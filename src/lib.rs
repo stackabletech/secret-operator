@@ -243,7 +243,7 @@ impl Pkcs12PbeParams {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OtherAlgorithmIdentifier {
     pub algorithm_type: ObjectIdentifier,
-    pub params: Vec<u8>,
+    pub params: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -270,7 +270,7 @@ impl AlgorithmIdentifier {
                 let params = Pkcs12PbeParams::parse(r.next())?;
                 return Ok(AlgorithmIdentifier::PbeWithSHAAnd3KeyTripleDESCBC(params));
             }
-            let params = r.next().read_der()?;
+            let params = r.read_optional(|r| r.read_der())?;
             Ok(AlgorithmIdentifier::OtherAlg(OtherAlgorithmIdentifier {
                 algorithm_type,
                 params,
@@ -310,7 +310,9 @@ impl AlgorithmIdentifier {
             }
             AlgorithmIdentifier::OtherAlg(other) => {
                 w.next().write_oid(&other.algorithm_type);
-                w.next().write_der(&other.params);
+                if let Some(der) = &other.params {
+                    w.next().write_der(der);
+                }
             }
         })
     }
