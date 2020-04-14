@@ -149,9 +149,9 @@ pub struct OtherContext {
 
 #[derive(Debug, Clone)]
 pub enum ContentInfo {
-    Data(pub Vec<u8>),
-    EncryptedData(pub EncryptedData),
-    OtherContext(pub OtherContext),
+    Data(Vec<u8>),
+    EncryptedData(EncryptedData),
+    OtherContext(OtherContext),
 }
 
 impl ContentInfo {
@@ -249,9 +249,9 @@ pub struct OtherAlgorithmIdentifier {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AlgorithmIdentifier {
     Sha1,
-    PbewithSHAAnd40BitRC2CBC(pub Pkcs12PbeParams),
-    PbeWithSHAAnd3KeyTripleDESCBC(pub Pkcs12PbeParams),
-    OtherAlg(pub OtherAlgorithmIdentifier),
+    PbewithSHAAnd40BitRC2CBC(Pkcs12PbeParams),
+    PbeWithSHAAnd3KeyTripleDESCBC(Pkcs12PbeParams),
+    OtherAlg(OtherAlgorithmIdentifier),
 }
 
 impl AlgorithmIdentifier {
@@ -762,12 +762,12 @@ pub struct OtherBag {
 #[derive(Debug, Clone)]
 pub enum SafeBagKind {
     //KeyBag(),
-    Pkcs8ShroudedKeyBag(pub EncryptedPrivateKeyInfo),
-    CertBag(pub CertBag),
+    Pkcs8ShroudedKeyBag(EncryptedPrivateKeyInfo),
+    CertBag(CertBag),
     //CRLBag(),
     //SecretBag(),
     //SafeContents(Vec<SafeBag>),
-    OtherBagKind(pub OtherBag),
+    OtherBagKind(OtherBag),
 }
 
 impl SafeBagKind {
@@ -821,9 +821,9 @@ pub struct OtherAttribute {
 
 #[derive(Debug, Clone)]
 pub enum PKCS12Attribute {
-    FriendlyName(pub String),
-    LocalKeyId(pub Vec<u8>),
-    Other(pub OtherAttribute),
+    FriendlyName(String),
+    LocalKeyId(Vec<u8>),
+    Other(OtherAttribute),
 }
 
 impl PKCS12Attribute {
