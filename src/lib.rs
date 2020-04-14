@@ -1,4 +1,4 @@
-//! 
+//!
 //! pure rust pkcs12 tool
 //!
 //!
@@ -46,8 +46,8 @@ fn sha1(bytes: &[u8]) -> Digest {
 
 #[derive(Debug, Clone)]
 pub struct EncryptedContentInfo {
-    content_encryption_algorithm: AlgorithmIdentifier,
-    encrypted_content: Vec<u8>,
+    pub content_encryption_algorithm: AlgorithmIdentifier,
+    pub encrypted_content: Vec<u8>,
 }
 
 impl EncryptedContentInfo {
@@ -71,7 +71,7 @@ impl EncryptedContentInfo {
             .decrypt_pbe(&self.encrypted_content, password)
     }
 
-    fn write(&self, w: DERWriter) {
+    pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| {
             w.next().write_oid(&OID_DATA_CONTENT_TYPE);
             self.content_encryption_algorithm.write(w.next());
@@ -109,11 +109,11 @@ impl EncryptedContentInfo {
 
 #[derive(Debug, Clone)]
 pub struct EncryptedData {
-    encrypted_content_info: EncryptedContentInfo,
+    pub encrypted_content_info: EncryptedContentInfo,
 }
 
 impl EncryptedData {
-    fn parse(r: BERReader) -> Result<Self, ASN1Error> {
+    pub fn parse(r: BERReader) -> Result<Self, ASN1Error> {
         r.read_sequence(|r| {
             let version = r.next().read_u8()?;
             debug_assert_eq!(version, 0);
@@ -124,16 +124,16 @@ impl EncryptedData {
             })
         })
     }
-    fn data(&self, password: &[u8]) -> Option<Vec<u8>> {
+    pub fn data(&self, password: &[u8]) -> Option<Vec<u8>> {
         self.encrypted_content_info.data(password)
     }
-    fn write(&self, w: DERWriter) {
+    pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| {
             w.next().write_u8(0);
             self.encrypted_content_info.write(w.next());
         })
     }
-    fn from_safe_bags(safe_bags: &[SafeBag], password: &[u8]) -> Option<Self> {
+    pub fn from_safe_bags(safe_bags: &[SafeBag], password: &[u8]) -> Option<Self> {
         let encrypted_content_info = EncryptedContentInfo::from_safe_bags(safe_bags, password)?;
         Some(EncryptedData {
             encrypted_content_info,
@@ -142,13 +142,20 @@ impl EncryptedData {
 }
 
 #[derive(Debug, Clone)]
+pub struct OtherContext {
+    pub content_type: ObjectIdentifier,
+    pub content: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
 pub enum ContentInfo {
-    Data(Vec<u8>),
-    EncryptedData(EncryptedData),
+    Data(pub Vec<u8>),
+    EncryptedData(pub EncryptedData),
+    OtherContext(pub OtherContext),
 }
 
 impl ContentInfo {
-    fn parse(r: BERReader) -> Result<Self, ASN1Error> {
+    pub fn parse(r: BERReader) -> Result<Self, ASN1Error> {
         Ok(r.read_sequence(|r| {
             let content_type = r.next().read_oid()?;
             if content_type == *OID_DATA_CONTENT_TYPE {
@@ -161,20 +168,26 @@ impl ContentInfo {
                 });
                 return result;
             }
-            println!("undefined context type: {:?}", content_type);
-            Err(ASN1Error::new(ASN1ErrorKind::Invalid))
+
+            let content = r.next().read_tagged(Tag::context(0), |r| r.read_der())?;
+            Ok(ContentInfo::OtherContext(OtherContext {
+                content_type,
+                content,
+            }))
         })?)
     }
     pub fn data(&self, password: &[u8]) -> Option<Vec<u8>> {
         match self {
             ContentInfo::Data(data) => Some(data.to_owned()),
             ContentInfo::EncryptedData(encrypted) => encrypted.data(password),
+            ContentInfo::OtherContext(_) => None,
         }
     }
     pub fn oid(&self) -> ObjectIdentifier {
         match self {
             ContentInfo::Data(_) => OID_DATA_CONTENT_TYPE.clone(),
             ContentInfo::EncryptedData(_) => OID_ENCRYPTED_DATA_CONTENT_TYPE.clone(),
+            ContentInfo::OtherContext(other) => other.content_type.clone(),
         }
     }
     pub fn write(&self, w: DERWriter) {
@@ -189,6 +202,11 @@ impl ContentInfo {
                 w.next()
                     .write_tagged(Tag::context(0), |w| encrypted_data.write(w))
             }),
+            ContentInfo::OtherContext(other) => w.write_sequence(|w| {
+                w.next().write_oid(&other.content_type);
+                w.next()
+                    .write_tagged(Tag::context(0), |w| w.write_der(&other.content))
+            }),
         }
     }
     pub fn to_der(&self) -> Vec<u8> {
@@ -202,19 +220,19 @@ impl ContentInfo {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pkcs12PbeParams {
-    salt: Vec<u8>,
-    iterations: u64,
+    pub salt: Vec<u8>,
+    pub iterations: u64,
 }
 
 impl Pkcs12PbeParams {
-    fn parse(r: BERReader) -> Result<Self, ASN1Error> {
+    pub fn parse(r: BERReader) -> Result<Self, ASN1Error> {
         r.read_sequence(|r| {
             let salt = r.next().read_bytes()?;
             let iterations = r.next().read_u64()?;
             Ok(Pkcs12PbeParams { salt, iterations })
         })
     }
-    fn write(&self, w: DERWriter) {
+    pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| {
             w.next().write_bytes(&self.salt);
             w.next().write_u64(self.iterations);
@@ -223,34 +241,43 @@ impl Pkcs12PbeParams {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct OtherAlgorithmIdentifier {
+    pub algorithm_type: ObjectIdentifier,
+    pub params: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum AlgorithmIdentifier {
     Sha1,
-    PbewithSHAAnd40BitRC2CBC(Pkcs12PbeParams),
-    PbeWithSHAAnd3KeyTripleDESCBC(Pkcs12PbeParams),
+    PbewithSHAAnd40BitRC2CBC(pub Pkcs12PbeParams),
+    PbeWithSHAAnd3KeyTripleDESCBC(pub Pkcs12PbeParams),
+    OtherAlg(pub OtherAlgorithmIdentifier),
 }
 
 impl AlgorithmIdentifier {
-    fn parse(r: BERReader) -> Result<Self, ASN1Error> {
+    pub fn parse(r: BERReader) -> Result<Self, ASN1Error> {
         r.read_sequence(|r| {
-            let oid = r.next().read_oid()?;
-
-            if oid == *OID_SHA1 {
-                r.next().read_null()?;
+            let algorithm_type = r.next().read_oid()?;
+            if algorithm_type == *OID_SHA1 {
+                r.read_optional(|r| r.read_null())?;
                 return Ok(AlgorithmIdentifier::Sha1);
             }
-            if oid == *OID_PBE_WITH_SHA1_AND40_BIT_RC2_CBC {
-                let param = Pkcs12PbeParams::parse(r.next())?;
-                return Ok(AlgorithmIdentifier::PbewithSHAAnd40BitRC2CBC(param));
+            if algorithm_type == *OID_PBE_WITH_SHA1_AND40_BIT_RC2_CBC {
+                let params = Pkcs12PbeParams::parse(r.next())?;
+                return Ok(AlgorithmIdentifier::PbewithSHAAnd40BitRC2CBC(params));
             }
-            if oid == *OID_PBE_WITH_SHA_AND3_KEY_TRIPLE_DESCBC {
-                let param = Pkcs12PbeParams::parse(r.next())?;
-                return Ok(AlgorithmIdentifier::PbeWithSHAAnd3KeyTripleDESCBC(param));
+            if algorithm_type == *OID_PBE_WITH_SHA_AND3_KEY_TRIPLE_DESCBC {
+                let params = Pkcs12PbeParams::parse(r.next())?;
+                return Ok(AlgorithmIdentifier::PbeWithSHAAnd3KeyTripleDESCBC(params));
             }
-            println!("unknown Algorithm Identifier : {}", oid);
-            Err(ASN1Error::new(ASN1ErrorKind::Invalid))
+            let params = r.next().read_der()?;
+            Ok(AlgorithmIdentifier::OtherAlg(OtherAlgorithmIdentifier {
+                algorithm_type,
+                params,
+            }))
         })
     }
-    fn decrypt_pbe(&self, ciphertext: &[u8], password: &[u8]) -> Option<Vec<u8>> {
+    pub fn decrypt_pbe(&self, ciphertext: &[u8], password: &[u8]) -> Option<Vec<u8>> {
         match self {
             AlgorithmIdentifier::Sha1 => None,
             AlgorithmIdentifier::PbewithSHAAnd40BitRC2CBC(param) => {
@@ -264,9 +291,10 @@ impl AlgorithmIdentifier {
                     param.iterations,
                 )
             }
+            AlgorithmIdentifier::OtherAlg(_) => None,
         }
     }
-    fn write(&self, w: DERWriter) {
+    pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| match self {
             AlgorithmIdentifier::Sha1 => {
                 w.next().write_oid(&OID_SHA1);
@@ -280,18 +308,23 @@ impl AlgorithmIdentifier {
                 w.next().write_oid(&OID_PBE_WITH_SHA_AND3_KEY_TRIPLE_DESCBC);
                 p.write(w.next());
             }
+            AlgorithmIdentifier::OtherAlg(other) => {
+                w.next().write_oid(&other.algorithm_type);
+                w.next().write_der(&other.params);
+            }
         })
     }
 }
 
 #[derive(Debug)]
 pub struct DigestInfo {
-    digest_algorithm: AlgorithmIdentifier,
-    digest: Vec<u8>,
+    pub digest_algorithm: AlgorithmIdentifier,
+    pub digest: Vec<u8>,
 }
 
 impl DigestInfo {
-    fn parse(r: BERReader) -> Result<Self, ASN1Error> {
+    pub fn parse(r: BERReader) -> Result<Self, ASN1Error> {
+        dbg!(10);
         r.read_sequence(|r| {
             let digest_algorithm = AlgorithmIdentifier::parse(r.next())?;
             let digest = r.next().read_bytes()?;
@@ -301,7 +334,7 @@ impl DigestInfo {
             })
         })
     }
-    fn write(&self, w: DERWriter) {
+    pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| {
             self.digest_algorithm.write(w.next());
             w.next().write_bytes(&self.digest);
@@ -311,13 +344,13 @@ impl DigestInfo {
 
 #[derive(Debug)]
 pub struct MacData {
-    mac: DigestInfo,
-    salt: Vec<u8>,
-    iterations: u32,
+    pub mac: DigestInfo,
+    pub salt: Vec<u8>,
+    pub iterations: u32,
 }
 
 impl MacData {
-    fn parse(r: BERReader) -> Result<MacData, ASN1Error> {
+    pub fn parse(r: BERReader) -> Result<MacData, ASN1Error> {
         Ok(r.read_sequence(|r| {
             let mac = DigestInfo::parse(r.next())?;
             let salt = r.next().read_bytes()?;
@@ -330,7 +363,7 @@ impl MacData {
         })?)
     }
 
-    fn write(&self, w: DERWriter) {
+    pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| {
             self.mac.write(w.next());
             w.next().write_bytes(&self.salt);
@@ -338,14 +371,14 @@ impl MacData {
         })
     }
 
-    fn verify_mac(&self, data: &[u8], password: &[u8]) -> bool {
+    pub fn verify_mac(&self, data: &[u8], password: &[u8]) -> bool {
         debug_assert_eq!(self.mac.digest_algorithm, AlgorithmIdentifier::Sha1);
         let key = pkcs12sha1(password, &self.salt, self.iterations as u64, 3, 20);
         let m = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, &key);
         hmac::verify(&m, data, &self.mac.digest).is_ok()
     }
 
-    fn new(data: &[u8], password: &[u8]) -> MacData {
+    pub fn new(data: &[u8], password: &[u8]) -> MacData {
         let salt = rand().unwrap();
         let key = pkcs12sha1(password, &salt, ITERATIONS, 3, 20);
         let m = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, &key);
@@ -370,9 +403,9 @@ fn rand() -> Option<[u8; 8]> {
 
 #[derive(Debug)]
 pub struct PFX {
-    version: u8,
-    auth_safe: ContentInfo,
-    mac_data: Option<MacData>,
+    pub version: u8,
+    pub auth_safe: ContentInfo,
+    pub mac_data: Option<MacData>,
 }
 
 impl PFX {
@@ -442,7 +475,7 @@ impl PFX {
     }
 
     pub fn parse(bytes: &[u8]) -> Result<PFX, ASN1Error> {
-        Ok(yasna::parse_der(bytes, |r| {
+        yasna::parse_der(bytes, |r| {
             r.read_sequence(|r| {
                 let version = r.next().read_u8()?;
                 let auth_safe = ContentInfo::parse(r.next())?;
@@ -453,7 +486,7 @@ impl PFX {
                     mac_data,
                 })
             })
-        })?)
+        })
     }
 
     pub fn write(&self, w: DERWriter) {
@@ -652,7 +685,7 @@ fn bmp_string(s: &str) -> Vec<u8> {
 
 #[derive(Debug, Clone)]
 pub struct CertBag {
-    cert: Vec<u8>, //x509 only
+    pub cert: Vec<u8>, //x509 only
 }
 
 impl CertBag {
@@ -678,8 +711,8 @@ impl CertBag {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EncryptedPrivateKeyInfo {
-    encryption_algorithm: AlgorithmIdentifier,
-    encrypted_data: Vec<u8>,
+    pub encryption_algorithm: AlgorithmIdentifier,
+    pub encrypted_data: Vec<u8>,
 }
 
 impl EncryptedPrivateKeyInfo {
@@ -721,38 +754,47 @@ fn test_encrypted_private_key_info() {
 }
 
 #[derive(Debug, Clone)]
+pub struct OtherBag {
+    pub bag_id: ObjectIdentifier,
+    pub bag_value: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
 pub enum SafeBagKind {
     //KeyBag(),
-    Pkcs8ShroudedKeyBag(EncryptedPrivateKeyInfo),
-    CertBag(CertBag),
+    Pkcs8ShroudedKeyBag(pub EncryptedPrivateKeyInfo),
+    CertBag(pub CertBag),
     //CRLBag(),
     //SecretBag(),
     //SafeContents(Vec<SafeBag>),
+    OtherBagKind(pub OtherBag),
 }
 
 impl SafeBagKind {
-    pub fn parse(r: BERReader, oid: ObjectIdentifier) -> Result<Self, ASN1Error> {
-        if oid == *OID_CERT_BAG {
+    pub fn parse(r: BERReader, bag_id: ObjectIdentifier) -> Result<Self, ASN1Error> {
+        if bag_id == *OID_CERT_BAG {
             return Ok(SafeBagKind::CertBag(CertBag::parse(r)?));
         }
-        if oid == *OID_PKCS8_SHROUDED_KEY_BAG {
+        if bag_id == *OID_PKCS8_SHROUDED_KEY_BAG {
             return Ok(SafeBagKind::Pkcs8ShroudedKeyBag(
                 EncryptedPrivateKeyInfo::parse(r)?,
             ));
         }
-        println!("unknown safe bug type : {}", oid);
-        Err(ASN1Error::new(ASN1ErrorKind::Invalid))
+        let bag_value = r.read_der()?;
+        Ok(SafeBagKind::OtherBagKind(OtherBag { bag_id, bag_value }))
     }
     pub fn write(&self, w: DERWriter) {
         match self {
             SafeBagKind::Pkcs8ShroudedKeyBag(epk) => epk.write(w),
             SafeBagKind::CertBag(cb) => cb.write(w),
+            SafeBagKind::OtherBagKind(other) => w.write_der(&other.bag_value),
         }
     }
     pub fn oid(&self) -> ObjectIdentifier {
         match self {
             SafeBagKind::Pkcs8ShroudedKeyBag(_) => OID_PKCS8_SHROUDED_KEY_BAG.clone(),
             SafeBagKind::CertBag(_) => OID_CERT_BAG.clone(),
+            SafeBagKind::OtherBagKind(other) => other.bag_id.clone(),
         }
     }
 
@@ -772,9 +814,16 @@ impl SafeBagKind {
 }
 
 #[derive(Debug, Clone)]
+pub struct OtherAttribute {
+    pub oid: ObjectIdentifier,
+    pub data: Vec<Vec<u8>>,
+}
+
+#[derive(Debug, Clone)]
 pub enum PKCS12Attribute {
-    FriendlyName(String),
-    LocalKeyId(Vec<u8>),
+    FriendlyName(pub String),
+    LocalKeyId(pub Vec<u8>),
+    Other(pub OtherAttribute),
 }
 
 impl PKCS12Attribute {
@@ -797,8 +846,10 @@ impl PKCS12Attribute {
                     .ok_or_else(|| ASN1Error::new(ASN1ErrorKind::Invalid))?;
                 return Ok(PKCS12Attribute::LocalKeyId(local_key_id));
             }
-            println!("unknown attribute : {}", oid);
-            Err(ASN1Error::new(ASN1ErrorKind::Invalid))
+
+            let data = r.next().collect_set_of(|s| s.read_der())?;
+            let other = OtherAttribute { oid, data };
+            Ok(PKCS12Attribute::Other(other))
         })
     }
     pub fn write(&self, w: DERWriter) {
@@ -813,13 +864,21 @@ impl PKCS12Attribute {
                 w.next().write_oid(&OID_LOCAL_KEY_ID);
                 w.next().write_set_of(|w| w.next().write_bytes(&id))
             }
+            PKCS12Attribute::Other(other) => {
+                w.next().write_oid(&other.oid);
+                w.next().write_set_of(|w| {
+                    for bytes in other.data.iter() {
+                        w.next().write_der(&bytes);
+                    }
+                })
+            }
         })
     }
 }
 #[derive(Debug, Clone)]
 pub struct SafeBag {
-    bag: SafeBagKind,
-    attributes: Vec<PKCS12Attribute>,
+    pub bag: SafeBagKind,
+    pub attributes: Vec<PKCS12Attribute>,
 }
 
 impl SafeBag {
