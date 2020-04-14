@@ -1,6 +1,6 @@
 [package]
 name = "p12"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["hjiayz <hjiayz@gmail.com>"]
 edition = "2018"
 keywords = ["pkcs12", "pkcs"]
