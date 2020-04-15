@@ -375,14 +375,14 @@ impl MacData {
 
     pub fn verify_mac(&self, data: &[u8], password: &[u8]) -> bool {
         debug_assert_eq!(self.mac.digest_algorithm, AlgorithmIdentifier::Sha1);
-        let key = pkcs12sha1(password, &self.salt, self.iterations as u64, 3, 20);
+        let key = pbepkcs12sha1(password, &self.salt, self.iterations as u64, 3, 20);
         let m = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, &key);
         hmac::verify(&m, data, &self.mac.digest).is_ok()
     }
 
     pub fn new(data: &[u8], password: &[u8]) -> MacData {
         let salt = rand().unwrap();
-        let key = pkcs12sha1(password, &salt, ITERATIONS, 3, 20);
+        let key = pbepkcs12sha1(password, &salt, ITERATIONS, 3, 20);
         let m = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, &key);
         let digest = hmac::sign(&m, data).as_ref().to_owned();
         MacData {
@@ -560,8 +560,18 @@ impl PFX {
     }
 }
 
+#[inline(always)]
+fn pbepkcs12sha1core(d: &[u8], i: &[u8], a: &mut Vec<u8>, iterations: u64) -> Vec<u8> {
+    let mut ai: Vec<u8> = d.iter().chain(i.iter()).cloned().collect();
+    for _ in 0..iterations {
+        ai = sha1(&ai).as_ref().to_owned();
+    }
+    a.append(&mut ai.clone());
+    ai
+}
+
 #[allow(clippy::many_single_char_names)]
-fn pkcs12sha1(pass: &[u8], salt: &[u8], iterations: u64, id: u8, size: u64) -> Vec<u8> {
+fn pbepkcs12sha1(pass: &[u8], salt: &[u8], iterations: u64, id: u8, size: u64) -> Vec<u8> {
     const U: u64 = 160 / 8;
     const V: u64 = 512 / 8;
     let r: u64 = iterations;
@@ -575,32 +585,27 @@ fn pkcs12sha1(pass: &[u8], salt: &[u8], iterations: u64, id: u8, size: u64) -> V
     let mut i: Vec<u8> = s.chain(p).cloned().collect();
     let c = (size + U - 1) / U;
     let mut a: Vec<u8> = vec![];
-    for i2 in 1..=c {
-        let mut ai: Vec<u8> = d.iter().chain(i.iter()).cloned().collect();
+    for _ in 1..c {
+        let ai = pbepkcs12sha1core(&d, &i, &mut a, r);
 
-        for _ in 0..r {
-            ai = sha1(&ai).as_ref().to_owned();
-        }
+        let b: Vec<u8> = ai.iter().cycle().take(V as usize).cloned().collect();
 
-        a.append(&mut ai.clone());
-
-        if i2 < c {
-            let b: Vec<u8> = ai.iter().cycle().take(V as usize).cloned().collect();
-
-            let b_iter = b.iter().rev().cycle().take(i.len());
-            let i_b_iter = i.iter_mut().rev().zip(b_iter);
-            let mut inc = 1u8;
-            for (i3, (ii, bi)) in i_b_iter.enumerate() {
-                if ((i3 as u64) % V) == 0 {
-                    inc = 1;
-                }
-                let (ii2, inc2) = ii.overflowing_add(*bi);
-                let (ii3, inc3) = ii2.overflowing_add(inc);
-                inc = (inc2 || inc3) as u8;
-                *ii = ii3;
+        let b_iter = b.iter().rev().cycle().take(i.len());
+        let i_b_iter = i.iter_mut().rev().zip(b_iter);
+        let mut inc = 1u8;
+        for (i3, (ii, bi)) in i_b_iter.enumerate() {
+            if ((i3 as u64) % V) == 0 {
+                inc = 1;
             }
+            let (ii2, inc2) = ii.overflowing_add(*bi);
+            let (ii3, inc3) = ii2.overflowing_add(inc);
+            inc = (inc2 || inc3) as u8;
+            *ii = ii3;
         }
     }
+
+    pbepkcs12sha1core(&d, &i, &mut a, r);
+
     a.iter().take(size as usize).cloned().collect()
 }
 
@@ -614,8 +619,8 @@ fn pbe_with_sha1_and40_bit_rc2_cbc(
     use rc2::Rc2;
     type Rc2Cbc = Cbc<Rc2, Pkcs7>;
 
-    let dk = pkcs12sha1(password, salt, iterations, 1, 5);
-    let iv = pkcs12sha1(password, salt, iterations, 2, 8);
+    let dk = pbepkcs12sha1(password, salt, iterations, 1, 5);
+    let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
     let rc2 = Rc2Cbc::new_var(&dk, &iv).ok()?;
     rc2.decrypt_vec(data).ok()
@@ -631,8 +636,8 @@ fn pbe_with_sha1_and40_bit_rc2_cbc_encrypt(
     use rc2::Rc2;
     type Rc2Cbc = Cbc<Rc2, Pkcs7>;
 
-    let dk = pkcs12sha1(password, salt, iterations, 1, 5);
-    let iv = pkcs12sha1(password, salt, iterations, 2, 8);
+    let dk = pbepkcs12sha1(password, salt, iterations, 1, 5);
+    let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
     let rc2 = Rc2Cbc::new_var(&dk, &iv).ok()?;
     Some(rc2.encrypt_vec(data))
@@ -648,8 +653,8 @@ fn pbe_with_sha_and3_key_triple_des_cbc(
     use des::TdesEde3;
     type TDesCbc = Cbc<TdesEde3, Pkcs7>;
 
-    let dk = pkcs12sha1(password, salt, iterations, 1, 24);
-    let iv = pkcs12sha1(password, salt, iterations, 2, 8);
+    let dk = pbepkcs12sha1(password, salt, iterations, 1, 24);
+    let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
     let tdes = TDesCbc::new_var(&dk, &iv).ok()?;
     tdes.decrypt_vec(data).ok()
@@ -665,8 +670,8 @@ fn pbe_with_sha_and3_key_triple_des_cbc_encrypt(
     use des::TdesEde3;
     type TDesCbc = Cbc<TdesEde3, Pkcs7>;
 
-    let dk = pkcs12sha1(password, salt, iterations, 1, 24);
-    let iv = pkcs12sha1(password, salt, iterations, 2, 8);
+    let dk = pbepkcs12sha1(password, salt, iterations, 1, 24);
+    let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
     let tdes = TDesCbc::new_var(&dk, &iv).ok()?;
     Some(tdes.encrypt_vec(data))
@@ -972,7 +977,7 @@ fn test_bmp_string() {
 }
 
 #[test]
-fn test_pkcs12sha1() {
+fn test_pbepkcs12sha1() {
     use hex_literal::hex;
     let pass = bmp_string("");
     assert_eq!(pass, vec![0, 0]);
@@ -980,13 +985,13 @@ fn test_pkcs12sha1() {
     let iterations = 2048;
     let id = 1;
     let size = 24;
-    let result = pkcs12sha1(&pass, &salt, iterations, id, size);
+    let result = pbepkcs12sha1(&pass, &salt, iterations, id, size);
     let res = hex!("c2294aa6d02930eb5ce9c329eccb9aee1cb136baea746557");
     assert_eq!(result, res);
 }
 
 #[test]
-fn test_pkcs12sha1_2() {
+fn test_pbepkcs12sha1_2() {
     use hex_literal::hex;
     let pass = bmp_string("");
     assert_eq!(pass, vec![0, 0]);
@@ -994,7 +999,7 @@ fn test_pkcs12sha1_2() {
     let iterations = 2048;
     let id = 2;
     let size = 8;
-    let result = pkcs12sha1(&pass, &salt, iterations, id, size);
+    let result = pbepkcs12sha1(&pass, &salt, iterations, id, size);
     let res = hex!("8e9f8fc7664378bc");
     assert_eq!(result, res);
 }
