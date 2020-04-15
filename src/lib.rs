@@ -21,6 +21,8 @@ lazy_static! {
     static ref OID_LOCAL_KEY_ID: ObjectIdentifier = as_oid(&[1, 2, 840, 113_549, 1, 9, 21]);
     static ref OID_CERT_TYPE_X509_CERTIFICATE: ObjectIdentifier =
         as_oid(&[1, 2, 840, 113_549, 1, 9, 22, 1]);
+    static ref OID_CERT_TYPE_SDSI_CERTIFICATE: ObjectIdentifier =
+        as_oid(&[1, 2, 840, 113_549, 1, 9, 22, 2]);
     static ref OID_PBE_WITH_SHA_AND3_KEY_TRIPLE_DESCBC: ObjectIdentifier =
         as_oid(&[1, 2, 840, 113_549, 1, 12, 1, 3]);
     static ref OID_SHA1: ObjectIdentifier = as_oid(&[1, 3, 14, 3, 2, 26]);
@@ -436,9 +438,7 @@ impl PFX {
             bag: key_bag_inner,
             attributes: vec![friendly_name.clone(), local_key_id.clone()],
         };
-        let cert_bag_inner = SafeBagKind::CertBag(CertBag {
-            cert: cert_der.to_owned(),
-        });
+        let cert_bag_inner = SafeBagKind::CertBag(CertBag::X509(cert_der.to_owned()));
         let cert_bag = SafeBag {
             bag: cert_bag_inner,
             attributes: vec![friendly_name, local_key_id],
@@ -446,9 +446,7 @@ impl PFX {
         let mut cert_bags = vec![cert_bag];
         if let Some(ca) = ca_der {
             cert_bags.push(SafeBag {
-                bag: SafeBagKind::CertBag(CertBag {
-                    cert: ca.to_owned(),
-                }),
+                bag: SafeBagKind::CertBag(CertBag::X509(ca.to_owned())),
                 attributes: vec![],
             });
         };
@@ -528,10 +526,10 @@ impl PFX {
         }
         Ok(result)
     }
-    pub fn cert_bags(&self, password: &str) -> Result<Vec<Vec<u8>>, ASN1Error> {
+    pub fn cert_x509_bags(&self, password: &str) -> Result<Vec<Vec<u8>>, ASN1Error> {
         let mut result = vec![];
         for safe_bag in self.bags(password)? {
-            if let Some(cert) = safe_bag.bag.get_cert() {
+            if let Some(cert) = safe_bag.bag.get_x509_cert() {
                 result.push(cert);
             }
         }
@@ -691,27 +689,40 @@ fn bmp_string(s: &str) -> Vec<u8> {
 }
 
 #[derive(Debug, Clone)]
-pub struct CertBag {
-    pub cert: Vec<u8>, //x509 only
+pub enum CertBag {
+    X509(Vec<u8>),
+    SDSI(String),
 }
 
 impl CertBag {
     pub fn parse(r: BERReader) -> Result<Self, ASN1Error> {
         r.read_sequence(|r| {
             let oid = r.next().read_oid()?;
-            if oid != *OID_CERT_TYPE_X509_CERTIFICATE {
-                println!("not x509 cert");
-                return Err(ASN1Error::new(ASN1ErrorKind::Invalid));
+            if oid == *OID_CERT_TYPE_X509_CERTIFICATE {
+                let x509 = r.next().read_tagged(Tag::context(0), |r| r.read_bytes())?;
+                return Ok(CertBag::X509(x509));
             };
-            let cert = r.next().read_tagged(Tag::context(0), |r| r.read_bytes())?;
-            Ok(CertBag { cert })
+            if oid == *OID_CERT_TYPE_SDSI_CERTIFICATE {
+                let sdsi = r
+                    .next()
+                    .read_tagged(Tag::context(0), |r| r.read_ia5_string())?;
+                return Ok(CertBag::SDSI(sdsi));
+            }
+            Err(ASN1Error::new(ASN1ErrorKind::Invalid))
         })
     }
     pub fn write(&self, w: DERWriter) {
-        w.write_sequence(|w| {
-            w.next().write_oid(&OID_CERT_TYPE_X509_CERTIFICATE);
-            w.next()
-                .write_tagged(Tag::context(0), |w| w.write_bytes(&self.cert))
+        w.write_sequence(|w| match self {
+            CertBag::X509(x509) => {
+                w.next().write_oid(&OID_CERT_TYPE_X509_CERTIFICATE);
+                w.next()
+                    .write_tagged(Tag::context(0), |w| w.write_bytes(x509));
+            }
+            CertBag::SDSI(sdsi) => {
+                w.next().write_oid(&OID_CERT_TYPE_SDSI_CERTIFICATE);
+                w.next()
+                    .write_tagged(Tag::context(0), |w| w.write_ia5_string(sdsi));
+            }
         })
     }
 }
@@ -805,9 +816,9 @@ impl SafeBagKind {
         }
     }
 
-    pub fn get_cert(&self) -> Option<Vec<u8>> {
-        if let SafeBagKind::CertBag(cb) = self {
-            return Some(cb.cert.to_owned());
+    pub fn get_x509_cert(&self) -> Option<Vec<u8>> {
+        if let SafeBagKind::CertBag(CertBag::X509(x509)) = self {
+            return Some(x509.to_owned());
         }
         None
     }
@@ -958,7 +969,7 @@ fn test_create_p12() {
     let keys = pfx.key_bags("changeit").unwrap();
     assert_eq!(keys[0], key);
 
-    let certs = pfx.cert_bags("changeit").unwrap();
+    let certs = pfx.cert_x509_bags("changeit").unwrap();
     assert_eq!(certs[0], cert);
     assert_eq!(certs[1], ca);
     assert!(pfx.verify_mac("changeit"));
