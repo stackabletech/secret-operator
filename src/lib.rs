@@ -535,6 +535,15 @@ impl PFX {
         }
         Ok(result)
     }
+    pub fn cert_sdsi_bags(&self, password: &str) -> Result<Vec<String>, ASN1Error> {
+        let mut result = vec![];
+        for safe_bag in self.bags(password)? {
+            if let Some(cert) = safe_bag.bag.get_sdsi_cert() {
+                result.push(cert);
+            }
+        }
+        Ok(result)
+    }
     pub fn key_bags(&self, password: &str) -> Result<Vec<Vec<u8>>, ASN1Error> {
         let bmp_password = bmp_string(password);
         let mut result = vec![];
@@ -819,6 +828,13 @@ impl SafeBagKind {
     pub fn get_x509_cert(&self) -> Option<Vec<u8>> {
         if let SafeBagKind::CertBag(CertBag::X509(x509)) = self {
             return Some(x509.to_owned());
+        }
+        None
+    }
+
+    pub fn get_sdsi_cert(&self) -> Option<String> {
+        if let SafeBagKind::CertBag(CertBag::SDSI(sdsi)) = self {
+            return Some(sdsi.to_owned());
         }
         None
     }
