@@ -526,6 +526,11 @@ impl PFX {
         }
         Ok(result)
     }
+    //DER-encoded X.509 certificate
+    pub fn cert_bags(&self, password: &str) -> Result<Vec<Vec<u8>>, ASN1Error> {
+        self.cert_x509_bags(password)
+    }
+    //DER-encoded X.509 certificate
     pub fn cert_x509_bags(&self, password: &str) -> Result<Vec<Vec<u8>>, ASN1Error> {
         let mut result = vec![];
         for safe_bag in self.bags(password)? {
@@ -824,7 +829,6 @@ impl SafeBagKind {
             SafeBagKind::OtherBagKind(other) => other.bag_id.clone(),
         }
     }
-
     pub fn get_x509_cert(&self) -> Option<Vec<u8>> {
         if let SafeBagKind::CertBag(CertBag::X509(x509)) = self {
             return Some(x509.to_owned());
