@@ -328,7 +328,6 @@ pub struct DigestInfo {
 
 impl DigestInfo {
     pub fn parse(r: BERReader) -> Result<Self, ASN1Error> {
-        dbg!(10);
         r.read_sequence(|r| {
             let digest_algorithm = AlgorithmIdentifier::parse(r.next())?;
             let digest = r.next().read_bytes()?;
@@ -420,6 +419,19 @@ impl PFX {
         password: &str,
         name: &str,
     ) -> Option<PFX> {
+        let mut cas = vec![];
+        if let Some(ca) = ca_der {
+            cas.push(ca);
+        }
+        Self::new_with_cas(cert_der, key_der, &cas, password, name)
+    }
+    pub fn new_with_cas(
+        cert_der: &[u8],
+        key_der: &[u8],
+        ca_der_list: &[&[u8]],
+        password: &str,
+        name: &str,
+    ) -> Option<PFX> {
         let password = bmp_string(password);
         let salt = rand()?.to_vec();
         let encrypted_data =
@@ -444,12 +456,12 @@ impl PFX {
             attributes: vec![friendly_name, local_key_id],
         };
         let mut cert_bags = vec![cert_bag];
-        if let Some(ca) = ca_der {
+        for ca in ca_der_list {
             cert_bags.push(SafeBag {
-                bag: SafeBagKind::CertBag(CertBag::X509(ca.to_owned())),
+                bag: SafeBagKind::CertBag(CertBag::X509((*ca).to_owned())),
                 attributes: vec![],
             });
-        };
+        }
         let contents = yasna::construct_der(|w| {
             w.write_sequence_of(|w| {
                 ContentInfo::EncryptedData(
