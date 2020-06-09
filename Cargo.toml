@@ -16,6 +16,8 @@ yasna = { version = "0.3.1" }
 ring = "0.16.12"
 block-modes = "0.3.3"
 block-cipher-trait = "0.6.2"
+hmac = "0.7.1"
+sha-1 = "0.8.1"
 rc2 = "0.3.0"
 des = "0.3.0"
 
