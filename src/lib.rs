@@ -4,7 +4,7 @@
 //!
 
 use lazy_static::lazy_static;
-use ring::rand::{self, SecureRandom};
+use getrandom::getrandom;
 use yasna::{models::ObjectIdentifier, ASN1Error, ASN1ErrorKind, BERReader, DERWriter, Tag};
 
 use hmac::{Mac, Hmac};
@@ -39,7 +39,6 @@ lazy_static! {
     static ref OID_SECRET_BAG: ObjectIdentifier = as_oid(&[1, 2, 840, 113_549, 1, 12, 10, 1, 5]);
     static ref OID_SAFE_CONTENTS_BAG: ObjectIdentifier =
         as_oid(&[1, 2, 840, 113_549, 1, 12, 10, 1, 6]);
-    static ref RAND: rand::SystemRandom = rand::SystemRandom::new();
 }
 
 const ITERATIONS: u64 = 2048;
@@ -405,9 +404,11 @@ impl MacData {
 
 fn rand() -> Option<[u8; 8]> {
     let mut buf = [0u8; 8];
-    let rng = rand::SystemRandom::new();
-    rng.fill(&mut buf).ok()?;
-    Some(buf)
+    if getrandom(&mut buf).is_ok() {
+        Some(buf)
+    } else {
+        None
+    }
 }
 
 #[derive(Debug)]
