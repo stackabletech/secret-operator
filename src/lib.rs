@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use getrandom::getrandom;
 use yasna::{models::ObjectIdentifier, ASN1Error, ASN1ErrorKind, BERReader, DERWriter, Tag};
 
-use hmac::{Mac, Hmac};
+use hmac::{Mac, Hmac, NewMac};
 use sha1::{Sha1, Digest};
 
 type HmacSha1 = Hmac<Sha1>;
@@ -45,8 +45,8 @@ const ITERATIONS: u64 = 2048;
 
 fn sha1(bytes: &[u8]) -> Vec<u8> {
     let mut hasher = Sha1::new();
-    hasher.input(bytes);
-    hasher.result().to_vec()
+    hasher.update(bytes);
+    hasher.finalize().to_vec()
 }
 
 #[derive(Debug, Clone)]
@@ -102,7 +102,7 @@ impl EncryptedContentInfo {
             pbe_with_sha1_and40_bit_rc2_cbc_encrypt(&data, password, &salt, ITERATIONS)?;
         let content_encryption_algorithm =
             AlgorithmIdentifier::PbewithSHAAnd40BitRC2CBC(Pkcs12PbeParams {
-                salt: salt,
+                salt,
                 iterations: ITERATIONS,
             });
         Some(EncryptedContentInfo {
@@ -381,7 +381,7 @@ impl MacData {
         debug_assert_eq!(self.mac.digest_algorithm, AlgorithmIdentifier::Sha1);
         let key = pbepkcs12sha1(password, &self.salt, self.iterations as u64, 3, 20);
         let mut mac = HmacSha1::new_varkey(&key).unwrap();
-        mac.input(data);
+        mac.update(data);
         mac.verify(&self.mac.digest).is_ok()
     }
 
@@ -389,8 +389,8 @@ impl MacData {
         let salt = rand().unwrap();
         let key = pbepkcs12sha1(password, &salt, ITERATIONS, 3, 20);
         let mut mac = HmacSha1::new_varkey(&key).unwrap();
-        mac.input(data);
-        let digest = mac.result().code().to_vec();
+        mac.update(data);
+        let digest = mac.finalize().into_bytes().to_vec();
         MacData {
             mac: DigestInfo {
                 digest_algorithm: AlgorithmIdentifier::Sha1,
