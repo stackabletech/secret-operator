@@ -3,12 +3,12 @@
 //!
 //!
 
-use lazy_static::lazy_static;
 use getrandom::getrandom;
+use lazy_static::lazy_static;
 use yasna::{models::ObjectIdentifier, ASN1Error, ASN1ErrorKind, BERReader, DERWriter, Tag};
 
-use hmac::{Mac, Hmac, NewMac};
-use sha1::{Sha1, Digest};
+use hmac::{Hmac, Mac, NewMac};
+use sha1::{Digest, Sha1};
 
 type HmacSha1 = Hmac<Sha1>;
 
