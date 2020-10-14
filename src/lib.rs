@@ -3,11 +3,14 @@
 //!
 //!
 
+use getrandom::getrandom;
 use lazy_static::lazy_static;
-use ring::digest::Digest;
-use ring::hmac;
-use ring::rand::{self, SecureRandom};
 use yasna::{models::ObjectIdentifier, ASN1Error, ASN1ErrorKind, BERReader, DERWriter, Tag};
+
+use hmac::{Hmac, Mac, NewMac};
+use sha1::{Digest, Sha1};
+
+type HmacSha1 = Hmac<Sha1>;
 
 fn as_oid(s: &'static [u64]) -> ObjectIdentifier {
     ObjectIdentifier::from_slice(s)
@@ -36,14 +39,14 @@ lazy_static! {
     static ref OID_SECRET_BAG: ObjectIdentifier = as_oid(&[1, 2, 840, 113_549, 1, 12, 10, 1, 5]);
     static ref OID_SAFE_CONTENTS_BAG: ObjectIdentifier =
         as_oid(&[1, 2, 840, 113_549, 1, 12, 10, 1, 6]);
-    static ref RAND: rand::SystemRandom = rand::SystemRandom::new();
 }
 
 const ITERATIONS: u64 = 2048;
 
-fn sha1(bytes: &[u8]) -> Digest {
-    use ring::digest::*;
-    digest(&SHA1_FOR_LEGACY_USE_ONLY, bytes)
+fn sha1(bytes: &[u8]) -> Vec<u8> {
+    let mut hasher = Sha1::new();
+    hasher.update(bytes);
+    hasher.finalize().to_vec()
 }
 
 #[derive(Debug, Clone)]
@@ -99,7 +102,7 @@ impl EncryptedContentInfo {
             pbe_with_sha1_and40_bit_rc2_cbc_encrypt(&data, password, &salt, ITERATIONS)?;
         let content_encryption_algorithm =
             AlgorithmIdentifier::PbewithSHAAnd40BitRC2CBC(Pkcs12PbeParams {
-                salt: salt,
+                salt,
                 iterations: ITERATIONS,
             });
         Some(EncryptedContentInfo {
@@ -377,15 +380,17 @@ impl MacData {
     pub fn verify_mac(&self, data: &[u8], password: &[u8]) -> bool {
         debug_assert_eq!(self.mac.digest_algorithm, AlgorithmIdentifier::Sha1);
         let key = pbepkcs12sha1(password, &self.salt, self.iterations as u64, 3, 20);
-        let m = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, &key);
-        hmac::verify(&m, data, &self.mac.digest).is_ok()
+        let mut mac = HmacSha1::new_varkey(&key).unwrap();
+        mac.update(data);
+        mac.verify(&self.mac.digest).is_ok()
     }
 
     pub fn new(data: &[u8], password: &[u8]) -> MacData {
         let salt = rand().unwrap();
         let key = pbepkcs12sha1(password, &salt, ITERATIONS, 3, 20);
-        let m = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, &key);
-        let digest = hmac::sign(&m, data).as_ref().to_owned();
+        let mut mac = HmacSha1::new_varkey(&key).unwrap();
+        mac.update(data);
+        let digest = mac.finalize().into_bytes().to_vec();
         MacData {
             mac: DigestInfo {
                 digest_algorithm: AlgorithmIdentifier::Sha1,
@@ -399,9 +404,11 @@ impl MacData {
 
 fn rand() -> Option<[u8; 8]> {
     let mut buf = [0u8; 8];
-    let rng = rand::SystemRandom::new();
-    rng.fill(&mut buf).ok()?;
-    Some(buf)
+    if getrandom(&mut buf).is_ok() {
+        Some(buf)
+    } else {
+        None
+    }
 }
 
 #[derive(Debug)]
@@ -445,7 +452,7 @@ impl PFX {
             encrypted_data,
         });
         let friendly_name = PKCS12Attribute::FriendlyName(name.to_owned());
-        let local_key_id = PKCS12Attribute::LocalKeyId(sha1(cert_der).as_ref().to_owned());
+        let local_key_id = PKCS12Attribute::LocalKeyId(sha1(cert_der));
         let key_bag = SafeBag {
             bag: key_bag_inner,
             attributes: vec![friendly_name.clone(), local_key_id.clone()],
@@ -588,7 +595,7 @@ impl PFX {
 fn pbepkcs12sha1core(d: &[u8], i: &[u8], a: &mut Vec<u8>, iterations: u64) -> Vec<u8> {
     let mut ai: Vec<u8> = d.iter().chain(i.iter()).cloned().collect();
     for _ in 0..iterations {
-        ai = sha1(&ai).as_ref().to_owned();
+        ai = sha1(&ai);
     }
     a.append(&mut ai.clone());
     ai
