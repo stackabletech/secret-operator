@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 lazy_static = "1.4.0"
-yasna = "0.3.2"
+yasna = "0.4.0"
 getrandom = "0.2.0"
 block-modes = "0.8.0"
 hmac = "0.11.0"
