@@ -380,7 +380,7 @@ impl MacData {
     pub fn verify_mac(&self, data: &[u8], password: &[u8]) -> bool {
         debug_assert_eq!(self.mac.digest_algorithm, AlgorithmIdentifier::Sha1);
         let key = pbepkcs12sha1(password, &self.salt, self.iterations as u64, 3, 20);
-        let mut mac = HmacSha1::new_varkey(&key).unwrap();
+        let mut mac = HmacSha1::new_from_slice(&key).unwrap();
         mac.update(data);
         mac.verify(&self.mac.digest).is_ok()
     }
@@ -388,7 +388,7 @@ impl MacData {
     pub fn new(data: &[u8], password: &[u8]) -> MacData {
         let salt = rand().unwrap();
         let key = pbepkcs12sha1(password, &salt, ITERATIONS, 3, 20);
-        let mut mac = HmacSha1::new_varkey(&key).unwrap();
+        let mut mac = HmacSha1::new_from_slice(&key).unwrap();
         mac.update(data);
         let digest = mac.finalize().into_bytes().to_vec();
         MacData {
@@ -653,7 +653,7 @@ fn pbe_with_sha1_and40_bit_rc2_cbc(
     let dk = pbepkcs12sha1(password, salt, iterations, 1, 5);
     let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
-    let rc2 = Rc2Cbc::new_var(&dk, &iv).ok()?;
+    let rc2 = Rc2Cbc::new_from_slices(&dk, &iv).ok()?;
     rc2.decrypt_vec(data).ok()
 }
 
@@ -670,7 +670,7 @@ fn pbe_with_sha1_and40_bit_rc2_cbc_encrypt(
     let dk = pbepkcs12sha1(password, salt, iterations, 1, 5);
     let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
-    let rc2 = Rc2Cbc::new_var(&dk, &iv).ok()?;
+    let rc2 = Rc2Cbc::new_from_slices(&dk, &iv).ok()?;
     Some(rc2.encrypt_vec(data))
 }
 
@@ -687,7 +687,7 @@ fn pbe_with_sha_and3_key_triple_des_cbc(
     let dk = pbepkcs12sha1(password, salt, iterations, 1, 24);
     let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
-    let tdes = TDesCbc::new_var(&dk, &iv).ok()?;
+    let tdes = TDesCbc::new_from_slices(&dk, &iv).ok()?;
     tdes.decrypt_vec(data).ok()
 }
 
@@ -704,7 +704,7 @@ fn pbe_with_sha_and3_key_triple_des_cbc_encrypt(
     let dk = pbepkcs12sha1(password, salt, iterations, 1, 24);
     let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
-    let tdes = TDesCbc::new_var(&dk, &iv).ok()?;
+    let tdes = TDesCbc::new_from_slices(&dk, &iv).ok()?;
     Some(tdes.encrypt_vec(data))
 }
 
