@@ -1,4 +1,4 @@
-# pkcs-12
+# p12
 
 pure rust pkcs12 tool
 

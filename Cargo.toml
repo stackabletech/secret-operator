@@ -5,8 +5,8 @@ authors = ["hjiayz <hjiayz@gmail.com>", "Marc-Antoine Perennou <Marc-Antoine@Per
 edition = "2018"
 keywords = ["pkcs12", "pkcs"]
 description = "pure rust pkcs12 tool"
-homepage = "https://github.com/Keruspe/pkcs-12"
-repository = "https://github.com/Keruspe/pkcs-12"
+homepage = "https://github.com/hjiayz/p12"
+repository = "https://github.com/hjiayz/p12"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 
