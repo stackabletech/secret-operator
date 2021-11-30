@@ -13,10 +13,21 @@ use grpc::csi::v1::{
 use pin_project::pin_project;
 use serde::{
     de::{value::MapDeserializer, IntoDeserializer},
-    Deserialize,
+    Deserialize, Deserializer,
 };
-use stackable_operator::{k8s_openapi::api::core::v1::Secret, kube};
-use std::{collections::HashMap, os::unix::prelude::FileTypeExt, path::PathBuf};
+use stackable_operator::{
+    k8s_openapi::{
+        api::core::v1::{Pod, Secret},
+        apimachinery::pkg::apis::meta::v1::LabelSelector,
+        ByteString,
+    },
+    kube::{self, api::ListParams},
+};
+use std::{
+    collections::{BTreeMap, HashMap},
+    os::unix::prelude::FileTypeExt,
+    path::PathBuf,
+};
 use structopt::StructOpt;
 use tokio::{
     fs::{create_dir_all, File},
@@ -67,6 +78,46 @@ struct SecretProvisionerNode {
     kube: kube::Client,
 }
 
+impl SecretProvisionerNode {
+    async fn get_secret_data(&self, sel: SecretVolumeSelector) -> BTreeMap<String, ByteString> {
+        let pods = kube::Api::<Pod>::namespaced(self.kube.clone(), &sel.namespace);
+        let secrets = kube::Api::<Secret>::namespaced(self.kube.clone(), &sel.namespace);
+        let pod = pods.get(&sel.pod).await.unwrap();
+        let mut label_selector = BTreeMap::new();
+        label_selector.insert("secrets.stackable.tech/type".to_string(), sel.ty);
+        for scope in sel.scope {
+            match scope {
+                SecretScope::Node => {
+                    label_selector.insert(
+                        "secrets.stackable.tech/node".to_string(),
+                        pod.spec.as_ref().unwrap().node_name.clone().unwrap(),
+                    );
+                }
+                SecretScope::Pod => {
+                    label_selector
+                        .insert("secrets.stackable.tech/pod".to_string(), sel.pod.clone());
+                }
+            }
+        }
+        let label_selector =
+            stackable_operator::label_selector::convert_label_selector_to_query_string(
+                &LabelSelector {
+                    match_expressions: None,
+                    match_labels: Some(label_selector),
+                },
+            )
+            .unwrap();
+        secrets
+            .list(&ListParams::default().labels(&label_selector))
+            .await
+            .unwrap()
+            .items
+            .remove(0)
+            .data
+            .unwrap_or_default()
+    }
+}
+
 #[tonic::async_trait]
 impl Node for SecretProvisionerNode {
     async fn node_stage_volume(
@@ -92,17 +143,8 @@ impl Node for SecretProvisionerNode {
         let target_path = PathBuf::from(request.target_path);
         let ctx_deserializer: MapDeserializer<_, serde::de::value::Error> =
             request.volume_context.into_deserializer();
-        let ctx = SecretVolumeContext::deserialize(ctx_deserializer).unwrap();
-        let data = match ctx.source {
-            SecretSource::Secret {
-                secret_name,
-                namespace,
-            } => {
-                let secrets = kube::Api::<Secret>::namespaced(self.kube.clone(), &namespace);
-                let secret = secrets.get(&secret_name).await.unwrap();
-                secret.data.unwrap_or_default()
-            }
-        };
+        let sel = SecretVolumeSelector::deserialize(ctx_deserializer).unwrap();
+        let data = self.get_secret_data(sel).await;
         for (k, v) in data {
             let item_path = target_path.join(k);
             if let Some(item_path_parent) = item_path.parent() {
@@ -165,20 +207,34 @@ impl Node for SecretProvisionerNode {
 }
 
 #[derive(Deserialize)]
-struct SecretVolumeContext {
-    #[serde(flatten)]
-    source: SecretSource,
+struct SecretVolumeSelector {
+    #[serde(rename = "secrets.stackable.tech/type")]
+    ty: String,
+    #[serde(
+        rename = "secrets.stackable.tech/scope",
+        default,
+        deserialize_with = "SecretScope::deserialize_vec"
+    )]
+    scope: Vec<SecretScope>,
+    #[serde(rename = "csi.storage.k8s.io/pod.name")]
+    pod: String,
+    #[serde(rename = "csi.storage.k8s.io/pod.namespace")]
+    namespace: String,
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase", tag = "secrets.stackable.tech/type")]
-enum SecretSource {
-    Secret {
-        #[serde(rename = "secrets.stackable.tech/secret.name")]
-        secret_name: String,
-        #[serde(rename = "csi.storage.k8s.io/pod.namespace")]
-        namespace: String,
-    },
+#[serde(rename_all = "camelCase")]
+enum SecretScope {
+    Node,
+    Pod,
+}
+
+impl SecretScope {
+    fn deserialize_vec<'de, D: Deserializer<'de>>(de: D) -> Result<Vec<Self>, D::Error> {
+        let scopes_str = String::deserialize(de)?;
+        let scopes_split = scopes_str.split(',').collect::<Vec<_>>();
+        Vec::<Self>::deserialize(scopes_split.into_deserializer())
+    }
 }
 
 #[derive(StructOpt)]
