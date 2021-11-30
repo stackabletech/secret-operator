@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secret-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: secret-consumer
+  template:
+    metadata:
+      labels:
+        app: secret-consumer
+    spec:
+      containers:
+      - name: shell
+        image: archlinux
+        stdin: true
+        tty: true
+        volumeMounts:
+        - name: secret
+          mountPath: /secret
+      volumes:
+      - name: secret
+        csi:
+          driver: secrets.stackable.tech
+          volumeAttributes:
+            secrets.stackable.tech/type: secret
+            secrets.stackable.tech/secret.name: secret-consumer-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-consumer-secret
+stringData:
+  boo: spooky, indeed!

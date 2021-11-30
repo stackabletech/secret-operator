@@ -1,0 +1,6 @@
+[submodule "vendor/csi"]
+	path = vendor/csi
+	url = https://github.com/container-storage-interface/spec
+[submodule "vendor/h2"]
+	path = vendor/h2
+	url = https://github.com/teozkr/h2
