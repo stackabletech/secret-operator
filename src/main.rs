@@ -1,4 +1,4 @@
-use futures::TryStreamExt;
+use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     identity_server::{Identity, IdentityServer},
     node_server::{Node, NodeServer},
@@ -33,6 +33,7 @@ use tokio::{
     fs::{create_dir_all, File},
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
     net::{UnixListener, UnixStream},
+    signal::unix::{signal, SignalKind},
 };
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::{
@@ -255,6 +256,7 @@ async fn main() -> eyre::Result<()> {
     {
         let _ = std::fs::remove_file(&opts.csi_endpoint);
     }
+    let mut sigterm = signal(SignalKind::terminate())?;
     Server::builder()
         .add_service(
             tonic_reflection::server::Builder::configure()
@@ -264,8 +266,9 @@ async fn main() -> eyre::Result<()> {
         )
         .add_service(IdentityServer::new(SecretProvisionerIdentity))
         .add_service(NodeServer::new(SecretProvisionerNode { kube }))
-        .serve_with_incoming(
+        .serve_with_incoming_shutdown(
             UnixListenerStream::new(UnixListener::bind(opts.csi_endpoint)?).map_ok(TonicUnixStream),
+            sigterm.recv().map(|_| ()),
         )
         .await?;
     Ok(())
