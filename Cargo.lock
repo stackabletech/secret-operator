@@ -1388,11 +1388,13 @@ dependencies = [
  "serde",
  "stackable-operator",
  "structopt",
+ "thiserror",
  "tokio",
  "tokio-stream",
  "tonic",
  "tonic-build",
  "tonic-reflection",
+ "tracing",
 ]
 
 [[package]]

@@ -11,22 +11,20 @@ use grpc::csi::v1::{
     NodeUnstageVolumeRequest, NodeUnstageVolumeResponse, ProbeRequest, ProbeResponse,
 };
 use pin_project::pin_project;
-use serde::{
-    de::{value::MapDeserializer, IntoDeserializer},
-    Deserialize, Deserializer,
-};
+use serde::{de::IntoDeserializer, Deserialize, Deserializer};
 use stackable_operator::{
     k8s_openapi::{
         api::core::v1::{Pod, Secret},
         apimachinery::pkg::apis::meta::v1::LabelSelector,
         ByteString,
     },
-    kube::{self, api::ListParams},
+    kube::{self, api::ListParams, runtime::reflector::ObjectRef},
 };
 use std::{
     collections::{BTreeMap, HashMap},
+    error::Error,
     os::unix::prelude::FileTypeExt,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 use structopt::StructOpt;
 use tokio::{
@@ -75,15 +73,86 @@ impl Identity for SecretProvisionerIdentity {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+enum PublishError {
+    #[error("failed to parse selector from volume context")]
+    InvalidSelector(#[source] serde::de::value::Error),
+    #[error("failed to find {1} owning the volume")]
+    OwnerPodNotFound(#[source] kube::Error, ObjectRef<Pod>),
+    #[error("owner {0} has no associated node")]
+    OwnerPodHasNoNode(ObjectRef<Pod>),
+    #[error("failed to build secret selector")]
+    SecretSelector(#[source] stackable_operator::error::Error),
+    #[error("failed to query for secrets")]
+    SecretQuery(#[source] kube::Error),
+    #[error("no secrets matched query {0}")]
+    NoSecret(String),
+    #[error("failed to create secret parent dir {1}")]
+    CreateDir(#[source] std::io::Error, PathBuf),
+    #[error("failed to create secret file {1}")]
+    CreateFile(#[source] std::io::Error, PathBuf),
+    #[error("failed to write secret file {1}")]
+    WriteFile(#[source] std::io::Error, PathBuf),
+}
+
+impl From<PublishError> for tonic::Status {
+    fn from(err: PublishError) -> Self {
+        let mut full_msg = format!("{}", err);
+        let mut curr_err = err.source();
+        while let Some(curr_source) = curr_err {
+            full_msg.push_str(&format!(": {}", err));
+            curr_err = curr_source.source();
+        }
+        match err {
+            PublishError::InvalidSelector(_) => tonic::Status::invalid_argument(full_msg),
+            PublishError::OwnerPodNotFound(_, _) => tonic::Status::failed_precondition(full_msg),
+            PublishError::OwnerPodHasNoNode(_) => tonic::Status::failed_precondition(full_msg),
+            PublishError::SecretSelector(_) => tonic::Status::failed_precondition(full_msg),
+            PublishError::SecretQuery(_) => tonic::Status::failed_precondition(full_msg),
+            PublishError::NoSecret(_) => tonic::Status::failed_precondition(full_msg),
+            PublishError::CreateDir(_, _) => tonic::Status::unavailable(full_msg),
+            PublishError::CreateFile(_, _) => tonic::Status::unavailable(full_msg),
+            PublishError::WriteFile(_, _) => tonic::Status::unavailable(full_msg),
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+enum UnpublishError {
+    #[error("failed to clean up volume mount directory {1}")]
+    Cleanup(#[source] std::io::Error, PathBuf),
+}
+
+impl From<UnpublishError> for tonic::Status {
+    fn from(err: UnpublishError) -> Self {
+        let mut full_msg = format!("{}", err);
+        let mut curr_err = err.source();
+        while let Some(curr_source) = curr_err {
+            full_msg.push_str(&format!(": {}", err));
+            curr_err = curr_source.source();
+        }
+        match err {
+            UnpublishError::Cleanup(_, _) => tonic::Status::unavailable(full_msg),
+        }
+    }
+}
+
 struct SecretProvisionerNode {
     kube: kube::Client,
 }
 
 impl SecretProvisionerNode {
-    async fn get_secret_data(&self, sel: SecretVolumeSelector) -> BTreeMap<String, ByteString> {
+    async fn get_secret_data(
+        &self,
+        sel: SecretVolumeSelector,
+    ) -> Result<BTreeMap<String, ByteString>, PublishError> {
         let pods = kube::Api::<Pod>::namespaced(self.kube.clone(), &sel.namespace);
         let secrets = kube::Api::<Secret>::namespaced(self.kube.clone(), &sel.namespace);
-        let pod = pods.get(&sel.pod).await.unwrap();
+        let pod_ref = ObjectRef::new(&sel.pod).within(&sel.namespace);
+        let pod = pods
+            .get(&sel.pod)
+            .await
+            .map_err(|err| PublishError::OwnerPodNotFound(err, pod_ref.clone()))?;
         let mut label_selector = BTreeMap::new();
         label_selector.insert("secrets.stackable.tech/type".to_string(), sel.ty);
         for scope in sel.scope {
@@ -91,7 +160,10 @@ impl SecretProvisionerNode {
                 SecretScope::Node => {
                     label_selector.insert(
                         "secrets.stackable.tech/node".to_string(),
-                        pod.spec.as_ref().unwrap().node_name.clone().unwrap(),
+                        pod.spec
+                            .as_ref()
+                            .and_then(|pod_spec| pod_spec.node_name.clone())
+                            .ok_or_else(|| PublishError::OwnerPodHasNoNode(pod_ref.clone()))?,
                     );
                 }
                 SecretScope::Pod => {
@@ -107,15 +179,39 @@ impl SecretProvisionerNode {
                     match_labels: Some(label_selector),
                 },
             )
-            .unwrap();
-        secrets
+            .map_err(PublishError::SecretSelector)?;
+        Ok(secrets
             .list(&ListParams::default().labels(&label_selector))
             .await
-            .unwrap()
+            .map_err(PublishError::SecretQuery)?
             .items
-            .remove(0)
+            .into_iter()
+            .next()
+            .ok_or(PublishError::NoSecret(label_selector))?
             .data
-            .unwrap_or_default()
+            .unwrap_or_default())
+    }
+
+    async fn save_secret_data(
+        &self,
+        target_path: &Path,
+        data: BTreeMap<String, ByteString>,
+    ) -> Result<(), PublishError> {
+        for (k, v) in data {
+            let item_path = target_path.join(k);
+            if let Some(item_path_parent) = item_path.parent() {
+                create_dir_all(item_path_parent)
+                    .await
+                    .map_err(|err| PublishError::CreateDir(err, item_path_parent.into()))?;
+            }
+            File::create(item_path)
+                .await
+                .map_err(|err| PublishError::CreateFile(err, target_path.into()))?
+                .write_all(&v.0)
+                .await
+                .map_err(|err| PublishError::WriteFile(err, target_path.into()))?;
+        }
+        Ok(())
     }
 }
 
@@ -139,25 +235,17 @@ impl Node for SecretProvisionerNode {
         &self,
         request: Request<NodePublishVolumeRequest>,
     ) -> Result<Response<NodePublishVolumeResponse>, tonic::Status> {
-        dbg!(&request);
         let request = request.into_inner();
         let target_path = PathBuf::from(request.target_path);
-        let ctx_deserializer: MapDeserializer<_, serde::de::value::Error> =
-            request.volume_context.into_deserializer();
-        let sel = SecretVolumeSelector::deserialize(ctx_deserializer).unwrap();
-        let data = self.get_secret_data(sel).await;
-        for (k, v) in data {
-            let item_path = target_path.join(k);
-            if let Some(item_path_parent) = item_path.parent() {
-                create_dir_all(item_path_parent).await.unwrap();
-            }
-            File::create(item_path)
-                .await
-                .unwrap()
-                .write_all(&v.0)
-                .await
-                .unwrap();
-        }
+        tracing::info!(
+            volume.path = %target_path.display(),
+            volume.ctx = ?request.volume_context,
+            "Received NodePublishVolume request"
+        );
+        let sel = SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
+            .map_err(PublishError::InvalidSelector)?;
+        let data = self.get_secret_data(sel).await?;
+        self.save_secret_data(&target_path, data).await?;
         Ok(Response::new(NodePublishVolumeResponse {}))
     }
 
@@ -165,10 +253,15 @@ impl Node for SecretProvisionerNode {
         &self,
         request: Request<NodeUnpublishVolumeRequest>,
     ) -> Result<Response<NodeUnpublishVolumeResponse>, tonic::Status> {
-        dbg!(&request);
         let request = request.into_inner();
         let target_path = PathBuf::from(request.target_path);
-        tokio::fs::remove_dir_all(target_path).await.unwrap();
+        tracing::info!(
+            volume.path = %target_path.display(),
+            "Received NodeUnpublishVolume request"
+        );
+        tokio::fs::remove_dir_all(&target_path)
+            .await
+            .map_err(|err| UnpublishError::Cleanup(err, target_path))?;
         Ok(Response::new(NodeUnpublishVolumeResponse {}))
     }
 

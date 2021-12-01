@@ -14,10 +14,12 @@ prost-types = "0.9.0"
 serde = "1.0.130"
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git" }
 structopt = "0.3.25"
+thiserror = "1.0.30"
 tokio = { version = "1.14.0", features = ["full"] }
 tokio-stream = { version = "0.1.8", features = ["net"] }
 tonic = "0.6.1"
 tonic-reflection = "0.3.0"
+tracing = "0.1.29"
 
 [build-dependencies]
 tonic-build = "0.6.0"
