@@ -505,6 +505,7 @@ dependencies = [
 [[package]]
 name = "h2"
 version = "0.3.7"
+source = "git+https://github.com/teozkr/h2.git?branch=feature/grpc-uds#b7554e1b8730af5fbb7fc1841d92f9247c4e477c"
 dependencies = [
  "bytes",
  "fnv",
@@ -1377,27 +1378,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
-name = "secret-provisioner"
-version = "0.1.0"
-dependencies = [
- "eyre",
- "futures",
- "pin-project 1.0.8",
- "prost",
- "prost-types",
- "serde",
- "stackable-operator",
- "structopt",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-build",
- "tonic-reflection",
- "tracing",
-]
-
-[[package]]
 name = "security-framework"
 version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1585,6 +1565,27 @@ dependencies = [
  "tracing-futures",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "stackable-secret-operator"
+version = "0.1.0"
+dependencies = [
+ "eyre",
+ "futures",
+ "pin-project 1.0.8",
+ "prost",
+ "prost-types",
+ "serde",
+ "stackable-operator",
+ "structopt",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
+ "tonic-reflection",
+ "tracing",
 ]
 
 [[package]]

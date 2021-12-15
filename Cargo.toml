@@ -1,5 +1,6 @@
 [package]
-name = "secret-provisioner"
+name = "stackable-secret-operator"
+license = "OSL-3.0"
 version = "0.1.0"
 edition = "2021"
 
@@ -25,6 +26,6 @@ tracing = "0.1.29"
 tonic-build = "0.6.0"
 
 [patch.crates-io]
-h2 = { path = "vendor/h2" }
+h2 = { git = "https://github.com/teozkr/h2.git", branch = "feature/grpc-uds" }
 
 [features]
