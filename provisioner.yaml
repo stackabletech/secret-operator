@@ -13,10 +13,12 @@ spec:
     spec:
       containers:
       - name: provisioner
+        image: secret-provisioner
+        imagePullPolicy: IfNotPresent
         # Currently just a placeholder
-        image: archlinux
-        stdin: true
-        tty: true
+        # image: archlinux
+        # stdin: true
+        # tty: true
         env:
         - name: CSI_ENDPOINT
           value: /csi/csi.sock

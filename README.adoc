@@ -1,0 +1,11 @@
+= secret-operator
+
+Manages/generates Kubernetes secrets, and mounts them into pods using CSI
+
+== Running
+
+The operator must be executed inside Kubernetes, since it registers a CSI plugin against Kubelet.
+
+Currently builds are only supported with Nix. To build and install, run:
+
+    nix run -f . crate2nix generate && nix build -f . docker && kind load image-archive <(./result) && kubectl apply -f provisioner.yaml && kubectl rollout restart ds/secret-provisioner
