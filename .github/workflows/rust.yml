@@ -25,6 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2.4.0
+        with:
+          submodules: true
       - uses: actions-rs/toolchain@v1.0.7
         with:
           profile: minimal
@@ -40,6 +42,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2.4.0
+        with:
+          submodules: true
       - uses: actions-rs/toolchain@v1.0.7
         with:
           profile: minimal
@@ -56,6 +60,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2.4.0
+        with:
+          submodules: true
       - uses: actions-rs/toolchain@v1.0.7
         with:
           profile: minimal
@@ -73,6 +79,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2.4.0
+        with:
+          submodules: true
       - uses: actions-rs/toolchain@v1.0.7
         with:
             profile: minimal
@@ -112,6 +120,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2.4.0
+        with:
+          submodules: true
       - uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check ${{ matrix.checks }}
