@@ -7,7 +7,7 @@ use getrandom::getrandom;
 use lazy_static::lazy_static;
 use yasna::{models::ObjectIdentifier, ASN1Error, ASN1ErrorKind, BERReader, DERWriter, Tag};
 
-use hmac::{Hmac, Mac, NewMac};
+use hmac::{Hmac, Mac};
 use sha1::{Digest, Sha1};
 
 type HmacSha1 = Hmac<Sha1>;
@@ -382,7 +382,7 @@ impl MacData {
         let key = pbepkcs12sha1(password, &self.salt, self.iterations as u64, 3, 20);
         let mut mac = HmacSha1::new_from_slice(&key).unwrap();
         mac.update(data);
-        mac.verify(&self.mac.digest).is_ok()
+        mac.verify_slice(&self.mac.digest).is_ok()
     }
 
     pub fn new(data: &[u8], password: &[u8]) -> MacData {
