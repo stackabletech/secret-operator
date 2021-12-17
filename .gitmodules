@@ -1,0 +1,3 @@
+[submodule "vendor/csi"]
+	path = vendor/csi
+	url = https://github.com/container-storage-interface/spec
