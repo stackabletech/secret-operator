@@ -10,7 +10,6 @@ use grpc::csi::v1::{
     NodeStageVolumeResponse, NodeUnpublishVolumeRequest, NodeUnpublishVolumeResponse,
     NodeUnstageVolumeRequest, NodeUnstageVolumeResponse, ProbeRequest, ProbeResponse,
 };
-use pin_project::pin_project;
 use serde::{de::IntoDeserializer, Deserialize, Deserializer};
 use stackable_operator::{
     k8s_openapi::{
@@ -29,17 +28,16 @@ use std::{
 use structopt::StructOpt;
 use tokio::{
     fs::{create_dir_all, File},
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
-    net::{UnixListener, UnixStream},
+    io::AsyncWriteExt,
+    net::UnixListener,
     signal::unix::{signal, SignalKind},
 };
 use tokio_stream::wrappers::UnixListenerStream;
-use tonic::{
-    transport::{server::Connected, Server},
-    Request, Response, Status,
-};
+use tonic::{transport::Server, Request, Response, Status};
+use utils::TonicUnixStream;
 
 mod grpc;
+mod utils;
 
 struct SecretProvisionerIdentity;
 
@@ -365,59 +363,4 @@ async fn main() -> eyre::Result<()> {
         )
         .await?;
     Ok(())
-}
-
-#[pin_project]
-struct TonicUnixStream(#[pin] UnixStream);
-
-impl AsyncRead for TonicUnixStream {
-    fn poll_read(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
-        self.project().0.poll_read(cx, buf)
-    }
-}
-
-impl AsyncWrite for TonicUnixStream {
-    fn poll_write(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &[u8],
-    ) -> std::task::Poll<Result<usize, std::io::Error>> {
-        self.project().0.poll_write(cx, buf)
-    }
-
-    fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        self.project().0.poll_flush(cx)
-    }
-
-    fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        self.project().0.poll_shutdown(cx)
-    }
-
-    fn poll_write_vectored(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        bufs: &[std::io::IoSlice<'_>],
-    ) -> std::task::Poll<Result<usize, std::io::Error>> {
-        self.project().0.poll_write_vectored(cx, bufs)
-    }
-
-    fn is_write_vectored(&self) -> bool {
-        self.0.is_write_vectored()
-    }
-}
-
-impl Connected for TonicUnixStream {
-    type ConnectInfo = ();
-
-    fn connect_info(&self) -> Self::ConnectInfo {}
 }
