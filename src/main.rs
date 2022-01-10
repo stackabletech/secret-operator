@@ -12,6 +12,7 @@ use grpc::csi::v1::{
     NodeUnstageVolumeRequest, NodeUnstageVolumeResponse, ProbeRequest, ProbeResponse,
 };
 use serde::{de::IntoDeserializer, Deserialize};
+use snafu::{ResultExt, Snafu};
 use std::{
     collections::HashMap,
     error::Error,
@@ -67,18 +68,28 @@ impl Identity for SecretProvisionerIdentity {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Snafu, Debug)]
+#[snafu(module)]
 enum PublishError {
-    #[error("failed to parse selector from volume context")]
-    InvalidSelector(#[source] serde::de::value::Error),
-    #[error("backend failed to get secret data")]
-    BackendGetSecretData(#[source] backend::k8s_search::Error),
-    #[error("failed to create secret parent dir {1}")]
-    CreateDir(#[source] std::io::Error, PathBuf),
-    #[error("failed to create secret file {1}")]
-    CreateFile(#[source] std::io::Error, PathBuf),
-    #[error("failed to write secret file {1}")]
-    WriteFile(#[source] std::io::Error, PathBuf),
+    #[snafu(display("failed to parse selector from volume context"))]
+    InvalidSelector { source: serde::de::value::Error },
+    #[snafu(display("backend failed to get secret data"))]
+    BackendGetSecretData { source: backend::k8s_search::Error },
+    #[snafu(display("failed to create secret parent dir {}", path.display()))]
+    CreateDir {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[snafu(display("failed to create secret file {}", path.display()))]
+    CreateFile {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[snafu(display("failed to write secret file {}", path.display()))]
+    WriteFile {
+        source: std::io::Error,
+        path: PathBuf,
+    },
 }
 
 impl From<PublishError> for tonic::Status {
@@ -90,21 +101,25 @@ impl From<PublishError> for tonic::Status {
             curr_err = curr_source.source();
         }
         match err {
-            PublishError::InvalidSelector(_) => tonic::Status::invalid_argument(full_msg),
-            PublishError::BackendGetSecretData(err) => {
-                tonic::Status::new(err.grpc_code(), full_msg)
+            PublishError::InvalidSelector { .. } => tonic::Status::invalid_argument(full_msg),
+            PublishError::BackendGetSecretData { source } => {
+                tonic::Status::new(source.grpc_code(), full_msg)
             }
-            PublishError::CreateDir(_, _) => tonic::Status::unavailable(full_msg),
-            PublishError::CreateFile(_, _) => tonic::Status::unavailable(full_msg),
-            PublishError::WriteFile(_, _) => tonic::Status::unavailable(full_msg),
+            PublishError::CreateDir { .. } => tonic::Status::unavailable(full_msg),
+            PublishError::CreateFile { .. } => tonic::Status::unavailable(full_msg),
+            PublishError::WriteFile { .. } => tonic::Status::unavailable(full_msg),
         }
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Snafu, Debug)]
+#[snafu(module)]
 enum UnpublishError {
-    #[error("failed to clean up volume mount directory {1}")]
-    Cleanup(#[source] std::io::Error, PathBuf),
+    #[snafu(display("failed to clean up volume mount directory {}", path.display()))]
+    Cleanup {
+        source: std::io::Error,
+        path: PathBuf,
+    },
 }
 
 impl From<UnpublishError> for tonic::Status {
@@ -116,7 +131,7 @@ impl From<UnpublishError> for tonic::Status {
             curr_err = curr_source.source();
         }
         match err {
-            UnpublishError::Cleanup(_, _) => tonic::Status::unavailable(full_msg),
+            UnpublishError::Cleanup { .. } => tonic::Status::unavailable(full_msg),
         }
     }
 }
@@ -136,14 +151,16 @@ impl SecretProvisionerNode {
             if let Some(item_path_parent) = item_path.parent() {
                 create_dir_all(item_path_parent)
                     .await
-                    .map_err(|err| PublishError::CreateDir(err, item_path_parent.into()))?;
+                    .context(publish_error::CreateDirSnafu {
+                        path: item_path_parent,
+                    })?;
             }
             File::create(item_path)
                 .await
-                .map_err(|err| PublishError::CreateFile(err, target_path.into()))?
+                .context(publish_error::CreateFileSnafu { path: target_path })?
                 .write_all(&v)
                 .await
-                .map_err(|err| PublishError::WriteFile(err, target_path.into()))?;
+                .context(publish_error::WriteFileSnafu { path: target_path })?;
         }
         Ok(())
     }
@@ -177,12 +194,12 @@ impl Node for SecretProvisionerNode {
             "Received NodePublishVolume request"
         );
         let sel = SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
-            .map_err(PublishError::InvalidSelector)?;
+            .context(publish_error::InvalidSelectorSnafu)?;
         let data = self
             .backend
             .get_secret_data(sel)
             .await
-            .map_err(PublishError::BackendGetSecretData)?;
+            .context(publish_error::BackendGetSecretDataSnafu)?;
         self.save_secret_data(&target_path, data).await?;
         Ok(Response::new(NodePublishVolumeResponse {}))
     }
@@ -199,7 +216,7 @@ impl Node for SecretProvisionerNode {
         );
         tokio::fs::remove_dir_all(&target_path)
             .await
-            .map_err(|err| UnpublishError::Cleanup(err, target_path))?;
+            .context(unpublish_error::CleanupSnafu { path: target_path })?;
         Ok(Response::new(NodeUnpublishVolumeResponse {}))
     }
 
