@@ -8,12 +8,14 @@ edition = "2021"
 repository = "https://github.com/stackabletech/secret-operator"
 
 [dependencies]
+async-trait = "0.1.52"
 eyre = "0.6.5"
 futures = "0.3.18"
 pin-project = "1.0.8"
 prost = "0.9.0"
 prost-types = "0.9.0"
 serde = "1.0.130"
+snafu = "0.7.0"
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.6.0" }
 structopt = "0.3.25"
 thiserror = "1.0.30"
