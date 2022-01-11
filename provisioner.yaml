@@ -22,6 +22,11 @@ spec:
         env:
         - name: CSI_ENDPOINT
           value: /csi/csi.sock
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
         volumeMounts:
         - name: csi
           mountPath: /csi

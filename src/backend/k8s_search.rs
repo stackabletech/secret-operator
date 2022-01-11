@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::PathBuf,
-};
+use std::collections::BTreeMap;
 
 use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -13,7 +10,7 @@ use stackable_operator::{
     kube::{api::ListParams, runtime::reflector::ObjectRef},
 };
 
-use super::{SecretBackend, SecretBackendError, SecretScope};
+use super::{SecretBackend, SecretBackendError, SecretFiles, SecretScope};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -51,8 +48,6 @@ impl SecretBackendError for Error {
 pub struct K8sSearch {
     pub client: stackable_operator::client::Client,
 }
-
-type SecretFiles = HashMap<PathBuf, Vec<u8>>;
 
 #[async_trait]
 impl SecretBackend for K8sSearch {

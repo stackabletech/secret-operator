@@ -1,12 +1,16 @@
+pub mod dynamic;
 pub mod k8s_search;
+pub mod tls;
 
 use async_trait::async_trait;
 use serde::{de::IntoDeserializer, Deserialize, Deserializer};
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, convert::Infallible, path::PathBuf};
 
+pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
+pub use tls::TlsGenerate;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum SecretScope {
     Node,
@@ -37,16 +41,37 @@ pub struct SecretVolumeSelector {
     pub namespace: String,
 }
 
+impl SecretVolumeSelector {
+    fn scope_value<'a>(&'a self, node_info: &'a NodeInfo, scope: SecretScope) -> &'a str {
+        match scope {
+            SecretScope::Node => &node_info.name,
+            SecretScope::Pod => &self.pod,
+        }
+    }
+}
+
+pub struct NodeInfo {
+    pub name: String,
+}
+
+type SecretFiles = HashMap<PathBuf, Vec<u8>>;
+
 #[async_trait]
-pub trait SecretBackend {
+pub trait SecretBackend: Send + Sync {
     type Error: SecretBackendError;
 
     async fn get_secret_data(
         &self,
         selector: SecretVolumeSelector,
-    ) -> Result<HashMap<PathBuf, Vec<u8>>, Self::Error>;
+    ) -> Result<SecretFiles, Self::Error>;
 }
 
-pub trait SecretBackendError: std::error::Error {
+pub trait SecretBackendError: std::error::Error + Send + Sync + 'static {
     fn grpc_code(&self) -> tonic::Code;
+}
+
+impl SecretBackendError for Infallible {
+    fn grpc_code(&self) -> tonic::Code {
+        match *self {}
+    }
 }

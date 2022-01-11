@@ -1,4 +1,4 @@
-use backend::{K8sSearch, SecretBackend, SecretBackendError};
+use backend::{NodeInfo, SecretBackendError};
 use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     identity_server::{Identity, IdentityServer},
@@ -74,7 +74,7 @@ enum PublishError {
     #[snafu(display("failed to parse selector from volume context"))]
     InvalidSelector { source: serde::de::value::Error },
     #[snafu(display("backend failed to get secret data"))]
-    BackendGetSecretData { source: backend::k8s_search::Error },
+    BackendGetSecretData { source: backend::dynamic::DynError },
     #[snafu(display("failed to create secret parent dir {}", path.display()))]
     CreateDir {
         source: std::io::Error,
@@ -97,7 +97,7 @@ impl From<PublishError> for tonic::Status {
         let mut full_msg = format!("{}", err);
         let mut curr_err = err.source();
         while let Some(curr_source) = curr_err {
-            full_msg.push_str(&format!(": {}", err));
+            full_msg.push_str(&format!(": {}", curr_source));
             curr_err = curr_source.source();
         }
         match err {
@@ -137,7 +137,7 @@ impl From<UnpublishError> for tonic::Status {
 }
 
 struct SecretProvisionerNode {
-    backend: K8sSearch,
+    backend: Box<backend::Dynamic>,
 }
 
 impl SecretProvisionerNode {
@@ -259,12 +259,17 @@ impl Node for SecretProvisionerNode {
 struct Opts {
     #[structopt(long, env)]
     csi_endpoint: PathBuf,
+    #[structopt(long, env)]
+    node_name: String,
 }
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     stackable_operator::logging::initialize_logging("SECRET_PROVISIONER_LOG");
     let opts = Opts::from_args();
+    let node_info = NodeInfo {
+        name: opts.node_name,
+    };
     let client =
         stackable_operator::client::create_client(Some("secrets.stackable.tech".to_string()))
             .await?;
@@ -285,7 +290,8 @@ async fn main() -> eyre::Result<()> {
         )
         .add_service(IdentityServer::new(SecretProvisionerIdentity))
         .add_service(NodeServer::new(SecretProvisionerNode {
-            backend: backend::K8sSearch { client },
+            // backend: backend::dynamic::from(backend::K8sSearch { client }),
+            backend: backend::dynamic::from(backend::TlsGenerate::new_self_signed(node_info)),
         }))
         .serve_with_incoming_shutdown(
             UnixListenerStream::new(UnixListener::bind(opts.csi_endpoint)?).map_ok(TonicUnixStream),

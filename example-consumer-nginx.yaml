@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secret-consumer-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: secret-consumer-nginx
+  template:
+    metadata:
+      labels:
+        app: secret-consumer-nginx
+    spec:
+      initContainers:
+      - name: merger
+        image: alpine
+        args:
+        - sh
+        - -c
+        - cat /secret/tls.crt /secret/ca.crt > /secret/tls-merged.crt
+        volumeMounts:
+        - name: secret
+          mountPath: /secret
+      containers:
+      - name: nginx
+        image: nginx
+        # args:
+        # - bash
+        # tty: true
+        # stdin: true
+        # - nginx-debug
+        # - -g
+        # - 'daemon off;'
+        # - -g
+        # - 'error_log /foo debug;'
+        ports:
+        - name: https
+          containerPort: 443
+        volumeMounts:
+        - name: secret
+          mountPath: /secret
+        - name: config
+          mountPath: /etc/nginx/conf.d
+      terminationGracePeriodSeconds: 1
+      volumes:
+      - name: secret
+        csi:
+          driver: secrets.stackable.tech
+          volumeAttributes:
+            secrets.stackable.tech/type: secret
+            secrets.stackable.tech/scope: node,pod
+      - name: config
+        configMap:
+          name: secret-consumer-nginx-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: secret-consumer-nginx
+spec:
+  type: NodePort
+  selector:
+    app: secret-consumer-nginx
+  ports:
+  - name: https
+    port: 443
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: secret-consumer-nginx-config
+data:
+  default.conf: |
+    server {
+      listen 443 ssl http2;
+      ssl_certificate /secret/tls-merged.crt;
+      ssl_certificate_key /secret/tls.key;
+
+      ssl_session_timeout 1d;
+      ssl_session_cache shared:MozSSL:10m;  # about 40000 sessions
+      ssl_session_tickets off;
+
+      # curl https://ssl-config.mozilla.org/ffdhe2048.txt > /path/to/dhparam
+      ssl_dhparam /etc/nginx/conf.d/dhparam;
+
+      # intermediate configuration
+      ssl_protocols TLSv1.2 TLSv1.3;
+      ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+      ssl_prefer_server_ciphers off;
+    }
+  dhparam: |
+    -----BEGIN DH PARAMETERS-----
+    MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz
+    +8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a
+    87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7
+    YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi
+    7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD
+    ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==
+    -----END DH PARAMETERS-----
