@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
       - name: provisioner
-        image: secret-provisioner
+        image: docker.stackable.tech/teozkr/secret-provisioner
         imagePullPolicy: IfNotPresent
         # Currently just a placeholder
         # image: archlinux
