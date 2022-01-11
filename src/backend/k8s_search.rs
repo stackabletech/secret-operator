@@ -8,7 +8,7 @@ use stackable_operator::{
 };
 
 use super::{
-    pod_info::PodInfo, SecretBackend, SecretBackendError, SecretFiles, SecretScope,
+    pod_info::PodInfo, scope::SecretScope, SecretBackend, SecretBackendError, SecretFiles,
     SecretVolumeSelector,
 };
 
@@ -64,6 +64,9 @@ impl SecretBackend for K8sSearch {
                         "secrets.stackable.tech/pod".to_string(),
                         selector.pod.clone(),
                     );
+                }
+                SecretScope::Service { name } => {
+                    label_selector.insert("secrets.stackable.tech/service".to_string(), name);
                 }
             }
         }

@@ -205,7 +205,7 @@ impl SecretBackend for TlsGenerate {
                 san_ext.critical();
                 let mut has_san = false;
                 for scope in &selector.scope {
-                    for addr in selector.scope_addresses(&pod_info, *scope) {
+                    for addr in selector.scope_addresses(&pod_info, scope) {
                         has_san = true;
                         match addr {
                             Address::Dns(dns) => san_ext.dns(&dns),
