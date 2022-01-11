@@ -1,16 +1,19 @@
 pub mod dynamic;
 pub mod k8s_search;
+pub mod pod_info;
 pub mod tls;
 
 use async_trait::async_trait;
 use serde::{de::IntoDeserializer, Deserialize, Deserializer};
-use std::{borrow::Cow, collections::HashMap, convert::Infallible, path::PathBuf};
+use std::{collections::HashMap, convert::Infallible, path::PathBuf};
 
 pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
 pub use tls::TlsGenerate;
 
-#[derive(Deserialize, Clone, Copy)]
+use self::pod_info::Address;
+
+#[derive(Deserialize, Clone, Copy, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum SecretScope {
     Node,
@@ -42,18 +45,34 @@ pub struct SecretVolumeSelector {
 }
 
 impl SecretVolumeSelector {
-    fn scope_value<'a>(&'a self, node_info: &'a NodeInfo, scope: SecretScope) -> Cow<'a, str> {
+    fn scope_addresses<'a>(
+        &'a self,
+        pod_info: &'a pod_info::PodInfo,
+        scope: SecretScope,
+    ) -> Vec<pod_info::Address> {
         match scope {
-            SecretScope::Node => Cow::Borrowed(&node_info.name),
+            SecretScope::Node => {
+                let mut addrs = vec![Address::Dns(pod_info.node_name.clone())];
+                addrs.extend(pod_info.node_ips.iter().copied().map(pod_info::Address::Ip));
+                addrs
+            }
             SecretScope::Pod => {
-                Cow::Owned(format!("{}.{}.svc.cluster.local", self.pod, self.namespace))
+                let mut addrs = Vec::new();
+                if let Some(svc_name) = &pod_info.service_name {
+                    addrs.push(pod_info::Address::Dns(format!(
+                        "{}.{}.svc.cluster.local",
+                        svc_name, self.namespace
+                    )));
+                    addrs.push(pod_info::Address::Dns(format!(
+                        "{}.{}.{}.svc.cluster.local",
+                        self.pod, svc_name, self.namespace
+                    )));
+                }
+                addrs.extend(pod_info.pod_ips.iter().copied().map(pod_info::Address::Ip));
+                addrs
             }
         }
     }
-}
-
-pub struct NodeInfo {
-    pub name: String,
 }
 
 type SecretFiles = HashMap<PathBuf, Vec<u8>>;
@@ -65,6 +84,7 @@ pub trait SecretBackend: Send + Sync {
     async fn get_secret_data(
         &self,
         selector: SecretVolumeSelector,
+        pod_info: pod_info::PodInfo,
     ) -> Result<SecretFiles, Self::Error>;
 }
 

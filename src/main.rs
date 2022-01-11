@@ -1,4 +1,4 @@
-use backend::{NodeInfo, SecretBackendError};
+use backend::{pod_info, SecretBackendError};
 use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     identity_server::{Identity, IdentityServer},
@@ -13,6 +13,7 @@ use grpc::csi::v1::{
 };
 use serde::{de::IntoDeserializer, Deserialize};
 use snafu::{ResultExt, Snafu};
+use stackable_operator::k8s_openapi::api::core::v1::Pod;
 use std::{
     collections::HashMap,
     error::Error,
@@ -30,7 +31,7 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tonic::{transport::Server, Request, Response, Status};
 use utils::TonicUnixStream;
 
-use crate::backend::SecretVolumeSelector;
+use crate::backend::{pod_info::PodInfo, SecretVolumeSelector};
 
 mod backend;
 mod grpc;
@@ -73,6 +74,12 @@ impl Identity for SecretProvisionerIdentity {
 enum PublishError {
     #[snafu(display("failed to parse selector from volume context"))]
     InvalidSelector { source: serde::de::value::Error },
+    #[snafu(display("failed to get pod for volume"))]
+    GetPod {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to parse pod details"))]
+    ParsePod { source: pod_info::FromPodError },
     #[snafu(display("backend failed to get secret data"))]
     BackendGetSecretData { source: backend::dynamic::DynError },
     #[snafu(display("failed to create secret parent dir {}", path.display()))]
@@ -102,6 +109,8 @@ impl From<PublishError> for tonic::Status {
         }
         match err {
             PublishError::InvalidSelector { .. } => tonic::Status::invalid_argument(full_msg),
+            PublishError::GetPod { .. } => tonic::Status::failed_precondition(full_msg),
+            PublishError::ParsePod { .. } => tonic::Status::failed_precondition(full_msg),
             PublishError::BackendGetSecretData { source } => {
                 tonic::Status::new(source.grpc_code(), full_msg)
             }
@@ -138,6 +147,7 @@ impl From<UnpublishError> for tonic::Status {
 
 struct SecretProvisionerNode {
     backend: Box<backend::Dynamic>,
+    client: stackable_operator::client::Client,
 }
 
 impl SecretProvisionerNode {
@@ -193,11 +203,18 @@ impl Node for SecretProvisionerNode {
             volume.ctx = ?request.volume_context,
             "Received NodePublishVolume request"
         );
-        let sel = SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
-            .context(publish_error::InvalidSelectorSnafu)?;
+        let selector =
+            SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
+                .context(publish_error::InvalidSelectorSnafu)?;
+        let pod = self
+            .client
+            .get::<Pod>(&selector.pod, Some(&selector.namespace))
+            .await
+            .context(publish_error::GetPodSnafu)?;
+        let pod_info = PodInfo::try_from(pod).context(publish_error::ParsePodSnafu)?;
         let data = self
             .backend
-            .get_secret_data(sel)
+            .get_secret_data(selector, pod_info)
             .await
             .context(publish_error::BackendGetSecretDataSnafu)?;
         self.save_secret_data(&target_path, data).await?;
@@ -259,17 +276,12 @@ impl Node for SecretProvisionerNode {
 struct Opts {
     #[structopt(long, env)]
     csi_endpoint: PathBuf,
-    #[structopt(long, env)]
-    node_name: String,
 }
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     stackable_operator::logging::initialize_logging("SECRET_PROVISIONER_LOG");
     let opts = Opts::from_args();
-    let node_info = NodeInfo {
-        name: opts.node_name,
-    };
     let client =
         stackable_operator::client::create_client(Some("secrets.stackable.tech".to_string()))
             .await?;
@@ -292,8 +304,9 @@ async fn main() -> eyre::Result<()> {
         .add_service(NodeServer::new(SecretProvisionerNode {
             // backend: backend::dynamic::from(backend::K8sSearch { client }),
             backend: backend::dynamic::from(
-                backend::TlsGenerate::get_or_create_k8s_certificate(node_info, &client).await,
+                backend::TlsGenerate::get_or_create_k8s_certificate(&client).await,
             ),
+            client,
         }))
         .serve_with_incoming_shutdown(
             UnixListenerStream::new(UnixListener::bind(opts.csi_endpoint)?).map_ok(TonicUnixStream),

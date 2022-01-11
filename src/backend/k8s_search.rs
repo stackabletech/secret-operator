@@ -3,24 +3,17 @@ use std::collections::BTreeMap;
 use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    k8s_openapi::{
-        api::core::v1::{Pod, Secret},
-        apimachinery::pkg::apis::meta::v1::LabelSelector,
-    },
-    kube::{api::ListParams, runtime::reflector::ObjectRef},
+    k8s_openapi::{api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector},
+    kube::api::ListParams,
 };
 
-use super::{SecretBackend, SecretBackendError, SecretFiles, SecretScope};
+use super::{
+    pod_info::PodInfo, SecretBackend, SecretBackendError, SecretFiles, SecretScope,
+    SecretVolumeSelector,
+};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("failed to find {pod} owning the volume"))]
-    OwnerPodNotFound {
-        source: stackable_operator::error::Error,
-        pod: ObjectRef<Pod>,
-    },
-    #[snafu(display("owner {pod} has no associated node"))]
-    OwnerPodHasNoNode { pod: ObjectRef<Pod> },
     #[snafu(display("failed to build Secret selector"))]
     SecretSelector {
         source: stackable_operator::error::Error,
@@ -36,8 +29,6 @@ pub enum Error {
 impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
         match self {
-            Error::OwnerPodNotFound { .. } => tonic::Code::FailedPrecondition,
-            Error::OwnerPodHasNoNode { .. } => tonic::Code::FailedPrecondition,
             Error::SecretSelector { .. } => tonic::Code::FailedPrecondition,
             Error::SecretQuery { .. } => tonic::Code::FailedPrecondition,
             Error::NoSecret { .. } => tonic::Code::FailedPrecondition,
@@ -55,34 +46,24 @@ impl SecretBackend for K8sSearch {
 
     async fn get_secret_data(
         &self,
-        sel: super::SecretVolumeSelector,
+        selector: SecretVolumeSelector,
+        pod_info: PodInfo,
     ) -> Result<SecretFiles, Self::Error> {
-        let pod_ref = ObjectRef::new(&sel.pod).within(&sel.namespace);
-        let pod = self
-            .client
-            .get::<Pod>(&sel.pod, Some(&sel.namespace))
-            .await
-            .with_context(|_| OwnerPodNotFoundSnafu {
-                pod: pod_ref.clone(),
-            })?;
         let mut label_selector = BTreeMap::new();
-        label_selector.insert("secrets.stackable.tech/type".to_string(), sel.ty);
-        for scope in sel.scope {
+        label_selector.insert("secrets.stackable.tech/type".to_string(), selector.ty);
+        for scope in selector.scope {
             match scope {
                 SecretScope::Node => {
                     label_selector.insert(
                         "secrets.stackable.tech/node".to_string(),
-                        pod.spec
-                            .as_ref()
-                            .and_then(|pod_spec| pod_spec.node_name.clone())
-                            .with_context(|| OwnerPodHasNoNodeSnafu {
-                                pod: pod_ref.clone(),
-                            })?,
+                        pod_info.node_name.clone(),
                     );
                 }
                 SecretScope::Pod => {
-                    label_selector
-                        .insert("secrets.stackable.tech/pod".to_string(), sel.pod.clone());
+                    label_selector.insert(
+                        "secrets.stackable.tech/pod".to_string(),
+                        selector.pod.clone(),
+                    );
                 }
             }
         }
@@ -97,7 +78,7 @@ impl SecretBackend for K8sSearch {
         let secret = self
             .client
             .list::<Secret>(
-                Some(&sel.namespace),
+                Some(&selector.namespace),
                 &ListParams::default().labels(&label_selector),
             )
             .await

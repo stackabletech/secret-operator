@@ -22,7 +22,7 @@ use stackable_operator::{
 };
 use time::{Duration, OffsetDateTime};
 
-use super::{NodeInfo, SecretBackend, SecretBackendError, SecretFiles};
+use super::{pod_info::Address, pod_info::PodInfo, SecretBackend, SecretBackendError, SecretFiles};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -45,13 +45,12 @@ impl SecretBackendError for Error {
 }
 
 pub struct TlsGenerate {
-    node_info: NodeInfo,
     ca_cert: X509,
     ca_key: PKey<Private>,
 }
 
 impl TlsGenerate {
-    pub fn new_self_signed(node_info: NodeInfo) -> Self {
+    pub fn new_self_signed() -> Self {
         let subject_name = X509NameBuilder::new()
             .and_then(|mut name| {
                 name.append_entry_by_nid(Nid::COMMONNAME, "secret-operator self-signed")?;
@@ -100,15 +99,10 @@ impl TlsGenerate {
             })
             .unwrap()
             .build();
-        Self {
-            node_info,
-            ca_key,
-            ca_cert,
-        }
+        Self { ca_key, ca_cert }
     }
 
     pub async fn get_or_create_k8s_certificate(
-        node_info: NodeInfo,
         client: &stackable_operator::client::Client,
     ) -> Self {
         let k8s_secret_name = "secret-provisioner-ca";
@@ -118,14 +112,13 @@ impl TlsGenerate {
             Ok(ca_secret) => {
                 let ca_data = ca_secret.data.unwrap_or_default();
                 Self {
-                    node_info,
                     ca_key: PKey::private_key_from_pem(&ca_data.get("ca.key").unwrap().0).unwrap(),
                     ca_cert: X509::from_pem(&ca_data.get("ca.crt").unwrap().0).unwrap(),
                 }
             }
             Err(_) => {
                 // Failed to get existing cert, try to create a new self-signed one
-                let ca = Self::new_self_signed(node_info);
+                let ca = Self::new_self_signed();
                 // Use create rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
                 client
                     .create(&Secret {
@@ -163,6 +156,7 @@ impl SecretBackend for TlsGenerate {
     async fn get_secret_data(
         &self,
         selector: super::SecretVolumeSelector,
+        pod_info: PodInfo,
     ) -> Result<SecretFiles, Self::Error> {
         let now = OffsetDateTime::now_utc();
         let not_before = now - Duration::minutes(5);
@@ -209,10 +203,19 @@ impl SecretBackend for TlsGenerate {
                 ];
                 let mut san_ext = SubjectAlternativeName::new();
                 san_ext.critical();
+                let mut has_san = false;
                 for scope in &selector.scope {
-                    san_ext.dns(&selector.scope_value(&self.node_info, *scope));
+                    for addr in selector.scope_addresses(&pod_info, *scope) {
+                        has_san = true;
+                        match addr {
+                            Address::Dns(dns) => san_ext.dns(&dns),
+                            Address::Ip(ip) => san_ext.ip(&ip.to_string()),
+                        };
+                    }
                 }
-                exts.push(san_ext.build(&ctx)?);
+                if has_san {
+                    exts.push(san_ext.build(&ctx)?);
+                }
                 for ext in exts {
                     x509.append_extension(ext)?;
                 }
