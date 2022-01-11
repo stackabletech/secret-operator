@@ -4,7 +4,7 @@ pub mod tls;
 
 use async_trait::async_trait;
 use serde::{de::IntoDeserializer, Deserialize, Deserializer};
-use std::{collections::HashMap, convert::Infallible, path::PathBuf};
+use std::{borrow::Cow, collections::HashMap, convert::Infallible, path::PathBuf};
 
 pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
@@ -42,10 +42,12 @@ pub struct SecretVolumeSelector {
 }
 
 impl SecretVolumeSelector {
-    fn scope_value<'a>(&'a self, node_info: &'a NodeInfo, scope: SecretScope) -> &'a str {
+    fn scope_value<'a>(&'a self, node_info: &'a NodeInfo, scope: SecretScope) -> Cow<'a, str> {
         match scope {
-            SecretScope::Node => &node_info.name,
-            SecretScope::Pod => &self.pod,
+            SecretScope::Node => Cow::Borrowed(&node_info.name),
+            SecretScope::Pod => {
+                Cow::Owned(format!("{}.{}.svc.cluster.local", self.pod, self.namespace))
+            }
         }
     }
 }

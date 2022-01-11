@@ -158,7 +158,7 @@ impl SecretBackend for TlsGenerate {
                 let mut san_ext = SubjectAlternativeName::new();
                 san_ext.critical();
                 for scope in &selector.scope {
-                    san_ext.dns(selector.scope_value(&self.node_info, *scope));
+                    san_ext.dns(&selector.scope_value(&self.node_info, *scope));
                 }
                 exts.push(san_ext.build(&ctx)?);
                 for ext in exts {
