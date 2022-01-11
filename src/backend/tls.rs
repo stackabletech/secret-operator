@@ -16,6 +16,10 @@ use openssl::{
     },
 };
 use snafu::{ResultExt, Snafu};
+use stackable_operator::{
+    builder::ObjectMetaBuilder,
+    k8s_openapi::{api::core::v1::Secret, ByteString},
+};
 use time::{Duration, OffsetDateTime};
 
 use super::{NodeInfo, SecretBackend, SecretBackendError, SecretFiles};
@@ -100,6 +104,54 @@ impl TlsGenerate {
             node_info,
             ca_key,
             ca_cert,
+        }
+    }
+
+    pub async fn get_or_create_k8s_certificate(
+        node_info: NodeInfo,
+        client: &stackable_operator::client::Client,
+    ) -> Self {
+        let k8s_secret_name = "secret-provisioner-ca";
+        let k8s_ns = "default";
+        let existing_secret = client.get::<Secret>(k8s_secret_name, Some(k8s_ns)).await;
+        match existing_secret {
+            Ok(ca_secret) => {
+                let ca_data = ca_secret.data.unwrap_or_default();
+                Self {
+                    node_info,
+                    ca_key: PKey::private_key_from_pem(&ca_data.get("ca.key").unwrap().0).unwrap(),
+                    ca_cert: X509::from_pem(&ca_data.get("ca.crt").unwrap().0).unwrap(),
+                }
+            }
+            Err(_) => {
+                // Failed to get existing cert, try to create a new self-signed one
+                let ca = Self::new_self_signed(node_info);
+                // Use create rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
+                client
+                    .create(&Secret {
+                        metadata: ObjectMetaBuilder::new()
+                            .namespace(k8s_ns)
+                            .name(k8s_secret_name)
+                            .build(),
+                        data: Some(
+                            [
+                                (
+                                    "ca.key".to_string(),
+                                    ByteString(ca.ca_key.private_key_to_pem_pkcs8().unwrap()),
+                                ),
+                                (
+                                    "ca.crt".to_string(),
+                                    ByteString(ca.ca_cert.to_pem().unwrap()),
+                                ),
+                            ]
+                            .into(),
+                        ),
+                        ..Secret::default()
+                    })
+                    .await
+                    .unwrap();
+                ca
+            }
         }
     }
 }

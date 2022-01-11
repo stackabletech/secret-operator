@@ -72,6 +72,8 @@ rules:
   - secrets
   verbs:
   - list
+  - create
+  - get
 - apiGroups:
   - ""
   resources:

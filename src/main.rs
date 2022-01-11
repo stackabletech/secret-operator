@@ -291,7 +291,9 @@ async fn main() -> eyre::Result<()> {
         .add_service(IdentityServer::new(SecretProvisionerIdentity))
         .add_service(NodeServer::new(SecretProvisionerNode {
             // backend: backend::dynamic::from(backend::K8sSearch { client }),
-            backend: backend::dynamic::from(backend::TlsGenerate::new_self_signed(node_info)),
+            backend: backend::dynamic::from(
+                backend::TlsGenerate::get_or_create_k8s_certificate(node_info, &client).await,
+            ),
         }))
         .serve_with_incoming_shutdown(
             UnixListenerStream::new(UnixListener::bind(opts.csi_endpoint)?).map_ok(TonicUnixStream),
