@@ -18,7 +18,6 @@
 }:
 rec {
   build = cargo.rootCrate.build;
-  crate2nix = pkgs.crate2nix;
   dockerImage = pkgs.dockerTools.streamLayeredImage {
     name = "docker.stackable.tech/teozkr/secret-provisioner";
     tag = dockerTag;
@@ -36,4 +35,7 @@ rec {
       path = pkgs.writeText "${dockerImage.name}-image-tag" "${dockerImage.imageName}:${dockerImage.imageTag}";
     }
   ];
+
+  crate2nix = pkgs.crate2nix;
+  tilt = pkgs.tilt;
 }
