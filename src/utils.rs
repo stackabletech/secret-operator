@@ -5,6 +5,7 @@ use tokio::{
 };
 use tonic::transport::server::Connected;
 
+/// Adapter for using [`UnixStream`] as a [`tonic`] connection
 #[pin_project]
 pub struct TonicUnixStream(#[pin] pub UnixStream);
 

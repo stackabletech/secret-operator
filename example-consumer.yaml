@@ -26,7 +26,7 @@ spec:
         csi:
           driver: secrets.stackable.tech
           volumeAttributes:
-            secrets.stackable.tech/type: secret
+            secrets.stackable.tech/class: secret
             secrets.stackable.tech/scope: node
 ---
 apiVersion: v1
@@ -34,7 +34,7 @@ kind: Secret
 metadata:
   name: secret-consumer-secret
   labels:
-    secrets.stackable.tech/type: secret
+    secrets.stackable.tech/class: secret
     secrets.stackable.tech/node: kind-control-plane
 stringData:
   boo: spooky, indeed!

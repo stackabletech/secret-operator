@@ -1,3 +1,5 @@
+//! Queries the Kubernetes API for predefined [`Secret`] objects
+
 use std::collections::BTreeMap;
 
 use async_trait::async_trait;
@@ -50,7 +52,10 @@ impl SecretBackend for K8sSearch {
         pod_info: PodInfo,
     ) -> Result<SecretFiles, Self::Error> {
         let mut label_selector = BTreeMap::new();
-        label_selector.insert("secrets.stackable.tech/type".to_string(), selector.ty);
+        label_selector.insert(
+            "secrets.stackable.tech/class".to_string(),
+            selector.class.to_string(),
+        );
         for scope in selector.scope {
             match scope {
                 SecretScope::Node => {

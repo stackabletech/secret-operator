@@ -1,3 +1,5 @@
+//! Collects or generates secret data based on the request in the Kubernetes `Volume` definition
+
 pub mod dynamic;
 pub mod k8s_search;
 pub mod pod_info;
@@ -6,7 +8,7 @@ pub mod tls;
 
 use async_trait::async_trait;
 use serde::Deserialize;
-use std::{collections::HashMap, convert::Infallible, path::PathBuf};
+use std::{collections::HashMap, convert::Infallible, fmt::Display, path::PathBuf};
 
 pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
@@ -15,23 +17,38 @@ pub use tls::TlsGenerate;
 use pod_info::Address;
 use scope::SecretScope;
 
+/// Configuration provided by the `Volume` selecting what secret data should be provided
+///
+/// Fields beginning with `csi.storage.k8s.io/` are provided by the Kubelet
 #[derive(Deserialize)]
 pub struct SecretVolumeSelector {
-    #[serde(rename = "secrets.stackable.tech/type")]
-    pub ty: String,
+    /// What kind of secret should be used
+    #[serde(rename = "secrets.stackable.tech/class")]
+    pub class: SecretClass,
+    /// Scopes define what the secret identifies about a pod
+    ///
+    /// Currently supported scopes:
+    /// - `pod` - The name and address of the pod itself
+    /// - `node` - The Kubernetes `Node` that the pod is running on
+    /// - `service` - A Kubernetes `Service` that the pod is participating in, this takes the name of the service in the format `service=foo`
+    ///
+    /// Multiple scopes are supported, these should be provided in a comma-separated list (for example: `pod,node`)
     #[serde(
         rename = "secrets.stackable.tech/scope",
         default,
         deserialize_with = "SecretScope::deserialize_vec"
     )]
     pub scope: Vec<scope::SecretScope>,
+    /// The name of the `Pod`, provided by Kubelet
     #[serde(rename = "csi.storage.k8s.io/pod.name")]
     pub pod: String,
+    /// The name of the `Pod`'s `Namespace`, provided by Kubelet
     #[serde(rename = "csi.storage.k8s.io/pod.namespace")]
     pub namespace: String,
 }
 
 impl SecretVolumeSelector {
+    /// Returns all addresses associated with a certain [`SecretScope`]
     fn scope_addresses<'a>(
         &'a self,
         pod_info: &'a pod_info::PodInfo,
@@ -62,6 +79,20 @@ impl SecretVolumeSelector {
                 "{}.{}.svc.cluster.local",
                 name, self.namespace
             ))],
+        }
+    }
+}
+
+/// Placeholder until we support admin-configurable classes
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SecretClass {
+    Tls,
+}
+impl Display for SecretClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Tls => f.write_str("tls"),
         }
     }
 }

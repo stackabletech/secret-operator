@@ -48,7 +48,7 @@ spec:
         csi:
           driver: secrets.stackable.tech
           volumeAttributes:
-            secrets.stackable.tech/type: secret
+            secrets.stackable.tech/class: tls
             secrets.stackable.tech/scope: node,pod,service=secret-consumer-nginx
       - name: config
         configMap:

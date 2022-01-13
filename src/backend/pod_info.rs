@@ -1,3 +1,5 @@
+//! See [`PodInfo`]
+
 use std::net::IpAddr;
 
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -15,6 +17,7 @@ pub enum FromPodError {
     NoNode,
 }
 
+/// Validated metadata about a scheduled [`Pod`]
 pub struct PodInfo {
     pub pod_ips: Vec<IpAddr>,
     pub service_name: Option<String>,

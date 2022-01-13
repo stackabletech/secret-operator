@@ -1,6 +1,9 @@
+//! See [`SecretScope`]
+
 use serde::{Deserialize, Deserializer};
 use snafu::{OptionExt, Snafu};
 
+/// Defines what properties the secret identifies about a pod
 #[derive(Clone, Debug)]
 pub enum SecretScope {
     Node,

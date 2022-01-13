@@ -1,3 +1,5 @@
+//! Dynamically provisions TLS certificates
+
 use async_trait::async_trait;
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},

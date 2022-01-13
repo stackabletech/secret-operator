@@ -1,3 +1,5 @@
+//! Support code for runtime-configurable dynamic [`SecretBackend`]s
+
 use async_trait::async_trait;
 use std::fmt::Display;
 
