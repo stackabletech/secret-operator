@@ -279,7 +279,7 @@ struct Opts {
 }
 
 #[tokio::main]
-async fn main() -> eyre::Result<()> {
+async fn main() -> anyhow::Result<()> {
     stackable_operator::logging::initialize_logging("SECRET_PROVISIONER_LOG");
     let opts = Opts::from_args();
     let client =
