@@ -1571,7 +1571,6 @@ dependencies = [
  "pin-project",
  "prost",
  "prost-types",
- "rand",
  "serde",
  "snafu",
  "stackable-operator",

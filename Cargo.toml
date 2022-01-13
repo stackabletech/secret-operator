@@ -15,7 +15,6 @@ openssl = "0.10.38"
 pin-project = "1.0.8"
 prost = "0.9.0"
 prost-types = "0.9.0"
-rand = "0.8.4"
 serde = "1.0.130"
 snafu = "0.7.0"
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.6.0" }
