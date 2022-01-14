@@ -21,8 +21,7 @@ You can also use [Tilt](https://tilt.dev/) to automatically recompile and redepl
 The operator injects secret data into `Pod` `Volume`s that declare a CSI volume with the `driver` `secrets.stackable.tech`.
 The volume takes the following mandatory attributes:
 
-- `secrets.stackable.tech/class`: The type of secret to be issued. Supported options:
-  - `tls`
+- `secrets.stackable.tech/class`: The type of secret to be issued. This corresponds to a `SecretClass` object.
 - `secrets.stackable.tech/scope`: The properties of the `Pod` that the secret should authenticate. Supported options:
   - `node`
   - `pod`
@@ -52,4 +51,21 @@ spec:
     volumeMounts:
     - name: tls
       mountPath: /tls
+```
+
+`SecretClass` defines where the secrets come from. For example, the following `SecretClass`
+issues TLS certificates, storing its CA certificate in `secret-provisioner-tls-ca`:
+
+```yaml
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: tls
+spec:
+  backend:
+    autoTls:
+      ca:
+        secret:
+          name: secret-provisioner-tls-ca
+          namespace: default
 ```

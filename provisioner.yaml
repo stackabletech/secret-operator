@@ -117,9 +117,8 @@ spec:
     autoTls:
       ca:
         secret:
-          name: foo
+          name: secret-provisioner-tls-ca
           namespace: default
-        generate: true
 ---
 apiVersion: secrets.stackable.tech/v1alpha1
 kind: SecretClass
