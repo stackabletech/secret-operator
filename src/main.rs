@@ -211,7 +211,9 @@ impl Node for SecretProvisionerNode {
             .get::<Pod>(&selector.pod, Some(&selector.namespace))
             .await
             .context(publish_error::GetPodSnafu)?;
-        let pod_info = PodInfo::try_from(pod).context(publish_error::ParsePodSnafu)?;
+        let pod_info = PodInfo::from_pod(&self.client, pod)
+            .await
+            .context(publish_error::ParsePodSnafu)?;
         let data = self
             .backend
             .get_secret_data(selector, pod_info)
