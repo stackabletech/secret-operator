@@ -1,4 +1,5 @@
 use backend::{pod_info, SecretBackendError};
+use crd::SecretClass;
 use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     identity_server::{Identity, IdentityServer},
@@ -13,7 +14,10 @@ use grpc::csi::v1::{
 };
 use serde::{de::IntoDeserializer, Deserialize};
 use snafu::{ResultExt, Snafu};
-use stackable_operator::k8s_openapi::api::core::v1::Pod;
+use stackable_operator::{
+    k8s_openapi::api::core::v1::Pod,
+    kube::{runtime::reflector::ObjectRef, CustomResourceExt},
+};
 use std::{
     collections::HashMap,
     error::Error,
@@ -34,6 +38,7 @@ use utils::TonicUnixStream;
 use crate::backend::{pod_info::PodInfo, SecretVolumeSelector};
 
 mod backend;
+mod crd;
 mod grpc;
 mod utils;
 
@@ -80,6 +85,16 @@ enum PublishError {
     },
     #[snafu(display("failed to parse pod details"))]
     ParsePod { source: pod_info::FromPodError },
+    #[snafu(display("failed to get {class}"))]
+    GetClass {
+        source: stackable_operator::error::Error,
+        class: ObjectRef<SecretClass>,
+    },
+    #[snafu(display("failed to initialize backend for {class}"))]
+    GetBackend {
+        source: backend::dynamic::FromClassError,
+        class: ObjectRef<SecretClass>,
+    },
     #[snafu(display("backend failed to get secret data"))]
     BackendGetSecretData { source: backend::dynamic::DynError },
     #[snafu(display("failed to create secret parent dir {}", path.display()))]
@@ -111,6 +126,10 @@ impl From<PublishError> for tonic::Status {
             PublishError::InvalidSelector { .. } => tonic::Status::invalid_argument(full_msg),
             PublishError::GetPod { .. } => tonic::Status::failed_precondition(full_msg),
             PublishError::ParsePod { .. } => tonic::Status::failed_precondition(full_msg),
+            PublishError::GetClass { .. } => tonic::Status::failed_precondition(full_msg),
+            PublishError::GetBackend { source, .. } => {
+                tonic::Status::new(source.grpc_code(), full_msg)
+            }
             PublishError::BackendGetSecretData { source } => {
                 tonic::Status::new(source.grpc_code(), full_msg)
             }
@@ -146,11 +165,34 @@ impl From<UnpublishError> for tonic::Status {
 }
 
 struct SecretProvisionerNode {
-    backend: Box<backend::Dynamic>,
     client: stackable_operator::client::Client,
 }
 
 impl SecretProvisionerNode {
+    async fn get_pod_info(&self, selector: &SecretVolumeSelector) -> Result<PodInfo, PublishError> {
+        let pod = self
+            .client
+            .get::<Pod>(&selector.pod, Some(&selector.namespace))
+            .await
+            .context(publish_error::GetPodSnafu)?;
+        PodInfo::try_from(pod).context(publish_error::ParsePodSnafu)
+    }
+
+    async fn get_secret_backend(
+        &self,
+        selector: &SecretVolumeSelector,
+    ) -> Result<Box<backend::Dynamic>, PublishError> {
+        let class_ref = || ObjectRef::new(&selector.class);
+        let class = self
+            .client
+            .get::<SecretClass>(&selector.class, None)
+            .await
+            .with_context(|_| publish_error::GetClassSnafu { class: class_ref() })?;
+        backend::dynamic::from_class(&self.client, class)
+            .await
+            .with_context(|_| publish_error::GetBackendSnafu { class: class_ref() })
+    }
+
     async fn save_secret_data(
         &self,
         target_path: &Path,
@@ -206,14 +248,9 @@ impl Node for SecretProvisionerNode {
         let selector =
             SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
                 .context(publish_error::InvalidSelectorSnafu)?;
-        let pod = self
-            .client
-            .get::<Pod>(&selector.pod, Some(&selector.namespace))
-            .await
-            .context(publish_error::GetPodSnafu)?;
-        let pod_info = PodInfo::try_from(pod).context(publish_error::ParsePodSnafu)?;
-        let data = self
-            .backend
+        let pod_info = self.get_pod_info(&selector).await?;
+        let backend = self.get_secret_backend(&selector).await?;
+        let data = backend
             .get_secret_data(selector, pod_info)
             .await
             .context(publish_error::BackendGetSecretDataSnafu)?;
@@ -276,42 +313,47 @@ impl Node for SecretProvisionerNode {
 struct Opts {
     #[structopt(long, env)]
     csi_endpoint: PathBuf,
+    #[structopt(flatten)]
+    cmd: stackable_operator::cli::Command,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     stackable_operator::logging::initialize_logging("SECRET_PROVISIONER_LOG");
     let opts = Opts::from_args();
-    let client =
-        stackable_operator::client::create_client(Some("secrets.stackable.tech".to_string()))
+    match opts.cmd {
+        stackable_operator::cli::Command::Crd => {
+            println!("{}", serde_yaml::to_string(&crd::SecretClass::crd())?)
+        }
+        stackable_operator::cli::Command::Run { product_config: _ } => {
+            let client = stackable_operator::client::create_client(Some(
+                "secrets.stackable.tech".to_string(),
+            ))
             .await?;
-    if opts
-        .csi_endpoint
-        .symlink_metadata()
-        .map_or(false, |meta| meta.file_type().is_socket())
-    {
-        let _ = std::fs::remove_file(&opts.csi_endpoint);
+            if opts
+                .csi_endpoint
+                .symlink_metadata()
+                .map_or(false, |meta| meta.file_type().is_socket())
+            {
+                let _ = std::fs::remove_file(&opts.csi_endpoint);
+            }
+            let mut sigterm = signal(SignalKind::terminate())?;
+            Server::builder()
+                .add_service(
+                    tonic_reflection::server::Builder::configure()
+                        .include_reflection_service(true)
+                        .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
+                        .build()?,
+                )
+                .add_service(IdentityServer::new(SecretProvisionerIdentity))
+                .add_service(NodeServer::new(SecretProvisionerNode { client }))
+                .serve_with_incoming_shutdown(
+                    UnixListenerStream::new(UnixListener::bind(opts.csi_endpoint)?)
+                        .map_ok(TonicUnixStream),
+                    sigterm.recv().map(|_| ()),
+                )
+                .await?;
+        }
     }
-    let mut sigterm = signal(SignalKind::terminate())?;
-    Server::builder()
-        .add_service(
-            tonic_reflection::server::Builder::configure()
-                .include_reflection_service(true)
-                .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
-                .build()?,
-        )
-        .add_service(IdentityServer::new(SecretProvisionerIdentity))
-        .add_service(NodeServer::new(SecretProvisionerNode {
-            // backend: backend::dynamic::from(backend::K8sSearch { client }),
-            backend: backend::dynamic::from(
-                backend::TlsGenerate::get_or_create_k8s_certificate(&client).await,
-            ),
-            client,
-        }))
-        .serve_with_incoming_shutdown(
-            UnixListenerStream::new(UnixListener::bind(opts.csi_endpoint)?).map_ok(TonicUnixStream),
-            sigterm.recv().map(|_| ()),
-        )
-        .await?;
     Ok(())
 }

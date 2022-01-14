@@ -22,7 +22,7 @@ rec {
     name = "docker.stackable.tech/teozkr/secret-provisioner";
     tag = dockerTag;
     config = {
-      Cmd = [ (build+"/bin/stackable-secret-operator") ];
+      Cmd = [ (build+"/bin/stackable-secret-operator") "run" ];
     };
   };
   docker = pkgs.linkFarm "secret-provisioner-docker" [
@@ -33,6 +33,16 @@ rec {
     {
       name = "ref";
       path = pkgs.writeText "${dockerImage.name}-image-tag" "${dockerImage.imageName}:${dockerImage.imageTag}";
+    }
+    {
+      name = "crd.yaml";
+      path = pkgs.runCommand "secret-provisioner-crd.yaml" {
+        # FIXME: CSI endpoint is currently always required...
+        CSI_ENDPOINT = "foo";
+      }
+      ''
+        ${build}/bin/stackable-secret-operator crd > $out
+      '';
     }
   ];
 
