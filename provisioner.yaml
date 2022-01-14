@@ -126,4 +126,8 @@ metadata:
   name: secret
 spec:
   backend:
-    k8sSearch: {}
+    k8sSearch:
+      searchNamespace:
+        pod: {}
+      secretLabels:
+        type: custom-secret
