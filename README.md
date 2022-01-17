@@ -26,7 +26,7 @@ The volume takes the following mandatory attributes:
 - `secrets.stackable.tech/scope`: The properties of the `Pod` that the secret should authenticate. Supported options:
   - `node`
   - `pod`
-  - `secret=<foo>`
+  - `service=<foo>`
   - Multiple scopes may be defined, they should be separated by commas
   
 A minimal secret-consuming `Pod` looks like this:
