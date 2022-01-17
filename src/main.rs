@@ -37,8 +37,11 @@ mod backend;
 mod grpc;
 mod utils;
 
+
 struct SecretProvisionerIdentity;
 
+// The identity services are mandatory to implement, we deliver some minimal responses here
+// https://github.com/container-storage-interface/spec/blob/master/spec.md#rpc-interface
 #[tonic::async_trait]
 impl Identity for SecretProvisionerIdentity {
     async fn get_plugin_info(
@@ -56,6 +59,8 @@ impl Identity for SecretProvisionerIdentity {
         &self,
         _request: Request<GetPluginCapabilitiesRequest>,
     ) -> Result<Response<GetPluginCapabilitiesResponse>, Status> {
+        // It is ok to return an empty vec here, as a minimal set of capabilities is
+        // is mandatory to implement. This list only refers to optional capabilities.
         Ok(Response::new(GetPluginCapabilitiesResponse {
             capabilities: Vec::new(),
         }))
@@ -99,14 +104,18 @@ enum PublishError {
     },
 }
 
+// Useful since all service calls return a [Result<tonic::Response<T>, tonic::Status>]
 impl From<PublishError> for tonic::Status {
     fn from(err: PublishError) -> Self {
+        // Build the full hierarchy of error messages by walking up the stack until an error
+        // without `source` set is encountered and concatenating all encountered error strings.
         let mut full_msg = format!("{}", err);
         let mut curr_err = err.source();
         while let Some(curr_source) = curr_err {
             full_msg.push_str(&format!(": {}", curr_source));
             curr_err = curr_source.source();
         }
+        // Convert to an appropriate tonic::Status representation and include full error message
         match err {
             PublishError::InvalidSelector { .. } => tonic::Status::invalid_argument(full_msg),
             PublishError::GetPod { .. } => tonic::Status::failed_precondition(full_msg),
@@ -131,26 +140,34 @@ enum UnpublishError {
     },
 }
 
+// Useful since all service calls return a [Result<tonic::Response<T>, tonic::Status>]
 impl From<UnpublishError> for tonic::Status {
     fn from(err: UnpublishError) -> Self {
+        // Build the full hierarchy of error messages by walking up the stack until an error
+        // without `source` set is encountered and concatenating all encountered error strings.
         let mut full_msg = format!("{}", err);
         let mut curr_err = err.source();
         while let Some(curr_source) = curr_err {
             full_msg.push_str(&format!(": {}", err));
             curr_err = curr_source.source();
         }
+        // Convert to an appropriate tonic::Status representation and include full error message
         match err {
             UnpublishError::Cleanup { .. } => tonic::Status::unavailable(full_msg),
         }
     }
 }
 
+// The actual provisioner that is run on all nodes and in charge of provisioning and storing
+// secrets for pods that get scheduled on that node.
 struct SecretProvisionerNode {
     backend: Box<backend::Dynamic>,
     client: stackable_operator::client::Client,
 }
 
 impl SecretProvisionerNode {
+    // Takes a path and list of filenames and content.
+    // Writes all files to the target directory.
     async fn save_secret_data(
         &self,
         target_path: &Path,
@@ -176,6 +193,10 @@ impl SecretProvisionerNode {
     }
 }
 
+// Most of the services are not yet implemented, most of them will never be, because they are
+// not needed for this use case.
+// The main two services are publish_volume und unpublish_volume, which get called whenever a
+// volume is bound to a pod on this node.
 #[tonic::async_trait]
 impl Node for SecretProvisionerNode {
     async fn node_stage_volume(
@@ -192,6 +213,8 @@ impl Node for SecretProvisionerNode {
         Err(tonic::Status::unimplemented("endpoint not implemented"))
     }
 
+    // Called when a volume is bound to a pod on this node.
+    // Creates and stores the certificates.
     async fn node_publish_volume(
         &self,
         request: Request<NodePublishVolumeRequest>,
@@ -223,6 +246,10 @@ impl Node for SecretProvisionerNode {
         Ok(Response::new(NodePublishVolumeResponse {}))
     }
 
+    // Called when a node is terminated that contained a volume created by this provider.
+    // Deletes the target directory which the publish step ran in.
+    // This means that any other files that were placed into that directory (for example by
+    // init containers will also be deleted during this step.
     async fn node_unpublish_volume(
         &self,
         request: Request<NodeUnpublishVolumeRequest>,
@@ -295,6 +322,8 @@ async fn main() -> anyhow::Result<()> {
         let _ = std::fs::remove_file(&opts.csi_endpoint);
     }
     let mut sigterm = signal(SignalKind::terminate())?;
+
+    // Start the services defined above and run until SigTerm
     Server::builder()
         .add_service(
             tonic_reflection::server::Builder::configure()
@@ -304,7 +333,8 @@ async fn main() -> anyhow::Result<()> {
         )
         .add_service(IdentityServer::new(SecretProvisionerIdentity))
         .add_service(NodeServer::new(SecretProvisionerNode {
-            // backend: backend::dynamic::from(backend::K8sSearch { client }),
+            // Currently the only supported backend is the tls backend, so this can be hard-coded
+            // here.
             backend: backend::dynamic::from(
                 backend::TlsGenerate::get_or_create_k8s_certificate(&client).await,
             ),
