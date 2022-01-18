@@ -36,10 +36,7 @@ rec {
     }
     {
       name = "crd.yaml";
-      path = pkgs.runCommand "secret-provisioner-crd.yaml" {
-        # FIXME: CSI endpoint is currently always required...
-        CSI_ENDPOINT = "foo";
-      }
+      path = pkgs.runCommand "secret-provisioner-crd.yaml" {}
       ''
         ${build}/bin/stackable-secret-operator crd > $out
       '';

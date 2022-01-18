@@ -1,4 +1,5 @@
 use backend::{pod_info, SecretBackendError};
+use clap::StructOpt;
 use crd::SecretClass;
 use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
@@ -24,7 +25,6 @@ use std::{
     os::unix::prelude::FileTypeExt,
     path::{Path, PathBuf},
 };
-use structopt::StructOpt;
 use tokio::{
     fs::{create_dir_all, File},
     io::AsyncWriteExt,
@@ -189,7 +189,9 @@ impl SecretProvisionerNode {
             .get::<Pod>(&selector.pod, Some(&selector.namespace))
             .await
             .context(publish_error::GetPodSnafu)?;
-        PodInfo::try_from(pod).context(publish_error::ParsePodSnafu)
+        PodInfo::from_pod(&self.client, pod)
+            .await
+            .context(publish_error::ParsePodSnafu)
     }
 
     async fn get_secret_backend(
@@ -335,33 +337,36 @@ impl Node for SecretProvisionerNode {
     }
 }
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 struct Opts {
-    #[structopt(long, env)]
+    #[clap(subcommand)]
+    cmd: stackable_operator::cli::Command<SecretOperatorRun>,
+}
+
+#[derive(clap::Parser)]
+struct SecretOperatorRun {
+    #[clap(long, env)]
     csi_endpoint: PathBuf,
-    #[structopt(flatten)]
-    cmd: stackable_operator::cli::Command,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     stackable_operator::logging::initialize_logging("SECRET_PROVISIONER_LOG");
-    let opts = Opts::from_args();
+    let opts = Opts::parse();
     match opts.cmd {
         stackable_operator::cli::Command::Crd => {
             println!("{}", serde_yaml::to_string(&crd::SecretClass::crd())?)
         }
-        stackable_operator::cli::Command::Run { product_config: _ } => {
+        stackable_operator::cli::Command::Run(SecretOperatorRun { csi_endpoint }) => {
             let client = stackable_operator::client::create_client(Some(
                 "secrets.stackable.tech".to_string(),
             ))
             .await?;
-            if opts
-                .csi_endpoint
+            if csi_endpoint
                 .symlink_metadata()
                 .map_or(false, |meta| meta.file_type().is_socket())
             {
-                let _ = std::fs::remove_file(&opts.csi_endpoint);
+                let _ = std::fs::remove_file(&csi_endpoint);
             }
             let mut sigterm = signal(SignalKind::terminate())?;
             Server::builder()
@@ -374,7 +379,7 @@ async fn main() -> anyhow::Result<()> {
                 .add_service(IdentityServer::new(SecretProvisionerIdentity))
                 .add_service(NodeServer::new(SecretProvisionerNode { client }))
                 .serve_with_incoming_shutdown(
-                    UnixListenerStream::new(UnixListener::bind(opts.csi_endpoint)?)
+                    UnixListenerStream::new(UnixListener::bind(csi_endpoint)?)
                         .map_ok(TonicUnixStream),
                     sigterm.recv().map(|_| ()),
                 )
