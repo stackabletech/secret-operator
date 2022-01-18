@@ -69,3 +69,16 @@ spec:
           name: secret-provisioner-tls-ca
           namespace: default
 ```
+
+`SecretClass`'s `spec` accepts the following options:
+
+- `backend`: The source of the secret data, exactly ONE variant may be used
+  - `autoTls`: Automatically provisions certificates
+    - `ca`: Configures the certificate authority used
+      - `secret`: Reference (`name` and `namespace`) to a K8s `Secret` object where the CA certificate and key is stored as `ca.crt` and `ca.key` respectively
+  - `k8sSearch`: Searches for a K8s `Secret` object that has labels matching the scopes specified on the volume (prefixed with `secrets.stackable.tech/`)
+    - `searchNamespace`: The namespace where the `Secret`s should be located, exactly ONE variant may be used
+      - `pod`: Searches in the same namespace where the `Pod` is located
+        - (empty object)
+      - `name`: Searches in the specified namespace
+    - `secretLabels`: Extra labels (and values) that should be present on the `Secret` for it to be considered a match
