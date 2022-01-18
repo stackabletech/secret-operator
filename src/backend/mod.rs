@@ -8,7 +8,7 @@ pub mod tls;
 
 use async_trait::async_trait;
 use serde::Deserialize;
-use std::{collections::HashMap, convert::Infallible, fmt::Display, path::PathBuf};
+use std::{collections::HashMap, convert::Infallible, path::PathBuf};
 
 pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
@@ -24,7 +24,7 @@ use scope::SecretScope;
 pub struct SecretVolumeSelector {
     /// What kind of secret should be used
     #[serde(rename = "secrets.stackable.tech/class")]
-    pub class: SecretClass,
+    pub class: String,
     /// Scopes define what the secret identifies about a pod
     ///
     /// Currently supported scopes:
@@ -79,20 +79,6 @@ impl SecretVolumeSelector {
                 "{}.{}.svc.cluster.local",
                 name, self.namespace
             ))],
-        }
-    }
-}
-
-/// Placeholder until we support admin-configurable classes
-#[derive(Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum SecretClass {
-    Tls,
-}
-impl Display for SecretClass {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Tls => f.write_str("tls"),
         }
     }
 }

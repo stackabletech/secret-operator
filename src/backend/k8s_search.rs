@@ -9,6 +9,8 @@ use stackable_operator::{
     kube::api::ListParams,
 };
 
+use crate::crd::SearchNamespace;
+
 use super::{
     pod_info::PodInfo, scope::SecretScope, SecretBackend, SecretBackendError, SecretFiles,
     SecretVolumeSelector,
@@ -40,6 +42,8 @@ impl SecretBackendError for Error {
 
 pub struct K8sSearch {
     pub client: stackable_operator::client::Client,
+    pub search_namespace: SearchNamespace,
+    pub secret_labels: BTreeMap<String, String>,
 }
 
 #[async_trait]
@@ -51,7 +55,7 @@ impl SecretBackend for K8sSearch {
         selector: SecretVolumeSelector,
         pod_info: PodInfo,
     ) -> Result<SecretFiles, Self::Error> {
-        let mut label_selector = BTreeMap::new();
+        let mut label_selector = self.secret_labels.clone();
         label_selector.insert(
             "secrets.stackable.tech/class".to_string(),
             selector.class.to_string(),
@@ -86,7 +90,10 @@ impl SecretBackend for K8sSearch {
         let secret = self
             .client
             .list::<Secret>(
-                Some(&selector.namespace),
+                match &self.search_namespace {
+                    SearchNamespace::Pod {} => Some(&selector.namespace),
+                    SearchNamespace::Name(ns) => Some(ns),
+                },
                 &ListParams::default().labels(&label_selector),
             )
             .await

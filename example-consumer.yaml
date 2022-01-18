@@ -36,5 +36,6 @@ metadata:
   labels:
     secrets.stackable.tech/class: secret
     secrets.stackable.tech/node: kind-control-plane
+    type: custom-secret
 stringData:
   boo: spooky, indeed!

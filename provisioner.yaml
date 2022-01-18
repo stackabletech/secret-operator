@@ -76,6 +76,12 @@ rules:
   - nodes
   verbs:
   - get
+- apiGroups:
+  - secrets.stackable.tech
+  resources:
+  - secretclasses
+  verbs:
+  - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -102,3 +108,27 @@ spec:
   - audience: secrets.stackable.tech/consumer
   volumeLifecycleModes:
   - Ephemeral
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: tls
+spec:
+  backend:
+    autoTls:
+      ca:
+        secret:
+          name: secret-provisioner-tls-ca
+          namespace: default
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: secret
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: {}
+      secretLabels:
+        type: custom-secret
