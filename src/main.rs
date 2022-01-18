@@ -37,7 +37,6 @@ mod backend;
 mod grpc;
 mod utils;
 
-
 struct SecretProvisionerIdentity;
 
 // The identity services are mandatory to implement, we deliver some minimal responses here
