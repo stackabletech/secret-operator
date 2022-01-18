@@ -266,7 +266,6 @@ impl Node for SecretProvisionerNode {
         let target_path = PathBuf::from(request.target_path);
         tracing::info!(
             volume.path = %target_path.display(),
-            volume.ctx = ?request.volume_context,
             "Received NodePublishVolume request"
         );
         let selector =
