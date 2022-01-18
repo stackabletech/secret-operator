@@ -99,6 +99,9 @@ impl Display for SecretClass {
 
 type SecretFiles = HashMap<PathBuf, Vec<u8>>;
 
+/// This trait needs to be implemented by all secret providers.
+/// It gets the pod information as well as volume definition and has to
+/// return any number of files.
 #[async_trait]
 pub trait SecretBackend: Send + Sync {
     type Error: SecretBackendError;
