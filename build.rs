@@ -1,3 +1,5 @@
+//! Compile Rust code from gRPC definition files stored in the vendor/csi directory.
+
 use std::path::PathBuf;
 
 fn main() {

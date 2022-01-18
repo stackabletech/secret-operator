@@ -1,3 +1,4 @@
+use backend::{pod_info, SecretBackendError};
 use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     identity_server::{Identity, IdentityServer},
@@ -10,18 +11,11 @@ use grpc::csi::v1::{
     NodeStageVolumeResponse, NodeUnpublishVolumeRequest, NodeUnpublishVolumeResponse,
     NodeUnstageVolumeRequest, NodeUnstageVolumeResponse, ProbeRequest, ProbeResponse,
 };
-use pin_project::pin_project;
-use serde::{de::IntoDeserializer, Deserialize, Deserializer};
-use stackable_operator::{
-    k8s_openapi::{
-        api::core::v1::{Pod, Secret},
-        apimachinery::pkg::apis::meta::v1::LabelSelector,
-        ByteString,
-    },
-    kube::{self, api::ListParams, runtime::reflector::ObjectRef},
-};
+use serde::{de::IntoDeserializer, Deserialize};
+use snafu::{ResultExt, Snafu};
+use stackable_operator::k8s_openapi::api::core::v1::Pod;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     error::Error,
     os::unix::prelude::FileTypeExt,
     path::{Path, PathBuf},
@@ -29,20 +23,24 @@ use std::{
 use structopt::StructOpt;
 use tokio::{
     fs::{create_dir_all, File},
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
-    net::{UnixListener, UnixStream},
+    io::AsyncWriteExt,
+    net::UnixListener,
     signal::unix::{signal, SignalKind},
 };
 use tokio_stream::wrappers::UnixListenerStream;
-use tonic::{
-    transport::{server::Connected, Server},
-    Request, Response, Status,
-};
+use tonic::{transport::Server, Request, Response, Status};
+use utils::TonicUnixStream;
 
+use crate::backend::{pod_info::PodInfo, SecretVolumeSelector};
+
+mod backend;
 mod grpc;
+mod utils;
 
 struct SecretProvisionerIdentity;
 
+// The identity services are mandatory to implement, we deliver some minimal responses here
+// https://github.com/container-storage-interface/spec/blob/master/spec.md#rpc-interface
 #[tonic::async_trait]
 impl Identity for SecretProvisionerIdentity {
     async fn get_plugin_info(
@@ -60,6 +58,8 @@ impl Identity for SecretProvisionerIdentity {
         &self,
         _request: Request<GetPluginCapabilitiesRequest>,
     ) -> Result<Response<GetPluginCapabilitiesResponse>, Status> {
+        // It is ok to return an empty vec here, as a minimal set of capabilities is
+        // is mandatory to implement. This list only refers to optional capabilities.
         Ok(Response::new(GetPluginCapabilitiesResponse {
             capabilities: Vec::new(),
         }))
@@ -73,148 +73,129 @@ impl Identity for SecretProvisionerIdentity {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Snafu, Debug)]
+#[snafu(module)]
 enum PublishError {
-    #[error("failed to parse selector from volume context")]
-    InvalidSelector(#[source] serde::de::value::Error),
-    #[error("failed to find {1} owning the volume")]
-    OwnerPodNotFound(#[source] kube::Error, ObjectRef<Pod>),
-    #[error("owner {0} has no associated node")]
-    OwnerPodHasNoNode(ObjectRef<Pod>),
-    #[error("failed to build secret selector")]
-    SecretSelector(#[source] stackable_operator::error::Error),
-    #[error("failed to query for secrets")]
-    SecretQuery(#[source] kube::Error),
-    #[error("no secrets matched query {0}")]
-    NoSecret(String),
-    #[error("failed to create secret parent dir {1}")]
-    CreateDir(#[source] std::io::Error, PathBuf),
-    #[error("failed to create secret file {1}")]
-    CreateFile(#[source] std::io::Error, PathBuf),
-    #[error("failed to write secret file {1}")]
-    WriteFile(#[source] std::io::Error, PathBuf),
+    #[snafu(display("failed to parse selector from volume context"))]
+    InvalidSelector { source: serde::de::value::Error },
+    #[snafu(display("failed to get pod for volume"))]
+    GetPod {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to parse pod details"))]
+    ParsePod { source: pod_info::FromPodError },
+    #[snafu(display("backend failed to get secret data"))]
+    BackendGetSecretData { source: backend::dynamic::DynError },
+    #[snafu(display("failed to create secret parent dir {}", path.display()))]
+    CreateDir {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[snafu(display("failed to create secret file {}", path.display()))]
+    CreateFile {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[snafu(display("failed to write secret file {}", path.display()))]
+    WriteFile {
+        source: std::io::Error,
+        path: PathBuf,
+    },
 }
 
+// Useful since all service calls return a [Result<tonic::Response<T>, tonic::Status>]
 impl From<PublishError> for tonic::Status {
     fn from(err: PublishError) -> Self {
+        // Build the full hierarchy of error messages by walking up the stack until an error
+        // without `source` set is encountered and concatenating all encountered error strings.
         let mut full_msg = format!("{}", err);
         let mut curr_err = err.source();
         while let Some(curr_source) = curr_err {
-            full_msg.push_str(&format!(": {}", err));
+            full_msg.push_str(&format!(": {}", curr_source));
             curr_err = curr_source.source();
         }
+        // Convert to an appropriate tonic::Status representation and include full error message
         match err {
-            PublishError::InvalidSelector(_) => tonic::Status::invalid_argument(full_msg),
-            PublishError::OwnerPodNotFound(_, _) => tonic::Status::failed_precondition(full_msg),
-            PublishError::OwnerPodHasNoNode(_) => tonic::Status::failed_precondition(full_msg),
-            PublishError::SecretSelector(_) => tonic::Status::failed_precondition(full_msg),
-            PublishError::SecretQuery(_) => tonic::Status::failed_precondition(full_msg),
-            PublishError::NoSecret(_) => tonic::Status::failed_precondition(full_msg),
-            PublishError::CreateDir(_, _) => tonic::Status::unavailable(full_msg),
-            PublishError::CreateFile(_, _) => tonic::Status::unavailable(full_msg),
-            PublishError::WriteFile(_, _) => tonic::Status::unavailable(full_msg),
+            PublishError::InvalidSelector { .. } => tonic::Status::invalid_argument(full_msg),
+            PublishError::GetPod { .. } => tonic::Status::failed_precondition(full_msg),
+            PublishError::ParsePod { .. } => tonic::Status::failed_precondition(full_msg),
+            PublishError::BackendGetSecretData { source } => {
+                tonic::Status::new(source.grpc_code(), full_msg)
+            }
+            PublishError::CreateDir { .. } => tonic::Status::unavailable(full_msg),
+            PublishError::CreateFile { .. } => tonic::Status::unavailable(full_msg),
+            PublishError::WriteFile { .. } => tonic::Status::unavailable(full_msg),
         }
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Snafu, Debug)]
+#[snafu(module)]
 enum UnpublishError {
-    #[error("failed to clean up volume mount directory {1}")]
-    Cleanup(#[source] std::io::Error, PathBuf),
+    #[snafu(display("failed to clean up volume mount directory {}", path.display()))]
+    Cleanup {
+        source: std::io::Error,
+        path: PathBuf,
+    },
 }
 
+// Useful since all service calls return a [Result<tonic::Response<T>, tonic::Status>]
 impl From<UnpublishError> for tonic::Status {
     fn from(err: UnpublishError) -> Self {
+        // Build the full hierarchy of error messages by walking up the stack until an error
+        // without `source` set is encountered and concatenating all encountered error strings.
         let mut full_msg = format!("{}", err);
         let mut curr_err = err.source();
         while let Some(curr_source) = curr_err {
             full_msg.push_str(&format!(": {}", err));
             curr_err = curr_source.source();
         }
+        // Convert to an appropriate tonic::Status representation and include full error message
         match err {
-            UnpublishError::Cleanup(_, _) => tonic::Status::unavailable(full_msg),
+            UnpublishError::Cleanup { .. } => tonic::Status::unavailable(full_msg),
         }
     }
 }
 
+// The actual provisioner that is run on all nodes and in charge of provisioning and storing
+// secrets for pods that get scheduled on that node.
 struct SecretProvisionerNode {
-    kube: kube::Client,
+    backend: Box<backend::Dynamic>,
+    client: stackable_operator::client::Client,
 }
 
 impl SecretProvisionerNode {
-    async fn get_secret_data(
-        &self,
-        sel: SecretVolumeSelector,
-    ) -> Result<BTreeMap<String, ByteString>, PublishError> {
-        let pods = kube::Api::<Pod>::namespaced(self.kube.clone(), &sel.namespace);
-        let secrets = kube::Api::<Secret>::namespaced(self.kube.clone(), &sel.namespace);
-        let pod_ref = ObjectRef::new(&sel.pod).within(&sel.namespace);
-        let pod = pods
-            .get(&sel.pod)
-            .await
-            .map_err(|err| PublishError::OwnerPodNotFound(err, pod_ref.clone()))?;
-        let mut label_selector = BTreeMap::new();
-        label_selector.insert("secrets.stackable.tech/type".to_string(), sel.ty);
-        for scope in sel.scope {
-            match scope {
-                SecretScope::Node => {
-                    label_selector.insert(
-                        "secrets.stackable.tech/node".to_string(),
-                        pod.spec
-                            .as_ref()
-                            .and_then(|pod_spec| pod_spec.node_name.clone())
-                            .ok_or_else(|| PublishError::OwnerPodHasNoNode(pod_ref.clone()))?,
-                    );
-                }
-                SecretScope::Pod => {
-                    label_selector
-                        .insert("secrets.stackable.tech/pod".to_string(), sel.pod.clone());
-                }
-            }
-        }
-        let label_selector =
-            stackable_operator::label_selector::convert_label_selector_to_query_string(
-                &LabelSelector {
-                    match_expressions: None,
-                    match_labels: Some(label_selector),
-                },
-            )
-            .map_err(PublishError::SecretSelector)?;
-        Ok(secrets
-            .list(&ListParams::default().labels(&label_selector))
-            .await
-            .map_err(PublishError::SecretQuery)?
-            .items
-            .into_iter()
-            .next()
-            .ok_or(PublishError::NoSecret(label_selector))?
-            .data
-            .unwrap_or_default())
-    }
-
+    // Takes a path and list of filenames and content.
+    // Writes all files to the target directory.
     async fn save_secret_data(
         &self,
         target_path: &Path,
-        data: BTreeMap<String, ByteString>,
+        data: HashMap<PathBuf, Vec<u8>>,
     ) -> Result<(), PublishError> {
         for (k, v) in data {
             let item_path = target_path.join(k);
             if let Some(item_path_parent) = item_path.parent() {
                 create_dir_all(item_path_parent)
                     .await
-                    .map_err(|err| PublishError::CreateDir(err, item_path_parent.into()))?;
+                    .context(publish_error::CreateDirSnafu {
+                        path: item_path_parent,
+                    })?;
             }
             File::create(item_path)
                 .await
-                .map_err(|err| PublishError::CreateFile(err, target_path.into()))?
-                .write_all(&v.0)
+                .context(publish_error::CreateFileSnafu { path: target_path })?
+                .write_all(&v)
                 .await
-                .map_err(|err| PublishError::WriteFile(err, target_path.into()))?;
+                .context(publish_error::WriteFileSnafu { path: target_path })?;
         }
         Ok(())
     }
 }
 
+// Most of the services are not yet implemented, most of them will never be, because they are
+// not needed for this use case.
+// The main two services are publish_volume und unpublish_volume, which get called whenever a
+// volume is bound to a pod on this node.
 #[tonic::async_trait]
 impl Node for SecretProvisionerNode {
     async fn node_stage_volume(
@@ -231,6 +212,8 @@ impl Node for SecretProvisionerNode {
         Err(tonic::Status::unimplemented("endpoint not implemented"))
     }
 
+    // Called when a volume is bound to a pod on this node.
+    // Creates and stores the certificates.
     async fn node_publish_volume(
         &self,
         request: Request<NodePublishVolumeRequest>,
@@ -242,13 +225,30 @@ impl Node for SecretProvisionerNode {
             volume.ctx = ?request.volume_context,
             "Received NodePublishVolume request"
         );
-        let sel = SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
-            .map_err(PublishError::InvalidSelector)?;
-        let data = self.get_secret_data(sel).await?;
+        let selector =
+            SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
+                .context(publish_error::InvalidSelectorSnafu)?;
+        let pod = self
+            .client
+            .get::<Pod>(&selector.pod, Some(&selector.namespace))
+            .await
+            .context(publish_error::GetPodSnafu)?;
+        let pod_info = PodInfo::from_pod(&self.client, pod)
+            .await
+            .context(publish_error::ParsePodSnafu)?;
+        let data = self
+            .backend
+            .get_secret_data(selector, pod_info)
+            .await
+            .context(publish_error::BackendGetSecretDataSnafu)?;
         self.save_secret_data(&target_path, data).await?;
         Ok(Response::new(NodePublishVolumeResponse {}))
     }
 
+    // Called when a pod is terminated that contained a volume created by this provider.
+    // Deletes the target directory which the publish step ran in.
+    // This means that any other files that were placed into that directory (for example by
+    // init containers will also be deleted during this step.
     async fn node_unpublish_volume(
         &self,
         request: Request<NodeUnpublishVolumeRequest>,
@@ -261,7 +261,7 @@ impl Node for SecretProvisionerNode {
         );
         tokio::fs::remove_dir_all(&target_path)
             .await
-            .map_err(|err| UnpublishError::Cleanup(err, target_path))?;
+            .context(unpublish_error::CleanupSnafu { path: target_path })?;
         Ok(Response::new(NodeUnpublishVolumeResponse {}))
     }
 
@@ -300,37 +300,6 @@ impl Node for SecretProvisionerNode {
     }
 }
 
-#[derive(Deserialize)]
-struct SecretVolumeSelector {
-    #[serde(rename = "secrets.stackable.tech/type")]
-    ty: String,
-    #[serde(
-        rename = "secrets.stackable.tech/scope",
-        default,
-        deserialize_with = "SecretScope::deserialize_vec"
-    )]
-    scope: Vec<SecretScope>,
-    #[serde(rename = "csi.storage.k8s.io/pod.name")]
-    pod: String,
-    #[serde(rename = "csi.storage.k8s.io/pod.namespace")]
-    namespace: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-enum SecretScope {
-    Node,
-    Pod,
-}
-
-impl SecretScope {
-    fn deserialize_vec<'de, D: Deserializer<'de>>(de: D) -> Result<Vec<Self>, D::Error> {
-        let scopes_str = String::deserialize(de)?;
-        let scopes_split = scopes_str.split(',').collect::<Vec<_>>();
-        Vec::<Self>::deserialize(scopes_split.into_deserializer())
-    }
-}
-
 #[derive(StructOpt)]
 struct Opts {
     #[structopt(long, env)]
@@ -338,10 +307,12 @@ struct Opts {
 }
 
 #[tokio::main]
-async fn main() -> eyre::Result<()> {
+async fn main() -> anyhow::Result<()> {
     stackable_operator::logging::initialize_logging("SECRET_PROVISIONER_LOG");
     let opts = Opts::from_args();
-    let kube = kube::Client::try_default().await?;
+    let client =
+        stackable_operator::client::create_client(Some("secrets.stackable.tech".to_string()))
+            .await?;
     if opts
         .csi_endpoint
         .symlink_metadata()
@@ -350,6 +321,8 @@ async fn main() -> eyre::Result<()> {
         let _ = std::fs::remove_file(&opts.csi_endpoint);
     }
     let mut sigterm = signal(SignalKind::terminate())?;
+
+    // Start the services defined above and run until SigTerm
     Server::builder()
         .add_service(
             tonic_reflection::server::Builder::configure()
@@ -358,66 +331,18 @@ async fn main() -> eyre::Result<()> {
                 .build()?,
         )
         .add_service(IdentityServer::new(SecretProvisionerIdentity))
-        .add_service(NodeServer::new(SecretProvisionerNode { kube }))
+        .add_service(NodeServer::new(SecretProvisionerNode {
+            // Currently the only supported backend is the tls backend, so this can be hard-coded
+            // here.
+            backend: backend::dynamic::from(
+                backend::TlsGenerate::get_or_create_k8s_certificate(&client).await,
+            ),
+            client,
+        }))
         .serve_with_incoming_shutdown(
             UnixListenerStream::new(UnixListener::bind(opts.csi_endpoint)?).map_ok(TonicUnixStream),
             sigterm.recv().map(|_| ()),
         )
         .await?;
     Ok(())
-}
-
-#[pin_project]
-struct TonicUnixStream(#[pin] UnixStream);
-
-impl AsyncRead for TonicUnixStream {
-    fn poll_read(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
-        self.project().0.poll_read(cx, buf)
-    }
-}
-
-impl AsyncWrite for TonicUnixStream {
-    fn poll_write(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &[u8],
-    ) -> std::task::Poll<Result<usize, std::io::Error>> {
-        self.project().0.poll_write(cx, buf)
-    }
-
-    fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        self.project().0.poll_flush(cx)
-    }
-
-    fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        self.project().0.poll_shutdown(cx)
-    }
-
-    fn poll_write_vectored(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        bufs: &[std::io::IoSlice<'_>],
-    ) -> std::task::Poll<Result<usize, std::io::Error>> {
-        self.project().0.poll_write_vectored(cx, bufs)
-    }
-
-    fn is_write_vectored(&self) -> bool {
-        self.0.is_write_vectored()
-    }
-}
-
-impl Connected for TonicUnixStream {
-    type ConnectInfo = ();
-
-    fn connect_info(&self) -> Self::ConnectInfo {}
 }

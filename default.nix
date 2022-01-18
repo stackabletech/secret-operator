@@ -14,15 +14,28 @@
       };
     };
   }
+, dockerTag ? "latest"
 }:
 rec {
   build = cargo.rootCrate.build;
-  crate2nix = pkgs.crate2nix;
-  docker = pkgs.dockerTools.streamLayeredImage {
-    name = "secret-provisioner";
-    tag = "latest";
+  dockerImage = pkgs.dockerTools.streamLayeredImage {
+    name = "docker.stackable.tech/teozkr/secret-provisioner";
+    tag = dockerTag;
     config = {
       Cmd = [ (build+"/bin/stackable-secret-operator") ];
     };
   };
+  docker = pkgs.linkFarm "secret-provisioner-docker" [
+    {
+      name = "load-image";
+      path = dockerImage;
+    }
+    {
+      name = "ref";
+      path = pkgs.writeText "${dockerImage.name}-image-tag" "${dockerImage.imageName}:${dockerImage.imageTag}";
+    }
+  ];
+
+  crate2nix = pkgs.crate2nix;
+  tilt = pkgs.tilt;
 }
