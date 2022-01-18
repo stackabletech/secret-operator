@@ -1,5 +1,5 @@
 use backend::{pod_info, SecretBackendError};
-use clap::StructOpt;
+use clap::{crate_description, crate_version, StructOpt};
 use crd::SecretClass;
 use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
@@ -54,7 +54,7 @@ impl Identity for SecretProvisionerIdentity {
     ) -> Result<Response<GetPluginInfoResponse>, Status> {
         Ok(Response::new(GetPluginInfoResponse {
             name: "secrets.stackable.tech".to_string(),
-            vendor_version: "0.0.0".to_string(),
+            vendor_version: crate_version!().to_string(),
             manifest: HashMap::new(),
         }))
     }
@@ -266,7 +266,6 @@ impl Node for SecretProvisionerNode {
         let target_path = PathBuf::from(request.target_path);
         tracing::info!(
             volume.path = %target_path.display(),
-            volume.ctx = ?request.volume_context,
             "Received NodePublishVolume request"
         );
         let selector =
@@ -338,6 +337,7 @@ impl Node for SecretProvisionerNode {
 }
 
 #[derive(clap::Parser)]
+#[clap(author, version)]
 struct Opts {
     #[clap(subcommand)]
     cmd: stackable_operator::cli::Command<SecretOperatorRun>,
@@ -349,6 +349,11 @@ struct SecretOperatorRun {
     csi_endpoint: PathBuf,
 }
 
+mod built_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+    pub const TARGET: Option<&str> = option_env!("TARGET");
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     stackable_operator::logging::initialize_logging("SECRET_PROVISIONER_LOG");
@@ -358,6 +363,14 @@ async fn main() -> anyhow::Result<()> {
             println!("{}", serde_yaml::to_string(&crd::SecretClass::crd())?)
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun { csi_endpoint }) => {
+            stackable_operator::utils::print_startup_string(
+                crate_description!(),
+                crate_version!(),
+                built_info::GIT_VERSION,
+                built_info::TARGET.unwrap_or("unknown target"),
+                built_info::BUILT_TIME_UTC,
+                built_info::RUSTC_VERSION,
+            );
             let client = stackable_operator::client::create_client(Some(
                 "secrets.stackable.tech".to_string(),
             ))
