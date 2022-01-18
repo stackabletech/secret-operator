@@ -6,6 +6,10 @@ use tokio::{
 use tonic::transport::server::Connected;
 
 /// Adapter for using [`UnixStream`] as a [`tonic`] connection
+/// Tonic usually communicates via TCP sockets, but the Kubernetes CSI interface expects
+/// plugins to use Unix sockets instead.
+/// This provides a wrapper implementation which delegates to tokio's [`UnixStream`] in order
+/// to enable tonic to communicate via Unix sockets.
 #[pin_project]
 pub struct TonicUnixStream(#[pin] pub UnixStream);
 

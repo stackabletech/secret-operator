@@ -141,6 +141,12 @@ impl TlsGenerate {
         Ok(Self { ca_key, ca_cert })
     }
 
+    /// Check if a signing CA has already been instantiated in a specified Kubernetes secret - if
+    /// one is found the key is loaded and used for signing certs.
+    /// If no current authority can be found, a new keypair and self signed certificate is created
+    /// and stored for future use.
+    /// This allows users to provide their own CA files, but also enables using this for dev and test
+    /// scenarios where self signed, ephemeral CAs are ok to use.
     pub async fn get_or_create_k8s_certificate(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
@@ -160,6 +166,7 @@ impl TlsGenerate {
         let existing_secret = client.get::<Secret>(k8s_secret_name, Some(k8s_ns)).await;
         Ok(match existing_secret {
             Ok(ca_secret) => {
+                // Existing CA has been found, load and use this
                 let ca_data = ca_secret.data.unwrap_or_default();
                 Self {
                     ca_key: PKey::private_key_from_pem(
@@ -215,6 +222,8 @@ impl TlsGenerate {
 impl SecretBackend for TlsGenerate {
     type Error = Error;
 
+    /// Generate a keypair and sign it with the CA key.
+    /// Then add the ca certificate and return these files for provisioning to the volume.
     async fn get_secret_data(
         &self,
         selector: super::SecretVolumeSelector,
