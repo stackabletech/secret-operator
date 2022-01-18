@@ -245,7 +245,7 @@ impl Node for SecretProvisionerNode {
         Ok(Response::new(NodePublishVolumeResponse {}))
     }
 
-    // Called when a node is terminated that contained a volume created by this provider.
+    // Called when a pod is terminated that contained a volume created by this provider.
     // Deletes the target directory which the publish step ran in.
     // This means that any other files that were placed into that directory (for example by
     // init containers will also be deleted during this step.
