@@ -1,7 +1,10 @@
+use std::{os::unix::prelude::AsRawFd, path::Path};
+
 use pin_project::pin_project;
+use socket2::Socket;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
-    net::UnixStream,
+    net::{UnixListener, UnixStream},
 };
 use tonic::transport::server::Connected;
 
@@ -63,4 +66,18 @@ impl Connected for TonicUnixStream {
     type ConnectInfo = ();
 
     fn connect_info(&self) -> Self::ConnectInfo {}
+}
+
+/// Bind a Unix Domain Socket listener that is only accessible to the current user
+pub fn uds_bind_private(path: impl AsRef<Path>) -> Result<UnixListener, std::io::Error> {
+    // Workaround for https://github.com/tokio-rs/tokio/issues/4422
+    let socket = Socket::new(socket2::Domain::UNIX, socket2::Type::STREAM, None)?;
+    unsafe {
+        if libc::fchmod(socket.as_raw_fd(), 0o600) == -1 {
+            return Err(std::io::Error::last_os_error());
+        }
+    }
+    socket.bind(&socket2::SockAddr::unix(path)?)?;
+    socket.listen(1024)?;
+    UnixListener::from_std(socket.into())
 }
