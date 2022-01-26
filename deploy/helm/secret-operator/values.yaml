@@ -22,7 +22,9 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
+securityContext:
+  # secret-operator requires root permissions
+  runAsUser: 0
   # capabilities:
   #   drop:
   #   - ALL

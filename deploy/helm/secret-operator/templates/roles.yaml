@@ -7,96 +7,21 @@ rules:
   - apiGroups:
       - ""
     resources:
-      - nodes
+      - secrets
     verbs:
       - list
-      - watch
+      - create
+      - get
   - apiGroups:
       - ""
     resources:
       - pods
-      - configmaps
-      - services
-      - endpoints
-      - serviceaccounts
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - rbac.authorization.k8s.io
-    resources:
-      - rolebindings
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - apps
-    resources:
-      - statefulsets
-    verbs:
-      - create
-      - delete
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - batch
-    resources:
-      - jobs
-    verbs:
-      - create
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - apiextensions.k8s.io
-    resources:
-      - customresourcedefinitions
+      - nodes
     verbs:
       - get
   - apiGroups:
-      - command.{{ include "operator.name" . }}.stackable.tech
+      - secrets.stackable.tech
     resources:
-      - inits
-      - restarts
-      - starts
-      - stops
+      - secretclasses
     verbs:
       - get
-      - list
-      - patch
-      - watch
-  - apiGroups:
-      - command.{{ include "operator.name" . }}.stackable.tech
-    resources:
-      - inits/status
-    verbs:
-      - patch
-  - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
-    resources:
-      - {{ include "operator.name" . }}clusters
-    verbs:
-      - get
-      - list
-      - patch
-      - watch
-  - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
-    resources:
-      - {{ include "operator.name" . }}clusters/status
-    verbs:
-      - patch

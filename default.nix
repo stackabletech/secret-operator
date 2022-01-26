@@ -18,6 +18,11 @@
 }:
 rec {
   build = cargo.rootCrate.build;
+  crds = pkgs.runCommand "secret-provisioner-crds.yaml" {}
+  ''
+    ${build}/bin/stackable-secret-operator crd > $out
+  '';
+
   dockerImage = pkgs.dockerTools.streamLayeredImage {
     name = "docker.stackable.tech/teozkr/secret-provisioner";
     tag = dockerTag;
@@ -35,11 +40,8 @@ rec {
       path = pkgs.writeText "${dockerImage.name}-image-tag" "${dockerImage.imageName}:${dockerImage.imageTag}";
     }
     {
-      name = "crd.yaml";
-      path = pkgs.runCommand "secret-provisioner-crd.yaml" {}
-      ''
-        ${build}/bin/stackable-secret-operator crd > $out
-      '';
+      name = "crds.yaml";
+      path = crds;
     }
   ];
 

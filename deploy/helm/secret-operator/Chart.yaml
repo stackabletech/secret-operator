@@ -1,12 +1,10 @@
 ---
 apiVersion: v2
 name: secret-operator
-version: <version_placeholder>
-appVersion: "<version_placeholder>"
+version: 0.1.0
+appVersion: "0.1.0"
 description: The Stackable Operator for Stackable Secret Operator
-
 home: https://github.com/stackabletech/secret-operator
-
 maintainers:
   - name: Stackable
     url: https://www.stackable.tech
