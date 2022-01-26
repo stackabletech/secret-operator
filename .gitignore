@@ -1,5 +1,9 @@
-/target
+debug/
+target/
+**/*.rs.bk
 
-/result*
-/Cargo.nix
-/crate-hashes.json
+.idea/
+*.iws
+*.iml
+
+*.tgz

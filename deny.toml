@@ -34,8 +34,10 @@ allow = [
 ]
 
 exceptions = [
+    { name = "stackable-secret-operator-crd", allow = ["OSL-3.0"] },
     { name = "stackable-secret-operator", allow = ["OSL-3.0"] },
-]
+    { name = "stackable-secret-operator-binary", allow = ["OSL-3.0"] },
+    ]
 
 [[licenses.clarify]]
 name = "ring"
@@ -56,4 +58,4 @@ unknown-registry = "deny"
 unknown-git = "deny"
 
 [sources.allow-org]
-github = ["stackabletech", "teozkr"]
+github = ["stackabletech"]
