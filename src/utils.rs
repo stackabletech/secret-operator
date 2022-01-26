@@ -73,6 +73,9 @@ pub fn uds_bind_private(path: impl AsRef<Path>) -> Result<UnixListener, std::io:
     // Workaround for https://github.com/tokio-rs/tokio/issues/4422
     let socket = Socket::new(socket2::Domain::UNIX, socket2::Type::STREAM, None)?;
     unsafe {
+        // Socket-level chmod is propagated to the file created by Socket::bind.
+        // We need to chmod /before/ creating the file, because otherwise there is a brief window where
+        // the file is world-accessible (unless restricted by the global umask).
         if libc::fchmod(socket.as_raw_fd(), 0o600) == -1 {
             return Err(std::io::Error::last_os_error());
         }
