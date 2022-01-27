@@ -49,7 +49,7 @@ jobs:
         run: make compile-chart
 
       - name: Package Chart
-        run: mkdir -p target/helm && helm package --destination target/helm deploy/helm/${{ env.PRODUCT_NAME }}-operator
+        run: mkdir -p target/helm && helm package --destination target/helm deploy/helm/secret-operator
 
       - name: Publish Chart
         env:
