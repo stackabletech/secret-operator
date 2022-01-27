@@ -7,8 +7,8 @@ tmp=$(mktemp -d ./manifests-XXXXX)
 
 helm template --output-dir $tmp \
               --include-crds \
-              --name-template secret-operator-operator \
-              deploy/helm/secret-operator-operator
+              --name-template secret-operator \
+              deploy/helm/secret-operator
 
 for file in $(find $tmp -type f)
 do
