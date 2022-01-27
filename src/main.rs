@@ -28,12 +28,11 @@ use std::{
 use tokio::{
     fs::{create_dir_all, File},
     io::AsyncWriteExt,
-    net::UnixListener,
     signal::unix::{signal, SignalKind},
 };
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::{transport::Server, Request, Response, Status};
-use utils::TonicUnixStream;
+use utils::{uds_bind_private, TonicUnixStream};
 
 use crate::backend::{pod_info::PodInfo, SecretVolumeSelector};
 
@@ -392,7 +391,7 @@ async fn main() -> anyhow::Result<()> {
                 .add_service(IdentityServer::new(SecretProvisionerIdentity))
                 .add_service(NodeServer::new(SecretProvisionerNode { client }))
                 .serve_with_incoming_shutdown(
-                    UnixListenerStream::new(UnixListener::bind(csi_endpoint)?)
+                    UnixListenerStream::new(uds_bind_private(csi_endpoint)?)
                         .map_ok(TonicUnixStream),
                     sigterm.recv().map(|_| ()),
                 )
