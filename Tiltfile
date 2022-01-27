@@ -9,4 +9,4 @@ k8s_yaml('provisioner.yaml')
 k8s_yaml('example-consumer-nginx.yaml')
 watch_file('result')
 if os.path.exists('result'):
-   k8s_yaml('result/crd.yaml')
+   k8s_yaml('result/crds.yaml')
