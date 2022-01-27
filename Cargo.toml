@@ -32,7 +32,7 @@ tracing = "0.1.29"
 
 [build-dependencies]
 built = { version = "0.5.1", features = ["chrono", "git2"] }
-tonic-build = "0.6.0"
+tonic-build = "0.6.2"
 
 [patch.crates-io]
 # Workaround for https://github.com/hyperium/tonic/issues/243
