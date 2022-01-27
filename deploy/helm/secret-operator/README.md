@@ -1,6 +1,6 @@
-# Helm Chart for Stackable Operator for Stackable Secret Operator
+# Helm Chart for Stackable Secret Operator
 
-This Helm Chart can be used to install Custom Resource Definitions and the Operator for Stackable Secret Operator provided by Stackable.
+This Helm Chart can be used to install Custom Resource Definitions and the Stackable Secret Operator.
 
 
 ## Requirements
@@ -9,7 +9,7 @@ This Helm Chart can be used to install Custom Resource Definitions and the Opera
 - Install [Helm](https://helm.sh/docs/intro/install/)
 
 
-## Install the Stackable Operator for Stackable Secret Operator
+## Install the Stackable Secret Operator
 
 ```bash
 # From the root of the operator repository
