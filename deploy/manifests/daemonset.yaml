@@ -23,6 +23,7 @@ spec:
       containers:
         - name: secret-operator
           securityContext:
+            privileged: true
             runAsUser: 0
           image: "docker.stackable.tech/stackable/secret-operator:0.1.0"
           imagePullPolicy: IfNotPresent
@@ -35,6 +36,7 @@ spec:
               mountPath: /csi
             - name: mountpoint
               mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
         - name: node-driver-registrar
           image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.4.0
           args:
