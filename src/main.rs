@@ -22,11 +22,13 @@ use stackable_operator::{
 use std::{
     collections::HashMap,
     error::Error,
-    os::unix::prelude::FileTypeExt,
+    fs::Permissions,
+    os::unix::prelude::{FileTypeExt, PermissionsExt},
     path::{Path, PathBuf},
 };
+use sys_mount::{unmount, Mount, MountFlags, UnmountFlags};
 use tokio::{
-    fs::{create_dir_all, File},
+    fs::{create_dir_all, OpenOptions},
     io::AsyncWriteExt,
     signal::unix::{signal, SignalKind},
 };
@@ -105,6 +107,16 @@ enum PublishError {
         source: std::io::Error,
         path: PathBuf,
     },
+    #[snafu(display("failed to mount volume mount directory {}", path.display()))]
+    Mount {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[snafu(display("failed to set volume permissions for {}", path.display()))]
+    SetDirPermissions {
+        source: std::io::Error,
+        path: PathBuf,
+    },
     #[snafu(display("failed to create secret file {}", path.display()))]
     CreateFile {
         source: std::io::Error,
@@ -141,6 +153,8 @@ impl From<PublishError> for tonic::Status {
                 tonic::Status::new(source.grpc_code(), full_msg)
             }
             PublishError::CreateDir { .. } => tonic::Status::unavailable(full_msg),
+            PublishError::Mount { .. } => tonic::Status::unavailable(full_msg),
+            PublishError::SetDirPermissions { .. } => tonic::Status::unavailable(full_msg),
             PublishError::CreateFile { .. } => tonic::Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => tonic::Status::unavailable(full_msg),
         }
@@ -150,8 +164,13 @@ impl From<PublishError> for tonic::Status {
 #[derive(Snafu, Debug)]
 #[snafu(module)]
 enum UnpublishError {
-    #[snafu(display("failed to clean up volume mount directory {}", path.display()))]
-    Cleanup {
+    #[snafu(display("failed to unmount volume mount directory {}", path.display()))]
+    Unmount {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[snafu(display("failed to delete volume mount directory {}", path.display()))]
+    Delete {
         source: std::io::Error,
         path: PathBuf,
     },
@@ -165,12 +184,13 @@ impl From<UnpublishError> for tonic::Status {
         let mut full_msg = format!("{}", err);
         let mut curr_err = err.source();
         while let Some(curr_source) = curr_err {
-            full_msg.push_str(&format!(": {}", err));
+            full_msg.push_str(&format!(": {}", curr_source));
             curr_err = curr_source.source();
         }
         // Convert to an appropriate tonic::Status representation and include full error message
         match err {
-            UnpublishError::Cleanup { .. } => tonic::Status::unavailable(full_msg),
+            UnpublishError::Unmount { .. } => tonic::Status::unavailable(full_msg),
+            UnpublishError::Delete { .. } => tonic::Status::unavailable(full_msg),
         }
     }
 }
@@ -208,6 +228,33 @@ impl SecretProvisionerNode {
             .with_context(|_| publish_error::GetBackendSnafu { class: class_ref() })
     }
 
+    async fn prepare_secret_dir(&self, target_path: &Path) -> Result<(), PublishError> {
+        match tokio::fs::create_dir(target_path).await {
+            Ok(_) => {}
+            Err(err) => match err.kind() {
+                std::io::ErrorKind::AlreadyExists => {
+                    tracing::warn!(volume.path = %target_path.display(), "Tried to create volume path that already exists");
+                }
+                _ => return Err(err).context(publish_error::CreateDirSnafu { path: target_path }),
+            },
+        }
+        Mount::new(
+            "",
+            target_path,
+            "tmpfs",
+            MountFlags::NODEV | MountFlags::NOEXEC | MountFlags::NOSUID,
+            None,
+        )
+        .context(publish_error::MountSnafu { path: target_path })?;
+        // User: root/secret-operator
+        // Group: Controlled by Pod.securityContext.fsGroup, the actual application
+        // (when running as unprivileged user)
+        tokio::fs::set_permissions(target_path, Permissions::from_mode(0o750))
+            .await
+            .context(publish_error::SetDirPermissionsSnafu { path: target_path })?;
+        Ok(())
+    }
+
     // Takes a path and list of filenames and content.
     // Writes all files to the target directory.
     async fn save_secret_data(
@@ -215,6 +262,16 @@ impl SecretProvisionerNode {
         target_path: &Path,
         data: HashMap<PathBuf, Vec<u8>>,
     ) -> Result<(), PublishError> {
+        let create_secret = {
+            let mut opts = OpenOptions::new();
+            opts.create(true)
+                .write(true)
+                // User: root/secret-operator
+                // Group: Controlled by Pod.securityContext.fsGroup, the actual application
+                // (when running as unprivileged user)
+                .mode(0o640);
+            opts
+        };
         for (k, v) in data {
             let item_path = target_path.join(k);
             if let Some(item_path_parent) = item_path.parent() {
@@ -224,13 +281,34 @@ impl SecretProvisionerNode {
                         path: item_path_parent,
                     })?;
             }
-            File::create(item_path)
+            create_secret
+                .open(&item_path)
                 .await
-                .context(publish_error::CreateFileSnafu { path: target_path })?
+                .context(publish_error::CreateFileSnafu { path: &item_path })?
                 .write_all(&v)
                 .await
-                .context(publish_error::WriteFileSnafu { path: target_path })?;
+                .context(publish_error::WriteFileSnafu { path: item_path })?;
         }
+        Ok(())
+    }
+
+    async fn clean_secret_dir(&self, target_path: &Path) -> Result<(), UnpublishError> {
+        match unmount(target_path, UnmountFlags::empty()) {
+            Ok(_) => {}
+            Err(err) => match err.kind() {
+                std::io::ErrorKind::NotFound => {
+                    tracing::warn!(volume.path = %target_path.display(), "Tried to delete volume path that does not exist, assuming it was already deleted");
+                    return Ok(());
+                }
+                std::io::ErrorKind::InvalidInput => {
+                    tracing::warn!(volume.path = %target_path.display(), "Tried to unmount volume path that is not mounted, trying to delete it anyway");
+                }
+                _ => return Err(err).context(unpublish_error::UnmountSnafu { path: target_path }),
+            },
+        };
+        tokio::fs::remove_dir(&target_path)
+            .await
+            .context(unpublish_error::DeleteSnafu { path: target_path })?;
         Ok(())
     }
 }
@@ -276,6 +354,7 @@ impl Node for SecretProvisionerNode {
             .get_secret_data(selector, pod_info)
             .await
             .context(publish_error::BackendGetSecretDataSnafu)?;
+        self.prepare_secret_dir(&target_path).await?;
         self.save_secret_data(&target_path, data).await?;
         Ok(Response::new(NodePublishVolumeResponse {}))
     }
@@ -294,9 +373,7 @@ impl Node for SecretProvisionerNode {
             volume.path = %target_path.display(),
             "Received NodeUnpublishVolume request"
         );
-        tokio::fs::remove_dir_all(&target_path)
-            .await
-            .context(unpublish_error::CleanupSnafu { path: target_path })?;
+        self.clean_secret_dir(&target_path).await?;
         Ok(Response::new(NodeUnpublishVolumeResponse {}))
     }
 
