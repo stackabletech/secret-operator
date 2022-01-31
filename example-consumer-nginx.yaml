@@ -20,7 +20,6 @@ spec:
         - -c
         - |
           cat /secret/tls.crt /secret/ca.crt > /secret/tls-merged.crt
-          chown 0:1000 /secret/tls-merged.crt
           chmod 640 /secret/tls-merged.crt
         volumeMounts:
         - name: secret
@@ -52,8 +51,6 @@ spec:
         - name: tmp
           mountPath: /var/run
       terminationGracePeriodSeconds: 1
-      securityContext:
-        fsGroup: 1000
       volumes:
       - name: secret
         csi:
