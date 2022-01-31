@@ -41,6 +41,7 @@ spec:
               mountPath: /csi
             - name: mountpoint
               mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
         - name: node-driver-registrar
           image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.4.0
           args:
