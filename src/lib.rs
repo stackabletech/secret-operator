@@ -161,7 +161,7 @@ pub enum ContentInfo {
 
 impl ContentInfo {
     pub fn parse(r: BERReader) -> Result<Self, ASN1Error> {
-        Ok(r.read_sequence(|r| {
+        r.read_sequence(|r| {
             let content_type = r.next().read_oid()?;
             if content_type == *OID_DATA_CONTENT_TYPE {
                 let data = r.next().read_tagged(Tag::context(0), |r| r.read_bytes())?;
@@ -179,7 +179,7 @@ impl ContentInfo {
                 content_type,
                 content,
             }))
-        })?)
+        })
     }
     pub fn data(&self, password: &[u8]) -> Option<Vec<u8>> {
         match self {
@@ -357,7 +357,7 @@ pub struct MacData {
 
 impl MacData {
     pub fn parse(r: BERReader) -> Result<MacData, ASN1Error> {
-        Ok(r.read_sequence(|r| {
+        r.read_sequence(|r| {
             let mac = DigestInfo::parse(r.next())?;
             let salt = r.next().read_bytes()?;
             let iterations = r.next().read_u32()?;
@@ -366,7 +366,7 @@ impl MacData {
                 salt,
                 iterations,
             })
-        })?)
+        })
     }
 
     pub fn write(&self, w: DERWriter) {
@@ -444,7 +444,7 @@ impl PFX {
         let encrypted_data =
             pbe_with_sha_and3_key_triple_des_cbc_encrypt(key_der, &password, &salt, ITERATIONS)?;
         let param = Pkcs12PbeParams {
-            salt: salt,
+            salt,
             iterations: ITERATIONS,
         };
         let key_bag_inner = SafeBagKind::Pkcs8ShroudedKeyBag(EncryptedPrivateKeyInfo {
@@ -800,7 +800,7 @@ fn test_encrypted_private_key_info() {
     let der = yasna::construct_der(|w| {
         epki.write(w);
     });
-    let epki2 = yasna::parse_ber(&der, |r| EncryptedPrivateKeyInfo::parse(r)).unwrap();
+    let epki2 = yasna::parse_ber(&der, EncryptedPrivateKeyInfo::parse).unwrap();
     assert_eq!(epki2, epki);
 }
 
@@ -919,13 +919,13 @@ impl PKCS12Attribute {
             }
             PKCS12Attribute::LocalKeyId(id) => {
                 w.next().write_oid(&OID_LOCAL_KEY_ID);
-                w.next().write_set_of(|w| w.next().write_bytes(&id))
+                w.next().write_set_of(|w| w.next().write_bytes(id))
             }
             PKCS12Attribute::Other(other) => {
                 w.next().write_oid(&other.oid);
                 w.next().write_set_of(|w| {
                     for bytes in other.data.iter() {
-                        w.next().write_der(&bytes);
+                        w.next().write_der(bytes);
                     }
                 })
             }
@@ -949,7 +949,7 @@ impl SafeBag {
 
             let attributes = r
                 .read_optional(|r| r.collect_set_of(PKCS12Attribute::parse))?
-                .unwrap_or_else(|| vec![]);
+                .unwrap_or_else(Vec::new);
 
             Ok(SafeBag { bag, attributes })
         })
