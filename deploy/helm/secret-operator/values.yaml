@@ -25,6 +25,7 @@ podSecurityContext: {}
 securityContext:
   # secret-operator requires root permissions
   runAsUser: 0
+  privileged: true
   # capabilities:
   #   drop:
   #   - ALL

@@ -26,6 +26,7 @@ rec {
   dockerImage = pkgs.dockerTools.streamLayeredImage {
     name = "docker.stackable.tech/teozkr/secret-provisioner";
     tag = dockerTag;
+    contents = [ pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal ];
     config = {
       Cmd = [ (build+"/bin/stackable-secret-operator") "run" ];
     };

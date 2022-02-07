@@ -13,12 +13,14 @@ spec:
         app: secret-consumer-nginx
     spec:
       initContainers:
-      - name: merger
+      - name: prepare
         image: alpine
         args:
         - sh
         - -c
-        - cat /secret/tls.crt /secret/ca.crt > /secret/tls-merged.crt
+        - |
+          cat /secret/tls.crt /secret/ca.crt > /secret/tls-merged.crt
+          chmod 640 /secret/tls-merged.crt
         volumeMounts:
         - name: secret
           mountPath: /secret
@@ -27,21 +29,27 @@ spec:
         image: nginx
         # args:
         # - bash
-        # tty: true
-        # stdin: true
+        tty: true
+        stdin: true
         # - nginx-debug
         # - -g
         # - 'daemon off;'
         # - -g
         # - 'error_log /foo debug;'
+        securityContext:
+          runAsUser: 1000
         ports:
         - name: https
-          containerPort: 443
+          containerPort: 8443
         volumeMounts:
         - name: secret
           mountPath: /secret
         - name: config
           mountPath: /etc/nginx/conf.d
+        - name: cache
+          mountPath: /var/cache/nginx
+        - name: tmp
+          mountPath: /var/run
       terminationGracePeriodSeconds: 1
       volumes:
       - name: secret
@@ -53,6 +61,10 @@ spec:
       - name: config
         configMap:
           name: secret-consumer-nginx-config
+      - name: cache
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -65,6 +77,7 @@ spec:
   ports:
   - name: https
     port: 443
+    targetPort: https
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -73,7 +86,7 @@ metadata:
 data:
   default.conf: |
     server {
-      listen 443 ssl http2;
+      listen 8443 ssl http2;
       ssl_certificate /secret/tls-merged.crt;
       ssl_certificate_key /secret/tls.key;
 

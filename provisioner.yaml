@@ -15,10 +15,8 @@ spec:
       - name: provisioner
         image: docker.stackable.tech/teozkr/secret-provisioner
         imagePullPolicy: IfNotPresent
-        # Currently just a placeholder
-        # image: archlinux
-        # stdin: true
-        # tty: true
+        securityContext:
+          privileged: true
         env:
         - name: CSI_ENDPOINT
           value: /csi/csi.sock
@@ -27,6 +25,7 @@ spec:
           mountPath: /csi
         - name: mountpoint
           mountPath: /var/lib/kubelet/pods
+          mountPropagation: Bidirectional
       - name: node-driver-registrar
         # image: csi-node-driver-registrar
         # imagePullPolicy: IfNotPresent
@@ -104,6 +103,7 @@ metadata:
 spec:
   attachRequired: false
   podInfoOnMount: true
+  fsGroupPolicy: File
   tokenRequests:
   - audience: secrets.stackable.tech/consumer
   volumeLifecycleModes:

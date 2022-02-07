@@ -6,5 +6,6 @@ metadata:
 spec:
   attachRequired: false
   podInfoOnMount: true
+  fsGroupPolicy: File
   volumeLifecycleModes:
     - Ephemeral
