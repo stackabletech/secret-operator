@@ -82,5 +82,6 @@ pub fn uds_bind_private(path: impl AsRef<Path>) -> Result<UnixListener, std::io:
     }
     socket.bind(&socket2::SockAddr::unix(path)?)?;
     socket.listen(1024)?;
+    socket.set_nonblocking(true)?;
     UnixListener::from_std(socket.into())
 }
