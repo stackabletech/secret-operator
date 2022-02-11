@@ -2,13 +2,14 @@
 name = "p12"
 version = "0.5.0"
 authors = ["hjiayz <hjiayz@gmail.com>", "Marc-Antoine Perennou <Marc-Antoine@Perennou.com>"]
-edition = "2018"
+edition = "2021"
 keywords = ["pkcs12", "pkcs"]
 description = "pure rust pkcs12 tool"
 homepage = "https://github.com/hjiayz/p12"
 repository = "https://github.com/hjiayz/p12"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
+rust-version = "1.56.0"
 
 [dependencies]
 des = "^0.8"
