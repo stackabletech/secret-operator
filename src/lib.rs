@@ -659,7 +659,7 @@ fn pbe_with_sha1_and40_bit_rc2_cbc(
     let rc2 = Rc2Cbc::new_from_slices(&dk, &iv).ok()?;
     let mut buf = vec![0; data.len()];
     let len = rc2
-        .decrypt_padded_b2b_mut::<Pkcs7>(&data, &mut buf)
+        .decrypt_padded_b2b_mut::<Pkcs7>(data, &mut buf)
         .ok()?
         .len();
     buf.resize(len, 0);
@@ -713,7 +713,7 @@ fn pbe_with_sha_and3_key_triple_des_cbc(
     let tdes = TDesCbc::new_from_slices(&dk, &iv).ok()?;
     let mut buf = vec![0; data.len()];
     let len = tdes
-        .decrypt_padded_b2b_mut::<Pkcs7>(&data, &mut buf)
+        .decrypt_padded_b2b_mut::<Pkcs7>(data, &mut buf)
         .ok()?
         .len();
     buf.resize(len, 0);
