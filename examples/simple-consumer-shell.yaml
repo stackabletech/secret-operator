@@ -1,4 +1,4 @@
-# Shell container that injects an arbitrary user-declared secret
+# Shell container that injects an arbitrary user-declared secret at /secret
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -28,9 +28,25 @@ spec:
         csi:
           driver: secrets.stackable.tech
           volumeAttributes:
+            # Use search parameters declared in SecretClass/secret to resolve this secret
             secrets.stackable.tech/class: secret
+            # The secret depends on the node, for a `k8sSearch` `SecretClass` this means that the the `Secret` must have the label `secrets.stackable.tech/node: ${pod.spec.nodeName}`
             secrets.stackable.tech/scope: node
 ---
+# SecretClass that searches the pod's namespace for Secret objects labeled with `type: custom-secret`
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: secret
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: {}
+      secretLabels:
+        type: custom-secret
+---
+# A Secret that matches SecretClass/secret, for the Node kind-control-plane
 apiVersion: v1
 kind: Secret
 metadata:
