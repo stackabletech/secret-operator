@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2022-02-14
+
 This release will cause any Pods that already used it get stuck Terminating when they are next deleted.
 The easiest way to fix this is to perform a rolling reboot of all nodes after the upgrade.
 
