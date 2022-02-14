@@ -42,7 +42,7 @@ config:
 
 crds:
 	mkdir -p deploy/helm/secret-operator/crds
-	cargo run crd | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' > deploy/helm/secret-operator/crds/crds.yaml
+	cargo run crd | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > deploy/helm/secret-operator/crds/crds.yaml
 
 chart-lint: compile-chart
 	docker run -it -v $(shell pwd):/build/helm-charts -w /build/helm-charts quay.io/helmpack/chart-testing:v3.5.0  ct lint --config deploy/helm/ct.yaml
