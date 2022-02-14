@@ -6,10 +6,45 @@ Manages/generates Kubernetes secrets, and mounts them into pods using CSI
 
 The operator must be executed inside Kubernetes, since it registers a CSI plugin against Kubelet.
 
-Currently builds are only supported with Nix. To build and install, run:
+Secret-operator can be built with either `docker build` or [Nix](https://nixos.org/). `docker build` is currently our primary deployment target, and our
+official images are built using it. However, Nix has much faster build and deploy times, making it ideal for local development.
+
+### Docker
+
+To build and deploy to the active Kind cluster, run:
 
 ```bash
-nix run -f . crate2nix generate && nix build -f . docker && kind load image-archive <(./result/load-image) && kubectl apply -f provisioner.yaml && kubectl rollout restart ds/secret-provisioner
+# Update the Chart metadata and CRD definitions
+$ make compile-chart
+# Create a unique image ID
+$ REPO=secret-operator
+$ TAG="$(uuidgen)"
+# Build the image
+$ docker build . -f docker/Dockerfile -t "$REPO:$TAG"
+# Load the image onto the Kind nodes
+$ kind load docker-image "$REPO:$TAG"
+# Deploy
+$ helm upgrade secret-operator deploy/helm/secret-operator --install --set-string "image.repository=$REPO,image.tag=$TAG"
+```
+
+### Nix
+
+To build and deploy to the active Kind cluster, run:
+
+```bash
+# Ensure that the Cargo.lock is up-to-date
+# This is not required if you use a tool that invokes Cargo regularly anyway, such as Rust-Analyzer
+$ cargo generate-lockfile
+# Use [crate2nix](https://github.com/kolloch/crate2nix) to convert Cargo.lock into a Nix derivation
+$ nix run -f . crate2nix generate 
+# Build the Docker images
+$ nix build -f . docker
+# Load the images onto the Kind nodes
+# Nix does not use the Docker daemon, instead it builds individual layers, as well as a script (`result/load-image`) that combines them into a Docker image archive
+$ kind load image-archive <(./result/load-image)
+# Deploy
+$ kubectl apply -f result/crds.yaml -f provisioner.yaml
+$ kubectl rollout restart ds/secret-provisioner
 ```
 
 You may need to add `extra-experimental-features = nix-command` to `/etc/nix/nix.conf`, or add `--experimental-features nix-command` to the Nix commands.
@@ -82,3 +117,7 @@ spec:
         - (empty object)
       - `name`: Searches in the specified namespace
     - `secretLabels`: Extra labels (and values) that should be present on the `Secret` for it to be considered a match
+    
+### Examples
+
+[`examples`](./examples) contains a number of self-contained example definitions.

@@ -1,3 +1,5 @@
+# Nginx HTTPS server that uses TLS certificates provisioned by Secret-Operator
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
