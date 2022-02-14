@@ -51,6 +51,14 @@ You may need to add `extra-experimental-features = nix-command` to `/etc/nix/nix
 
 You can also use [Tilt](https://tilt.dev/) to automatically recompile and redeploy when files are changed: `nix run -f . tilt up`.
 
+### K3d
+
+Secret-Operator, as with most CSI providers, requires the Kubernetes node's root folder to be mounted as `rshared`. K3d does not do this by default,
+but can be prodded into doing this by running `mount --make-rshared /` in each node container.
+
+To do this for each running node, run `for i in $(k3d node list -o json | jq -r .[].name); docker exec -it $i mount --make-rshared /; end`.
+This is _not_ persistent, and must be re-executed every time the cluster (or a node in it) is restarted.
+
 ## Usage
 
 The operator injects secret data into `Pod` `Volume`s that declare a CSI volume with the `driver` `secrets.stackable.tech`.
