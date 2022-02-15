@@ -740,7 +740,8 @@ fn pbe_with_sha_and3_key_triple_des_cbc_encrypt(
     let mut len = data.len();
     let bs = TdesEde3::block_size();
     let extra = len % bs;
-    if extra != 0 {
+    if extra != 0
+    || len == 0 {
         len += bs - extra;
     }
     let mut buf = vec![0; len];
@@ -1053,6 +1054,32 @@ fn test_create_p12() {
     assert_eq!(certs[0], cert);
     assert_eq!(certs[1], ca);
     assert!(pfx.verify_mac("changeit"));
+
+    let mut fp12 = File::create("test.p12").unwrap();
+    fp12.write_all(&p12).unwrap();
+}
+#[test]
+fn test_create_p12_without_password() {
+    use std::fs::File;
+    use std::io::{Read, Write};
+    let mut cafile = File::open("ca.der").unwrap();
+    let mut ca = vec![];
+    cafile.read_to_end(&mut ca).unwrap();
+    let mut fcert = File::open("clientcert.der").unwrap();
+
+    let mut cert = vec![];
+    fcert.read_to_end(&mut cert).unwrap();
+
+    let p12 = PFX::new(&cert, &[], Some(&ca), "", "look")
+        .unwrap()
+        .to_der();
+
+    let pfx = PFX::parse(&p12).unwrap();
+
+    let certs = pfx.cert_x509_bags("").unwrap();
+    assert_eq!(certs[0], cert);
+    assert_eq!(certs[1], ca);
+    assert!(pfx.verify_mac(""));
 
     let mut fp12 = File::create("test.p12").unwrap();
     fp12.write_all(&p12).unwrap();
