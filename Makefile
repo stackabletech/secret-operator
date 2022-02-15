@@ -34,18 +34,15 @@ compile-chart: version crds config
 chart-clean:
 	rm -rf deploy/helm/secret-operator/configs
 	rm -rf deploy/helm/secret-operator/crds
-	rm -rf deploy/helm/secret-operator/templates/crds.yaml
 
 version:
 	yq eval -i '.version = ${VERSION} | .appVersion = ${VERSION}' deploy/helm/secret-operator/Chart.yaml
 
 config:
 
-crds: deploy/helm/secret-operator/crds/crds.yaml
-
-deploy/helm/secret-operator/crds/crds.yaml:
+crds:
 	mkdir -p deploy/helm/secret-operator/crds
-	cargo run crd | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > ${@}
+	cargo run crd | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > deploy/helm/secret-operator/crds/crds.yaml
 
 chart-lint: compile-chart
 	docker run -it -v $(shell pwd):/build/helm-charts -w /build/helm-charts quay.io/helmpack/chart-testing:v3.5.0  ct lint --config deploy/helm/ct.yaml
@@ -57,3 +54,5 @@ clean-manifests:
 
 generate-manifests: clean-manifests compile-chart
 	./scripts/generate-manifests.sh
+
+regenerate-charts: chart-clean clean-manifests crds compile-chart generate-manifests
