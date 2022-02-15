@@ -740,8 +740,7 @@ fn pbe_with_sha_and3_key_triple_des_cbc_encrypt(
     let mut len = data.len();
     let bs = TdesEde3::block_size();
     let extra = len % bs;
-    if extra != 0
-    || len == 0 {
+    if extra != 0 || len == 0 {
         len += bs - extra;
     }
     let mut buf = vec![0; len];
