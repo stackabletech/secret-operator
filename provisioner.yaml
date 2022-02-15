@@ -120,15 +120,3 @@ spec:
         secret:
           name: secret-provisioner-tls-ca
           namespace: default
----
-apiVersion: secrets.stackable.tech/v1alpha1
-kind: SecretClass
-metadata:
-  name: secret
-spec:
-  backend:
-    k8sSearch:
-      searchNamespace:
-        pod: {}
-      secretLabels:
-        type: custom-secret

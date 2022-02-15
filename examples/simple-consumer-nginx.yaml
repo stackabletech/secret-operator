@@ -1,3 +1,5 @@
+# Nginx HTTPS server that uses TLS certificates provisioned by Secret-Operator
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,6 +14,7 @@ spec:
       labels:
         app: secret-consumer-nginx
     spec:
+      # Nginx expects the TLS certificate file to contain the entire chain, so concatenate them
       initContainers:
       - name: prepare
         image: alpine
@@ -19,31 +22,26 @@ spec:
         - sh
         - -c
         - |
-          cat /secret/tls.crt /secret/ca.crt > /secret/tls-merged.crt
-          chmod 640 /secret/tls-merged.crt
+          cat /tls/tls.crt /tls/ca.crt > /tls-merged/tls.crt
+          chmod -R u=rwX,g=rX,o= /tls
         volumeMounts:
-        - name: secret
-          mountPath: /secret
+        - name: tls
+          mountPath: /tls
+        - name: tls-merged
+          mountPath: /tls-merged
       containers:
       - name: nginx
         image: nginx
-        # args:
-        # - bash
-        tty: true
-        stdin: true
-        # - nginx-debug
-        # - -g
-        # - 'daemon off;'
-        # - -g
-        # - 'error_log /foo debug;'
         securityContext:
           runAsUser: 1000
         ports:
         - name: https
           containerPort: 8443
         volumeMounts:
-        - name: secret
-          mountPath: /secret
+        - name: tls
+          mountPath: /tls
+        - name: tls-merged
+          mountPath: /tls-merged
         - name: config
           mountPath: /etc/nginx/conf.d
         - name: cache
@@ -52,12 +50,14 @@ spec:
           mountPath: /var/run
       terminationGracePeriodSeconds: 1
       volumes:
-      - name: secret
+      - name: tls
         csi:
           driver: secrets.stackable.tech
           volumeAttributes:
             secrets.stackable.tech/class: tls
             secrets.stackable.tech/scope: node,pod,service=secret-consumer-nginx
+      - name: tls-merged
+        emptyDir: {}
       - name: config
         configMap:
           name: secret-consumer-nginx-config
@@ -87,8 +87,8 @@ data:
   default.conf: |
     server {
       listen 8443 ssl http2;
-      ssl_certificate /secret/tls-merged.crt;
-      ssl_certificate_key /secret/tls.key;
+      ssl_certificate /tls-merged/tls.crt;
+      ssl_certificate_key /tls/tls.key;
 
       ssl_session_timeout 1d;
       ssl_session_cache shared:MozSSL:10m;  # about 40000 sessions
