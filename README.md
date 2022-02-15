@@ -14,6 +14,8 @@ official images are built using it. However, Nix has much faster build and deplo
 To build and deploy to the active Kind cluster, run:
 
 ```bash
+# Ensure that all submodules are up-to-date
+$ git submodule update --recursive --init
 # Update the Chart metadata and CRD definitions
 $ make compile-chart
 # Create a unique image ID
@@ -32,6 +34,8 @@ $ helm upgrade secret-operator deploy/helm/secret-operator --install --set-strin
 To build and deploy to the active Kind cluster, run:
 
 ```bash
+# Ensure that all submodules are up-to-date
+$ git submodule update --recursive --init
 # Ensure that the Cargo.lock is up-to-date
 # This is not required if you use a tool that invokes Cargo regularly anyway, such as Rust-Analyzer
 $ cargo generate-lockfile
