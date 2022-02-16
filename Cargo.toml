@@ -23,6 +23,10 @@ sha1 = "^0.10"
 version = "^0.1"
 features = ["block-padding"]
 
+[dependencies.cipher]
+version = "^0.4.1"
+features = ["alloc", "block-padding"]
+
 [dependencies.yasna]
 version = "^0.5"
 features = ["std"]

@@ -657,13 +657,7 @@ fn pbe_with_sha1_and40_bit_rc2_cbc(
     let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
     let rc2 = Rc2Cbc::new_from_slices(&dk, &iv).ok()?;
-    let mut buf = vec![0; data.len()];
-    let len = rc2
-        .decrypt_padded_b2b_mut::<Pkcs7>(data, &mut buf)
-        .ok()?
-        .len();
-    buf.resize(len, 0);
-    Some(buf)
+    rc2.decrypt_padded_vec::<Pkcs7>(data).ok()
 }
 
 fn pbe_with_sha1_and40_bit_rc2_cbc_encrypt(
@@ -673,7 +667,7 @@ fn pbe_with_sha1_and40_bit_rc2_cbc_encrypt(
     iterations: u64,
 ) -> Option<Vec<u8>> {
     use cbc::{
-        cipher::{block_padding::Pkcs7, BlockEncryptMut, BlockSizeUser, KeyIvInit},
+        cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit},
         Encryptor,
     };
     use rc2::Rc2;
@@ -683,15 +677,7 @@ fn pbe_with_sha1_and40_bit_rc2_cbc_encrypt(
     let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
     let rc2 = Rc2Cbc::new_from_slices(&dk, &iv).ok()?;
-    let mut len = data.len();
-    let bs = Rc2::block_size();
-    let extra = len % bs;
-    if extra != 0 {
-        len += bs - extra;
-    }
-    let mut buf = vec![0; len];
-    rc2.encrypt_padded_b2b_mut::<Pkcs7>(data, &mut buf).unwrap();
-    Some(buf)
+    Some(rc2.encrypt_padded_vec_mut::<Pkcs7>(data))
 }
 
 fn pbe_with_sha_and3_key_triple_des_cbc(
@@ -711,13 +697,7 @@ fn pbe_with_sha_and3_key_triple_des_cbc(
     let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
     let tdes = TDesCbc::new_from_slices(&dk, &iv).ok()?;
-    let mut buf = vec![0; data.len()];
-    let len = tdes
-        .decrypt_padded_b2b_mut::<Pkcs7>(data, &mut buf)
-        .ok()?
-        .len();
-    buf.resize(len, 0);
-    Some(buf)
+    tdes.decrypt_padded_vec::<Pkcs7>(data).ok()
 }
 
 fn pbe_with_sha_and3_key_triple_des_cbc_encrypt(
@@ -727,7 +707,7 @@ fn pbe_with_sha_and3_key_triple_des_cbc_encrypt(
     iterations: u64,
 ) -> Option<Vec<u8>> {
     use cbc::{
-        cipher::{block_padding::Pkcs7, BlockEncryptMut, BlockSizeUser, KeyIvInit},
+        cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit},
         Encryptor,
     };
     use des::TdesEde3;
@@ -737,16 +717,7 @@ fn pbe_with_sha_and3_key_triple_des_cbc_encrypt(
     let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
     let tdes = TDesCbc::new_from_slices(&dk, &iv).ok()?;
-    let mut len = data.len();
-    let bs = TdesEde3::block_size();
-    let extra = len % bs;
-    if extra != 0 || len == 0 {
-        len += bs - extra;
-    }
-    let mut buf = vec![0; len];
-    tdes.encrypt_padded_b2b_mut::<Pkcs7>(data, &mut buf)
-        .unwrap();
-    Some(buf)
+    Some(tdes.encrypt_padded_vec_mut::<Pkcs7>(data))
 }
 
 fn bmp_string(s: &str) -> Vec<u8> {
