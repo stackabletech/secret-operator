@@ -24,7 +24,7 @@ version = "^0.1"
 features = ["block-padding"]
 
 [dependencies.cipher]
-version = "^0.4.1"
+version = "^0.4.2"
 features = ["alloc", "block-padding"]
 
 [dependencies.yasna]
