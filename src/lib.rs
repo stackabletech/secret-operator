@@ -657,7 +657,7 @@ fn pbe_with_sha1_and40_bit_rc2_cbc(
     let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
     let rc2 = Rc2Cbc::new_from_slices(&dk, &iv).ok()?;
-    rc2.decrypt_padded_vec::<Pkcs7>(data).ok()
+    rc2.decrypt_padded_vec_mut::<Pkcs7>(data).ok()
 }
 
 fn pbe_with_sha1_and40_bit_rc2_cbc_encrypt(
@@ -697,7 +697,7 @@ fn pbe_with_sha_and3_key_triple_des_cbc(
     let iv = pbepkcs12sha1(password, salt, iterations, 2, 8);
 
     let tdes = TDesCbc::new_from_slices(&dk, &iv).ok()?;
-    tdes.decrypt_padded_vec::<Pkcs7>(data).ok()
+    tdes.decrypt_padded_vec_mut::<Pkcs7>(data).ok()
 }
 
 fn pbe_with_sha_and3_key_triple_des_cbc_encrypt(
