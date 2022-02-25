@@ -1,12 +1,12 @@
-= Secret Scope
+= Scope
 
 Secrets often cover some specific aspect of a workload. For example:
 
 * A Kerberos credential may be bound to one node IP
 * An internal TLS certificate's `subjectAlternateName` section must match the `Pod`'s name and service
 
-To solve this, the Stackable Secret Operator has a concept of "scopes", which allow a `Pod` to opt into including this
-extra information. The exact impact of the scope depends on which xref:secretclass.adoc#backend[`backend`] is used.
+To solve this, the Stackable Secret Operator has a concept of "scopes", which allow a xref:volume.adoc[] to selectively
+include this extra context. The exact effect of the scope depends on which xref:secretclass.adoc#backend[`backend`] is used.
 
 [#node]
 == `node`

@@ -1,10 +1,6 @@
 = Usage
 
-The operator injects secret data into `Pod` `Volume` objects that declare a CSI volume that set `driver: secrets.stackable.tech`.
-The volume takes the following mandatory attributes:
-
-- `secrets.stackable.tech/class`: The type of secret to be issued. This corresponds to a xref:secretclass.adoc[] object.
-- `secrets.stackable.tech/scope`: The properties of the `Pod` that the secret concerns, see xref:scope.adoc[]. Multiple scopes may be defined, they should be separated by commas.
+The operator injects secret data into xref:volume.adoc[] mounts that declare a CSI volume with `driver: secrets.stackable.tech`.
   
 A minimal secret-consuming `Pod` looks like this:
 

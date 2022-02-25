@@ -1,0 +1,46 @@
+= Volume
+
+The primary entry point for applications is by mounting a secret into a `Pod` object's `volume` set. This is done by using Kubernetes'
+https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#csivolumesource-v1-core[`CSIVolumeSource`] type.
+For example:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-secret-consumer
+spec:
+  volumes:
+  - name: secret
+    csi:
+      driver: secrets.stackable.tech # <1>
+      volumeAttributes:
+        secrets.stackable.tech/class: tls # <2>
+        secrets.stackable.tech/scope: node,pod,service=secret-consumer # <3>
+  containers:
+  - name: ubuntu
+    volumeMounts:
+    - name: tls # <4>
+      mountPath: /tls
+----
+<1> Tells Kubernetes that the Stackable Secret Operator is responsible for mounting this volume
+<2> This secret is provided by the xref:secretclass.adoc[] named `tls`
+<3> This secret should be xref:scope.adoc[scoped] by the intersection of xref:scope.adoc#node[`node`], xref:scope.adoc#pod[`pod`], and the xref:scope.adoc#service[`service`] named `secret-consumer`
+<4> The injected volume can then be mounted into a container, just like any other volume
+
+== Attributes
+
+=== `secrets.stackable.tech/class`
+
+*Required*: true
+
+The name of the xref:secretclass.adoc[] that is responsible for providing this secret.
+
+=== `secrets.stackable.tech/scope`
+
+*Required*: false
+
+*Default value*: no scopes
+
+The xref:scope.adoc[scopes] used to select or provision the secret. Multiple scopes should be separated by commas (`,`), and scope parameters are separated by equals signs (`=`) where applicable.
