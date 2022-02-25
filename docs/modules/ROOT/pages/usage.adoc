@@ -1,123 +1,51 @@
 = Usage
 
-TODO
+The operator injects secret data into `Pod` `Volume` objects that declare a CSI volume that set `driver: secrets.stackable.tech`.
+The volume takes the following mandatory attributes:
 
-After installation, the CRD for this operator must be created:
-
-    kubectl apply -f /etc/stackable/kafka-operator/crd/kafkacluster.crd.yaml
-
-To create an Apache Kafka (v3.1.0) cluster named `simple-kafka` assuming that you already have a Zookeeper cluster named `simple-zk`:
-
-    cat <<EOF | kubectl apply -f -
-    apiVersion: zookeeper.stackable.tech/v1alpha1
-    kind: ZookeeperZnode
-    metadata:
-      name: simple-kafka-znode
-    spec:
-      clusterRef:
-        name: simple-zk
-        namespace: default
-    ---
-    apiVersion: kafka.stackable.tech/v1alpha1
-    kind: KafkaCluster
-    metadata:
-      name: simple-kafka
-    spec:
-      version: 3.1.0
-      zookeeperConfigMapName: simple-kafka-znode
-      brokers:
-        roleGroups:
-          default:
-            replicas: 1
-    EOF
-
-If you wish to include integration with https://docs.stackable.tech/opa/index.html[Open Policy Agent] and already have an opa cluster, then you can include an `opa` stanza:
-
-    cat <<EOF | kubectl apply -f -
-    apiVersion: kafka.stackable.tech/v1alpha1
-    kind: KafkaCluster
-    metadata:
-      name: simple-kafka
-    spec:
-      version: 3.1.0
-      zookeeperConfigMapName: simple-kafka-znode
-      opa:
-        configMapName: simple-opacluster
-        authorizerClassName: org.openpolicyagent.kafka.OpaAuthorizer
-        authorizerCacheInitialCapacity: 0
-        authorizerCacheMaximumSize: 0
-        authorizerCacheExpireAfterSeconds: 0
-      brokers:
-        roleGroups:
-          default:
-            replicas: 1
-    EOF
-
-== Monitoring
-
-The managed Kafka instances are automatically configured to export Prometheus metrics. See
-xref:home::monitoring.adoc[] for more details.
-
-== Configuration & Environment Overrides
-
-The cluster definition also supports overriding configuration properties and environment variables, either per role or per role group, where the more specific override (role group) has precedence over the less specific one (role).
-
-IMPORTANT: Overriding certain properties which are set by operator (such as the ports) can interfere with the operator and can lead to problems.
-
-=== Configuration Properties
-
-For a role or role group, at the same level of `config`, you can specify: `configOverrides` for the `server.properties`. For example, if you want to set the `auto.create.topics.enable` to disable automatic topic creation, it can be configured in the `KafkaCluster` resource like so:
+- `secrets.stackable.tech/class`: The type of secret to be issued. This corresponds to a xref:secretclass.adoc[] object.
+- `secrets.stackable.tech/scope`: The properties of the `Pod` that the secret concerns, see xref:scope.adoc[]. Multiple scopes may be defined, they should be separated by commas.
+  
+A minimal secret-consuming `Pod` looks like this:
 
 [source,yaml]
 ----
-brokers:
-  roleGroups:
-    default:
-      configOverrides:
-        server.properties:
-          auto.create.topics.enable: "false"
-      replicas: 1
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-secret-consumer
+spec:
+  volumes:
+  - name: secret
+    csi:
+      driver: secrets.stackable.tech
+      volumeAttributes:
+        secrets.stackable.tech/class: tls
+        secrets.stackable.tech/scope: node,pod,service=secret-consumer-nginx
+  containers:
+  - name: ubuntu
+    image: ubuntu
+    stdin: true
+    tty: true
+    volumeMounts:
+    - name: tls
+      mountPath: /tls
 ----
 
-Just as for the `config`, it is possible to specify this at role level as well:
+xref:secretclass.adoc[] defines where the secrets come from. For example, the following `SecretClass`
+issues TLS certificates, storing its CA certificate in `secret-provisioner-tls-ca`:
 
 [source,yaml]
 ----
-brokers:
-  configOverrides:
-    server.properties:
-      auto.create.topics.enable: "false"
-  roleGroups:
-    default:
-      replicas: 1
-----
-
-All override property values must be strings.
-
-For a full list of configuration options we refer to the Apache Kafka https://kafka.apache.org/documentation/#configuration[Configuration Reference].
-
-=== Environment Variables
-
-In a similar fashion, environment variables can be (over)written. For example per role group:
-
-[source,yaml]
-----
-servers:
-  roleGroups:
-    default:
-      envOverrides:
-        MY_ENV_VAR: "MY_VALUE"
-      replicas: 1
-----
-
-or per role:
-
-[source,yaml]
-----
-servers:
-  envOverrides:
-    MY_ENV_VAR: "MY_VALUE"
-  roleGroups:
-    default:
-      replicas: 1
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: tls
+spec:
+  backend:
+    autoTls:
+      ca:
+        secret:
+          name: secret-provisioner-tls-ca
+          namespace: default
 ----

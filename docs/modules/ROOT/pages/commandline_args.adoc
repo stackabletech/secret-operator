@@ -1,4 +1,4 @@
-=== csi-endpoint
+=== --csi-endpoint
 
 *Required*: true
 
