@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-secret-consumer
+spec:
+  volumes:
+  - name: secret
+    csi:
+      driver: secrets.stackable.tech
+      volumeAttributes:
+        secrets.stackable.tech/class: tls
+        secrets.stackable.tech/scope: node,pod,service=secret-consumer-nginx
+  containers:
+  - name: ubuntu
+    image: ubuntu
+    stdin: true
+    tty: true
+    volumeMounts:
+    - name: tls
+      mountPath: /tls

@@ -6,23 +6,7 @@ For example:
 
 [source,yaml]
 ----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: example-secret-consumer
-spec:
-  volumes:
-  - name: secret
-    csi:
-      driver: secrets.stackable.tech # <1>
-      volumeAttributes:
-        secrets.stackable.tech/class: tls # <2>
-        secrets.stackable.tech/scope: node,pod,service=secret-consumer # <3>
-  containers:
-  - name: ubuntu
-    volumeMounts:
-    - name: tls # <4>
-      mountPath: /tls
+include::example$volume-pod.yaml[]
 ----
 <1> Tells Kubernetes that the Stackable Secret Operator is responsible for mounting this volume
 <2> This secret is provided by the xref:secretclass.adoc[] named `tls`

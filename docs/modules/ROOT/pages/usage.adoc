@@ -6,26 +6,7 @@ A minimal secret-consuming `Pod` looks like this:
 
 [source,yaml]
 ----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: example-secret-consumer
-spec:
-  volumes:
-  - name: secret
-    csi:
-      driver: secrets.stackable.tech
-      volumeAttributes:
-        secrets.stackable.tech/class: tls
-        secrets.stackable.tech/scope: node,pod,service=secret-consumer-nginx
-  containers:
-  - name: ubuntu
-    image: ubuntu
-    stdin: true
-    tty: true
-    volumeMounts:
-    - name: tls
-      mountPath: /tls
+include::example$usage-pod.yaml[]
 ----
 
 xref:secretclass.adoc[] defines where the secrets come from. For example, the following `SecretClass`
@@ -33,15 +14,5 @@ issues TLS certificates, storing its CA certificate in `secret-provisioner-tls-c
 
 [source,yaml]
 ----
-apiVersion: secrets.stackable.tech/v1alpha1
-kind: SecretClass
-metadata:
-  name: tls
-spec:
-  backend:
-    autoTls:
-      ca:
-        secret:
-          name: secret-provisioner-tls-ca
-          namespace: default
+include::example$usage-secretclass-tls.yaml[]
 ----
