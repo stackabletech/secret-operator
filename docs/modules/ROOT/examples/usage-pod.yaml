@@ -5,7 +5,7 @@ metadata:
   name: example-secret-consumer
 spec:
   volumes:
-  - name: secret
+  - name: tls
     csi:
       driver: secrets.stackable.tech
       volumeAttributes:
