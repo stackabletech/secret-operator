@@ -24,3 +24,15 @@ The `pod` scope is resolved to the name of the Kubernetes `Pod`. This allows the
 
 The `service` scope allows `Pod` objects to specify custom scopes. This should typically correspond to `Service` objects that the
 `Pod` participate in.
+
+
+== Examples
+Below are a few examples that may help better illustrate the concept of a secret scope:
+
+So a secret provided by the autoTls provider that is configured with the scopes `node` and `pod` would get the following values added to the `subjectAlternateName` extension field:
+
+ - Node IP Address
+ - Node DNS Name
+ - Pod DNS Names
+
+By also specifying the service scope it is possible to also add DNS names of `Service` objects that can be reached to the SAN extension.
