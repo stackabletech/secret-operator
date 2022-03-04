@@ -11,7 +11,7 @@ include::example$volume-pod.yaml[]
 <1> Tells Kubernetes that the Stackable Secret Operator is responsible for mounting this volume
 <2> This secret is provided by the xref:secretclass.adoc[] named `tls`
 <3> This secret should be xref:scope.adoc[scoped] by the intersection of xref:scope.adoc#node[`node`], xref:scope.adoc#pod[`pod`], and the xref:scope.adoc#service[`service`] named `secret-consumer`
-<4> The injected volume can then be mounted into a container, just like any other volume
+<4> The injected volume can then be mounted into a container, just like any other volume. In this example, the secrets are provided in the `/tls` directory of the container.
 
 == Attributes
 
