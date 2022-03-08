@@ -1,0 +1,37 @@
+= Scope
+
+Secrets often cover some specific aspect of a workload. For example:
+
+* A Kerberos credential may be bound to one node IP
+* An internal TLS certificate's `subjectAlternateName` section must match the `Pod` object's name and service
+
+To solve this, the Stackable Secret Operator has a concept of "scopes", which allow a xref:volume.adoc[] to selectively
+include this extra context. The exact effect of the scope depends on which xref:secretclass.adoc#backend[`backend`] is used.
+
+== Supported Scopes
+
+[#node]
+=== `node`
+
+The `node` scope is resolved to the name of the Kubernetes `Node` object that the `Pod` is running on. This will typically
+be the DNS name of the node.
+
+[#pod]
+=== `pod`
+
+The `pod` scope is resolved to the name of the Kubernetes `Pod`. This allows the secret to differentiate between `StatefulSet` replicas.
+
+[#service]
+=== `service`
+
+The `service` scope allows `Pod` objects to specify custom scopes. This should typically correspond to `Service` objects that the
+`Pod` participate in.
+
+== Example
+
+For example, a TLS certificate provisioned by the xref:secretclass.adoc#backend-autotls[`autoTls`] backend, with the scopes
+xref:#node[] and xref:#pod[] would contain the following values in its `subjectAlternateName` (SAN) extension field:
+
+- The node's IP address
+- The node's fully qualified domain name (`my-node.example.com`)
+- The pod's fully qualified domain name (`my-pod.my-service.my-namespace.svc.cluster.local`)

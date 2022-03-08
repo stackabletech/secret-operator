@@ -1,0 +1,29 @@
+= Installation
+
+There are two ways to run the Stackable Secret Operator:
+
+1. Helm managed Docker container deployment on Kubernetes
+
+2. Build from source
+
+
+== Helm
+Helm allows you to download and deploy Stackable operators on Kubernetes and is by far the easiest installation method. First ensure that you have installed the Stackable Operators Helm repository:
+
+[source,console]
+----
+$ helm repo add stackable https://repo.stackable.tech/repository/helm-stable/
+----
+
+Then install the Stackable Secret Operator
+
+[source,console]
+----
+$ helm install secret-operator stackable/secret-operator
+----
+
+Helm will deploy the operator in Kubernetes containers and apply the CRDs. You're now ready to deploy secrets!
+
+== Building the operator from source
+
+See xref:building.adoc[] for more information.

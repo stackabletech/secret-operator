@@ -1,0 +1,11 @@
+=== --csi-endpoint
+
+*Required*: true
+
+*Multiple values*: false
+
+*Environment variable:* `CSI_ENDPOINT`
+
+The path to the https://github.com/container-storage-interface/spec/blob/master/spec.md[Container Storage Interface] Unix Domain Socket
+that the operator should listen on.
+

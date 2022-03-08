@@ -1,0 +1,3 @@
+= Stackable Secret Operator
+
+This is an operator for Kubernetes that provisions and injects secrets into Kubernetes Pods.
