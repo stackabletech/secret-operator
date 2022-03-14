@@ -34,7 +34,7 @@ use super::{pod_info::Address, pod_info::PodInfo, SecretBackend, SecretBackendEr
 pub enum Error {
     #[snafu(display("failed to generate certificate key"))]
     GenerateKey { source: openssl::error::ErrorStack },
-    #[snafu(display("could not find CA, and autoGenerate is false"))]
+    #[snafu(display("could not find CA {secret}, and autoGenerate is false"))]
     FindCaAndGenDisabled {
         source: stackable_operator::error::Error,
         secret: ObjectRef<Secret>,
