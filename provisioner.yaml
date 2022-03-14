@@ -120,3 +120,4 @@ spec:
         secret:
           name: secret-provisioner-tls-ca
           namespace: default
+        autoGenerate: true

@@ -53,4 +53,7 @@ pub struct AutoTlsBackend {
 #[serde(rename_all = "camelCase")]
 pub struct AutoTlsCa {
     pub secret: SecretReference,
+    /// Whether a new certificate authority should be generated if it does not already exist
+    #[serde(default)]
+    pub auto_generate: bool,
 }
