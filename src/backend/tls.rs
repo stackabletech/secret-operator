@@ -34,6 +34,11 @@ use super::{pod_info::Address, pod_info::PodInfo, SecretBackend, SecretBackendEr
 pub enum Error {
     #[snafu(display("failed to generate certificate key"))]
     GenerateKey { source: openssl::error::ErrorStack },
+    #[snafu(display("could not find CA {secret}, and autoGenerate is false"))]
+    FindCaAndGenDisabled {
+        source: stackable_operator::error::Error,
+        secret: ObjectRef<Secret>,
+    },
     #[snafu(display("CA secret is missing required certificate file"))]
     MissingCaCertificate,
     #[snafu(display("failed to load {tpe:?} certificate"))]
@@ -71,6 +76,7 @@ impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
         match self {
             Error::GenerateKey { .. } => tonic::Code::Internal,
+            Error::FindCaAndGenDisabled { .. } => tonic::Code::FailedPrecondition,
             Error::MissingCaCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::LoadCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::InvalidSecretRef { .. } => tonic::Code::FailedPrecondition,
@@ -150,6 +156,7 @@ impl TlsGenerate {
     pub async fn get_or_create_k8s_certificate(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
+        auto_generate_if_missing: bool,
     ) -> Result<Self> {
         let (k8s_secret_name, k8s_ns) = match secret_ref {
             SecretReference {
@@ -179,7 +186,7 @@ impl TlsGenerate {
                     .context(LoadCertificateSnafu { tpe: CertType::Ca })?,
                 }
             }
-            Err(_) => {
+            Err(_) if auto_generate_if_missing => {
                 // Failed to get existing cert, try to create a new self-signed one
                 let ca = Self::new_self_signed()?;
                 // Use create rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
@@ -213,6 +220,11 @@ impl TlsGenerate {
                         secret: ObjectRef::new(k8s_secret_name).within(k8s_ns),
                     })?;
                 ca
+            }
+            Err(err) => {
+                return Err(err).context(FindCaAndGenDisabledSnafu {
+                    secret: ObjectRef::new(k8s_secret_name).within(k8s_ns),
+                });
             }
         })
     }

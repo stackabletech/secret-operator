@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- autoTls CA generation now requires opt-in ([#77]).
+  - The default `tls` `SecretClass` now has this opt-in by default.
+
+[#77]: https://github.com/stackabletech/secret-operator/pull/77
+
 ## [0.2.0] - 2022-02-14
 
 This release will cause any Pods that already used it get stuck Terminating when they are next deleted.

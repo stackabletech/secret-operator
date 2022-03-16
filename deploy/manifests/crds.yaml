@@ -35,6 +35,10 @@ spec:
                       properties:
                         ca:
                           properties:
+                            autoGenerate:
+                              default: false
+                              description: Whether a new certificate authority should be generated if it does not already exist
+                              type: boolean
                             secret:
                               description: SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace
                               properties:
