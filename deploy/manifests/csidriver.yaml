@@ -1,4 +1,5 @@
 ---
+# Source: secret-operator/templates/csidriver.yaml
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
@@ -8,4 +9,4 @@ spec:
   podInfoOnMount: true
   fsGroupPolicy: File
   volumeLifecycleModes:
-    - Ephemeral
+  - Ephemeral

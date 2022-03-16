@@ -39,6 +39,10 @@ version:
 	yq eval -i '.version = ${VERSION} | .appVersion = ${VERSION}' deploy/helm/secret-operator/Chart.yaml
 
 config:
+	if [ -d "deploy/config-spec/" ]; then\
+		mkdir -p deploy/helm/secret-operator/configs;\
+		cp -r deploy/config-spec/* deploy/helm/secret-operator/configs;\
+	fi
 
 crds:
 	mkdir -p deploy/helm/secret-operator/crds
@@ -55,4 +59,4 @@ clean-manifests:
 generate-manifests: clean-manifests compile-chart
 	./scripts/generate-manifests.sh
 
-regenerate-charts: chart-clean clean-manifests crds compile-chart generate-manifests
+regenerate-charts: chart-clean clean-manifests compile-chart generate-manifests

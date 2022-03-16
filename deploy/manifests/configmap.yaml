@@ -1,0 +1,14 @@
+---
+# Source: secret-operator/templates/configmap.yaml
+apiVersion: v1
+data:
+  {}
+kind: ConfigMap
+metadata:
+  name: secret-operator-configmap
+  labels:
+    helm.sh/chart: secret-operator-0.3.0-nightly
+    app.kubernetes.io/name: secret-operator
+    app.kubernetes.io/instance: secret-operator
+    app.kubernetes.io/version: "0.3.0-nightly"
+    app.kubernetes.io/managed-by: Helm
