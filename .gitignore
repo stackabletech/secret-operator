@@ -7,7 +7,3 @@ target/
 *.iml
 
 *.tgz
-
-Cargo.nix
-crate-hashes.json
-result*

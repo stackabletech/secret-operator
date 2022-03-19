@@ -12,6 +12,8 @@ TAG    := $(shell git rev-parse --short HEAD)
 
 VERSION := $(shell cargo metadata --format-version 1 | jq '.packages[] | select(.name=="stackable-secret-operator") | .version')
 
+SHELL=/bin/bash -euo pipefail
+
 ## Docker related targets
 docker-build:
 	docker build --force-rm -t "docker.stackable.tech/stackable/secret-operator:${VERSION}" -f docker/Dockerfile .
@@ -36,13 +38,17 @@ chart-clean:
 	rm -rf deploy/helm/secret-operator/crds
 
 version:
-	yq eval -i '.version = ${VERSION} | .appVersion = ${VERSION}' deploy/helm/secret-operator/Chart.yaml
+	yq eval -i '.version = ${VERSION} | .appVersion = ${VERSION}' /dev/stdin < deploy/helm/secret-operator/Chart.yaml
 
 config:
+	if [ -d "deploy/config-spec/" ]; then\
+		mkdir -p deploy/helm/secret-operator/configs;\
+		cp -r deploy/config-spec/* deploy/helm/secret-operator/configs;\
+	fi
 
 crds:
 	mkdir -p deploy/helm/secret-operator/crds
-	cargo run crd | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > deploy/helm/secret-operator/crds/crds.yaml
+	cargo run --bin stackable-secret-operator -- crd | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > deploy/helm/secret-operator/crds/crds.yaml
 
 chart-lint: compile-chart
 	docker run -it -v $(shell pwd):/build/helm-charts -w /build/helm-charts quay.io/helmpack/chart-testing:v3.5.0  ct lint --config deploy/helm/ct.yaml
@@ -55,4 +61,4 @@ clean-manifests:
 generate-manifests: clean-manifests compile-chart
 	./scripts/generate-manifests.sh
 
-regenerate-charts: chart-clean clean-manifests crds compile-chart generate-manifests
+regenerate-charts: chart-clean clean-manifests compile-chart generate-manifests

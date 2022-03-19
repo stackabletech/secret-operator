@@ -1,0 +1,3 @@
+---
+# Source: secret-operator/templates/deployment.yaml
+# Templated Deployment disabled for this operator
