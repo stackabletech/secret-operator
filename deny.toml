@@ -57,7 +57,7 @@ license-files = [
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-git = [
-    "git+https://github.com/teozkr/h2.git",
+    "https://github.com/teozkr/h2",
 ]
 
 [sources.allow-org]
