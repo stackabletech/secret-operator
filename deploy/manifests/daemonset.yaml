@@ -1,12 +1,15 @@
 ---
+# Source: secret-operator/templates/daemonset.yaml
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: secret-operator-daemonset
   labels:
+    helm.sh/chart: secret-operator-0.3.0-nightly
     app.kubernetes.io/name: secret-operator
     app.kubernetes.io/instance: secret-operator
     app.kubernetes.io/version: "0.3.0-nightly"
+    app.kubernetes.io/managed-by: Helm
 spec:
   selector:
     matchLabels:
@@ -19,15 +22,16 @@ spec:
         app.kubernetes.io/instance: secret-operator
     spec:
       serviceAccountName: secret-operator-serviceaccount
-      securityContext: {}
+      securityContext:
+        {}
       containers:
         - name: secret-operator
           securityContext:
-            privileged: true
-            runAsUser: 0
+            {}
           image: "docker.stackable.tech/stackable/secret-operator:0.3.0-nightly"
           imagePullPolicy: IfNotPresent
-          resources: {}
+          resources:
+            {}
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
