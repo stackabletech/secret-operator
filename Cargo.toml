@@ -1,5 +1,5 @@
 [workspace]
-members = ["rust/*"]
+members = ["rust/operator-binary"]
 default-members = ["rust/operator-binary"]
 
 [patch.crates-io]
