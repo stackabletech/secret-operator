@@ -53,4 +53,4 @@ unknown-registry = "deny"
 unknown-git = "deny"
 
 [sources.allow-org]
-github = ["stackabletech", "teozkr"]
+github = ["stackabletech"]

@@ -40,6 +40,6 @@ tonic-build = "0.6.2"
 
 [patch.crates-io]
 # Workaround for https://github.com/hyperium/tonic/issues/243
-h2 = { git = "https://github.com/teozkr/h2.git", branch = "feature/grpc-uds" }
+h2 = { git = "https://github.com/stackabletech/h2.git", branch = "feature/grpc-uds" }
 
 [features]

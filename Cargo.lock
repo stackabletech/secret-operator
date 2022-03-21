@@ -544,7 +544,7 @@ dependencies = [
 [[package]]
 name = "h2"
 version = "0.3.7"
-source = "git+https://github.com/teozkr/h2.git?branch=feature/grpc-uds#b7554e1b8730af5fbb7fc1841d92f9247c4e477c"
+source = "git+https://github.com/stackabletech/h2.git?branch=feature/grpc-uds#b7554e1b8730af5fbb7fc1841d92f9247c4e477c"
 dependencies = [
  "bytes",
  "fnv",
