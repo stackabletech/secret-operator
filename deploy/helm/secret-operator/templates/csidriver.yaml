@@ -8,4 +8,4 @@ spec:
   podInfoOnMount: true
   fsGroupPolicy: File
   volumeLifecycleModes:
-  - Ephemeral
+    - Ephemeral

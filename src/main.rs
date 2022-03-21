@@ -436,7 +436,7 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         stackable_operator::cli::Command::Crd => {
-            println!("{}", serde_yaml::to_string(&crd::SecretClass::crd())?)
+            print!("{}", serde_yaml::to_string(&crd::SecretClass::crd())?)
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun { csi_endpoint }) => {
             stackable_operator::utils::print_startup_string(
