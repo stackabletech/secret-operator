@@ -51,7 +51,7 @@ name = "webpki"
 expression = "LicenseRef-webpki"
 license-files = [
     { path = "LICENSE", hash = 0x001c7e6c },
-]-
+]
 
 [sources]
 unknown-registry = "deny"
