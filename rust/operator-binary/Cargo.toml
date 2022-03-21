@@ -8,7 +8,7 @@ edition = "2021"
 repository = "https://github.com/stackabletech/secret-operator"
 
 [dependencies]
-anyhow = "1.0.53"
+anyhow = "1.0.56"
 async-trait = "0.1.52"
 clap = { version = "3.0.14", features = ["derive", "env"] }
 futures = "0.3.21"
