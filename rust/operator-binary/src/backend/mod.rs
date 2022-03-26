@@ -2,6 +2,7 @@
 
 pub mod dynamic;
 pub mod k8s_search;
+pub mod kerberos_keytab;
 pub mod pod_info;
 pub mod scope;
 pub mod tls;
@@ -12,6 +13,7 @@ use std::{collections::HashMap, convert::Infallible, path::PathBuf};
 
 pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
+pub use kerberos_keytab::KerberosKeytab;
 pub use tls::TlsGenerate;
 
 use pod_info::Address;

@@ -26,6 +26,7 @@ pub struct SecretClassSpec {
 pub enum SecretClassBackend {
     K8sSearch(K8sSearchBackend),
     AutoTls(AutoTlsBackend),
+    KerberosKeytab(KerberosKeytabBackend),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
@@ -57,3 +58,7 @@ pub struct AutoTlsCa {
     #[serde(default)]
     pub auto_generate: bool,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KerberosKeytabBackend {}

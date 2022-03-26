@@ -1,0 +1,127 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: krb5-kdc
+spec:
+  selector:
+    matchLabels:
+      app: krb5-kdc
+  template:
+    metadata:
+      labels:
+        app: krb5-kdc
+    spec:
+      initContainers:
+      - name: init
+        image: docker.stackable.tech/teozkr/krb5
+        args:
+        - sh
+        - -euo
+        - pipefail
+        - -c
+        - |
+          kdb5_util create -s -P asdf
+          kadmin.local add_principal -pw asdf root
+          kadmin.local add_principal -pw asdf root/admin
+        env:
+        - name: KRB5_CONFIG
+          value: /stackable/config/krb5.conf
+        volumeMounts:
+        - mountPath: /stackable/config
+          name: config
+        - mountPath: /var/lib/krb5kdc
+          name: data
+      containers:
+      - name: kdc
+        image: docker.stackable.tech/teozkr/krb5
+        args:
+        - krb5kdc
+        - -n
+        env:
+        - name: KRB5_CONFIG
+          value: /stackable/config/krb5.conf
+        volumeMounts:
+        - mountPath: /stackable/config
+          name: config
+        - mountPath: /var/lib/krb5kdc
+          name: data
+      - name: kadmind
+        image: docker.stackable.tech/teozkr/krb5
+        args:
+        - kadmind
+        - -nofork
+        env:
+        - name: KRB5_CONFIG
+          value: /stackable/config/krb5.conf
+        volumeMounts:
+        - mountPath: /stackable/config
+          name: config
+        - mountPath: /var/lib/krb5kdc
+          name: data
+      - name: client
+        image: docker.stackable.tech/teozkr/krb5
+        tty: true
+        stdin: true
+        env:
+        - name: KRB5_CONFIG
+          value: /stackable/config/krb5.conf
+        volumeMounts:
+        - mountPath: /stackable/config
+          name: config
+      volumes:
+      - name: config
+        configMap:
+          name: krb5-kdc
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: krb5-kdc
+spec:
+  selector:
+    app: krb5-kdc
+  ports:
+  - name: kadmin
+    port: 749
+  - name: kdc
+    port: 88
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: krb5-kdc
+data:
+  krb5.conf: |
+    [logging]
+    default = STDERR
+    kdc = STDERR
+    admin_server = STDERR
+    # default = FILE:/var/log/krb5libs.log
+    # kdc = FILE:/var/log/krb5kdc.log
+    # admin_server = FILE:/var/log/kadmind.log
+
+    [libdefaults]
+    dns_lookup_realm = false
+    ticket_lifetime = 24h
+    renew_lifetime = 7d
+    forwardable = true
+    rdns = false
+    default_realm = CLUSTER.LOCAL
+    spake_preauth_groups = edwards25519
+
+    [realms]
+    CLUSTER.LOCAL = {
+     kdc = krb5-kdc.default.svc.cluster.local
+     admin_server = krb5-kdc.default.svc.cluster.local
+     acl_file = /stackable/config/kadm5.acl
+     disable_encrypted_timestamp = false
+    }
+
+    [domain_realm]
+    .cluster.local = CLUSTER.LOCAL
+    cluster.local = CLUSTER.LOCAL
+  kadm5.acl: |
+    root/admin *
+

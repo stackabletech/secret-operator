@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: krb5-client
+spec:
+  selector:
+    matchLabels:
+      app: krb5-client
+  template:
+    metadata:
+      labels:
+        app: krb5-client
+    spec:
+      containers:
+      - name: client
+        image: docker.stackable.tech/teozkr/krb5
+        tty: true
+        stdin: true
+        volumeMounts:
+        - mountPath: /stackable/krb
+          name: kerberos
+      volumes:
+      - name: kerberos
+        csi:
+          driver: secrets.stackable.tech
+          volumeAttributes:
+            secrets.stackable.tech/class: kerberos
+            secrets.stackable.tech/scope: node,pod
+      terminationGracePeriodSeconds: 0

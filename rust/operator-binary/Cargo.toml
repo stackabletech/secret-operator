@@ -31,6 +31,8 @@ tonic = "0.6.2"
 tonic-reflection = "0.3.0"
 tracing = "0.1.30"
 
+krb5-sys = { path = "../krb5-sys" }
+
 # Need to keep this in sync with our patched h2 build
 h2 = "=0.3.7"
 

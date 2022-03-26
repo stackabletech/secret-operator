@@ -86,5 +86,8 @@ pub async fn from_class(
             super::TlsGenerate::get_or_create_k8s_certificate(client, &secret, auto_generate)
                 .await?,
         ),
+        crd::SecretClassBackend::KerberosKeytab(crd::KerberosKeytabBackend {}) => {
+            from(super::KerberosKeytab {})
+        }
     })
 }
