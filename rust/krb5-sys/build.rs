@@ -16,6 +16,7 @@ fn main() {
         .allowlist_function("^krb5_.*")
         .allowlist_function("^kadm5_.*")
         .allowlist_function("error_message")
+        .allowlist_function("^profile_.*")
         .allowlist_var("KRB5_.*")
         .allowlist_var("KADM5_.*")
         .new_type_alias("krb5_error_code")

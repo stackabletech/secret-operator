@@ -14,7 +14,7 @@
       };
       krb5-sys = attrs: {
         nativeBuildInputs = [ pkgs.pkg-config ];
-        buildInputs = [ pkgs.libkrb5 ];
+        buildInputs = [ (pkgs.enableDebugging pkgs.libkrb5) ];
         LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
         BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.stdenv.glibc.dev}/include -I${pkgs.clang.cc.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang.cc}/include";
       };
@@ -34,9 +34,12 @@ rec {
   dockerImage = pkgs.dockerTools.streamLayeredImage {
     name = "docker.stackable.tech/teozkr/secret-provisioner";
     tag = dockerTag;
-    contents = [ pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal ];
+    contents = [ pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal pkgs.krb5 pkgs.vim ];
     config = {
-      Cmd = [ (build+"/bin/stackable-secret-operator") "run" ];
+      Cmd = [
+        # "${pkgs.gdb}/bin/gdbserver" ":9999"
+        (build+"/bin/stackable-secret-operator") "run"
+      ];
     };
   };
   docker = pkgs.linkFarm "secret-provisioner-docker" [

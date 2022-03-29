@@ -1,23 +1,47 @@
-use std::{convert::Infallible, ffi::CString};
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
-use krb5_sys::kadm5_randkey_principal_3;
 use snafu::{ResultExt, Snafu};
+use tempfile::tempdir;
 
+use super::pod_info::Address;
 use super::{SecretBackend, SecretBackendError};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("failed to initialize krb5"))]
-    KrbInit { source: kadm5::KrbError },
-    #[snafu(display("failed to initialize kadmin"))]
-    KadminInit { source: kadm5::KadmError },
+    #[snafu(display("failed to create temp dir"))]
+    TempSetup { source: std::io::Error },
+    #[snafu(display("failed to write Kerberos configuration"))]
+    WriteConfig { source: std::io::Error },
+    #[snafu(display("failed to spawn kadmin"))]
+    SpawnKadmin { source: std::io::Error },
+    #[snafu(display("kadmin failed to add principal to keytab, with status {status} and message {keytab_add_msg:?} (additionally, got message {add_principal_msg:?} when creating principal)"))]
+    AddToKeytab {
+        status: std::process::ExitStatus,
+        keytab_add_msg: String,
+        add_principal_msg: String,
+    },
+    #[snafu(display("failed to read keytab"))]
+    ReadKeytab { source: std::io::Error },
+    // #[snafu(display("failed to initialize krb5 profile"))]
+    // ProfileInit { source: krb5::ProfileError },
+    // #[snafu(display("failed to configure krb5 profile"))]
+    // ProfileConfig { source: krb5::ProfileError },
+    // #[snafu(display("failed to initialize krb5"))]
+    // KrbInit { source: krb5::KrbError },
+    // #[snafu(display("failed to initialize kadmin"))]
+    // KadminInit { source: krb5::KadmError },
 }
 impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
         match self {
-            Self::KrbInit { .. } => tonic::Code::Unavailable,
-            Self::KadminInit { .. } => tonic::Code::Unavailable,
+            Error::TempSetup { .. } => tonic::Code::Unavailable,
+            Error::WriteConfig { .. } => tonic::Code::Unavailable,
+            Error::SpawnKadmin { .. } => tonic::Code::FailedPrecondition,
+            Error::AddToKeytab { .. } => tonic::Code::Unavailable,
+            Error::ReadKeytab { .. } => tonic::Code::Unavailable,
         }
     }
 }
@@ -30,225 +54,121 @@ impl SecretBackend for KerberosKeytab {
 
     async fn get_secret_data(
         &self,
-        _selector: super::SecretVolumeSelector,
-        _pod_info: super::pod_info::PodInfo,
+        selector: super::SecretVolumeSelector,
+        pod_info: super::pod_info::PodInfo,
     ) -> Result<super::SecretFiles, Self::Error> {
         // kadm5_randkey_principal_3(server_handle, principal, keepold, n_ks_tuple, ks_tuple, keyblocks, n_keys)
-        let config_params = kadm5::ConfigParams {
-            default_realm: Some(CString::new("ASDF").unwrap()),
-        };
-        let krb = kadm5::KrbContext::new().context(KrbInitSnafu)?;
-        let kadmin = kadm5::ServerHandle::new(
-            &krb,
-            &CString::new("stackable-secret-operator@ASDF").unwrap(),
-            &kadm5::Credential::ServiceKey {
-                keytab: CString::new("").unwrap(),
-                service_name: CString::new("").unwrap(),
-            },
-            &config_params,
-        )
-        .context(KadminInitSnafu)?;
-        todo!()
+        let tmp = tempdir().context(TempSetupSnafu)?;
+        let profile = format!(
+            r#"
+[libdefaults]
+default_realm = CLUSTER.LOCAL
+
+[realms]
+CLUSTER.LOCAL = {{
+  kdc = krb5-kdc
+  admin_server = krb5-kdc
+}}
+"#
+        );
+        let profile_file_path = tmp.path().join("krb5.conf");
+        let mut profile_file = File::create(&profile_file_path).context(WriteConfigSnafu)?;
+        profile_file
+            .write_all(profile.as_bytes())
+            .context(WriteConfigSnafu)?;
+        profile_file.flush().context(WriteConfigSnafu)?;
+        let keytab_file_path = tmp.path().join("keytab");
+        for scope in &selector.scope {
+            for addr in selector.scope_addresses(&pod_info, scope) {
+                if let Address::Dns(hostname) = addr {
+                    add_principal(
+                        &profile_file_path,
+                        "stackable-secret-operator",
+                        "/keytab/kt".as_ref(),
+                        &format!("sample/{hostname}"),
+                        &keytab_file_path,
+                    )?;
+                }
+            }
+        }
+        let mut keytab_data = Vec::new();
+        let mut keytab_file = File::open(keytab_file_path).context(ReadKeytabSnafu)?;
+        keytab_file
+            .read_to_end(&mut keytab_data)
+            .context(ReadKeytabSnafu)?;
+        Ok([
+            (PathBuf::from("keytab"), keytab_data),
+            (PathBuf::from("krb5.conf"), profile.into_bytes()),
+        ]
+        .into())
+        // let profile_file_path = profile_file.path().as_os_str().as_bytes();
+        // let config_params = krb5::ConfigParams {
+        //     default_realm: Some(CString::new("CLUSTER.LOCAL").unwrap()),
+        //     admin_server: Some(CString::new("krb5-kdc").unwrap()),
+        //     kadmind_port: Some(749),
+        // };
+        // let mut profile = krb5::Profile::from_path(&CString::new(profile_file_path).unwrap())
+        //     .context(ProfileInitSnafu)?;
+        // dbg!(profile_file.keep().unwrap());
+        // profile
+        //     .set(
+        //         &[
+        //             &CString::new("realms").unwrap(),
+        //             &CString::new("CLUSTER.LOCAL").unwrap(),
+        //             &CString::new("kdc").unwrap(),
+        //         ],
+        //         &CString::new("krb5-kdc").unwrap(),
+        //     )
+        //     .context(ProfileConfigSnafu)?;
+        // profile.flush().context(ProfileConfigSnafu)?;
+        // let krb = krb5::KrbContext::from_profile(&profile).context(KrbInitSnafu)?;
+        // let kadmin = krb5::ServerHandle::new(
+        //     &krb,
+        //     &CString::new("stackable-secret-operator@CLUSTER.LOCAL").unwrap(),
+        //     &krb5::Credential::ServiceKey {
+        //         keytab: CString::new("/keytab/kt").unwrap(),
+        //         service_name: CString::new("stackable-secret-operator@CLUSTER.LOCAL").unwrap(),
+        //     },
+        //     &config_params,
+        // )
+        // .context(KadminInitSnafu)?;
+        // todo!()
     }
 }
 
-mod kadm5 {
-    use std::{
-        ffi::{CStr, CString},
-        fmt::Display,
-    };
-
-    use krb5_sys::{kadm5_destroy, kadm5_init_with_skey};
-    use snafu::Snafu;
-
-    #[derive(Debug)]
-    pub struct KadmError {
-        code: krb5_sys::kadm5_ret_t,
+fn add_principal(
+    config_path: &Path,
+    admin_principal: &str,
+    admin_keytab: &Path,
+    pod_principal: &str,
+    pod_keytab: &Path,
+) -> Result<(), Error> {
+    let addprinc_output = std::process::Command::new("kadmin")
+        .args(["-p", admin_principal, "-kt"])
+        .arg(admin_keytab)
+        .args(["add_principal", "-randkey", pod_principal])
+        .env("KRB5_CONFIG", config_path)
+        .output()
+        .context(SpawnKadminSnafu)?;
+    if !addprinc_output.status.success() {
+        // Try to keep going, the principal might already exist
     }
-    impl KadmError {
-        fn from_ret(code: krb5_sys::kadm5_ret_t) -> Result<(), Self> {
-            if code.0 == krb5_sys::kadm5_ret_t(krb5_sys::KADM5_OK.into()).0 {
-                Ok(())
-            } else {
-                Err(Self { code })
-            }
+    let ktadd_output = std::process::Command::new("kadmin")
+        .args(["-p", admin_principal, "-kt"])
+        .arg(admin_keytab)
+        .args(["ktadd", "-norandkey", "-k"])
+        .arg(pod_keytab)
+        .arg(pod_principal)
+        .env("KRB5_CONFIG", config_path)
+        .output()
+        .context(SpawnKadminSnafu)?;
+    if !ktadd_output.status.success() {
+        return AddToKeytabSnafu {
+            status: ktadd_output.status,
+            keytab_add_msg: String::from_utf8_lossy(&ktadd_output.stderr),
+            add_principal_msg: String::from_utf8_lossy(&addprinc_output.stderr),
         }
+        .fail();
     }
-    impl std::error::Error for KadmError {}
-    impl Display for KadmError {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let msg = unsafe { CStr::from_ptr(krb5_sys::error_message(self.code.0)) };
-            f.write_str(&msg.to_string_lossy())
-        }
-    }
-
-    #[derive(Debug, Snafu)]
-    pub struct KrbError {
-        code: krb5_sys::krb5_error_code,
-    }
-    impl KrbError {
-        fn from_code(code: krb5_sys::krb5_error_code) -> Result<(), Self> {
-            if code.0 == 0 {
-                Ok(())
-            } else {
-                Err(Self { code })
-            }
-        }
-    }
-
-    pub struct KrbContext {
-        raw: krb5_sys::krb5_context,
-    }
-    impl KrbContext {
-        pub fn new() -> Result<Self, KrbError> {
-            let mut ctx = std::ptr::null_mut();
-            KrbError::from_code(unsafe { krb5_sys::kadm5_init_krb5_context(&mut ctx) })?;
-            Ok(Self { raw: ctx })
-        }
-
-        pub fn parse_name(&self, princ_name: &CStr) -> Result<Principal, KrbError> {
-            let mut principal = std::ptr::null_mut();
-            KrbError::from_code(unsafe {
-                krb5_sys::krb5_parse_name(self.raw, princ_name.as_ptr(), &mut principal)
-            })?;
-            Ok(Principal {
-                ctx: self,
-                raw: principal,
-            })
-        }
-    }
-    impl Drop for KrbContext {
-        fn drop(&mut self) {
-            unsafe {
-                krb5_sys::krb5_free_context(self.raw);
-            }
-        }
-    }
-
-    pub struct Principal<'a> {
-        ctx: &'a KrbContext,
-        raw: krb5_sys::krb5_principal,
-    }
-    impl Drop for Principal<'_> {
-        fn drop(&mut self) {
-            unsafe {
-                krb5_sys::krb5_free_principal(self.ctx.raw, self.raw);
-            }
-        }
-    }
-
-    pub enum Credential {
-        ServiceKey {
-            keytab: CString,
-            service_name: CString,
-        },
-    }
-
-    #[derive(Default)]
-    pub struct ConfigParams {
-        pub default_realm: Option<CString>,
-    }
-    impl ConfigParams {
-        /// Return a [`krb5_sys::kadm5_config_params`] view of `self`
-        ///
-        /// The returned `kadm5_config_params` has the same lifetime as `&self`. It
-        /// should be considered unusable as soon as `self` is moved, modified,
-        /// or dropped.
-        fn as_c(&self) -> krb5_sys::kadm5_config_params {
-            let mut c = unsafe { std::mem::zeroed::<krb5_sys::kadm5_config_params>() };
-            if let Some(default_realm) = &self.default_realm {
-                c.realm = default_realm.as_ptr() as *mut i8;
-                c.mask |= i64::from(krb5_sys::KADM5_CONFIG_REALM);
-            }
-            c
-        }
-    }
-
-    pub struct ServerHandle<'a> {
-        ctx: &'a KrbContext,
-        raw: *mut std::ffi::c_void,
-    }
-    impl<'a> ServerHandle<'a> {
-        pub fn new(
-            ctx: &'a KrbContext,
-            client_name: &CStr,
-            credential: &Credential,
-            params: &ConfigParams,
-        ) -> Result<Self, KadmError> {
-            let mut server_handle = std::ptr::null_mut();
-            let mut params = params.as_c();
-
-            match credential {
-                Credential::ServiceKey {
-                    keytab,
-                    service_name,
-                } => unsafe {
-                    KadmError::from_ret(kadm5_init_with_skey(
-                        ctx.raw,
-                        client_name.as_ptr() as *mut i8,
-                        keytab.as_ptr() as *mut i8,
-                        service_name.as_ptr() as *mut i8,
-                        &mut params,
-                        krb5_sys::KADM5_STRUCT_VERSION_1,
-                        krb5_sys::KADM5_API_VERSION_4,
-                        std::ptr::null_mut(),
-                        &mut server_handle,
-                    ))?;
-                },
-            }
-            Ok(Self {
-                ctx,
-                raw: server_handle,
-            })
-        }
-
-        pub fn generate_principal_keys(
-            &self,
-            principal: &Principal,
-            keep_old: bool,
-            keyset_id: i32,
-            key_salt_tuple: krb5_sys::krb5_key_salt_tuple,
-        ) -> Result<(), KadmError> {
-            let mut keys = std::ptr::null_mut();
-            let mut key_count = 0;
-
-            KadmError::from_ret(unsafe {
-                krb5_sys::kadm5_randkey_principal_3(
-                    self.raw,
-                    principal.raw,
-                    if keep_old { 1 } else { 0 },
-                    keyset_id,
-                    std::ptr::null_mut(),
-                    &mut keys,
-                    &mut key_count,
-                )
-            })?;
-            dbg!(keys);
-            let keyblock = Keyblock {
-                ctx: self.ctx,
-                raw: keys,
-                key_count,
-            };
-            Ok(())
-        }
-    }
-    impl<'a> Drop for ServerHandle<'a> {
-        fn drop(&mut self) {
-            unsafe {
-                KadmError::from_ret(kadm5_destroy(self.raw))
-                    .expect("failed to destroy kadmin5 server handle");
-            }
-        }
-    }
-
-    struct Keyblock<'a> {
-        ctx: &'a KrbContext,
-        raw: *mut krb5_sys::krb5_keyblock,
-        key_count: i32,
-    }
-    impl Drop for Keyblock<'_> {
-        fn drop(&mut self) {
-            unsafe { krb5_sys::krb5_free_keyblock(self.ctx.raw, self.raw) }
-        }
-    }
+    Ok(())
 }

@@ -14,18 +14,26 @@ spec:
       containers:
       - name: provisioner
         image: docker.stackable.tech/teozkr/secret-provisioner
+        stdin: true
+        tty: true
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
         env:
         - name: CSI_ENDPOINT
           value: /csi/csi.sock
+        - name: KRB5_TRACE
+          value: /dev/stdout
         volumeMounts:
         - name: csi
           mountPath: /csi
         - name: mountpoint
           mountPath: /var/lib/kubelet/pods
           mountPropagation: Bidirectional
+        - name: keytab
+          mountPath: /keytab
+        - name: tmp
+          mountPath: /tmp
       - name: node-driver-registrar
         # image: csi-node-driver-registrar
         # imagePullPolicy: IfNotPresent
@@ -48,7 +56,23 @@ spec:
       - name: mountpoint
         hostPath:
           path: /var/lib/kubelet/pods/
+      - name: keytab
+        secret:
+          secretName: secret-provisioner-keytab
+      - name: tmp
+        emptyDir: {}
       serviceAccountName: secret-provisioner
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-provisioner-keytab
+data:
+  kt: |
+    BQIAAABdAAEADUNMVVNURVIuTE9DQUwAGXN0YWNrYWJsZS1zZWNyZXQtb3BlcmF0b3IAAAABYkIj
+    6wIAEgAg4+P2cyLxtUjwZdneDmqh0BHZCw2vjxZIPVuDXlriQiAAAAACAAAATQABAA1DTFVTVEVS
+    LkxPQ0FMABlzdGFja2FibGUtc2VjcmV0LW9wZXJhdG9yAAAAAWJCI+sCABEAEL0YFdQPpM+vKBG8
+    PE+CV9IAAAAC
 ---
 apiVersion: v1
 kind: ServiceAccount

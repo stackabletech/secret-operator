@@ -876,6 +876,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "krb5"
+version = "0.1.0"
+dependencies = [
+ "krb5-sys",
+ "snafu",
+ "tempfile",
+]
+
+[[package]]
 name = "krb5-sys"
 version = "0.1.0"
 dependencies = [
@@ -1832,7 +1841,6 @@ dependencies = [
  "clap 3.0.14",
  "futures",
  "h2",
- "krb5-sys",
  "libc",
  "openssl",
  "pin-project",
@@ -1845,6 +1853,7 @@ dependencies = [
  "socket2",
  "stackable-operator",
  "sys-mount",
+ "tempfile",
  "time 0.3.7",
  "tokio",
  "tokio-stream",

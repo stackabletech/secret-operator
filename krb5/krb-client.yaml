@@ -3,6 +3,7 @@ kind: StatefulSet
 metadata:
   name: krb5-client
 spec:
+  serviceName: krb5-client
   selector:
     matchLabels:
       app: krb5-client
@@ -16,6 +17,9 @@ spec:
         image: docker.stackable.tech/teozkr/krb5
         tty: true
         stdin: true
+        env:
+        - name: KRB5_CONFIG
+          value: /stackable/krb/krb5.conf
         volumeMounts:
         - mountPath: /stackable/krb
           name: kerberos
@@ -27,3 +31,14 @@ spec:
             secrets.stackable.tech/class: kerberos
             secrets.stackable.tech/scope: node,pod
       terminationGracePeriodSeconds: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: krb5-client
+spec:
+  selector:
+    app: krb5-client
+  ports:
+  - name: dummy
+    port: 9999
