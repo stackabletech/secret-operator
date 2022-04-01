@@ -29,6 +29,8 @@ spec:
                         - k8sSearch
                     - required:
                         - autoTls
+                    - required:
+                        - kerberosKeytab
                   properties:
                     autoTls:
                       properties:
@@ -75,6 +77,8 @@ spec:
                           type: object
                       required:
                         - searchNamespace
+                      type: object
+                    kerberosKeytab:
                       type: object
                   type: object
               required:
