@@ -65,8 +65,6 @@ impl SecretBackend for KerberosKeytab {
 default_realm = CLUSTER.LOCAL
 rdns = false
 dns_canonicalize_hostnames = false
-canonicalize = false
-ignore_acceptor_hostname = true
 
 [realms]
 CLUSTER.LOCAL = {{
