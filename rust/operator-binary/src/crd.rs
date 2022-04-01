@@ -61,4 +61,10 @@ pub struct AutoTlsCa {
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct KerberosKeytabBackend {}
+pub struct KerberosKeytabBackend {
+    pub realm_name: String,
+    pub kdc: String,
+    pub admin_server: String,
+    pub admin_keytab_secret: SecretReference,
+    pub admin_principal: String,
+}

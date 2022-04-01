@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
-use snafu::{ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::k8s_openapi::api::core::v1::{Secret, SecretReference};
 use tempfile::tempdir;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -12,10 +13,21 @@ use super::{SecretBackend, SecretBackendError};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
+    #[snafu(display("invalid secret reference: {secret:?}"))]
+    InvalidSecretRef { secret: SecretReference },
+    #[snafu(display("failed to load admin keytab {secret:?}"))]
+    LoadAdminKeytab {
+        source: stackable_operator::error::Error,
+        secret: SecretReference,
+    },
+    #[snafu(display(r#"admin keytab {secret:?} does not contain field "keytab""#))]
+    NoAdminKeytabFieldInSecret { secret: SecretReference },
     #[snafu(display("failed to create temp dir"))]
     TempSetup { source: std::io::Error },
     #[snafu(display("failed to write Kerberos configuration"))]
     WriteConfig { source: std::io::Error },
+    #[snafu(display("failed to write admin keytab"))]
+    WriteAdminKeytab { source: std::io::Error },
     #[snafu(display("failed to spawn kadmin"))]
     SpawnKadmin { source: std::io::Error },
     #[snafu(display("kadmin failed to add principal to keytab, with status {status} and message {keytab_add_msg:?} (additionally, got message {add_principal_msg:?} when creating principal)"))]
@@ -30,8 +42,12 @@ pub enum Error {
 impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
         match self {
+            Error::InvalidSecretRef { .. } => tonic::Code::FailedPrecondition,
+            Error::LoadAdminKeytab { .. } => tonic::Code::FailedPrecondition,
+            Error::NoAdminKeytabFieldInSecret { .. } => tonic::Code::FailedPrecondition,
             Error::TempSetup { .. } => tonic::Code::Unavailable,
             Error::WriteConfig { .. } => tonic::Code::Unavailable,
+            Error::WriteAdminKeytab { .. } => tonic::Code::Unavailable,
             Error::SpawnKadmin { .. } => tonic::Code::FailedPrecondition,
             Error::AddToKeytab { .. } => tonic::Code::Unavailable,
             Error::ReadKeytab { .. } => tonic::Code::Unavailable,
@@ -39,7 +55,58 @@ impl SecretBackendError for Error {
     }
 }
 
-pub struct KerberosKeytab {}
+pub struct KerberosProfile {
+    pub realm_name: String,
+    pub kdc: String,
+    pub admin_server: String,
+}
+
+pub struct KerberosKeytab {
+    profile: KerberosProfile,
+    admin_keytab: Vec<u8>,
+    admin_principal: String,
+}
+
+impl KerberosKeytab {
+    pub async fn new_from_k8s_keytab(
+        client: &stackable_operator::client::Client,
+        profile: KerberosProfile,
+        admin_keytab_secret_ref: &SecretReference,
+        admin_principal: impl Into<String>,
+    ) -> Result<Self, Error> {
+        let (keytab_secret_name, keytab_secret_ns) = match admin_keytab_secret_ref {
+            SecretReference {
+                name: Some(name),
+                namespace: Some(ns),
+            } => (name, ns),
+            _ => {
+                return InvalidSecretRefSnafu {
+                    secret: admin_keytab_secret_ref.clone(),
+                }
+                .fail()
+            }
+        };
+        let admin_keytab_secret = client
+            .get::<Secret>(keytab_secret_name, Some(keytab_secret_ns))
+            .await
+            .context(LoadAdminKeytabSnafu {
+                secret: admin_keytab_secret_ref.clone(),
+            })?;
+        let admin_keytab = admin_keytab_secret
+            .data
+            .unwrap_or_default()
+            .remove("keytab")
+            .context(NoAdminKeytabFieldInSecretSnafu {
+                secret: admin_keytab_secret_ref.clone(),
+            })?
+            .0;
+        Ok(Self {
+            profile,
+            admin_keytab,
+            admin_principal: admin_principal.into(),
+        })
+    }
+}
 
 #[async_trait]
 impl SecretBackend for KerberosKeytab {
@@ -50,44 +117,65 @@ impl SecretBackend for KerberosKeytab {
         selector: super::SecretVolumeSelector,
         pod_info: super::pod_info::PodInfo,
     ) -> Result<super::SecretFiles, Self::Error> {
-        // kadm5_randkey_principal_3(server_handle, principal, keepold, n_ks_tuple, ks_tuple, keyblocks, n_keys)
+        let Self {
+            profile:
+                KerberosProfile {
+                    realm_name,
+                    kdc,
+                    admin_server,
+                },
+            admin_keytab,
+            admin_principal,
+        } = self;
+
         let tmp = tempdir().context(TempSetupSnafu)?;
         let profile = format!(
             r#"
 [libdefaults]
-default_realm = CLUSTER.LOCAL
+default_realm = {realm_name}
 rdns = false
 dns_canonicalize_hostnames = false
 
 [realms]
-CLUSTER.LOCAL = {{
-  kdc = krb5-kdc
-  admin_server = krb5-kdc
+{realm_name} = {{
+  kdc = {kdc}
+  admin_server = {admin_server}
 }}
 
 [domain_realm]
-cluster.local = CLUSTER.LOCAL
-.cluster.local = CLUSTER.LOCAL
+cluster.local = {realm_name}
+.cluster.local = {realm_name}
 "#
         );
         let profile_file_path = tmp.path().join("krb5.conf");
-        let mut profile_file = File::create(&profile_file_path)
-            .await
-            .context(WriteConfigSnafu)?;
-        profile_file
-            .write_all(profile.as_bytes())
-            .await
-            .context(WriteConfigSnafu)?;
-        profile_file.flush().await.context(WriteConfigSnafu)?;
-        let keytab_file_path = tmp.path().join("keytab");
+        {
+            let mut profile_file = File::create(&profile_file_path)
+                .await
+                .context(WriteConfigSnafu)?;
+            profile_file
+                .write_all(profile.as_bytes())
+                .await
+                .context(WriteConfigSnafu)?;
+        }
+        let admin_keytab_file_path = tmp.path().join("admin-keytab");
+        {
+            let mut admin_keytab_file = File::create(&admin_keytab_file_path)
+                .await
+                .context(WriteAdminKeytabSnafu)?;
+            admin_keytab_file
+                .write_all(admin_keytab)
+                .await
+                .context(WriteAdminKeytabSnafu)?;
+        }
+        let keytab_file_path = tmp.path().join("pod-keytab");
         for service_name in &selector.kerberos_service_names {
             for scope in &selector.scope {
                 for addr in selector.scope_addresses(&pod_info, scope) {
                     if let Address::Dns(hostname) = addr {
                         add_principal_to_keytab(
                             &profile_file_path,
-                            "stackable-secret-operator",
-                            "/keytab/kt".as_ref(),
+                            &admin_principal,
+                            &admin_keytab_file_path,
                             &format!("{service_name}/{hostname}"),
                             &keytab_file_path,
                         )

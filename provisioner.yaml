@@ -68,7 +68,7 @@ kind: Secret
 metadata:
   name: secret-provisioner-keytab
 data:
-  kt: |
+  keytab: |
     BQIAAABdAAEADUNMVVNURVIuTE9DQUwAGXN0YWNrYWJsZS1zZWNyZXQtb3BlcmF0b3IAAAABYkRh
     /gIAEgAgUr0IiiuLtamD4367KdUCcTTLYZuVPB6Qg5bI7SJuM+0AAAACAAAATQABAA1DTFVTVEVS
     LkxPQ0FMABlzdGFja2FibGUtc2VjcmV0LW9wZXJhdG9yAAAAAWJEYf4CABEAEIAFlcYvPmCuza80
@@ -152,4 +152,11 @@ metadata:
   name: kerberos
 spec:
   backend:
-    kerberosKeytab: {}
+    kerberosKeytab:
+      realmName: CLUSTER.LOCAL
+      kdc: krb5-kdc
+      adminServer: krb5-kdc
+      adminKeytabSecret:
+        namespace: default
+        name: secret-provisioner-keytab
+      adminPrincipal: stackable-secret-operator

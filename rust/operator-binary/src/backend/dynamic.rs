@@ -4,7 +4,9 @@ use async_trait::async_trait;
 use snafu::Snafu;
 use std::fmt::Display;
 
-use super::{pod_info::PodInfo, SecretBackend, SecretBackendError};
+use super::{
+    kerberos_keytab::KerberosProfile, pod_info::PodInfo, SecretBackend, SecretBackendError,
+};
 use crate::crd::{self, SecretClass};
 
 #[derive(Debug)]
@@ -53,12 +55,20 @@ pub fn from(backend: impl SecretBackend + 'static) -> Box<Dynamic> {
 pub enum FromClassError {
     #[snafu(display("failed to initialize TLS backend"), context(false))]
     Tls { source: super::tls::Error },
+    #[snafu(
+        display("failed to initialize Kerberos Keytab backend"),
+        context(false)
+    )]
+    KerberosKeytab {
+        source: super::kerberos_keytab::Error,
+    },
 }
 
 impl SecretBackendError for FromClassError {
     fn grpc_code(&self) -> tonic::Code {
         match self {
             FromClassError::Tls { source } => source.grpc_code(),
+            FromClassError::KerberosKeytab { source } => source.grpc_code(),
         }
     }
 }
@@ -86,8 +96,24 @@ pub async fn from_class(
             super::TlsGenerate::get_or_create_k8s_certificate(client, &secret, auto_generate)
                 .await?,
         ),
-        crd::SecretClassBackend::KerberosKeytab(crd::KerberosKeytabBackend {}) => {
-            from(super::KerberosKeytab {})
-        }
+        crd::SecretClassBackend::KerberosKeytab(crd::KerberosKeytabBackend {
+            realm_name,
+            kdc,
+            admin_server,
+            admin_keytab_secret,
+            admin_principal,
+        }) => from(
+            super::KerberosKeytab::new_from_k8s_keytab(
+                client,
+                KerberosProfile {
+                    realm_name,
+                    kdc,
+                    admin_server,
+                },
+                &admin_keytab_secret,
+                admin_principal,
+            )
+            .await?,
+        ),
     })
 }
