@@ -8,7 +8,7 @@ pub mod scope;
 pub mod tls;
 
 use async_trait::async_trait;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::{collections::HashMap, convert::Infallible, path::PathBuf};
 
 pub use dynamic::Dynamic;
@@ -47,6 +47,13 @@ pub struct SecretVolumeSelector {
     /// The name of the `Pod`'s `Namespace`, provided by Kubelet
     #[serde(rename = "csi.storage.k8s.io/pod.namespace")]
     pub namespace: String,
+
+    #[serde(
+        rename = "secrets.stackable.tech/kerberos.service.names",
+        default = "SecretVolumeSelector::default_kerberos_service_names",
+        deserialize_with = "SecretVolumeSelector::deserialize_str_vec"
+    )]
+    pub kerberos_service_names: Vec<String>,
 }
 
 impl SecretVolumeSelector {
@@ -82,6 +89,15 @@ impl SecretVolumeSelector {
                 name, self.namespace
             ))],
         }
+    }
+
+    fn default_kerberos_service_names() -> Vec<String> {
+        vec!["HTTP".to_string()]
+    }
+
+    fn deserialize_str_vec<'de, D: Deserializer<'de>>(de: D) -> Result<Vec<String>, D::Error> {
+        let full_str = String::deserialize(de)?;
+        Ok(full_str.split(',').map(str::to_string).collect())
     }
 }
 

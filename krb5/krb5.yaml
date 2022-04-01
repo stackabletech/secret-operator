@@ -94,6 +94,9 @@ spec:
     port: 749
   - name: kdc
     port: 88
+  - name: kdc
+    port: 88
+    protocol: UDP
 ---
 apiVersion: v1
 kind: ConfigMap

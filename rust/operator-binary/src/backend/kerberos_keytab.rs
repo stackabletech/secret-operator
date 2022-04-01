@@ -63,12 +63,20 @@ impl SecretBackend for KerberosKeytab {
             r#"
 [libdefaults]
 default_realm = CLUSTER.LOCAL
+rdns = false
+dns_canonicalize_hostnames = false
+canonicalize = false
+ignore_acceptor_hostname = true
 
 [realms]
 CLUSTER.LOCAL = {{
   kdc = krb5-kdc
   admin_server = krb5-kdc
 }}
+
+[domain_realm]
+cluster.local = CLUSTER.LOCAL
+.cluster.local = CLUSTER.LOCAL
 "#
         );
         let profile_file_path = tmp.path().join("krb5.conf");
@@ -78,16 +86,18 @@ CLUSTER.LOCAL = {{
             .context(WriteConfigSnafu)?;
         profile_file.flush().context(WriteConfigSnafu)?;
         let keytab_file_path = tmp.path().join("keytab");
-        for scope in &selector.scope {
-            for addr in selector.scope_addresses(&pod_info, scope) {
-                if let Address::Dns(hostname) = addr {
-                    add_principal(
-                        &profile_file_path,
-                        "stackable-secret-operator",
-                        "/keytab/kt".as_ref(),
-                        &format!("sample/{hostname}"),
-                        &keytab_file_path,
-                    )?;
+        for service_name in &selector.kerberos_service_names {
+            for scope in &selector.scope {
+                for addr in selector.scope_addresses(&pod_info, scope) {
+                    if let Address::Dns(hostname) = addr {
+                        add_principal(
+                            &profile_file_path,
+                            "stackable-secret-operator",
+                            "/keytab/kt".as_ref(),
+                            &format!("{service_name}/{hostname}"),
+                            &keytab_file_path,
+                        )?;
+                    }
                 }
             }
         }
