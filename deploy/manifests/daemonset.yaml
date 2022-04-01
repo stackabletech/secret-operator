@@ -22,9 +22,7 @@ spec:
       securityContext: {}
       containers:
         - name: secret-operator
-          securityContext:
-            privileged: true
-            runAsUser: 0
+          securityContext: {}
           image: "docker.stackable.tech/stackable/secret-operator:0.3.0-nightly"
           imagePullPolicy: IfNotPresent
           resources: {}
