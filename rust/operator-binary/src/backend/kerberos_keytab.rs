@@ -1,10 +1,11 @@
-use std::fs::File;
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
 use tempfile::tempdir;
+use tokio::fs::File;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::process::Command;
 
 use super::pod_info::Address;
 use super::{SecretBackend, SecretBackendError};
@@ -25,14 +26,6 @@ pub enum Error {
     },
     #[snafu(display("failed to read keytab"))]
     ReadKeytab { source: std::io::Error },
-    // #[snafu(display("failed to initialize krb5 profile"))]
-    // ProfileInit { source: krb5::ProfileError },
-    // #[snafu(display("failed to configure krb5 profile"))]
-    // ProfileConfig { source: krb5::ProfileError },
-    // #[snafu(display("failed to initialize krb5"))]
-    // KrbInit { source: krb5::KrbError },
-    // #[snafu(display("failed to initialize kadmin"))]
-    // KadminInit { source: krb5::KadmError },
 }
 impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
@@ -78,31 +71,38 @@ cluster.local = CLUSTER.LOCAL
 "#
         );
         let profile_file_path = tmp.path().join("krb5.conf");
-        let mut profile_file = File::create(&profile_file_path).context(WriteConfigSnafu)?;
+        let mut profile_file = File::create(&profile_file_path)
+            .await
+            .context(WriteConfigSnafu)?;
         profile_file
             .write_all(profile.as_bytes())
+            .await
             .context(WriteConfigSnafu)?;
-        profile_file.flush().context(WriteConfigSnafu)?;
+        profile_file.flush().await.context(WriteConfigSnafu)?;
         let keytab_file_path = tmp.path().join("keytab");
         for service_name in &selector.kerberos_service_names {
             for scope in &selector.scope {
                 for addr in selector.scope_addresses(&pod_info, scope) {
                     if let Address::Dns(hostname) = addr {
-                        add_principal(
+                        add_principal_to_keytab(
                             &profile_file_path,
                             "stackable-secret-operator",
                             "/keytab/kt".as_ref(),
                             &format!("{service_name}/{hostname}"),
                             &keytab_file_path,
-                        )?;
+                        )
+                        .await?;
                     }
                 }
             }
         }
         let mut keytab_data = Vec::new();
-        let mut keytab_file = File::open(keytab_file_path).context(ReadKeytabSnafu)?;
+        let mut keytab_file = File::open(keytab_file_path)
+            .await
+            .context(ReadKeytabSnafu)?;
         keytab_file
             .read_to_end(&mut keytab_data)
+            .await
             .context(ReadKeytabSnafu)?;
         Ok([
             (PathBuf::from("keytab"), keytab_data),
@@ -144,24 +144,27 @@ cluster.local = CLUSTER.LOCAL
     }
 }
 
-fn add_principal(
+#[tracing::instrument]
+async fn add_principal_to_keytab(
     config_path: &Path,
     admin_principal: &str,
     admin_keytab: &Path,
     pod_principal: &str,
     pod_keytab: &Path,
 ) -> Result<(), Error> {
-    let addprinc_output = std::process::Command::new("kadmin")
+    let addprinc_output = Command::new("kadmin")
         .args(["-p", admin_principal, "-kt"])
         .arg(admin_keytab)
         .args(["add_principal", "-randkey", pod_principal])
         .env("KRB5_CONFIG", config_path)
         .output()
+        .await
         .context(SpawnKadminSnafu)?;
     if !addprinc_output.status.success() {
         // Try to keep going, the principal might already exist
+        tracing::info!("failed to create principal, assuming it already exists")
     }
-    let ktadd_output = std::process::Command::new("kadmin")
+    let ktadd_output = Command::new("kadmin")
         .args(["-p", admin_principal, "-kt"])
         .arg(admin_keytab)
         .args(["ktadd", "-norandkey", "-k"])
@@ -169,6 +172,7 @@ fn add_principal(
         .arg(pod_principal)
         .env("KRB5_CONFIG", config_path)
         .output()
+        .await
         .context(SpawnKadminSnafu)?;
     if !ktadd_output.status.success() {
         return AddToKeytabSnafu {
