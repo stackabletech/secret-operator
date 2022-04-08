@@ -23,6 +23,8 @@ podSecurityContext: {}
   # fsGroup: 2000
 
 securityContext:
+  # secret-operator requires root permissions
+  runAsUser: 0
   privileged: true
   # capabilities:
   #   drop:
