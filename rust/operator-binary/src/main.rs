@@ -1,6 +1,7 @@
-use backend::{pod_info, SecretBackendError};
+use backend::{pod_info, SecretBackendError, SecretContents};
 use clap::{crate_description, crate_version, StructOpt};
 use crd::SecretClass;
+use fnv::FnvHasher;
 use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     identity_server::{Identity, IdentityServer},
@@ -16,13 +17,15 @@ use grpc::csi::v1::{
 use serde::{de::IntoDeserializer, Deserialize};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
+    builder::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::Pod,
     kube::{runtime::reflector::ObjectRef, CustomResourceExt},
 };
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     error::Error,
     fs::Permissions,
+    hash::{Hash, Hasher},
     os::unix::prelude::{FileTypeExt, PermissionsExt},
     path::{Path, PathBuf},
 };
@@ -127,6 +130,10 @@ enum PublishError {
         source: std::io::Error,
         path: PathBuf,
     },
+    #[snafu(display("failed to tag pod with expiry metadata"))]
+    TagPod {
+        source: stackable_operator::error::Error,
+    },
 }
 
 // Useful since all service calls return a [Result<tonic::Response<T>, tonic::Status>]
@@ -157,6 +164,7 @@ impl From<PublishError> for tonic::Status {
             PublishError::SetDirPermissions { .. } => tonic::Status::unavailable(full_msg),
             PublishError::CreateFile { .. } => tonic::Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => tonic::Status::unavailable(full_msg),
+            PublishError::TagPod { .. } => tonic::Status::unavailable(full_msg),
         }
     }
 }
@@ -260,7 +268,7 @@ impl SecretProvisionerNode {
     async fn save_secret_data(
         &self,
         target_path: &Path,
-        data: HashMap<PathBuf, Vec<u8>>,
+        data: &SecretContents,
     ) -> Result<(), PublishError> {
         let create_secret = {
             let mut opts = OpenOptions::new();
@@ -272,7 +280,7 @@ impl SecretProvisionerNode {
                 .mode(0o640);
             opts
         };
-        for (k, v) in data {
+        for (k, v) in &data.files {
             let item_path = target_path.join(k);
             if let Some(item_path_parent) = item_path.parent() {
                 create_dir_all(item_path_parent)
@@ -285,9 +293,49 @@ impl SecretProvisionerNode {
                 .open(&item_path)
                 .await
                 .context(publish_error::CreateFileSnafu { path: &item_path })?
-                .write_all(&v)
+                .write_all(v)
                 .await
                 .context(publish_error::WriteFileSnafu { path: item_path })?;
+        }
+        Ok(())
+    }
+
+    async fn tag_pod(
+        &self,
+        client: &stackable_operator::client::Client,
+        volume_id: &str,
+        selector: &SecretVolumeSelector,
+        data: &SecretContents,
+    ) -> Result<(), PublishError> {
+        // Each volume must have a unique tag, so that multiple markers of the same type can coexist on the same pod
+        // Each tag needs to be simple and unique-ish per volume
+        let mut volume_tag_hasher = FnvHasher::default();
+        "secrets.stackable.tech/volume:".hash(&mut volume_tag_hasher);
+        volume_id.hash(&mut volume_tag_hasher);
+        let volume_tag = volume_tag_hasher.finish();
+
+        let mut annotations = BTreeMap::default();
+
+        if let Some(expires_after) = data.expires_after {
+            annotations.insert(
+                format!("restarter.stackable.tech/expiry.{volume_tag:x}"),
+                expires_after.to_rfc3339(),
+            );
+        }
+
+        if !annotations.is_empty() {
+            let tagged_pod = Pod {
+                metadata: ObjectMetaBuilder::new()
+                    .name(&selector.pod)
+                    .namespace(&selector.namespace)
+                    .annotations(annotations)
+                    .build(),
+                ..Pod::default()
+            };
+            client
+                .merge_patch(&tagged_pod, &tagged_pod)
+                .await
+                .context(publish_error::TagPodSnafu)?;
         }
         Ok(())
     }
@@ -351,11 +399,13 @@ impl Node for SecretProvisionerNode {
         let pod_info = self.get_pod_info(&selector).await?;
         let backend = self.get_secret_backend(&selector).await?;
         let data = backend
-            .get_secret_data(selector, pod_info)
+            .get_secret_data(&selector, pod_info)
             .await
             .context(publish_error::BackendGetSecretDataSnafu)?;
+        self.tag_pod(&self.client, &request.volume_id, &selector, &data)
+            .await?;
         self.prepare_secret_dir(&target_path).await?;
-        self.save_secret_data(&target_path, data).await?;
+        self.save_secret_data(&target_path, &data).await?;
         Ok(Response::new(NodePublishVolumeResponse {}))
     }
 

@@ -1689,6 +1689,7 @@ dependencies = [
  "async-trait",
  "built",
  "clap",
+ "fnv",
  "futures",
  "h2",
  "libc",
