@@ -60,33 +60,33 @@ kind: ClusterRole
 metadata:
   name: secret-provisioner
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - list
-  - create
-  - get
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - patch
-- apiGroups:
-  - secrets.stackable.tech
-  resources:
-  - secretclasses
-  verbs:
-  - get
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - list
+      - create
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - patch
+  - apiGroups:
+      - secrets.stackable.tech
+    resources:
+      - secretclasses
+    verbs:
+      - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
