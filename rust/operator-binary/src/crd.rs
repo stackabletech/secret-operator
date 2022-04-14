@@ -26,6 +26,7 @@ pub struct SecretClassSpec {
 pub enum SecretClassBackend {
     K8sSearch(K8sSearchBackend),
     AutoTls(AutoTlsBackend),
+    KerberosKeytab(KerberosKeytabBackend),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
@@ -56,4 +57,14 @@ pub struct AutoTlsCa {
     /// Whether a new certificate authority should be generated if it does not already exist
     #[serde(default)]
     pub auto_generate: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KerberosKeytabBackend {
+    pub realm_name: String,
+    pub kdc: String,
+    pub admin_server: String,
+    pub admin_keytab_secret: SecretReference,
+    pub admin_principal: String,
 }
