@@ -318,7 +318,7 @@ impl SecretProvisionerNode {
 
         if let Some(expires_after) = data.expires_after {
             annotations.insert(
-                format!("restarter.stackable.tech/expiry.{volume_tag:x}"),
+                format!("restarter.stackable.tech/expires-at.{volume_tag:x}"),
                 expires_after.to_rfc3339(),
             );
         }
