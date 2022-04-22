@@ -91,6 +91,7 @@ pub struct SecretContents {
     pub files: SecretFiles,
     pub expires_after: Option<DateTime<FixedOffset>>,
 }
+
 impl SecretContents {
     fn new(files: SecretFiles) -> Self {
         Self {
