@@ -85,6 +85,7 @@ impl SecretVolumeSelector {
 }
 
 type SecretFiles = HashMap<PathBuf, Vec<u8>>;
+
 #[derive(Default, Debug)]
 pub struct SecretContents {
     pub files: SecretFiles,
