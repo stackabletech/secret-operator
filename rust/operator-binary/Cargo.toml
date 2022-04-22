@@ -35,6 +35,9 @@ tracing = "0.1.30"
 # Need to keep this in sync with our patched h2 build
 h2 = "=0.3.7"
 
+[dev-dependencies]
+time = { version = "0.3.7", features = ["parsing"] }
+
 [build-dependencies]
 built = { version = "0.5.1", features = ["chrono", "git2"] }
 tonic-build = "0.6.2"

@@ -342,3 +342,22 @@ fn time_datetime_to_chrono(dt: time::OffsetDateTime) -> chrono::DateTime<FixedOf
     let tz = chrono::FixedOffset::east(dt.offset().whole_seconds());
     tz.timestamp(dt.unix_timestamp(), dt.nanosecond())
 }
+
+#[cfg(test)]
+mod tests {
+    use time::format_description::well_known::Rfc3339;
+
+    use super::chrono;
+    use super::time_datetime_to_chrono;
+
+    #[test]
+    fn datetime_conversion() {
+        // Conversion should preserve timezone and fractional seconds
+        assert_eq!(
+            time_datetime_to_chrono(
+                time::OffsetDateTime::parse("2021-02-04T05:23:00.123+01:00", &Rfc3339).unwrap()
+            ),
+            chrono::DateTime::parse_from_rfc3339("2021-02-04T06:23:00.123+02:00").unwrap()
+        );
+    }
+}
