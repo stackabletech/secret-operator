@@ -1,7 +1,6 @@
 use backend::{pod_info, SecretBackendError, SecretContents};
 use clap::{crate_description, crate_version, StructOpt};
 use crd::SecretClass;
-use fnv::FnvHasher;
 use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     identity_server::{Identity, IdentityServer},
@@ -14,6 +13,7 @@ use grpc::csi::v1::{
     NodeStageVolumeResponse, NodeUnpublishVolumeRequest, NodeUnpublishVolumeResponse,
     NodeUnstageVolumeRequest, NodeUnstageVolumeResponse, ProbeRequest, ProbeResponse,
 };
+use openssl::sha::Sha256;
 use serde::{de::IntoDeserializer, Deserialize};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -25,7 +25,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     error::Error,
     fs::Permissions,
-    hash::{Hash, Hasher},
     os::unix::prelude::{FileTypeExt, PermissionsExt},
     path::{Path, PathBuf},
 };
@@ -37,7 +36,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::{transport::Server, Request, Response, Status};
-use utils::{uds_bind_private, TonicUnixStream};
+use utils::{uds_bind_private, FmtByteSlice, TonicUnixStream};
 
 use crate::backend::{pod_info::PodInfo, SecretVolumeSelector};
 
@@ -309,16 +308,23 @@ impl SecretProvisionerNode {
     ) -> Result<(), PublishError> {
         // Each volume must have a unique tag, so that multiple markers of the same type can coexist on the same pod
         // Each tag needs to be simple and unique-ish per volume
-        let mut volume_tag_hasher = FnvHasher::default();
-        "secrets.stackable.tech/volume:".hash(&mut volume_tag_hasher);
-        volume_id.hash(&mut volume_tag_hasher);
+        let mut volume_tag_hasher = Sha256::new();
+        volume_tag_hasher.update("secrets.stackable.tech/volume:".as_bytes());
+        volume_tag_hasher.update(volume_id.as_bytes());
         let volume_tag = volume_tag_hasher.finish();
+        // Truncating sha256 hashes opens up some collision vulnerabilities
+        // (https://csrc.nist.gov/CSRC/media/Events/First-Cryptographic-Hash-Workshop/documents/Kelsey_Truncation.pdf)
+        // however, we mostly just care about preventing accidental hashes here, for which plain byte truncation should be "good enough".
+        let volume_tag = &volume_tag[..16];
 
         let mut annotations = BTreeMap::default();
 
         if let Some(expires_after) = data.expires_after {
             annotations.insert(
-                format!("restarter.stackable.tech/expires-at.{volume_tag:x}"),
+                format!(
+                    "restarter.stackable.tech/expires-at.{:x}",
+                    FmtByteSlice(volume_tag)
+                ),
                 expires_after.to_rfc3339(),
             );
         }
