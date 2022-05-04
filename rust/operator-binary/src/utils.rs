@@ -1,8 +1,4 @@
-use std::{
-    fmt::{LowerHex, Write},
-    os::unix::prelude::AsRawFd,
-    path::Path,
-};
+use std::{fmt::LowerHex, os::unix::prelude::AsRawFd, path::Path};
 
 use pin_project::pin_project;
 use socket2::Socket;
