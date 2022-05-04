@@ -12,7 +12,7 @@ use stackable_operator::{
 use crate::crd::SearchNamespace;
 
 use super::{
-    pod_info::PodInfo, scope::SecretScope, SecretBackend, SecretBackendError, SecretFiles,
+    pod_info::PodInfo, scope::SecretScope, SecretBackend, SecretBackendError, SecretContents,
     SecretVolumeSelector,
 };
 
@@ -52,15 +52,15 @@ impl SecretBackend for K8sSearch {
 
     async fn get_secret_data(
         &self,
-        selector: SecretVolumeSelector,
+        selector: &SecretVolumeSelector,
         pod_info: PodInfo,
-    ) -> Result<SecretFiles, Self::Error> {
+    ) -> Result<SecretContents, Self::Error> {
         let mut label_selector = self.secret_labels.clone();
         label_selector.insert(
             "secrets.stackable.tech/class".to_string(),
             selector.class.to_string(),
         );
-        for scope in selector.scope {
+        for scope in &selector.scope {
             match scope {
                 SecretScope::Node => {
                     label_selector.insert(
@@ -75,7 +75,8 @@ impl SecretBackend for K8sSearch {
                     );
                 }
                 SecretScope::Service { name } => {
-                    label_selector.insert("secrets.stackable.tech/service".to_string(), name);
+                    label_selector
+                        .insert("secrets.stackable.tech/service".to_string(), name.clone());
                 }
             }
         }
@@ -101,11 +102,13 @@ impl SecretBackend for K8sSearch {
             .into_iter()
             .next()
             .context(NoSecretSnafu { label_selector })?;
-        Ok(secret
-            .data
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(k, v)| (k.into(), v.0))
-            .collect())
+        Ok(SecretContents::new(
+            secret
+                .data
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.0))
+                .collect(),
+        ))
     }
 }

@@ -4,12 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Pods that use autoTls volumes are now evicted when their certificates are about to expire ([#114], [commons-#20]).
+
 ### Changed
 
 - autoTls CA generation now requires opt-in ([#77]).
   - The default `tls` `SecretClass` now has this opt-in by default.
 
 [#77]: https://github.com/stackabletech/secret-operator/pull/77
+[#114]: https://github.com/stackabletech/secret-operator/pull/114
+[commons-#20]: https://github.com/stackabletech/commons-operator/pull/20
 
 ## [0.2.0] - 2022-02-14
 

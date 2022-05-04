@@ -22,13 +22,16 @@ use stackable_operator::{
     builder::ObjectMetaBuilder,
     k8s_openapi::{
         api::core::v1::{Secret, SecretReference},
+        chrono::{self, FixedOffset, TimeZone},
         ByteString,
     },
     kube::runtime::reflector::ObjectRef,
 };
 use time::{Duration, OffsetDateTime};
 
-use super::{pod_info::Address, pod_info::PodInfo, SecretBackend, SecretBackendError, SecretFiles};
+use super::{
+    pod_info::Address, pod_info::PodInfo, SecretBackend, SecretBackendError, SecretContents,
+};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -238,12 +241,13 @@ impl SecretBackend for TlsGenerate {
     /// Then add the ca certificate and return these files for provisioning to the volume.
     async fn get_secret_data(
         &self,
-        selector: super::SecretVolumeSelector,
+        selector: &super::SecretVolumeSelector,
         pod_info: PodInfo,
-    ) -> Result<SecretFiles, Self::Error> {
+    ) -> Result<SecretContents, Self::Error> {
         let now = OffsetDateTime::now_utc();
         let not_before = now - Duration::minutes(5);
         let not_after = now + Duration::days(1);
+        let expire_pod_after = not_after - Duration::minutes(30);
         let conf = Conf::new(ConfMethod::default()).unwrap();
         let pod_key = Rsa::generate(2048)
             .and_then(PKey::try_from)
@@ -307,26 +311,53 @@ impl SecretBackend for TlsGenerate {
             })
             .context(BuildCertificateSnafu { tpe: CertType::Pod })?
             .build();
-        Ok([
-            (
-                "ca.crt".into(),
-                self.ca_cert
-                    .to_pem()
-                    .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
+        Ok(SecretContents::new(
+            [
+                (
+                    "ca.crt".into(),
+                    self.ca_cert
+                        .to_pem()
+                        .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
+                ),
+                (
+                    "tls.crt".into(),
+                    pod_cert
+                        .to_pem()
+                        .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
+                ),
+                (
+                    "tls.key".into(),
+                    pod_key
+                        .private_key_to_pem_pkcs8()
+                        .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
+                ),
+            ]
+            .into(),
+        )
+        .expires_after(time_datetime_to_chrono(expire_pod_after)))
+    }
+}
+
+fn time_datetime_to_chrono(dt: time::OffsetDateTime) -> chrono::DateTime<FixedOffset> {
+    let tz = chrono::FixedOffset::east(dt.offset().whole_seconds());
+    tz.timestamp(dt.unix_timestamp(), dt.nanosecond())
+}
+
+#[cfg(test)]
+mod tests {
+    use time::format_description::well_known::Rfc3339;
+
+    use super::chrono;
+    use super::time_datetime_to_chrono;
+
+    #[test]
+    fn datetime_conversion() {
+        // Conversion should preserve timezone and fractional seconds
+        assert_eq!(
+            time_datetime_to_chrono(
+                time::OffsetDateTime::parse("2021-02-04T05:23:00.123+01:00", &Rfc3339).unwrap()
             ),
-            (
-                "tls.crt".into(),
-                pod_cert
-                    .to_pem()
-                    .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
-            ),
-            (
-                "tls.key".into(),
-                pod_key
-                    .private_key_to_pem_pkcs8()
-                    .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
-            ),
-        ]
-        .into())
+            chrono::DateTime::parse_from_rfc3339("2021-02-04T06:23:00.123+02:00").unwrap()
+        );
     }
 }

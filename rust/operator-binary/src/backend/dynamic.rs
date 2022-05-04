@@ -34,9 +34,9 @@ impl<B: SecretBackend + Send + Sync> SecretBackend for DynamicAdapter<B> {
 
     async fn get_secret_data(
         &self,
-        selector: super::SecretVolumeSelector,
+        selector: &super::SecretVolumeSelector,
         pod_info: PodInfo,
-    ) -> Result<super::SecretFiles, Self::Error> {
+    ) -> Result<super::SecretContents, Self::Error> {
         self.0
             .get_secret_data(selector, pod_info)
             .await

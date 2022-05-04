@@ -8,6 +8,7 @@ pub mod tls;
 
 use async_trait::async_trait;
 use serde::Deserialize;
+use stackable_operator::k8s_openapi::chrono::{DateTime, FixedOffset};
 use std::{collections::HashMap, convert::Infallible, path::PathBuf};
 
 pub use dynamic::Dynamic;
@@ -85,6 +86,26 @@ impl SecretVolumeSelector {
 
 type SecretFiles = HashMap<PathBuf, Vec<u8>>;
 
+#[derive(Default, Debug)]
+pub struct SecretContents {
+    pub files: SecretFiles,
+    pub expires_after: Option<DateTime<FixedOffset>>,
+}
+
+impl SecretContents {
+    fn new(files: SecretFiles) -> Self {
+        Self {
+            files,
+            ..Self::default()
+        }
+    }
+
+    fn expires_after(mut self, deadline: DateTime<FixedOffset>) -> Self {
+        self.expires_after = Some(deadline);
+        self
+    }
+}
+
 /// This trait needs to be implemented by all secret providers.
 /// It gets the pod information as well as volume definition and has to
 /// return any number of files.
@@ -94,9 +115,9 @@ pub trait SecretBackend: Send + Sync {
 
     async fn get_secret_data(
         &self,
-        selector: SecretVolumeSelector,
+        selector: &SecretVolumeSelector,
         pod_info: pod_info::PodInfo,
-    ) -> Result<SecretFiles, Self::Error>;
+    ) -> Result<SecretContents, Self::Error>;
 }
 
 pub trait SecretBackendError: std::error::Error + Send + Sync + 'static {

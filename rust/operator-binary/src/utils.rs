@@ -1,4 +1,4 @@
-use std::{os::unix::prelude::AsRawFd, path::Path};
+use std::{fmt::LowerHex, os::unix::prelude::AsRawFd, path::Path};
 
 use pin_project::pin_project;
 use socket2::Socket;
@@ -84,4 +84,25 @@ pub fn uds_bind_private(path: impl AsRef<Path>) -> Result<UnixListener, std::io:
     socket.listen(1024)?;
     socket.set_nonblocking(true)?;
     UnixListener::from_std(socket.into())
+}
+
+/// Helper for formatting byte arrays
+pub struct FmtByteSlice<'a>(pub &'a [u8]);
+impl LowerHex for FmtByteSlice<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for byte in self.0 {
+            f.write_fmt(format_args!("{:02x}", byte))?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::utils::FmtByteSlice;
+
+    #[test]
+    fn fmt_hex_byte_slice() {
+        assert_eq!(format!("{:x}", FmtByteSlice(&[1, 2, 255, 128])), "0102ff80",);
+    }
 }
