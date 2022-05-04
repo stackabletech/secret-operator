@@ -68,11 +68,6 @@ spec:
                             pod:
                               type: object
                           type: object
-                        secretLabels:
-                          additionalProperties:
-                            type: string
-                          default: {}
-                          type: object
                       required:
                         - searchNamespace
                       type: object

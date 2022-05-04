@@ -68,14 +68,12 @@ pub async fn from_class(
     class: SecretClass,
 ) -> Result<Box<Dynamic>, FromClassError> {
     Ok(match class.spec.backend {
-        crd::SecretClassBackend::K8sSearch(crd::K8sSearchBackend {
-            search_namespace,
-            secret_labels,
-        }) => from(super::K8sSearch {
-            client: client.clone(),
-            search_namespace,
-            secret_labels,
-        }),
+        crd::SecretClassBackend::K8sSearch(crd::K8sSearchBackend { search_namespace }) => {
+            from(super::K8sSearch {
+                client: client.clone(),
+                search_namespace,
+            })
+        }
         crd::SecretClassBackend::AutoTls(crd::AutoTlsBackend {
             ca:
                 crd::AutoTlsCa {

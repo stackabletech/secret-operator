@@ -43,8 +43,6 @@ spec:
     k8sSearch:
       searchNamespace:
         pod: {}
-      secretLabels:
-        type: custom-secret
 ---
 # A Secret that matches SecretClass/secret, for the Node kind-control-plane
 apiVersion: v1
