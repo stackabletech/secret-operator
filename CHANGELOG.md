@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Pods that use autoTls volumes are now deleted when their certificates are about to expire ([#114], [commons-#20]).
+- Pods that use autoTls volumes are now evicted when their certificates are about to expire ([#114], [commons-#20]).
 
 ### Changed
 
