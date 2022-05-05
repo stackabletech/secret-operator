@@ -39,6 +39,6 @@ time = { version = "0.3.7", features = ["parsing"] }
 
 [build-dependencies]
 built = { version = "0.5.1", features = ["chrono", "git2"] }
-tonic-build = "0.6.2"
+tonic-build = "0.7.2"
 
 [features]
