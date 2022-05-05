@@ -43,7 +43,6 @@ impl SecretBackendError for Error {
 pub struct K8sSearch {
     pub client: stackable_operator::client::Client,
     pub search_namespace: SearchNamespace,
-    pub secret_labels: BTreeMap<String, String>,
 }
 
 #[async_trait]
@@ -55,11 +54,10 @@ impl SecretBackend for K8sSearch {
         selector: &SecretVolumeSelector,
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
-        let mut label_selector = self.secret_labels.clone();
-        label_selector.insert(
+        let mut label_selector = BTreeMap::from([(
             "secrets.stackable.tech/class".to_string(),
             selector.class.to_string(),
-        );
+        )]);
         for scope in &selector.scope {
             match scope {
                 SecretScope::Node => {

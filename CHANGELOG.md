@@ -10,11 +10,16 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- autoTls CA generation now requires opt-in ([#77]).
+- `autoTls` CA generation now requires opt-in ([#77]).
   - The default `tls` `SecretClass` now has this opt-in by default.
+  
+### Removed
+
+- `k8sSearch` backend's option `secretLabels` has been removed ([#123]).
 
 [#77]: https://github.com/stackabletech/secret-operator/pull/77
 [#114]: https://github.com/stackabletech/secret-operator/pull/114
+[#123]: https://github.com/stackabletech/secret-operator/pull/123
 [commons-#20]: https://github.com/stackabletech/commons-operator/pull/20
 
 ## [0.2.0] - 2022-02-14
