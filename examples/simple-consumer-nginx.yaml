@@ -51,11 +51,19 @@ spec:
       terminationGracePeriodSeconds: 1
       volumes:
       - name: tls
-        csi:
-          driver: secrets.stackable.tech
-          volumeAttributes:
-            secrets.stackable.tech/class: tls
-            secrets.stackable.tech/scope: node,pod,service=secret-consumer-nginx
+        ephemeral:
+          volumeClaimTemplate:
+            metadata:
+              annotations:
+                secrets.stackable.tech/class: tls
+                secrets.stackable.tech/scope: node,pod,service=secret-consumer-nginx
+            spec:
+              storageClassName: secrets.stackable.tech
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: "1"
       - name: tls-merged
         emptyDir: {}
       - name: config

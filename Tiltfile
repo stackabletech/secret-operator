@@ -7,6 +7,7 @@ custom_build(
 )
 k8s_yaml('provisioner.yaml')
 k8s_yaml('examples/simple-consumer-nginx.yaml')
+k8s_yaml('examples/simple-consumer-shell.yaml')
 watch_file('result')
 if os.path.exists('result'):
    k8s_yaml('result/crds.yaml')

@@ -1,8 +1,9 @@
 //! Queries the Kubernetes API for predefined [`Secret`] objects
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use async_trait::async_trait;
+use futures::future::select;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector},
@@ -45,6 +46,15 @@ pub struct K8sSearch {
     pub search_namespace: SearchNamespace,
 }
 
+impl K8sSearch {
+    fn search_ns_for_pod<'a>(&'a self, selector: &'a SecretVolumeSelector) -> &'a str {
+        match &self.search_namespace {
+            SearchNamespace::Pod {} => &selector.namespace,
+            SearchNamespace::Name(ns) => ns,
+        }
+    }
+}
+
 #[async_trait]
 impl SecretBackend for K8sSearch {
     type Error = Error;
@@ -54,45 +64,11 @@ impl SecretBackend for K8sSearch {
         selector: &SecretVolumeSelector,
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
-        let mut label_selector = BTreeMap::from([(
-            "secrets.stackable.tech/class".to_string(),
-            selector.class.to_string(),
-        )]);
-        for scope in &selector.scope {
-            match scope {
-                SecretScope::Node => {
-                    label_selector.insert(
-                        "secrets.stackable.tech/node".to_string(),
-                        pod_info.node_name.clone(),
-                    );
-                }
-                SecretScope::Pod => {
-                    label_selector.insert(
-                        "secrets.stackable.tech/pod".to_string(),
-                        selector.pod.clone(),
-                    );
-                }
-                SecretScope::Service { name } => {
-                    label_selector
-                        .insert("secrets.stackable.tech/service".to_string(), name.clone());
-                }
-            }
-        }
-        let label_selector =
-            stackable_operator::label_selector::convert_label_selector_to_query_string(
-                &LabelSelector {
-                    match_expressions: None,
-                    match_labels: Some(label_selector),
-                },
-            )
-            .context(SecretSelectorSnafu)?;
+        let label_selector = build_label_selector_query(selector, Some(&pod_info))?;
         let secret = self
             .client
             .list::<Secret>(
-                match &self.search_namespace {
-                    SearchNamespace::Pod {} => Some(&selector.namespace),
-                    SearchNamespace::Name(ns) => Some(ns),
-                },
+                Some(self.search_ns_for_pod(selector)),
                 &ListParams::default().labels(&label_selector),
             )
             .await
@@ -109,4 +85,68 @@ impl SecretBackend for K8sSearch {
                 .collect(),
         ))
     }
+
+    async fn get_qualified_node_names(
+        &self,
+        selector: &SecretVolumeSelector,
+    ) -> Result<Option<HashSet<String>>, Self::Error> {
+        if selector.scope.contains(&SecretScope::Node) {
+            let label_selector = build_label_selector_query(selector, None)?;
+            Ok(Some(
+                self.client
+                    .list::<Secret>(
+                        Some(__self.search_ns_for_pod(selector)),
+                        &ListParams::default().labels(&label_selector),
+                    )
+                    .await
+                    .context(SecretQuerySnafu)?
+                    .into_iter()
+                    .filter_map(|secret| {
+                        secret
+                            .metadata
+                            .labels?
+                            .remove("secrets.stackable.tech/node")
+                    })
+                    .collect(),
+            ))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+fn build_label_selector_query(
+    vol_selector: &SecretVolumeSelector,
+    pod_info: Option<&PodInfo>,
+) -> Result<String, Error> {
+    let mut label_selector = BTreeMap::from([(
+        "secrets.stackable.tech/class".to_string(),
+        vol_selector.class.to_string(),
+    )]);
+    for scope in &vol_selector.scope {
+        match scope {
+            SecretScope::Node => {
+                if let Some(pod_info) = pod_info {
+                    label_selector.insert(
+                        "secrets.stackable.tech/node".to_string(),
+                        pod_info.node_name.clone(),
+                    );
+                }
+            }
+            SecretScope::Pod => {
+                label_selector.insert(
+                    "secrets.stackable.tech/pod".to_string(),
+                    vol_selector.pod.clone(),
+                );
+            }
+            SecretScope::Service { name } => {
+                label_selector.insert("secrets.stackable.tech/service".to_string(), name.clone());
+            }
+        }
+    }
+    stackable_operator::label_selector::convert_label_selector_to_query_string(&LabelSelector {
+        match_expressions: None,
+        match_labels: Some(label_selector),
+    })
+    .context(SecretSelectorSnafu)
 }

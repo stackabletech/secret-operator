@@ -9,7 +9,11 @@ pub mod tls;
 use async_trait::async_trait;
 use serde::Deserialize;
 use stackable_operator::k8s_openapi::chrono::{DateTime, FixedOffset};
-use std::{collections::HashMap, convert::Infallible, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::Infallible,
+    path::PathBuf,
+};
 
 pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
@@ -21,7 +25,7 @@ use scope::SecretScope;
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
 /// Fields beginning with `csi.storage.k8s.io/` are provided by the Kubelet
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct SecretVolumeSelector {
     /// What kind of secret should be used
     #[serde(rename = "secrets.stackable.tech/class")]
@@ -118,6 +122,13 @@ pub trait SecretBackend: Send + Sync {
         selector: &SecretVolumeSelector,
         pod_info: pod_info::PodInfo,
     ) -> Result<SecretContents, Self::Error>;
+
+    async fn get_qualified_node_names(
+        &self,
+        selector: &SecretVolumeSelector,
+    ) -> Result<Option<HashSet<String>>, Self::Error> {
+        Ok(None)
+    }
 }
 
 pub trait SecretBackendError: std::error::Error + Send + Sync + 'static {

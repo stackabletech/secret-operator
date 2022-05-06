@@ -20,12 +20,26 @@ spec:
         env:
         - name: CSI_ENDPOINT
           value: /csi/csi.sock
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
         volumeMounts:
         - name: csi
           mountPath: /csi
         - name: mountpoint
           mountPath: /var/lib/kubelet/pods
           mountPropagation: Bidirectional
+      - name: external-provisioner
+        image: k8s.gcr.io/sig-storage/csi-provisioner:v3.1.0
+        args:
+        - --csi-address=/csi/csi.sock
+        - --feature-gates=Topology=true
+        - --extra-create-metadata
+        volumeMounts:
+        - name: csi
+          mountPath: /csi
       - name: node-driver-registrar
         # image: csi-node-driver-registrar
         # imagePullPolicy: IfNotPresent
@@ -64,16 +78,40 @@ rules:
       - ""
     resources:
       - secrets
+      - events
     verbs:
-      - list
-      - create
       - get
+      - list
+      - watch
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumes
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - delete
   - apiGroups:
       - ""
     resources:
       - nodes
+      - persistentvolumeclaims
     verbs:
       - get
+      - list
+      - watch
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - csinodes
+      - storageclasses
+    verbs:
+      - get
+      - list
+      - watch
   - apiGroups:
       - ""
     resources:
@@ -114,6 +152,13 @@ spec:
   - audience: secrets.stackable.tech/consumer
   volumeLifecycleModes:
   - Ephemeral
+  - Persistent
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: secrets.stackable.tech
+provisioner: secrets.stackable.tech
 ---
 apiVersion: secrets.stackable.tech/v1alpha1
 kind: SecretClass
