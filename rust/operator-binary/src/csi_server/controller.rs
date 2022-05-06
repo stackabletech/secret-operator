@@ -1,5 +1,5 @@
 use crate::{
-    backend::{self, SecretVolumeSelector},
+    backend::{self, SecretBackendError, SecretVolumeSelector},
     grpc::csi::{
         self,
         v1::{
@@ -8,6 +8,7 @@ use crate::{
             DeleteVolumeResponse, Topology, Volume,
         },
     },
+    utils::error_full_message,
 };
 use serde::{de::IntoDeserializer, Deserialize};
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -35,6 +36,32 @@ enum CreateVolumeError {
         source: serde::de::value::Error,
         pvc: ObjectRef<PersistentVolumeClaim>,
     },
+    #[snafu(display("failed to initialize backend"))]
+    InitBackend {
+        source: backend::dynamic::FromSelectorError,
+    },
+    #[snafu(display("failed to find nodes matching scopes"))]
+    FindNodes { source: backend::dynamic::DynError },
+    #[snafu(display("no nodes match scopes"))]
+    NoMatchingNode,
+}
+
+impl From<CreateVolumeError> for Status {
+    fn from(err: CreateVolumeError) -> Self {
+        let full_msg = error_full_message(&err);
+        // Convert to an appropriate tonic::Status representation and include full error message
+        match err {
+            CreateVolumeError::InvalidParams { .. } => Status::invalid_argument(full_msg),
+            CreateVolumeError::FindPvc { .. } => Status::unavailable(full_msg),
+            CreateVolumeError::ResolveOwnerPod { .. } => Status::failed_precondition(full_msg),
+            CreateVolumeError::InvalidSecretSelector { .. } => {
+                Status::failed_precondition(full_msg)
+            }
+            CreateVolumeError::InitBackend { source } => Status::new(source.grpc_code(), full_msg),
+            CreateVolumeError::FindNodes { source } => Status::new(source.grpc_code(), full_msg),
+            CreateVolumeError::NoMatchingNode => Status::unavailable(full_msg),
+        }
+    }
 }
 
 pub struct SecretProvisionerController {
@@ -64,16 +91,14 @@ impl Controller for SecretProvisionerController {
     ) -> Result<Response<csi::v1::CreateVolumeResponse>, Status> {
         let request = request.into_inner();
         let params = CreateVolumeParams::deserialize(request.parameters.into_deserializer())
-            .context(create_volume_error::InvalidParamsSnafu)
-            .unwrap();
+            .context(create_volume_error::InvalidParamsSnafu)?;
         let pvc = self
             .client
             .get::<PersistentVolumeClaim>(&params.pvc_name, Some(&params.pvc_namespace))
             .await
             .with_context(|_| create_volume_error::FindPvcSnafu {
                 pvc: ObjectRef::new(&params.pvc_name).within(&params.pvc_namespace),
-            })
-            .unwrap();
+            })?;
         let pod_name = pvc
             .metadata
             .owner_references
@@ -87,8 +112,7 @@ impl Controller for SecretProvisionerController {
             })
             .with_context(|| create_volume_error::ResolveOwnerPodSnafu {
                 pvc: ObjectRef::new(&params.pvc_name).within(&params.pvc_namespace),
-            })
-            .unwrap()
+            })?
             .name;
         let pvc_selector = pvc.metadata.annotations.unwrap_or_default();
         let mut raw_selector = pvc_selector.clone();
@@ -102,25 +126,27 @@ impl Controller for SecretProvisionerController {
         let selector = SecretVolumeSelector::deserialize(raw_selector.into_deserializer())
             .with_context(|_| create_volume_error::InvalidSecretSelectorSnafu {
                 pvc: ObjectRef::new(&params.pvc_name).within(&params.pvc_namespace),
-            })
-            .unwrap();
+            })?;
         let backend = backend::dynamic::from_selector(&self.client, &selector)
             .await
-            .unwrap();
-        let accessible_topology =
-            if let Some(nodes) = backend.get_qualified_node_names(&selector).await.unwrap() {
-                if nodes.is_empty() {
-                    todo!("no nodes")
-                }
-                nodes
-                    .into_iter()
-                    .map(|node| Topology {
-                        segments: [("secrets.stackable.tech/node".to_string(), node)].into(),
-                    })
-                    .collect()
-            } else {
-                Vec::new()
-            };
+            .context(create_volume_error::InitBackendSnafu)?;
+        let accessible_topology = if let Some(nodes) = backend
+            .get_qualified_node_names(&selector)
+            .await
+            .context(create_volume_error::FindNodesSnafu)?
+        {
+            if nodes.is_empty() {
+                create_volume_error::NoMatchingNodeSnafu.fail()?;
+            }
+            nodes
+                .into_iter()
+                .map(|node| Topology {
+                    segments: [("secrets.stackable.tech/node".to_string(), node)].into(),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
         Ok(Response::new(CreateVolumeResponse {
             volume: Some(Volume {
                 volume_id: "asdf".to_string(),

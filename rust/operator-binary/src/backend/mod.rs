@@ -127,6 +127,8 @@ pub trait SecretBackend: Send + Sync {
         &self,
         selector: &SecretVolumeSelector,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
+        // selector is unused in the stub implementation, but should still be used in all "real" impls
+        let _ = selector;
         Ok(None)
     }
 }

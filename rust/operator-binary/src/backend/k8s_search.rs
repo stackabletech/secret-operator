@@ -3,7 +3,6 @@
 use std::collections::{BTreeMap, HashSet};
 
 use async_trait::async_trait;
-use futures::future::select;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector},

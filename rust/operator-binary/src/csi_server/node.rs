@@ -10,7 +10,7 @@ use crate::{
         NodeStageVolumeResponse, NodeUnpublishVolumeRequest, NodeUnpublishVolumeResponse,
         NodeUnstageVolumeRequest, NodeUnstageVolumeResponse, Topology,
     },
-    utils::FmtByteSlice,
+    utils::{error_full_message, FmtByteSlice},
 };
 use openssl::sha::Sha256;
 use serde::{de::IntoDeserializer, Deserialize};
@@ -18,7 +18,6 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{builder::ObjectMetaBuilder, k8s_openapi::api::core::v1::Pod};
 use std::{
     collections::BTreeMap,
-    error::Error,
     fs::Permissions,
     os::unix::prelude::PermissionsExt,
     path::{Path, PathBuf},
@@ -81,14 +80,7 @@ enum PublishError {
 // Useful since all service calls return a [Result<tonic::Response<T>, tonic::Status>]
 impl From<PublishError> for Status {
     fn from(err: PublishError) -> Self {
-        // Build the full hierarchy of error messages by walking up the stack until an error
-        // without `source` set is encountered and concatenating all encountered error strings.
-        let mut full_msg = format!("{}", err);
-        let mut curr_err = err.source();
-        while let Some(curr_source) = curr_err {
-            full_msg.push_str(&format!(": {}", curr_source));
-            curr_err = curr_source.source();
-        }
+        let full_msg = error_full_message(&err);
         // Convert to an appropriate tonic::Status representation and include full error message
         match err {
             PublishError::InvalidSelector { .. } => Status::invalid_argument(full_msg),
@@ -126,14 +118,7 @@ enum UnpublishError {
 // Useful since all service calls return a [Result<tonic::Response<T>, tonic::Status>]
 impl From<UnpublishError> for Status {
     fn from(err: UnpublishError) -> Self {
-        // Build the full hierarchy of error messages by walking up the stack until an error
-        // without `source` set is encountered and concatenating all encountered error strings.
-        let mut full_msg = format!("{}", err);
-        let mut curr_err = err.source();
-        while let Some(curr_source) = curr_err {
-            full_msg.push_str(&format!(": {}", curr_source));
-            curr_err = curr_source.source();
-        }
+        let full_msg = error_full_message(&err);
         // Convert to an appropriate tonic::Status representation and include full error message
         match err {
             UnpublishError::Unmount { .. } => Status::unavailable(full_msg),
