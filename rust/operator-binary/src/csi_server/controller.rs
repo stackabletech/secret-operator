@@ -18,6 +18,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::PersistentVolumeClaim, kube::runtime::reflector::ObjectRef,
 };
 use tonic::{Request, Response, Status};
+use uuid::Uuid;
 
 pub const TOPOLOGY_NODE: &str = "secrets.stackable.tech/node";
 
@@ -170,7 +171,9 @@ impl Controller for SecretProvisionerController {
         };
         Ok(Response::new(CreateVolumeResponse {
             volume: Some(Volume {
-                volume_id: "asdf".to_string(),
+                // We don't care about the volume ID ourselves, but generate something unique
+                // in case anyone else relies on it for some kind of deduplication
+                volume_id: Uuid::new_v4().to_string(),
                 accessible_topology,
                 volume_context: pvc_selector.into_iter().collect(),
                 ..Volume::default()
