@@ -15,31 +15,31 @@ spec:
         app: secret-consumer-shell
     spec:
       containers:
-      - name: shell
-        image: archlinux
-        stdin: true
-        tty: true
-        volumeMounts:
-        - name: secret
-          mountPath: /secret
+        - name: shell
+          image: archlinux
+          stdin: true
+          tty: true
+          volumeMounts:
+            - name: secret
+              mountPath: /secret
       terminationGracePeriodSeconds: 1
       volumes:
-      - name: secret
-        ephemeral:
-          volumeClaimTemplate:
-            metadata:
-              annotations:
-                # Use search parameters declared in SecretClass/secret to resolve this secret
-                secrets.stackable.tech/class: secret
-                # The secret depends on the node, for a `k8sSearch` `SecretClass` this means that the the `Secret` must have the label `secrets.stackable.tech/node: ${pod.spec.nodeName}`
-                secrets.stackable.tech/scope: node
-            spec:
-              storageClassName: secrets.stackable.tech
-              accessModes:
-              - ReadWriteOnce
-              resources:
-                requests:
-                  storage: "1"
+        - name: secret
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  # Use search parameters declared in SecretClass/secret to resolve this secret
+                  secrets.stackable.tech/class: secret
+                  # The secret depends on the node, for a `k8sSearch` `SecretClass` this means that the the `Secret` must have the label `secrets.stackable.tech/node: ${pod.spec.nodeName}`
+                  secrets.stackable.tech/scope: node
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
 ---
 # SecretClass that searches the pod's namespace for Secret objects labeled with `type: custom-secret`
 apiVersion: secrets.stackable.tech/v1alpha1
