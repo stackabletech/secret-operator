@@ -29,6 +29,8 @@ use tokio::{
 };
 use tonic::{Request, Response, Status};
 
+use super::controller::TOPOLOGY_NODE;
+
 #[derive(Snafu, Debug)]
 #[snafu(module)]
 enum PublishError {
@@ -377,11 +379,7 @@ impl Node for SecretProvisionerNode {
             node_id: self.node_name.clone(),
             max_volumes_per_node: i64::MAX,
             accessible_topology: Some(Topology {
-                segments: [(
-                    "secrets.stackable.tech/node".to_string(),
-                    self.node_name.clone(),
-                )]
-                .into(),
+                segments: [(TOPOLOGY_NODE.to_string(), self.node_name.clone())].into(),
             }),
         }))
     }

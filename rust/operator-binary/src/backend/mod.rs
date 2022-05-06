@@ -117,12 +117,18 @@ impl SecretContents {
 pub trait SecretBackend: Send + Sync {
     type Error: SecretBackendError;
 
+    /// Provision or load secret data from the source.
     async fn get_secret_data(
         &self,
         selector: &SecretVolumeSelector,
         pod_info: pod_info::PodInfo,
     ) -> Result<SecretContents, Self::Error>;
 
+    /// Try to predict which nodes would be able to provision this secret.
+    ///
+    /// Should return `None` if no constraints apply, `Some(HashSet::new())` is interpreted as "no nodes match the given constraints".
+    ///
+    /// The default stub implementation assumes that no constraints apply.
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,

@@ -16,6 +16,11 @@ use super::{
     SecretVolumeSelector,
 };
 
+const LABEL_CLASS: &str = "secrets.stackable.tech/class";
+const LABEL_SCOPE_NODE: &str = "secrets.stackable.tech/node";
+const LABEL_SCOPE_POD: &str = "secrets.stackable.tech/pod";
+const LABEL_SCOPE_SERVICE: &str = "secrets.stackable.tech/service";
+
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("failed to build Secret selector"))]
@@ -100,12 +105,7 @@ impl SecretBackend for K8sSearch {
                     .await
                     .context(SecretQuerySnafu)?
                     .into_iter()
-                    .filter_map(|secret| {
-                        secret
-                            .metadata
-                            .labels?
-                            .remove("secrets.stackable.tech/node")
-                    })
+                    .filter_map(|secret| secret.metadata.labels?.remove(LABEL_SCOPE_NODE))
                     .collect(),
             ))
         } else {
@@ -118,28 +118,20 @@ fn build_label_selector_query(
     vol_selector: &SecretVolumeSelector,
     pod_info: Option<&PodInfo>,
 ) -> Result<String, Error> {
-    let mut label_selector = BTreeMap::from([(
-        "secrets.stackable.tech/class".to_string(),
-        vol_selector.class.to_string(),
-    )]);
+    let mut label_selector =
+        BTreeMap::from([(LABEL_CLASS.to_string(), vol_selector.class.to_string())]);
     for scope in &vol_selector.scope {
         match scope {
             SecretScope::Node => {
                 if let Some(pod_info) = pod_info {
-                    label_selector.insert(
-                        "secrets.stackable.tech/node".to_string(),
-                        pod_info.node_name.clone(),
-                    );
+                    label_selector.insert(LABEL_SCOPE_NODE.to_string(), pod_info.node_name.clone());
                 }
             }
             SecretScope::Pod => {
-                label_selector.insert(
-                    "secrets.stackable.tech/pod".to_string(),
-                    vol_selector.pod.clone(),
-                );
+                label_selector.insert(LABEL_SCOPE_POD.to_string(), vol_selector.pod.clone());
             }
             SecretScope::Service { name } => {
-                label_selector.insert("secrets.stackable.tech/service".to_string(), name.clone());
+                label_selector.insert(LABEL_SCOPE_SERVICE.to_string(), name.clone());
             }
         }
     }

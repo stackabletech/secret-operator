@@ -17,6 +17,8 @@ use stackable_operator::{
 };
 use tonic::{Request, Response, Status};
 
+pub const TOPOLOGY_NODE: &str = "secrets.stackable.tech/node";
+
 #[derive(Snafu, Debug)]
 #[snafu(module)]
 enum CreateVolumeError {
@@ -130,22 +132,24 @@ impl Controller for SecretProvisionerController {
         let backend = backend::dynamic::from_selector(&self.client, &selector)
             .await
             .context(create_volume_error::InitBackendSnafu)?;
-        let accessible_topology = if let Some(nodes) = backend
+        let accessible_topology = match backend
             .get_qualified_node_names(&selector)
             .await
             .context(create_volume_error::FindNodesSnafu)?
         {
-            if nodes.is_empty() {
-                create_volume_error::NoMatchingNodeSnafu.fail()?;
+            // No node constraints apply to this volume, so allow any topology
+            None => Vec::new(),
+            // No nodes match the constraints on this volume, so fail
+            Some(nodes) if nodes.is_empty() => {
+                return Err(create_volume_error::NoMatchingNodeSnafu.build().into());
             }
-            nodes
+            // Matching nodes were found, only allow scheduling to them
+            Some(nodes) => nodes
                 .into_iter()
                 .map(|node| Topology {
-                    segments: [("secrets.stackable.tech/node".to_string(), node)].into(),
+                    segments: [(TOPOLOGY_NODE.to_string(), node)].into(),
                 })
-                .collect()
-        } else {
-            Vec::new()
+                .collect(),
         };
         Ok(Response::new(CreateVolumeResponse {
             volume: Some(Volume {
