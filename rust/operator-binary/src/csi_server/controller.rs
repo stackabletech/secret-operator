@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::{
     backend::{self, SecretBackendError, SecretVolumeSelector},
     grpc::csi::{
@@ -70,30 +72,13 @@ pub struct SecretProvisionerController {
     pub client: stackable_operator::client::Client,
 }
 
-#[tonic::async_trait]
-impl Controller for SecretProvisionerController {
-    async fn controller_get_capabilities(
+impl SecretProvisionerController {
+    async fn get_pvc_secret_selector(
         &self,
-        _request: Request<csi::v1::ControllerGetCapabilitiesRequest>,
-    ) -> Result<Response<csi::v1::ControllerGetCapabilitiesResponse>, Status> {
-        Ok(Response::new(ControllerGetCapabilitiesResponse {
-            capabilities: vec![ControllerServiceCapability {
-                r#type: Some(controller_service_capability::Type::Rpc(
-                    controller_service_capability::Rpc {
-                        r#type: controller_service_capability::rpc::Type::CreateDeleteVolume.into(),
-                    },
-                )),
-            }],
-        }))
-    }
-
-    async fn create_volume(
-        &self,
-        request: Request<csi::v1::CreateVolumeRequest>,
-    ) -> Result<Response<csi::v1::CreateVolumeResponse>, Status> {
-        let request = request.into_inner();
-        let params = CreateVolumeParams::deserialize(request.parameters.into_deserializer())
-            .context(create_volume_error::InvalidParamsSnafu)?;
+        params: &CreateVolumeParams,
+    ) -> Result<(BTreeMap<String, String>, SecretVolumeSelector), CreateVolumeError> {
+        // PersistentVolumeClaim doesn't allow users to set arbitrary custom storage parameters,
+        // so instead we load the PVC and treat _its_ annotations as parameters
         let pvc = self
             .client
             .get::<PersistentVolumeClaim>(&params.pvc_name, Some(&params.pvc_namespace))
@@ -125,10 +110,42 @@ impl Controller for SecretProvisionerController {
                 params.pvc_namespace.clone(),
             ),
         ]);
-        let selector = SecretVolumeSelector::deserialize(raw_selector.into_deserializer())
-            .with_context(|_| create_volume_error::InvalidSecretSelectorSnafu {
-                pvc: ObjectRef::new(&params.pvc_name).within(&params.pvc_namespace),
-            })?;
+        Ok((
+            pvc_selector,
+            SecretVolumeSelector::deserialize(raw_selector.into_deserializer()).with_context(
+                |_| create_volume_error::InvalidSecretSelectorSnafu {
+                    pvc: ObjectRef::new(&params.pvc_name).within(&params.pvc_namespace),
+                },
+            )?,
+        ))
+    }
+}
+
+#[tonic::async_trait]
+impl Controller for SecretProvisionerController {
+    async fn controller_get_capabilities(
+        &self,
+        _request: Request<csi::v1::ControllerGetCapabilitiesRequest>,
+    ) -> Result<Response<csi::v1::ControllerGetCapabilitiesResponse>, Status> {
+        Ok(Response::new(ControllerGetCapabilitiesResponse {
+            capabilities: vec![ControllerServiceCapability {
+                r#type: Some(controller_service_capability::Type::Rpc(
+                    controller_service_capability::Rpc {
+                        r#type: controller_service_capability::rpc::Type::CreateDeleteVolume.into(),
+                    },
+                )),
+            }],
+        }))
+    }
+
+    async fn create_volume(
+        &self,
+        request: Request<csi::v1::CreateVolumeRequest>,
+    ) -> Result<Response<csi::v1::CreateVolumeResponse>, Status> {
+        let request = request.into_inner();
+        let params = CreateVolumeParams::deserialize(request.parameters.into_deserializer())
+            .context(create_volume_error::InvalidParamsSnafu)?;
+        let (pvc_selector, selector) = self.get_pvc_secret_selector(&params).await?;
         let backend = backend::dynamic::from_selector(&self.client, &selector)
             .await
             .context(create_volume_error::InitBackendSnafu)?;
