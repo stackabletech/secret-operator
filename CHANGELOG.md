@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Pods that consume Node-scoped `k8sSearch` secrets will now only be scheduled to Nodes that have the secret provisioned ([#125]).
+  - This is only supported for pods that use the new-style `ephemeral` volume definitions rather than `csi`.
+
+### Changed
+
+- Pods that consume secrets should now use the `ephemeral` volume type rather than `csi` ([#125]).
+  - `ephemeral` volumes will keep working for now, but should be considered deprecated, and will not be compatible
+    with all new features.
+
+[#125]: https://github.com/stackabletech/secret-operator/pull/125
+
 ## [0.3.0] - 2022-05-05
 
 ### Added

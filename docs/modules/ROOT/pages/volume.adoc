@@ -1,17 +1,20 @@
 = Volume
 
 The primary entry point for applications is by mounting a secret into a `Pod` object's `volume` set. This is done by using Kubernetes'
-https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#csivolumesource-v1-core[`CSIVolumeSource`] type.
+https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#ephemeralvolumesource-v1-core[`EphemeralVolumeSource`] type.
 For example:
 
 [source,yaml]
 ----
 include::example$volume-pod.yaml[]
 ----
-<1> Tells Kubernetes that the Stackable Secret Operator is responsible for mounting this volume
-<2> This secret is provided by the xref:secretclass.adoc[] named `tls`
-<3> This secret should be xref:scope.adoc[scoped] by the intersection of xref:scope.adoc#node[`node`], xref:scope.adoc#pod[`pod`], and the xref:scope.adoc#service[`service`] named `secret-consumer`
-<4> The injected volume can then be mounted into a container, just like any other volume. In this example, the secrets are provided in the `/tls` directory of the container.
+<1> This secret is provided by the xref:secretclass.adoc[] named `tls`
+<2> This secret should be xref:scope.adoc[scoped] by the intersection of xref:scope.adoc#node[`node`], xref:scope.adoc#pod[`pod`], and the xref:scope.adoc#service[`service`] named `secret-consumer`
+<3> Tells Kubernetes that the Stackable Secret Operator is responsible for mounting this volume
+<4> Kubernetes requires us to specify some boilerplate settings for a `PersistentVolumeClaim` to be well-formed
+<5> The injected volume can then be mounted into a container, just like any other volume. In this example, the secrets are provided in the `/tls` directory of the container.
+
+NOTE: Only ephemeral volumes are supported, the Secret Operator does *not* support declaring standalone `PersistentVolumeClaim` objects.
 
 == Attributes
 
