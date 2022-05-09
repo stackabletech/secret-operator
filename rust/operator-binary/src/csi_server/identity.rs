@@ -29,7 +29,7 @@ impl Identity for SecretProvisionerIdentity {
         _request: Request<GetPluginCapabilitiesRequest>,
     ) -> Result<Response<GetPluginCapabilitiesResponse>, Status> {
         // It is ok to return an empty vec here, as a minimal set of capabilities is
-        // is mandatory to implement. This list only refers to optional capabilities.
+        // mandatory to implement. This list only refers to optional capabilities.
         Ok(Response::new(GetPluginCapabilitiesResponse {
             capabilities: vec![
                 PluginCapability {
