@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Pods that consume secrets should now use the `ephemeral` volume type rather than `csi` ([#125]).
-  - `ephemeral` volumes will keep working for now, but should be considered deprecated, and will not be compatible
+  - `csi` volumes will keep working for now, but should be considered deprecated, and will not be compatible
     with all new features.
 
 [#125]: https://github.com/stackabletech/secret-operator/pull/125
