@@ -36,12 +36,26 @@ spec:
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
           volumeMounts:
             - name: csi
               mountPath: /csi
             - name: mountpoint
               mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
+        - name: external-provisioner
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.1.0
+          args:
+            - --csi-address=/csi/csi.sock
+            - --feature-gates=Topology=true
+            - --extra-create-metadata
+          volumeMounts:
+            - name: csi
+              mountPath: /csi
         - name: node-driver-registrar
           image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.4.0
           args:

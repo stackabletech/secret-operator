@@ -5,14 +5,22 @@ metadata:
   name: example-secret-consumer
 spec:
   volumes:
-  - name: secret
-    csi:
-      driver: secrets.stackable.tech # <1>
-      volumeAttributes:
-        secrets.stackable.tech/class: tls # <2>
-        secrets.stackable.tech/scope: node,pod,service=secret-consumer # <3>
+    - name: secret
+      ephemeral:
+        volumeClaimTemplate:
+          metadata:
+            annotations:
+              secrets.stackable.tech/class: secret # <1>
+              secrets.stackable.tech/scope: node # <2>
+          spec:
+            storageClassName: secrets.stackable.tech # <3>
+            accessModes: # <4>
+              - ReadWriteOnce
+            resources: # <4>
+              requests:
+                storage: "1"
   containers:
-  - name: ubuntu
-    volumeMounts:
-    - name: tls # <4>
-      mountPath: /tls
+    - name: ubuntu
+      volumeMounts:
+        - name: tls # <5>
+          mountPath: /tls

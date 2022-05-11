@@ -16,55 +16,63 @@ spec:
     spec:
       # Nginx expects the TLS certificate file to contain the entire chain, so concatenate them
       initContainers:
-      - name: prepare
-        image: alpine
-        args:
-        - sh
-        - -c
-        - |
-          cat /tls/tls.crt /tls/ca.crt > /tls-merged/tls.crt
-          chmod -R u=rwX,g=rX,o= /tls
-        volumeMounts:
-        - name: tls
-          mountPath: /tls
-        - name: tls-merged
-          mountPath: /tls-merged
+        - name: prepare
+          image: alpine
+          args:
+            - sh
+            - -c
+            - |
+              cat /tls/tls.crt /tls/ca.crt > /tls-merged/tls.crt
+              chmod -R u=rwX,g=rX,o= /tls
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+            - name: tls-merged
+              mountPath: /tls-merged
       containers:
-      - name: nginx
-        image: nginx
-        securityContext:
-          runAsUser: 1000
-        ports:
-        - name: https
-          containerPort: 8443
-        volumeMounts:
-        - name: tls
-          mountPath: /tls
-        - name: tls-merged
-          mountPath: /tls-merged
-        - name: config
-          mountPath: /etc/nginx/conf.d
-        - name: cache
-          mountPath: /var/cache/nginx
-        - name: tmp
-          mountPath: /var/run
+        - name: nginx
+          image: nginx
+          securityContext:
+            runAsUser: 1000
+          ports:
+            - name: https
+              containerPort: 8443
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+            - name: tls-merged
+              mountPath: /tls-merged
+            - name: config
+              mountPath: /etc/nginx/conf.d
+            - name: cache
+              mountPath: /var/cache/nginx
+            - name: tmp
+              mountPath: /var/run
       terminationGracePeriodSeconds: 1
       volumes:
-      - name: tls
-        csi:
-          driver: secrets.stackable.tech
-          volumeAttributes:
-            secrets.stackable.tech/class: tls
-            secrets.stackable.tech/scope: node,pod,service=secret-consumer-nginx
-      - name: tls-merged
-        emptyDir: {}
-      - name: config
-        configMap:
-          name: secret-consumer-nginx-config
-      - name: cache
-        emptyDir: {}
-      - name: tmp
-        emptyDir: {}
+        - name: tls
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls
+                  secrets.stackable.tech/scope: node,pod,service=secret-consumer-nginx
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+        - name: tls-merged
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: secret-consumer-nginx-config
+        - name: cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -75,9 +83,9 @@ spec:
   selector:
     app: secret-consumer-nginx
   ports:
-  - name: https
-    port: 443
-    targetPort: https
+    - name: https
+      port: 443
+      targetPort: https
 ---
 apiVersion: v1
 kind: ConfigMap

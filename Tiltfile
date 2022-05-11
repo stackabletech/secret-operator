@@ -5,8 +5,26 @@ custom_build(
     # ignore=['result*', 'Cargo.nix', 'target', *.yaml],
     outputs_image_ref_to='result/ref',
 )
-k8s_yaml('provisioner.yaml')
-k8s_yaml('examples/simple-consumer-nginx.yaml')
+
+# Load the latest CRDs from Nix
 watch_file('result')
 if os.path.exists('result'):
    k8s_yaml('result/crds.yaml')
+
+# Exclude stale CRDs from Helm chart, and apply the rest
+helm_crds, helm_non_crds = filter_yaml(
+   helm(
+      'deploy/helm/secret-operator',
+      name='secret-operator',
+      set=[
+         'image.repository=docker.stackable.tech/teozkr/secret-provisioner',
+      ],
+   ),
+   api_version = "^apiextensions\\.k8s\\.io/.*$",
+   kind = "^CustomResourceDefinition$",
+)
+k8s_yaml(helm_non_crds)
+
+# Load examples
+k8s_yaml('examples/simple-consumer-nginx.yaml')
+k8s_yaml('examples/simple-consumer-shell.yaml')

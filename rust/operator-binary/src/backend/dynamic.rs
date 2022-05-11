@@ -1,10 +1,11 @@
 //! Support code for runtime-configurable dynamic [`SecretBackend`]s
 
 use async_trait::async_trait;
-use snafu::Snafu;
-use std::fmt::Display;
+use snafu::{ResultExt, Snafu};
+use stackable_operator::kube::runtime::reflector::ObjectRef;
+use std::{collections::HashSet, fmt::Display};
 
-use super::{pod_info::PodInfo, SecretBackend, SecretBackendError};
+use super::{pod_info::PodInfo, tls, SecretBackend, SecretBackendError, SecretVolumeSelector};
 use crate::crd::{self, SecretClass};
 
 #[derive(Debug)]
@@ -42,6 +43,16 @@ impl<B: SecretBackend + Send + Sync> SecretBackend for DynamicAdapter<B> {
             .await
             .map_err(|err| DynError(Box::new(err)))
     }
+
+    async fn get_qualified_node_names(
+        &self,
+        selector: &SecretVolumeSelector,
+    ) -> Result<Option<HashSet<String>>, Self::Error> {
+        self.0
+            .get_qualified_node_names(selector)
+            .await
+            .map_err(|err| DynError(Box::new(err)))
+    }
 }
 
 pub type Dynamic = dyn SecretBackend<Error = DynError>;
@@ -50,9 +61,10 @@ pub fn from(backend: impl SecretBackend + 'static) -> Box<Dynamic> {
 }
 
 #[derive(Debug, Snafu)]
+#[snafu(module)]
 pub enum FromClassError {
     #[snafu(display("failed to initialize TLS backend"), context(false))]
-    Tls { source: super::tls::Error },
+    Tls { source: tls::Error },
 }
 
 impl SecretBackendError for FromClassError {
@@ -85,4 +97,42 @@ pub async fn from_class(
                 .await?,
         ),
     })
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(module)]
+pub enum FromSelectorError {
+    #[snafu(display("failed to get {class}"))]
+    GetSecretClass {
+        source: stackable_operator::error::Error,
+        class: ObjectRef<SecretClass>,
+    },
+    #[snafu(display("failed to initialize backend for {class}"))]
+    FromClass {
+        source: FromClassError,
+        class: ObjectRef<SecretClass>,
+    },
+}
+
+impl SecretBackendError for FromSelectorError {
+    fn grpc_code(&self) -> tonic::Code {
+        match self {
+            FromSelectorError::GetSecretClass { .. } => tonic::Code::Unavailable,
+            FromSelectorError::FromClass { source, .. } => source.grpc_code(),
+        }
+    }
+}
+
+pub async fn from_selector(
+    client: &stackable_operator::client::Client,
+    selector: &SecretVolumeSelector,
+) -> Result<Box<Dynamic>, FromSelectorError> {
+    let class_ref = || ObjectRef::new(&selector.class);
+    let class = client
+        .get::<SecretClass>(&selector.class, None)
+        .await
+        .with_context(|_| from_selector_error::GetSecretClassSnafu { class: class_ref() })?;
+    from_class(client, class)
+        .await
+        .with_context(|_| from_selector_error::FromClassSnafu { class: class_ref() })
 }
