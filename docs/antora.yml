@@ -4,3 +4,4 @@ version: nightly
 title: Stackable Secret Operator
 nav:
   - modules/ROOT/nav.adoc
+prerelease: true
