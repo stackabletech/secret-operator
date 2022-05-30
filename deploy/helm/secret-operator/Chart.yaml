@@ -1,7 +1,7 @@
 ---
 apiVersion: v2
 name: secret-operator
-version: 0.5.0-nightly
+version: "0.5.0-nightly"
 appVersion: "0.5.0-nightly"
 description: The Stackable Operator for Stackable Secret Operator
 home: https://github.com/stackabletech/secret-operator
