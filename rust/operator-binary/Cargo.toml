@@ -25,7 +25,7 @@ socket2 = { version = "0.4.5", features = ["all"] }
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.10.0" }
 sys-mount = { version = "1.5.1", default-features = false }
 time = "0.3.9"
-tokio = { version = "1.18.2", features = ["full"] }
+tokio = { version = "1.19.2", features = ["full"] }
 tokio-stream = { version = "0.1.9", features = ["net"] }
 tonic = "0.7.2"
 tonic-reflection = "0.4.0"
