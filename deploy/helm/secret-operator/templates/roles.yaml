@@ -55,3 +55,11 @@ rules:
       - secretclasses
     verbs:
       - get
+  - apiGroups:
+    - security.openshift.io
+    resourceNames:
+    - privileged
+    resources:
+    - securitycontextconstraints
+    verbs:
+    - use

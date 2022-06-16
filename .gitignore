@@ -13,3 +13,6 @@ target/
 Cargo.nix
 crate-hashes.json
 result
+
+.vscode/
+vendor/
