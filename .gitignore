@@ -15,4 +15,4 @@ crate-hashes.json
 result
 
 .vscode/
-vendor/
+/vendor/
