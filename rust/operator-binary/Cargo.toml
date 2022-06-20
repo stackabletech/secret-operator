@@ -31,7 +31,7 @@ tonic = "0.7.2"
 tonic-reflection = "0.4.0"
 tracing = "0.1.35"
 
-h2 = "=0.3.13" # Need to keep this in sync with our patched h2 build
+h2 = "=0.3.7" # Need to keep this in sync with our patched h2 build
 uuid = { version = "1.1.2", features = ["v4"] }
 
 [dev-dependencies]
