@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- "privileged" security context constraints for OpenShift clusters ([#144])
+
+[#144]: https://github.com/stackabletech/secret-operator/pull/144
+
 ## [0.4.0] - 2022-05-18
 
 ### Added
