@@ -604,9 +604,8 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.3.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37a82c6d637fc9515a4694bbf1cb2457b79d81ce52b3108bdeea58b07dd34a57"
+version = "0.3.7"
+source = "git+https://github.com/stackabletech/h2.git?branch=feature/grpc-uds#b7554e1b8730af5fbb7fc1841d92f9247c4e477c"
 dependencies = [
  "bytes",
  "fnv",
@@ -617,7 +616,7 @@ dependencies = [
  "indexmap",
  "slab",
  "tokio",
- "tokio-util 0.7.1",
+ "tokio-util 0.6.9",
  "tracing",
 ]
 
@@ -2491,8 +2490,3 @@ name = "zeroize"
 version = "1.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94693807d016b2f2d2e14420eb3bfcca689311ff775dcf113d74ea624b7cdf07"
-
-[[patch.unused]]
-name = "h2"
-version = "0.3.7"
-source = "git+https://github.com/stackabletech/h2.git?branch=feature/grpc-uds#b7554e1b8730af5fbb7fc1841d92f9247c4e477c"
