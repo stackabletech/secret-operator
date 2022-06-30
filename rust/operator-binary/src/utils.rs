@@ -2,6 +2,7 @@ use std::{fmt::LowerHex, os::unix::prelude::AsRawFd, path::Path};
 
 use pin_project::pin_project;
 use socket2::Socket;
+use std::fmt::Write as _; // import without risk of name clashing
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::{UnixListener, UnixStream},
@@ -104,7 +105,7 @@ pub fn error_full_message(err: &dyn std::error::Error) -> String {
     let mut full_msg = format!("{}", err);
     let mut curr_err = err.source();
     while let Some(curr_source) = curr_err {
-        full_msg.push_str(&format!(": {}", curr_source));
+        let _ = write!(full_msg, ": {}", curr_source);
         curr_err = curr_source.source();
     }
     full_msg

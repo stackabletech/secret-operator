@@ -30,7 +30,8 @@ use stackable_operator::{
 use time::{Duration, OffsetDateTime};
 
 use super::{
-    pod_info::Address, pod_info::PodInfo, SecretBackend, SecretBackendError, SecretContents,
+    pod_info::{Address, PodInfo},
+    SecretBackend, SecretBackendError, SecretContents,
 };
 
 #[derive(Debug, Snafu)]
@@ -347,8 +348,7 @@ fn time_datetime_to_chrono(dt: time::OffsetDateTime) -> chrono::DateTime<FixedOf
 mod tests {
     use time::format_description::well_known::Rfc3339;
 
-    use super::chrono;
-    use super::time_datetime_to_chrono;
+    use super::{chrono, time_datetime_to_chrono};
 
     #[test]
     fn datetime_conversion() {
