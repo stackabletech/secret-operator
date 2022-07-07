@@ -6,5 +6,5 @@ This is a Kubernetes Operator to provision and inject secrets for Kubernetes pod
 
 It is written by [Stackable](https://www.stackable.tech) in Rust.
 
-The documentation for this operator can be found at https://docs.stackable.tech/secret-operator/index.html.
+The documentation for this operator can be found at https://docs.stackable.tech/secret-operator/stable/index.html
 The documentation for all Stackable products can be found at https://docs.stackable.tech.
