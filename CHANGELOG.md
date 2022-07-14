@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Include chart name when installing with a custom release name ([#153]).
+
+[#153]: https://github.com/stackabletech/secret-operator/pull/153
+
 ## [0.5.0] - 2022-06-30
 
 ### Added

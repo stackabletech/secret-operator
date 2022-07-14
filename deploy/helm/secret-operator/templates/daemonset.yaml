@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ .Release.Name }}-daemonset
+  name: {{ include "operator.fullname" . }}-daemonset
   labels:
     {{- include "operator.labels" . | nindent 4 }}
 spec:
@@ -22,7 +22,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ .Release.Name }}-serviceaccount
+      serviceAccountName: {{ include "operator.fullname" . }}-serviceaccount
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
