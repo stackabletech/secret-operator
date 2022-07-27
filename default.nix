@@ -14,24 +14,25 @@
       };
     };
   }
-, dockerTag ? "latest"
+, dockerName ? "docker.stackable.tech/sandbox/secret-operator"
+, dockerTag ? null
 }:
 rec {
   build = cargo.rootCrate.build;
-  crds = pkgs.runCommand "secret-provisioner-crds.yaml" {}
+  crds = pkgs.runCommand "secret-operator-crds.yaml" {}
   ''
     ${build}/bin/stackable-secret-operator crd > $out
   '';
 
   dockerImage = pkgs.dockerTools.streamLayeredImage {
-    name = "docker.stackable.tech/teozkr/secret-provisioner";
+    name = dockerName;
     tag = dockerTag;
     contents = [ pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal ];
     config = {
       Cmd = [ (build+"/bin/stackable-secret-operator") "run" ];
     };
   };
-  docker = pkgs.linkFarm "secret-provisioner-docker" [
+  docker = pkgs.linkFarm "secret-operator-docker" [
     {
       name = "load-image";
       path = dockerImage;
