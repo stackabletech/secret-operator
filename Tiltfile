@@ -1,6 +1,8 @@
+default_registry("docker.stackable.tech/sandbox")
+
 custom_build(
-    'docker.stackable.tech/teozkr/secret-provisioner',
-    'nix run -f . crate2nix generate && nix-build . -A docker --arg dockerTag null && ./result/load-image | docker load',
+    'docker.stackable.tech/sandbox/secret-operator',
+    'nix run -f . crate2nix generate && nix-build . -A docker --argstr dockerName "${EXPECTED_REGISTRY}/secret-operator" && ./result/load-image | docker load',
     deps=['rust', 'Cargo.toml', 'Cargo.lock', 'default.nix', "nix", 'build.rs', 'vendor'],
     # ignore=['result*', 'Cargo.nix', 'target', *.yaml],
     outputs_image_ref_to='result/ref',
@@ -17,7 +19,7 @@ helm_crds, helm_non_crds = filter_yaml(
       'deploy/helm/secret-operator',
       name='secret-operator',
       set=[
-         'image.repository=docker.stackable.tech/teozkr/secret-provisioner',
+         'image.repository=docker.stackable.tech/sandbox/secret-operator',
       ],
    ),
    api_version = "^apiextensions\\.k8s\\.io/.*$",
