@@ -1,4 +1,5 @@
-{ nixpkgs ? <nixpkgs>
+{ sources ? import ./nix/sources.nix # managed by https://github.com/nmattia/niv
+, nixpkgs ? sources.nixpkgs
 , pkgs ? import nixpkgs {}
 , cargo ? import ./Cargo.nix {
     inherit nixpkgs pkgs; release = false;
