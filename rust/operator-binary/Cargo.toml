@@ -15,8 +15,8 @@ futures = "0.3.21"
 libc = "0.2.126"
 openssl = "0.10.40"
 pin-project = "1.0.10"
-prost = "0.10.4"
-prost-types = "0.10.1"
+prost = "0.11"
+prost-types = "0.11"
 serde = "1.0.137"
 serde_json = "1.0.81"
 serde_yaml = "0.8.24"
@@ -27,8 +27,8 @@ sys-mount = { version = "1.5.1", default-features = false }
 time = "0.3.10"
 tokio = { version = "1.20.0", features = ["full"] }
 tokio-stream = { version = "0.1.9", features = ["net"] }
-tonic = "0.7.2"
-tonic-reflection = "0.4.0"
+tonic = "0.8"
+tonic-reflection = "0.5.0"
 tracing = "0.1.35"
 
 h2 = "=0.3.7" # Need to keep this in sync with our patched h2 build
@@ -39,6 +39,6 @@ time = { version = "0.3.10", features = ["parsing"] }
 
 [build-dependencies]
 built = { version = "0.5.1", features = ["chrono", "git2"] }
-tonic-build = "0.7.2"
+tonic-build = "0.8"
 
 [features]
