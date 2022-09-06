@@ -7,7 +7,7 @@ use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
-use stackable_operator::kube::CustomResourceExt;
+use stackable_operator::{logging::TracingTarget, CustomResourceExt};
 use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio_stream::wrappers::UnixListenerStream;
@@ -19,6 +19,8 @@ mod crd;
 mod csi_server;
 mod grpc;
 mod utils;
+
+pub const APP_NAME: &str = "secret";
 
 #[derive(clap::Parser)]
 #[clap(author, version)]
@@ -33,6 +35,9 @@ struct SecretOperatorRun {
     csi_endpoint: PathBuf,
     #[clap(long, env)]
     node_name: String,
+    /// Tracing log collector system
+    #[clap(long, env, default_value_t, arg_enum)]
+    pub tracing_target: TracingTarget,
 }
 
 mod built_info {
@@ -42,16 +47,21 @@ mod built_info {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    stackable_operator::logging::initialize_logging("SECRET_PROVISIONER_LOG");
     let opts = Opts::parse();
     match opts.cmd {
         stackable_operator::cli::Command::Crd => {
-            print!("{}", serde_yaml::to_string(&crd::SecretClass::crd())?)
+            crd::SecretClass::print_yaml_schema()?;
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun {
             csi_endpoint,
             node_name,
+            tracing_target,
         }) => {
+            stackable_operator::logging::initialize_logging(
+                "SECRET_PROVISIONER_LOG",
+                APP_NAME,
+                tracing_target,
+            );
             stackable_operator::utils::print_startup_string(
                 crate_description!(),
                 crate_version!(),
