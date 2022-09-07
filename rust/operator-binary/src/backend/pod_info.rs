@@ -10,6 +10,7 @@ use stackable_operator::{
 
 #[derive(Debug, Snafu)]
 #[snafu(module)]
+#[allow(clippy::large_enum_variant)]
 pub enum FromPodError {
     #[snafu(display("failed to parse IP address {ip:?}"))]
     IllegalIp {
