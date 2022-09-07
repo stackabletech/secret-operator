@@ -4,14 +4,11 @@
 , cargo ? import ./Cargo.nix {
     inherit nixpkgs pkgs; release = false;
     defaultCrateOverrides = pkgs.defaultCrateOverrides // {
-      prost-build = attrs: {
-        buildInputs = [ pkgs.protobuf ];
-      };
       tonic-reflection = attrs: {
-        buildInputs = [ pkgs.rustfmt ];
+        buildInputs = [ pkgs.protobuf pkgs.rustfmt ];
       };
       stackable-secret-operator = attrs: {
-        buildInputs = [ pkgs.rustfmt ];
+        buildInputs = [ pkgs.protobuf pkgs.rustfmt ];
       };
     };
   }
