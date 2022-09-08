@@ -7,8 +7,10 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Include chart name when installing with a custom release name ([#153]).
+- operator-rs: 0.10.0 -> 0.25.0 ([#180]).
 
 [#153]: https://github.com/stackabletech/secret-operator/pull/153
+[#180]: https://github.com/stackabletech/secret-operator/pull/180
 
 ## [0.5.0] - 2022-06-30
 
