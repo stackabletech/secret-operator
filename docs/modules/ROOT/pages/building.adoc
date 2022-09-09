@@ -51,6 +51,8 @@ $ nix build -f . docker
 # Nix does not use the Docker daemon, instead it builds individual layers, as well as
 # a script (`result/load-image`) that combines them into a Docker image archive.
 # `load-image` can also be piped into `docker load` to prepare for pushing to a registry.
+# Some people have reported issues with piping, for those it may be helpful to buffer the image through a file
+# by running `./result/load-image > image.tar && kind load image-archive image.tar`.
 $ ./result/load-image | kind load image-archive /dev/stdin
 # Deploy
 $ kubectl apply -f result/crds.yaml
