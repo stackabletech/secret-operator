@@ -35,31 +35,33 @@ $ helm upgrade secret-operator deploy/helm/secret-operator \
 
 == Nix
 
-To build and deploy to the active Kind cluster, run:
+To build and deploy to the active Kind cluster, run the following bash script:
 
 [source,console]
 ----
 $ echo Building with Nix
 # Ensure that all submodules are up-to-date
 $ git submodule update --recursive --init
-# Ensure that the Cargo.lock is up-to-date
-# This is not required if you use a tool that invokes Cargo regularly anyway, such as Rust-Analyzer
-$ cargo generate-lockfile
 # Use crate2nix (https://github.com/kolloch/crate2nix) to convert Cargo.lock into a Nix derivation
-$ nix run -f . crate2nix generate 
+$ nix run -f . crate2nix generate
 # Build the Docker images
+# A custom Docker repository can be specified by appending `--argstr dockerName my-custom-repository`
 $ nix build -f . docker
 # Load the images onto the Kind nodes
-# Nix does not use the Docker daemon, instead it builds individual layers, as well as a script (`result/load-image`) that combines them into a Docker image archive
-$ kind load image-archive <(./result/load-image)
+# Nix does not use the Docker daemon, instead it builds individual layers, as well as
+# a script (`result/load-image`) that combines them into a Docker image archive.
+# `load-image` can also be piped into `docker load` to prepare for pushing to a registry.
+$ ./result/load-image | kind load image-archive /dev/stdin
 # Deploy
-$ kubectl apply -f result/crds.yaml -f provisioner.yaml
-$ kubectl rollout restart ds/secret-provisioner
+$ kubectl apply -f result/crds.yaml
+$ helm upgrade secret-operator deploy/helm/secret-operator \
+  --install \
+  --set-string "image.repository=$(cat result/image-repo),image.tag=$(cat result/image-tag)"
 ----
 
 You may need to add `extra-experimental-features = nix-command` to `/etc/nix/nix.conf`, or add `--experimental-features nix-command` to the Nix commands.
 
-You can also use https://tilt.dev/[Tilt] to automatically recompile and redeploy when files are changed:
+You can also use https://tilt.dev/[Tilt] to automatically rebuild and redeploy when files are changed:
 
 [source,console]
 ----
