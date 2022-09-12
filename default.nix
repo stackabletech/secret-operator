@@ -41,11 +41,11 @@ rec {
     }
     {
       name = "image-repo";
-      path = pkgs.writeText "${dockerImage.name}-name" dockerImage.imageName;
+      path = pkgs.writeText "${dockerImage.name}-repo" dockerImage.imageName;
     }
     {
       name = "image-tag";
-      path = pkgs.writeText "${dockerImage.name}-name" dockerImage.imageTag;
+      path = pkgs.writeText "${dockerImage.name}-tag" dockerImage.imageTag;
     }
     {
       name = "crds.yaml";
