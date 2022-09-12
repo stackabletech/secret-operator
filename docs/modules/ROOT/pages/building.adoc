@@ -18,8 +18,6 @@ To build and deploy to the active Kind cluster, run:
 $ echo Building with Docker
 # Ensure that all submodules are up-to-date
 $ git submodule update --recursive --init
-# Update the Chart metadata and CRD definitions
-$ make compile-chart
 # Create a unique image ID
 $ REPO=secret-operator
 $ TAG="$(uuidgen)"
@@ -27,6 +25,8 @@ $ TAG="$(uuidgen)"
 $ docker build . -f docker/Dockerfile -t "$REPO:$TAG"
 # Load the image onto the Kind nodes
 $ kind load docker-image "$REPO:$TAG"
+# Deploy latest CRD
+$ docker run --rm "$REPO:$TAG" crd | kubectl apply -f-
 # Deploy
 $ helm upgrade secret-operator deploy/helm/secret-operator \
        --install \
@@ -51,9 +51,9 @@ $ nix build -f . docker
 # Nix does not use the Docker daemon, instead it builds individual layers, as well as
 # a script (`result/load-image`) that combines them into a Docker image archive.
 # `load-image` can also be piped into `docker load` to prepare for pushing to a registry.
-# Some people have reported issues with piping, for those it may be helpful to buffer the image through a file
-# by running `./result/load-image > image.tar && kind load image-archive image.tar`.
-$ ./result/load-image | kind load image-archive /dev/stdin
+$ ./result/load-image > image.tar && kind load image-archive image.tar
+# On single-node kind clusters it is slightly more efficient to run
+# `./result/load-image | kind load image-archive /dev/stdin` instead.
 # Deploy
 $ kubectl apply -f result/crds.yaml
 $ helm upgrade secret-operator deploy/helm/secret-operator \
