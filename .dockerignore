@@ -5,6 +5,9 @@ target/
 .idea/
 *.iws
 
+Cargo.nix
+crate-hashes.json
+result
 image.tar
 
 # We do NOT want to ignore .git because we use the `built` crate to gather the current git commit hash at built time
