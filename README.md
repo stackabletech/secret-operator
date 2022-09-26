@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="150" src="./Icon_Stackable.svg" alt="PGO: The Postgres Operator from Crunchy Data"/>
+  <img width="150" src="./Icon_Stackable.svg" alt="Stackable Logo"/>
 </p>
 <h1 align="center">Stackable Secret Operator</h1>
 
@@ -7,18 +7,11 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-green.svg)](https://docs.stackable.tech/home/stable/contributor/index.html)
 [![License OSL3.0](https://img.shields.io/badge/license-OSL3.0-green)](./LICENSE)
 
-
 <!-- Abstract -->
 
-The documentation for this operator can be found at https://docs.stackable.tech/secret-operator/stable/index.html.
+This is a Kubernetes Operator to provision and inject secrets for Kubernetes pods. Compared to Kubernetes' native secret mounts, this permits secrets to be selected dynamically based on properties of the `Pod`. Have a look at the [Documentation](https://docs.stackable.tech/secret-operator/stable/index.html) for more information.
 
-## Introduction
-
-This is a Kubernetes Operator to provision and inject secrets for Kubernetes pods. Compared to Kubernetes' native secret mounts, this permits secrets to be selected dynamically based on properties of the `Pod`.
-
-## Quickstart
-
-Not really applicable to this operator
+<!-- Quickstart section left out, because this operator doesn't do anything stand-alone -->
 
 ## How it works
 
@@ -26,6 +19,8 @@ How does it work actually?
 
 This operator is used by other Stackable operators to provision secrets and certificates.
 It is deployed as a DaemonSet and provides a CSI to mount files directly into Pods. etc. etc.
+
+  <img width="500" src="./dummy_diagram.svg" alt="A diagram overview of the workings of the operator"/>
 
 ## About The Stackable Data Platform
 
