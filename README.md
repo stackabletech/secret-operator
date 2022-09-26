@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="150" src="./Icon_Stackable.svg" alt="Stackable Logo"/>
+  <img width="150" src="./.readme/Icon_Stackable.svg" alt="Stackable Logo"/>
 </p>
 <h1 align="center">Stackable Secret Operator</h1>
 
@@ -48,7 +48,10 @@ Contributions are welcome. Follow our [Contributors Guide](https://docs.stackabl
 
 ## Further Reading
 
+Here are some links if you want to learn more about the operator
+
 - Link to a Blog Post
+- Another link to content
 
 ## License
 
