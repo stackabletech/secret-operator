@@ -19,13 +19,13 @@ This is a Kubernetes Operator to provision and inject secrets for Kubernetes Pod
 This operator is used by other Stackable operators to provision secrets and certificates.
 It is deployed as a DaemonSet and provides a CSI to mount files directly into Pods.
 
-  <img width="500" src="./secret-operator.drawio.svg" alt="A diagram overview of the workings of the operator"/>
+  <img width="500" src="./.readme/secret-operator.drawio.svg" alt="A diagram overview of the workings of the operator"/>
 
 ## About The Stackable Data Platform
 
 This operator is written and maintained by [Stackable](https://www.stackable.tech) and it is part of a larger platform. It is used by the other Operators to - for example - provision TLS certificates for secure traffic.
 
-![Stackable Data Platform Overview](sdp_overview.png)
+![Stackable Data Platform Overview](./.readme/sdp_overview.png)
 
 ## The Operators
 
@@ -44,7 +44,7 @@ This operator is written and maintained by [Stackable](https://www.stackable.tec
 
 ## Contributing
 
-Contributions are welcome! Follow our [Contributors Guide](https://docs.stackable.tech/home/stable/contributor/index.html) to learn how you can contribute.
+Contributions are welcome. Follow our [Contributors Guide](https://docs.stackable.tech/home/stable/contributor/index.html) to learn how you can contribute.
 
 ## Further Reading
 
