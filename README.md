@@ -20,7 +20,7 @@ How does it work actually?
 This operator is used by other Stackable operators to provision secrets and certificates.
 It is deployed as a DaemonSet and provides a CSI to mount files directly into Pods. etc. etc.
 
-  <img width="500" src="./dummy_diagram.svg" alt="A diagram overview of the workings of the operator"/>
+  <img width="500" src="./secret-operator.drawio.svg" alt="A diagram overview of the workings of the operator"/>
 
 ## About The Stackable Data Platform
 
