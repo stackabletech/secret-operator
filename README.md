@@ -7,17 +7,37 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-green.svg)](https://docs.stackable.tech/home/stable/contributor/index.html)
 [![License OSL3.0](https://img.shields.io/badge/license-OSL3.0-green)](./LICENSE)
 
+[Documentation](https://docs.stackable.tech/secret-operator/stable/index.html) | [Quickstart](http://example.com/) | [Stackable Data Platform](https://stackable.tech/) | [Platform Docs](https://docs.stackable.tech/)
+
 <!-- Abstract -->
 
 The Secret Operator by [Stackable](https://stackable.tech/).
-This is a Kubernetes Operator to provision and inject secrets for Kubernetes Pods. Compared to Kubernetes' native secret mounts, this permits secrets to be selected dynamically based on properties of the Pod. Have a look at the [Documentation](https://docs.stackable.tech/secret-operator/stable/index.html) for more information.
+This is a Kubernetes Operator to provision and inject secrets for Kubernetes Pods. It is part of the [Stackable Data Platform](https://stackable.tech/), a curated selection of the best open source data apps like Kafka, Druid, Trino or Spark, all working together seamlessly. Based on Kubernetes, it runs everywhere – on prem or in the cloud.
 
 <!-- Quickstart section left out, because this operator doesn't do anything stand-alone -->
 
+## Quickstart
+
+The Operator is installable via Helm:
+
+```
+helm repo add stackable https://repo.stackable.tech/repository/helm-stable/
+helm install secret-operator stackable/secret-operator
+```
+
+See it in action in one of our [Demos](https://stackable.tech/en/demos/).
+
+## What does it do?
+
+The Secret Operator provisions and mounts secrets, but unlike the default Kubernetes Secret mechanism, Secrets can be created and mouted dynamically based on Pod properties. The Operator supports:
+
+- Generating TLS certificates on demand and mounting them
+- Handling XYZ
+- And something else
+
 ## How it works
 
-This operator is used by other Stackable operators to provision secrets and certificates.
-It is deployed as a DaemonSet and provides a CSI to mount files directly into Pods.
+The Secret Operator is deployed as a DaemonSet and provides a CSI to mount files directly into Pods.
 
   <img width="500" src="./.readme/secret-operator.drawio.svg" alt="A diagram overview of the workings of the operator"/>
 
@@ -28,6 +48,8 @@ This operator is written and maintained by [Stackable](https://www.stackable.tec
 ![Stackable Data Platform Overview](./.readme/sdp_overview.png)
 
 ## The Operators
+
+These are the Operators currently part of the Stackable Data Platform, many of which use the Secret Operator.
 
 - [Apache Airflow Operator](https://github.com/stackabletech/airflow-operator)
 - [Apache Druid Operator](https://github.com/stackabletech/druid-operator)
