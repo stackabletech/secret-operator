@@ -9,7 +9,8 @@
 
 <!-- Abstract -->
 
-This is a Kubernetes Operator to provision and inject secrets for Kubernetes pods. Compared to Kubernetes' native secret mounts, this permits secrets to be selected dynamically based on properties of the `Pod`. Have a look at the [Documentation](https://docs.stackable.tech/secret-operator/stable/index.html) for more information.
+The Secret Operator by [Stackable](https://stackable.tech/).
+This is a Kubernetes Operator to provision and inject secrets for Kubernetes Pods. Compared to Kubernetes' native secret mounts, this permits secrets to be selected dynamically based on properties of the Pod. Have a look at the [Documentation](https://docs.stackable.tech/secret-operator/stable/index.html) for more information.
 
 <!-- Quickstart section left out, because this operator doesn't do anything stand-alone -->
 
