@@ -18,7 +18,7 @@ This is a Kubernetes Operator to provision and inject secrets for Kubernetes Pod
 
 The best way to get started with this operator (and the platform) is to use `stackablectl`. Download the latest [release](https://github.com/stackabletech/stackablectl/releases) and have a look at the [docs](https://docs.stackable.tech/stackablectl/stable/index.html).
 
-You can install this operator simply with
+You can install this operator by running:
 
 ```
 stackablectl operator install secret
