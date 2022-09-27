@@ -46,7 +46,7 @@ This operator is written and maintained by [Stackable](https://www.stackable.tec
 
 ![Stackable Data Platform Overview](./.readme/sdp_overview.png)
 
-## The Operators
+### Other Operators
 
 These are the Operators currently part of the Stackable Data Platform, many of which use the Secret Operator.
 
