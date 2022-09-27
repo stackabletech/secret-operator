@@ -14,15 +14,14 @@
 The Secret Operator by [Stackable](https://stackable.tech/).
 This is a Kubernetes Operator to provision and inject secrets for Kubernetes Pods. It is part of the [Stackable Data Platform](https://stackable.tech/), a curated selection of the best open source data apps like Kafka, Druid, Trino or Spark, all working together seamlessly. Based on Kubernetes, it runs everywhere – on prem or in the cloud.
 
-<!-- Quickstart section left out, because this operator doesn't do anything stand-alone -->
-
 ## Quickstart
 
-The Operator is installable via Helm:
+The best way to get started with this operator (and the platform) is to use `stackablectl`. Download the latest [release](https://github.com/stackabletech/stackablectl/releases) and have a look at the [docs](https://docs.stackable.tech/stackablectl/stable/index.html).
+
+You can install this operator simply with
 
 ```
-helm repo add stackable https://repo.stackable.tech/repository/helm-stable/
-helm install secret-operator stackable/secret-operator
+stackablectl operator install secret
 ```
 
 See it in action in one of our [Demos](https://stackable.tech/en/demos/).
