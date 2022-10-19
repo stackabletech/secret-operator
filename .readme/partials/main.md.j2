@@ -13,3 +13,18 @@ Read on to get started with it, or see it in action in one of our [demos](https:
 You can follow this [tutorial](https://docs.stackable.tech/{{operator_name}}/stable/getting_started/first_steps.html).
 
 {% include "partials/borrowed/documentation.md.j2" %}
+
+## What does it do?
+
+The Secret Operator provisions and mounts secrets, but unlike the default Kubernetes Secret mechanism, Secrets can be created and mounted dynamically based on Pod properties. The Operator supports:
+
+- Generating TLS certificates on demand and mounting them
+
+## How it works
+
+The Secret Operator is deployed as a DaemonSet and provides a CSI to mount files directly into Pods.
+
+  <img width="500" src="./.readme/static/secret-operator.drawio.svg" alt="A diagram overview of the workings of the operator"/>
+
+The Secret Operator by [Stackable](https://stackable.tech/).
+This is a Kubernetes Operator to provision and inject secrets for Kubernetes Pods. It is part of the [Stackable Data Platform](https://stackable.tech/), a curated selection of the best open source data apps like Kafka, Druid, Trino or Spark, all working together seamlessly. Based on Kubernetes, it runs everywhere – on prem or in the cloud.
