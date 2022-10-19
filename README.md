@@ -4,7 +4,6 @@
 
 <h1 align="center">Stackable Secret Operator</h1>
 
-
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/stackabletech/secret-operator/graphs/commit-activity)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-green.svg)](https://docs.stackable.tech/home/stable/contributor/index.html)
 [![License OSL3.0](https://img.shields.io/badge/license-OSL3.0-green)](./LICENSE)
@@ -13,7 +12,7 @@
 
 This is a Kubernetes Operator to provision and inject secrets for Kubernetes pods. Compared to Kubernetes' native secret mounts, this permits secrets to be selected dynamically based on properties of the `Pod`.
 
-It is part of the Stackable Data Platform, a curated selection of the best open source data apps like Kafka, Druid, Trino or Spark, [all](#other-operators) working together seamlessly. Based on Kubernetes, it runs everywhere – [on prem or in the cloud]((#supported-platforms)).
+It is part of the Stackable Data Platform, a curated selection of the best open source data apps like Kafka, Druid, Trino or Spark, [all](#other-operators) working together seamlessly. Based on Kubernetes, it runs everywhere – [on prem or in the cloud](#supported-platforms).
 
 ## Installation
 
@@ -65,11 +64,12 @@ We love open-source!
 
 We develop and test our operators on the following cloud platforms:
 
-* Kubernetes 1.21-1.24
+* AKS on Microsoft Azure
 * EKS on Amazon Web Services (AWS)
 * GKE on Google Cloud Platform (GCP)
-* AKS on Microsoft Azure
+* [IONOS Cloud Managed Kubernetes](https://cloud.ionos.com/managed/kubernetes)
 * K3s
+* Kubernetes 1.21-1.24
 
 We are currently working to support:
 
