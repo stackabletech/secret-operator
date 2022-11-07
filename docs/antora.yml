@@ -1,7 +1,7 @@
 ---
 name: secret-operator
-version: "nightly"
+version: "0.6"
 title: Stackable Secret Operator
 nav:
   - modules/ROOT/nav.adoc
-prerelease: true
+prerelease: false

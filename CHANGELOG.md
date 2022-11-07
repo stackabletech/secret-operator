@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] - 2022-11-07
+
 ### Changed
 
 - Include chart name when installing with a custom release name ([#153]).
