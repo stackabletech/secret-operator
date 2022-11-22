@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- operator-rs: 0.25.0 -> 0.27.1 ([#212]).
+
+[#212]: https://github.com/stackabletech/secret-operator/pull/212
+
 ## [0.6.0] - 2022-11-07
 
 ### Changed
