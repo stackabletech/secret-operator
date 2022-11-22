@@ -82,7 +82,7 @@ impl SecretProvisionerController {
         // so instead we load the PVC and treat _its_ annotations as parameters
         let pvc = self
             .client
-            .get::<PersistentVolumeClaim>(&params.pvc_name, Some(&params.pvc_namespace))
+            .get::<PersistentVolumeClaim>(&params.pvc_name, &params.pvc_namespace)
             .await
             .with_context(|_| create_volume_error::FindPvcSnafu {
                 pvc: ObjectRef::new(&params.pvc_name).within(&params.pvc_namespace),

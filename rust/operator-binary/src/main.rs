@@ -1,4 +1,4 @@
-use clap::{crate_description, crate_version, StructOpt};
+use clap::{crate_description, crate_version, Parser};
 use csi_server::{
     controller::SecretProvisionerController, identity::SecretProvisionerIdentity,
     node::SecretProvisionerNode,
@@ -36,7 +36,7 @@ struct SecretOperatorRun {
     #[clap(long, env)]
     node_name: String,
     /// Tracing log collector system
-    #[clap(long, env, default_value_t, arg_enum)]
+    #[arg(long, env, default_value_t, value_enum)]
     pub tracing_target: TracingTarget,
 }
 

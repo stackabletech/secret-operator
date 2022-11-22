@@ -72,7 +72,7 @@ impl SecretBackend for K8sSearch {
         let secret = self
             .client
             .list::<Secret>(
-                Some(self.search_ns_for_pod(selector)),
+                self.search_ns_for_pod(selector),
                 &ListParams::default().labels(&label_selector),
             )
             .await
@@ -99,7 +99,7 @@ impl SecretBackend for K8sSearch {
             Ok(Some(
                 self.client
                     .list::<Secret>(
-                        Some(__self.search_ns_for_pod(selector)),
+                        __self.search_ns_for_pod(selector),
                         &ListParams::default().labels(&label_selector),
                     )
                     .await
