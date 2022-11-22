@@ -129,7 +129,7 @@ pub async fn from_selector(
 ) -> Result<Box<Dynamic>, FromSelectorError> {
     let class_ref = || ObjectRef::new(&selector.class);
     let class = client
-        .get::<SecretClass>(&selector.class, None)
+        .get::<SecretClass>(&selector.class, &())
         .await
         .with_context(|_| from_selector_error::GetSecretClassSnafu { class: class_ref() })?;
     from_class(client, class)

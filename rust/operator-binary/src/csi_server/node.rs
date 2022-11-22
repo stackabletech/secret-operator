@@ -140,7 +140,7 @@ impl SecretProvisionerNode {
     async fn get_pod_info(&self, selector: &SecretVolumeSelector) -> Result<PodInfo, PublishError> {
         let pod = self
             .client
-            .get::<Pod>(&selector.pod, Some(&selector.namespace))
+            .get::<Pod>(&selector.pod, &selector.namespace)
             .await
             .context(publish_error::GetPodSnafu)?;
         PodInfo::from_pod(&self.client, pod)

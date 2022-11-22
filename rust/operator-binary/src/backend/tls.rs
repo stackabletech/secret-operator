@@ -174,7 +174,7 @@ impl TlsGenerate {
                 .fail()
             }
         };
-        let existing_secret = client.get::<Secret>(k8s_secret_name, Some(k8s_ns)).await;
+        let existing_secret = client.get::<Secret>(k8s_secret_name, k8s_ns).await;
         Ok(match existing_secret {
             Ok(ca_secret) => {
                 // Existing CA has been found, load and use this
