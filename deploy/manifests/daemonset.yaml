@@ -6,7 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: secret-operator
     app.kubernetes.io/instance: secret-operator
-    app.kubernetes.io/version: "0.3.0-nightly"
+    app.kubernetes.io/version: "0.7.0-nightly"
 spec:
   selector:
     matchLabels:
@@ -25,18 +25,32 @@ spec:
           securityContext:
             privileged: true
             runAsUser: 0
-          image: "docker.stackable.tech/stackable/secret-operator:0.3.0-nightly"
+          image: "docker.stackable.tech/stackable/secret-operator:0.7.0-nightly"
           imagePullPolicy: IfNotPresent
           resources: {}
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
           volumeMounts:
             - name: csi
               mountPath: /csi
             - name: mountpoint
               mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
+        - name: external-provisioner
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.1.0
+          args:
+            - --csi-address=/csi/csi.sock
+            - --feature-gates=Topology=true
+            - --extra-create-metadata
+          volumeMounts:
+            - name: csi
+              mountPath: /csi
         - name: node-driver-registrar
           image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.4.0
           args:

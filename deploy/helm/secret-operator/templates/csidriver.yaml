@@ -9,3 +9,4 @@ spec:
   fsGroupPolicy: File
   volumeLifecycleModes:
     - Ephemeral
+    - Persistent

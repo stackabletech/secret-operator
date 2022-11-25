@@ -9,7 +9,12 @@ pub mod tls;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Deserializer};
-use std::{collections::HashMap, convert::Infallible, path::PathBuf};
+use stackable_operator::k8s_openapi::chrono::{DateTime, FixedOffset};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::Infallible,
+    path::PathBuf,
+};
 
 pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
@@ -22,7 +27,7 @@ use scope::SecretScope;
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
 /// Fields beginning with `csi.storage.k8s.io/` are provided by the Kubelet
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct SecretVolumeSelector {
     /// What kind of secret should be used
     #[serde(rename = "secrets.stackable.tech/class")]
@@ -103,6 +108,26 @@ impl SecretVolumeSelector {
 
 type SecretFiles = HashMap<PathBuf, Vec<u8>>;
 
+#[derive(Default, Debug)]
+pub struct SecretContents {
+    pub files: SecretFiles,
+    pub expires_after: Option<DateTime<FixedOffset>>,
+}
+
+impl SecretContents {
+    fn new(files: SecretFiles) -> Self {
+        Self {
+            files,
+            ..Self::default()
+        }
+    }
+
+    fn expires_after(mut self, deadline: DateTime<FixedOffset>) -> Self {
+        self.expires_after = Some(deadline);
+        self
+    }
+}
+
 /// This trait needs to be implemented by all secret providers.
 /// It gets the pod information as well as volume definition and has to
 /// return any number of files.
@@ -110,11 +135,26 @@ type SecretFiles = HashMap<PathBuf, Vec<u8>>;
 pub trait SecretBackend: Send + Sync {
     type Error: SecretBackendError;
 
+    /// Provision or load secret data from the source.
     async fn get_secret_data(
         &self,
-        selector: SecretVolumeSelector,
+        selector: &SecretVolumeSelector,
         pod_info: pod_info::PodInfo,
-    ) -> Result<SecretFiles, Self::Error>;
+    ) -> Result<SecretContents, Self::Error>;
+
+    /// Try to predict which nodes would be able to provision this secret.
+    ///
+    /// Should return `None` if no constraints apply, `Some(HashSet::new())` is interpreted as "no nodes match the given constraints".
+    ///
+    /// The default stub implementation assumes that no constraints apply.
+    async fn get_qualified_node_names(
+        &self,
+        selector: &SecretVolumeSelector,
+    ) -> Result<Option<HashSet<String>>, Self::Error> {
+        // selector is unused in the stub implementation, but should still be used in all "real" impls
+        let _ = selector;
+        Ok(None)
+    }
 }
 
 pub trait SecretBackendError: std::error::Error + Send + Sync + 'static {

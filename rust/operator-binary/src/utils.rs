@@ -1,7 +1,8 @@
-use std::{os::unix::prelude::AsRawFd, path::Path};
+use std::{fmt::LowerHex, os::unix::prelude::AsRawFd, path::Path};
 
 use pin_project::pin_project;
 use socket2::Socket;
+use std::fmt::Write as _; // import without risk of name clashing
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::{UnixListener, UnixStream},
@@ -84,4 +85,55 @@ pub fn uds_bind_private(path: impl AsRef<Path>) -> Result<UnixListener, std::io:
     socket.listen(1024)?;
     socket.set_nonblocking(true)?;
     UnixListener::from_std(socket.into())
+}
+
+/// Helper for formatting byte arrays
+pub struct FmtByteSlice<'a>(pub &'a [u8]);
+impl LowerHex for FmtByteSlice<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for byte in self.0 {
+            f.write_fmt(format_args!("{:02x}", byte))?;
+        }
+        Ok(())
+    }
+}
+
+/// Combines the messages of an error and its sources into a [`String`] of the form `"error: source 1: source 2: root error"`
+pub fn error_full_message(err: &dyn std::error::Error) -> String {
+    // Build the full hierarchy of error messages by walking up the stack until an error
+    // without `source` set is encountered and concatenating all encountered error strings.
+    let mut full_msg = format!("{}", err);
+    let mut curr_err = err.source();
+    while let Some(curr_source) = curr_err {
+        let _ = write!(full_msg, ": {}", curr_source);
+        curr_err = curr_source.source();
+    }
+    full_msg
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::utils::{error_full_message, FmtByteSlice};
+
+    #[test]
+    fn fmt_hex_byte_slice() {
+        assert_eq!(format!("{:x}", FmtByteSlice(&[1, 2, 255, 128])), "0102ff80");
+    }
+
+    #[test]
+    fn error_messages() {
+        assert_eq!(
+            error_full_message(anyhow::anyhow!("standalone error").as_ref()),
+            "standalone error"
+        );
+        assert_eq!(
+            error_full_message(
+                anyhow::anyhow!("root error")
+                    .context("middleware")
+                    .context("leaf")
+                    .as_ref()
+            ),
+            "leaf: middleware: root error"
+        );
+    }
 }

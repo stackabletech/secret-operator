@@ -26,13 +26,14 @@ allow = [
     "Apache-2.0",
     "BSD-3-Clause",
     "CC0-1.0",
+    "ISC",
+    "LicenseRef-ring",
+    "LicenseRef-webpki",
     "MIT",
+    "Unicode-DFS-2016",
     "Zlib"
 ]
-
-exceptions = [
-    { name = "stackable-secret-operator", allow = ["OSL-3.0"] },
-]
+private = { ignore = true }
 
 [[licenses.clarify]]
 name = "ring"

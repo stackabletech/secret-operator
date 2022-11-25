@@ -10,6 +10,7 @@ use stackable_operator::{
 
 #[derive(Debug, Snafu)]
 #[snafu(module)]
+#[allow(clippy::large_enum_variant)]
 pub enum FromPodError {
     #[snafu(display("failed to parse IP address {ip:?}"))]
     IllegalIp {
@@ -44,7 +45,7 @@ impl PodInfo {
             .and_then(|spec| spec.node_name.clone())
             .context(from_pod_error::NoNodeSnafu)?;
         let node = client
-            .get::<Node>(&node_name, None)
+            .get::<Node>(&node_name, &())
             .await
             .with_context(|_| from_pod_error::GetNodeSnafu {
                 node: ObjectRef::new(&node_name),

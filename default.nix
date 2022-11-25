@@ -1,16 +1,14 @@
-{ nixpkgs ? <nixpkgs>
+{ sources ? import ./nix/sources.nix # managed by https://github.com/nmattia/niv
+, nixpkgs ? sources.nixpkgs
 , pkgs ? import nixpkgs {}
 , cargo ? import ./Cargo.nix {
     inherit nixpkgs pkgs; release = false;
     defaultCrateOverrides = pkgs.defaultCrateOverrides // {
-      prost-build = attrs: {
-        buildInputs = [ pkgs.protobuf ];
-      };
       tonic-reflection = attrs: {
-        buildInputs = [ pkgs.rustfmt ];
+        buildInputs = [ pkgs.protobuf pkgs.rustfmt ];
       };
       stackable-secret-operator = attrs: {
-        buildInputs = [ pkgs.rustfmt ];
+        buildInputs = [ pkgs.protobuf pkgs.rustfmt ];
       };
       krb5-sys = attrs: {
         nativeBuildInputs = [ pkgs.pkg-config ];
@@ -20,19 +18,20 @@
       };
     };
   }
-, dockerTag ? "latest"
+, dockerName ? "docker.stackable.tech/sandbox/secret-operator"
+, dockerTag ? null
 }:
 rec {
   inherit pkgs;
 
   build = cargo.workspaceMembers.stackable-secret-operator.build;
-  crds = pkgs.runCommand "secret-provisioner-crds.yaml" {}
+  crds = pkgs.runCommand "secret-operator-crds.yaml" {}
   ''
     ${build}/bin/stackable-secret-operator crd > $out
   '';
 
   dockerImage = pkgs.dockerTools.streamLayeredImage {
-    name = "docker.stackable.tech/teozkr/secret-provisioner";
+    name = dockerName;
     tag = dockerTag;
     contents = [ pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal pkgs.krb5 pkgs.vim ];
     config = {
@@ -42,7 +41,7 @@ rec {
       ];
     };
   };
-  docker = pkgs.linkFarm "secret-provisioner-docker" [
+  docker = pkgs.linkFarm "secret-operator-docker" [
     {
       name = "load-image";
       path = dockerImage;
@@ -50,6 +49,14 @@ rec {
     {
       name = "ref";
       path = pkgs.writeText "${dockerImage.name}-image-tag" "${dockerImage.imageName}:${dockerImage.imageTag}";
+    }
+    {
+      name = "image-repo";
+      path = pkgs.writeText "${dockerImage.name}-repo" dockerImage.imageName;
+    }
+    {
+      name = "image-tag";
+      path = pkgs.writeText "${dockerImage.name}-tag" dockerImage.imageTag;
     }
     {
       name = "crds.yaml";

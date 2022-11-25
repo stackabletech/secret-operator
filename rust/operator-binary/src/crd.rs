@@ -1,9 +1,9 @@
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
-use stackable_operator::k8s_openapi::api::core::v1::SecretReference;
-use stackable_operator::kube::CustomResource;
-use stackable_operator::schemars::{self, JsonSchema};
+use stackable_operator::{
+    k8s_openapi::api::core::v1::SecretReference,
+    kube::CustomResource,
+    schemars::{self, JsonSchema},
+};
 
 #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, JsonSchema)]
 #[kube(
@@ -33,8 +33,6 @@ pub enum SecretClassBackend {
 #[serde(rename_all = "camelCase")]
 pub struct K8sSearchBackend {
     pub search_namespace: SearchNamespace,
-    #[serde(default)]
-    pub secret_labels: BTreeMap<String, String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
