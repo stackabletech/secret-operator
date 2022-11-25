@@ -6,7 +6,7 @@ use stackable_operator::kube::runtime::reflector::ObjectRef;
 use std::{collections::HashSet, fmt::Display};
 
 use super::{
-    tls, kerberos_keytab::KerberosProfile, pod_info::PodInfo, SecretBackend, SecretBackendError,
+    kerberos_keytab::KerberosProfile, pod_info::PodInfo, tls, SecretBackend, SecretBackendError,
 };
 use crate::crd::{self, SecretClass};
 
