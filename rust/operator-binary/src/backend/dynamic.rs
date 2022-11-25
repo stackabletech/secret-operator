@@ -6,7 +6,9 @@ use stackable_operator::kube::runtime::reflector::ObjectRef;
 use std::{collections::HashSet, fmt::Display};
 
 use super::{
-    kerberos_keytab::KerberosProfile, pod_info::PodInfo, tls, SecretBackend, SecretBackendError,
+    kerberos_keytab::{self, KerberosProfile},
+    pod_info::PodInfo,
+    tls, SecretBackend, SecretBackendError, SecretVolumeSelector,
 };
 use crate::crd::{self, SecretClass};
 
@@ -71,9 +73,7 @@ pub enum FromClassError {
         display("failed to initialize Kerberos Keytab backend"),
         context(false)
     )]
-    KerberosKeytab {
-        source: super::kerberos_keytab::Error,
-    },
+    KerberosKeytab { source: kerberos_keytab::Error },
 }
 
 impl SecretBackendError for FromClassError {

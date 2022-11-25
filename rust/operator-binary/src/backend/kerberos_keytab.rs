@@ -4,12 +4,13 @@ use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::k8s_openapi::api::core::v1::{Secret, SecretReference};
 use tempfile::tempdir;
-use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::process::Command;
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, AsyncWriteExt},
+    process::Command,
+};
 
-use super::pod_info::Address;
-use super::{SecretBackend, SecretBackendError};
+use super::{pod_info::Address, SecretBackend, SecretBackendError, SecretContents};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -87,7 +88,7 @@ impl KerberosKeytab {
             }
         };
         let admin_keytab_secret = client
-            .get::<Secret>(keytab_secret_name, Some(keytab_secret_ns))
+            .get::<Secret>(keytab_secret_name, keytab_secret_ns)
             .await
             .context(LoadAdminKeytabSnafu {
                 secret: admin_keytab_secret_ref.clone(),
@@ -114,9 +115,9 @@ impl SecretBackend for KerberosKeytab {
 
     async fn get_secret_data(
         &self,
-        selector: super::SecretVolumeSelector,
+        selector: &super::SecretVolumeSelector,
         pod_info: super::pod_info::PodInfo,
-    ) -> Result<super::SecretFiles, Self::Error> {
+    ) -> Result<super::SecretContents, Self::Error> {
         let Self {
             profile:
                 KerberosProfile {
@@ -174,7 +175,7 @@ cluster.local = {realm_name}
                     if let Address::Dns(hostname) = addr {
                         add_principal_to_keytab(
                             &profile_file_path,
-                            &admin_principal,
+                            admin_principal,
                             &admin_keytab_file_path,
                             &format!("{service_name}/{hostname}"),
                             &keytab_file_path,
@@ -192,11 +193,13 @@ cluster.local = {realm_name}
             .read_to_end(&mut keytab_data)
             .await
             .context(ReadKeytabSnafu)?;
-        Ok([
-            (PathBuf::from("keytab"), keytab_data),
-            (PathBuf::from("krb5.conf"), profile.into_bytes()),
-        ]
-        .into())
+        Ok(SecretContents::new(
+            [
+                (PathBuf::from("keytab"), keytab_data),
+                (PathBuf::from("krb5.conf"), profile.into_bytes()),
+            ]
+            .into(),
+        ))
         // let profile_file_path = profile_file.path().as_os_str().as_bytes();
         // let config_params = krb5::ConfigParams {
         //     default_realm: Some(CString::new("CLUSTER.LOCAL").unwrap()),
