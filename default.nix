@@ -64,6 +64,6 @@ rec {
     }
   ];
 
-  crate2nix = pkgs.crate2nix;
+  crate2nix = import sources.crate2nix {};
   tilt = pkgs.tilt;
 }

@@ -135,4 +135,18 @@ data:
   kadm5.acl: |
     root/admin *
     stackable-secret-operator *e
-
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: kerberos
+spec:
+  backend:
+    kerberosKeytab:
+      realmName: CLUSTER.LOCAL
+      kdc: krb5-kdc
+      adminServer: krb5-kdc
+      adminKeytabSecret:
+        namespace: default
+        name: secret-provisioner-keytab
+      adminPrincipal: stackable-secret-operator

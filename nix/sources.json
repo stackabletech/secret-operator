@@ -1,14 +1,26 @@
 {
+    "crate2nix": {
+        "branch": "master",
+        "description": "nix build file generator for rust crates",
+        "homepage": "",
+        "owner": "kolloch",
+        "repo": "crate2nix",
+        "rev": "e4414cc2579d6ab11e9542f49eeb302b451bf0e2",
+        "sha256": "02yvn61w16sgkdxa019l5y9i2ybyk8h4516718gmarqxx5ws2kz8",
+        "type": "tarball",
+        "url": "https://github.com/kolloch/crate2nix/archive/e4414cc2579d6ab11e9542f49eeb302b451bf0e2.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "nixpkgs": {
         "branch": "nixpkgs-unstable",
         "description": "Nix Packages collection",
         "homepage": "",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "3bbb296d9a0088c314ce83038b896753bbe33acb",
-        "sha256": "0dlq1zjcki30k2afg749a7c34vyb86sx1irab48l2g214nhj83hw",
+        "rev": "8e8b5f3b1e899bf5d250279578c0283705b8cdb4",
+        "sha256": "1vf7g02syz8fbqvcx3wzfq53xvyw9z6xpyzfh5ijxryx2g2msdq2",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/3bbb296d9a0088c314ce83038b896753bbe33acb.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/8e8b5f3b1e899bf5d250279578c0283705b8cdb4.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
