@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [23.1.0] - 2023-01-23
+
 ### Changed
 
 - operator-rs: 0.25.0 -> 0.27.1 ([#212]).
