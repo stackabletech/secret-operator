@@ -1,6 +1,6 @@
 ---
 name: secret-operator
-version: "23.1.0"
+version: "23.1"
 title: Stackable Secret Operator
 nav:
   - modules/ROOT/nav.adoc
