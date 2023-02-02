@@ -11,9 +11,12 @@ All notable changes to this project will be documented in this file.
   - After upgrading you will need to
     `rmdir /var/lib/kubelet/plugins_registry/secrets.stackable.tech-reg.sock` manually.
     This applies to *all* users, not just Microk8s.
+- Made kubeletDir configurable ([#232]).
+  - Microk8s users will need to `--set kubeletDir=/var/snap/microk8s/common/var/lib/kubelet`.
 
 [#212]: https://github.com/stackabletech/secret-operator/pull/212
 [#231]: https://github.com/stackabletech/secret-operator/pull/231
+[#232]: https://github.com/stackabletech/secret-operator/pull/232
 
 ## [0.6.0] - 2022-11-07
 

@@ -50,3 +50,6 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# Kubelet dir may vary in environments such as microk8s, see https://github.com/stackabletech/secret-operator/issues/229
+kubeletDir: /var/lib/kubelet

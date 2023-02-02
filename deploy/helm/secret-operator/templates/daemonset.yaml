@@ -45,7 +45,7 @@ spec:
             - name: csi
               mountPath: /csi
             - name: mountpoint
-              mountPath: /var/lib/kubelet/pods
+              mountPath: {{ .Values.kubeletDir }}/pods
               mountPropagation: Bidirectional
         - name: external-provisioner
           image: k8s.gcr.io/sig-storage/csi-provisioner:v3.1.0
@@ -60,7 +60,7 @@ spec:
           image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.4.0
           args:
             - --csi-address=/csi/csi.sock
-            - --kubelet-registration-path=/var/lib/kubelet/plugins/secrets.stackable.tech/csi.sock
+            - --kubelet-registration-path={{ .Values.kubeletDir }}/plugins/secrets.stackable.tech/csi.sock
           volumeMounts:
             - name: registration-sock
               mountPath: /registration
@@ -71,13 +71,13 @@ spec:
           hostPath:
             # node-driver-registrar appends a driver-unique filename to this path to avoid conflicts
             # see https://github.com/stackabletech/secret-operator/issues/229 for why this path should not be too long
-            path: /var/lib/kubelet/plugins_registry
+            path: {{ .Values.kubeletDir }}/plugins_registry
         - name: csi
           hostPath:
-            path: /var/lib/kubelet/plugins/secrets.stackable.tech/
+            path: {{ .Values.kubeletDir }}/plugins/secrets.stackable.tech/
         - name: mountpoint
           hostPath:
-            path: /var/lib/kubelet/pods/
+            path: {{ .Values.kubeletDir }}/pods/
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
