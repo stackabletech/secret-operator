@@ -69,6 +69,7 @@ spec:
       volumes:
         - name: registration-sock
           hostPath:
+            # node-driver-registrar appends a driver-unique filename to this path to avoid conflicts
             path: /var/lib/kubelet/plugins_registry
         - name: csi
           hostPath:
