@@ -36,6 +36,11 @@ $ helm install secret-operator stackable/secret-operator
 
 Helm will deploy the operator in Kubernetes containers and apply the CRDs. You're now ready to deploy secrets!
 
+=== Microk8s
+
+Microk8s uses a non-standard Kubelet state directory. Installing secret-operator on Microk8s requires the argument
+`--set kubeletDir=/var/snap/microk8s/common/var/lib/kubelet` to be added to the `helm install` command.
+
 == Building the operator from source
 
 See xref:building.adoc[] for more information.
