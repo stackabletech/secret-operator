@@ -53,6 +53,7 @@ rec {
     }
   ];
 
-  crate2nix = pkgs.crate2nix;
+  # need to use vendored crate2nix because of https://github.com/kolloch/crate2nix/issues/264
+  crate2nix = pkgs.callPackage sources.crate2nix {};
   tilt = pkgs.tilt;
 }
