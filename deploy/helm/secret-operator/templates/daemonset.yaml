@@ -69,7 +69,7 @@ spec:
       volumes:
         - name: registration-sock
           hostPath:
-            path: /var/lib/kubelet/plugins_registry/secrets.stackable.tech-reg.sock
+            path: /var/lib/kubelet/plugins_registry
         - name: csi
           hostPath:
             path: /var/lib/kubelet/plugins/secrets.stackable.tech/
