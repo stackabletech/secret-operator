@@ -47,6 +47,8 @@ spec:
             - name: mountpoint
               mountPath: {{ .Values.kubeletDir }}/pods
               mountPropagation: Bidirectional
+            - name: tmp
+              mountPath: /tmp
         - name: external-provisioner
           image: k8s.gcr.io/sig-storage/csi-provisioner:v3.1.0
           args:
@@ -78,6 +80,8 @@ spec:
         - name: mountpoint
           hostPath:
             path: {{ .Values.kubeletDir }}/pods/
+        - name: tmp
+          emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
