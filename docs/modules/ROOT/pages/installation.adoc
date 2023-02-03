@@ -6,6 +6,18 @@ There are two ways to run the Stackable Secret Operator:
 
 2. Build from source
 
+== Prerequisites
+
+You will need:
+
+* a Kubernetes cluster
+* kubectl
+* Helm
+
+Resource sizing depends on cluster type(s), usage and scope, but as a starting point we recommend a minimum of the following resources for this operator:
+
+* 0.2 cores (e.g. i5 or similar)
+* 256MB RAM
 
 == Helm
 Helm allows you to download and deploy Stackable operators on Kubernetes and is by far the easiest installation method. First ensure that you have installed the Stackable Operators Helm repository:
@@ -23,6 +35,11 @@ $ helm install secret-operator stackable/secret-operator
 ----
 
 Helm will deploy the operator in Kubernetes containers and apply the CRDs. You're now ready to deploy secrets!
+
+=== Microk8s
+
+Microk8s uses a non-standard Kubelet state directory. Installing secret-operator on Microk8s requires the argument
+`--set kubeletDir=/var/snap/microk8s/common/var/lib/kubelet` to be added to the `helm install` command.
 
 == Building the operator from source
 

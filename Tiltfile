@@ -5,7 +5,7 @@ default_registry("docker.stackable.tech/sandbox")
 custom_build(
     'docker.stackable.tech/sandbox/secret-operator',
     'nix shell -f . crate2nix -c crate2nix generate && nix-build . -A docker --argstr dockerName "${EXPECTED_REGISTRY}/secret-operator" && ./result/load-image | docker load',
-    deps=['rust', 'Cargo.toml', 'Cargo.lock', 'default.nix', "nix", 'vendor'],
+    deps=['rust', 'Cargo.toml', 'Cargo.lock', 'default.nix', "nix", 'build.rs', 'vendor'],
     ignore=['*.~undo-tree~'],
     # ignore=['result*', 'Cargo.nix', 'target', *.yaml],
     outputs_image_ref_to='result/ref',

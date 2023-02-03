@@ -94,7 +94,7 @@ spec:
     port: 749
   - name: kdc
     port: 88
-  - name: kdc
+  - name: kdc-udp
     port: 88
     protocol: UDP
 ---
