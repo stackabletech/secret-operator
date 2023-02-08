@@ -4,11 +4,11 @@ image:
   repository: docker.stackable.tech/stackable/secret-operator
   pullPolicy: IfNotPresent
 csiProvisionerImage:
-  repository: docker.stackable.tech/sig-storage/csi-provisioner
+  repository: docker.stackable.tech/k8s/sig-storage/csi-provisioner
   tag: v3.1.0
   pullPolicy: IfNotPresent
 csiNodeDriverRegistrarImage:
-  repository: docker.stackable.tech/sig-storage/csi-node-driver-registrar
+  repository: docker.stackable.tech/k8s/sig-storage/csi-node-driver-registrar
   tag: v2.5.0
   pullPolicy: IfNotPresent
 
