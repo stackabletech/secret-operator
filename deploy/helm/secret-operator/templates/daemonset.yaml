@@ -48,8 +48,8 @@ spec:
               mountPath: {{ .Values.kubeletDir }}/pods
               mountPropagation: Bidirectional
         - name: external-provisioner
-          image: "{{ .Values.csiProvisionerImage.repository }}:{{ .Values.csiProvisionerImage.tag }}"
-          imagePullPolicy: {{ .Values.csiProvisionerImage.pullPolicy }}
+          image: "{{ .Values.csiProvisioner.image.repository }}:{{ .Values.csiProvisioner.image.tag }}"
+          imagePullPolicy: {{ .Values.csiProvisioner.image.pullPolicy }}
           args:
             - --csi-address=/csi/csi.sock
             - --feature-gates=Topology=true
@@ -58,8 +58,8 @@ spec:
             - name: csi
               mountPath: /csi
         - name: node-driver-registrar
-          image: "{{ .Values.csiNodeDriverRegistrarImage.repository }}:{{ .Values.csiNodeDriverRegistrarImage.tag }}"
-          imagePullPolicy: {{ .Values.csiNodeDriverRegistrarImage.pullPolicy }}
+          image: "{{ .Values.csiNodeDriverRegistrar.image.repository }}:{{ .Values.csiNodeDriverRegistrar.image.tag }}"
+          imagePullPolicy: {{ .Values.csiNodeDriverRegistrar.image.pullPolicy }}
           args:
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path={{ .Values.kubeletDir }}/plugins/secrets.stackable.tech/csi.sock
