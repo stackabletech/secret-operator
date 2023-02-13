@@ -1,7 +1,3 @@
 ---
-name: secret-operator
+name: home
 version: "23.1"
-title: Stackable Secret Operator
-nav:
-  - modules/ROOT/nav.adoc
-prerelease: false
