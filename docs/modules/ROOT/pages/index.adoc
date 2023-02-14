@@ -1,0 +1,3 @@
+= Stackable Secret Operator
+
+The docs can now be found at: xref:home:secret-operator:index.adoc[]
