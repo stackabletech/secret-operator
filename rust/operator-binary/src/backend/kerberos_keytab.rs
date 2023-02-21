@@ -258,6 +258,7 @@ async fn add_principal_to_keytab(
     let ktadd_output = Command::new("kadmin")
         .args(["-p", admin_principal, "-kt"])
         .arg(admin_keytab)
+        // Principal may already be mounted into other pods, so do not regenerate the key
         .args(["ktadd", "-norandkey", "-k"])
         .arg(pod_keytab)
         .arg(pod_principal)
