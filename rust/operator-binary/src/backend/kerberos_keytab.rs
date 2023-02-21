@@ -10,6 +10,8 @@ use tokio::{
     process::Command,
 };
 
+use crate::crd::{Hostname, InvalidKerberosPrincipal, KerberosPrincipal};
+
 use super::{pod_info::Address, SecretBackend, SecretBackendError, SecretContents};
 
 #[derive(Debug, Snafu)]
@@ -31,6 +33,8 @@ pub enum Error {
     WriteAdminKeytab { source: std::io::Error },
     #[snafu(display("failed to spawn kadmin"))]
     SpawnKadmin { source: std::io::Error },
+    #[snafu(display("generated invalid Kerberos principal for pod"))]
+    PodPrincipal { source: InvalidKerberosPrincipal },
     #[snafu(display("kadmin failed to add principal to keytab, with status {status} and message {keytab_add_msg:?} (additionally, got message {add_principal_msg:?} when creating principal)"))]
     AddToKeytab {
         status: std::process::ExitStatus,
@@ -50,6 +54,7 @@ impl SecretBackendError for Error {
             Error::WriteConfig { .. } => tonic::Code::Unavailable,
             Error::WriteAdminKeytab { .. } => tonic::Code::Unavailable,
             Error::SpawnKadmin { .. } => tonic::Code::FailedPrecondition,
+            Error::PodPrincipal { .. } => tonic::Code::FailedPrecondition,
             Error::AddToKeytab { .. } => tonic::Code::Unavailable,
             Error::ReadKeytab { .. } => tonic::Code::Unavailable,
         }
@@ -57,15 +62,15 @@ impl SecretBackendError for Error {
 }
 
 pub struct KerberosProfile {
-    pub realm_name: String,
-    pub kdc: String,
-    pub admin_server: String,
+    pub realm_name: Hostname,
+    pub kdc: Hostname,
+    pub admin_server: Hostname,
 }
 
 pub struct KerberosKeytab {
     profile: KerberosProfile,
     admin_keytab: Vec<u8>,
-    admin_principal: String,
+    admin_principal: KerberosPrincipal,
 }
 
 impl KerberosKeytab {
@@ -73,7 +78,7 @@ impl KerberosKeytab {
         client: &stackable_operator::client::Client,
         profile: KerberosProfile,
         admin_keytab_secret_ref: &SecretReference,
-        admin_principal: impl Into<String>,
+        admin_principal: KerberosPrincipal,
     ) -> Result<Self, Error> {
         let (keytab_secret_name, keytab_secret_ns) = match admin_keytab_secret_ref {
             SecretReference {
@@ -104,7 +109,7 @@ impl KerberosKeytab {
         Ok(Self {
             profile,
             admin_keytab,
-            admin_principal: admin_principal.into(),
+            admin_principal,
         })
     }
 }
@@ -177,7 +182,9 @@ cluster.local = {realm_name}
                             &profile_file_path,
                             admin_principal,
                             &admin_keytab_file_path,
-                            &format!("{service_name}/{hostname}"),
+                            &format!("{service_name}/{hostname}")
+                                .try_into()
+                                .context(PodPrincipalSnafu)?,
                             &keytab_file_path,
                         )
                         .await?;
@@ -238,15 +245,18 @@ cluster.local = {realm_name}
 #[tracing::instrument]
 async fn add_principal_to_keytab(
     config_path: &Path,
-    admin_principal: &str,
+    admin_principal: &KerberosPrincipal,
     admin_keytab: &Path,
-    pod_principal: &str,
+    pod_principal: &KerberosPrincipal,
     pod_keytab: &Path,
 ) -> Result<(), Error> {
     let addprinc_output = Command::new("kadmin")
-        .args(["-p", admin_principal, "-kt"])
+        .arg("-p")
+        .arg(admin_principal)
+        .arg("-kt")
         .arg(admin_keytab)
-        .args(["add_principal", "-randkey", pod_principal])
+        .args(["add_principal", "-randkey"])
+        .arg(pod_principal)
         .env("KRB5_CONFIG", config_path)
         .output()
         .await
@@ -256,7 +266,9 @@ async fn add_principal_to_keytab(
         tracing::info!("failed to create principal, assuming it already exists")
     }
     let ktadd_output = Command::new("kadmin")
-        .args(["-p", admin_principal, "-kt"])
+        .arg("-p")
+        .arg(admin_principal)
+        .arg("-kt")
         .arg(admin_keytab)
         // Principal may already be mounted into other pods, so do not regenerate the key
         .args(["ktadd", "-norandkey", "-k"])
