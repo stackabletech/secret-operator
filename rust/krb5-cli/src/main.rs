@@ -1,13 +1,13 @@
 use std::{
-    ffi::{CStr, CString},
+    ffi::CString,
     io::{stdin, BufReader},
-    os::unix::prelude::OsStrExt,
-    path::PathBuf,
 };
 
-use krb5::Keytab;
+use krb5::{
+    kadm5::{self, KadmError},
+    Keytab,
+};
 use serde::{Deserialize, Serialize};
-use tempfile::NamedTempFile;
 
 #[derive(Deserialize)]
 struct Request {
@@ -71,6 +71,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut kt = Keytab::resolve(&krb, &CString::new("/new-kt").unwrap())?;
     for princ_req in req.principals {
         let princ = krb.parse_name(&princ_req.name)?;
+        match kadmin.create_principal(&princ) {
+            Err(KadmError { code, .. }) if code.0 == kadm5::error_code::DUP => {
+                println!("principal already exists, reusing")
+            }
+            res => res?,
+        }
         let keys = kadmin.get_principal_keys(&princ, 1)?;
         for key in keys.keys() {
             kt.add(&princ, key.kvno, &key.keyblock)?;

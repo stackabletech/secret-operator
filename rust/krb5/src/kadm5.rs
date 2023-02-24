@@ -8,7 +8,7 @@ use crate::{KeyblockRef, KrbContext, Principal};
 
 #[derive(Debug)]
 pub struct KadmError {
-    code: krb5_sys::kadm5_ret_t,
+    pub code: krb5_sys::kadm5_ret_t,
 }
 impl KadmError {
     fn from_ret(code: krb5_sys::kadm5_ret_t) -> Result<(), Self> {
@@ -25,6 +25,11 @@ impl Display for KadmError {
         let msg = unsafe { CStr::from_ptr(krb5_sys::error_message(self.code.0)) };
         f.write_str(&msg.to_string_lossy())
     }
+}
+
+pub mod error_code {
+    pub use krb5_sys::kadm5_ret_t;
+    pub const DUP: i64 = krb5_sys::KADM5_DUP as _;
 }
 
 pub enum Credential {
@@ -128,6 +133,20 @@ impl<'a> ServerHandle<'a> {
     //     };
     //     Ok(())
     // }
+
+    pub fn create_principal(&self, principal: &Principal) -> Result<(), KadmError> {
+        unsafe {
+            let mut ent: krb5_sys::_kadm5_principal_ent_t = std::mem::zeroed();
+            let mask = krb5_sys::KADM5_PRINCIPAL;
+            ent.principal = principal.raw;
+            KadmError::from_ret(krb5_sys::kadm5_create_principal(
+                self.raw,
+                &mut ent,
+                mask.into(),
+                std::ptr::null_mut(),
+            ))
+        }
+    }
 
     pub fn get_principal_keys(
         &self,
