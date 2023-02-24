@@ -7,10 +7,10 @@ use std::{
 use crate::{KeyblockRef, KrbContext, Principal};
 
 #[derive(Debug)]
-pub struct KadmError {
+pub struct Error {
     pub code: krb5_sys::kadm5_ret_t,
 }
-impl KadmError {
+impl Error {
     fn from_ret(code: krb5_sys::kadm5_ret_t) -> Result<(), Self> {
         if code.0 == krb5_sys::kadm5_ret_t(krb5_sys::KADM5_OK.into()).0 {
             Ok(())
@@ -19,8 +19,8 @@ impl KadmError {
         }
     }
 }
-impl std::error::Error for KadmError {}
-impl Display for KadmError {
+impl std::error::Error for Error {}
+impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let msg = unsafe { CStr::from_ptr(krb5_sys::error_message(self.code.0)) };
         f.write_str(&msg.to_string_lossy())
@@ -77,13 +77,13 @@ impl<'a> ServerHandle<'a> {
         service_name: Option<&CStr>,
         credential: &Credential,
         params: &ConfigParams,
-    ) -> Result<Self, KadmError> {
+    ) -> Result<Self, Error> {
         let mut server_handle = std::ptr::null_mut();
         let mut params = params.as_c();
 
         match credential {
             Credential::ServiceKey { keytab } => unsafe {
-                KadmError::from_ret(krb5_sys::kadm5_init_with_skey(
+                Error::from_ret(krb5_sys::kadm5_init_with_skey(
                     ctx.raw,
                     client_name.as_ptr().cast_mut(),
                     keytab.as_ptr().cast_mut(),
@@ -134,12 +134,12 @@ impl<'a> ServerHandle<'a> {
     //     Ok(())
     // }
 
-    pub fn create_principal(&self, principal: &Principal) -> Result<(), KadmError> {
+    pub fn create_principal(&self, principal: &Principal) -> Result<(), Error> {
         unsafe {
             let mut ent: krb5_sys::_kadm5_principal_ent_t = std::mem::zeroed();
             let mask = krb5_sys::KADM5_PRINCIPAL;
             ent.principal = principal.raw;
-            KadmError::from_ret(krb5_sys::kadm5_create_principal(
+            Error::from_ret(krb5_sys::kadm5_create_principal(
                 self.raw,
                 &mut ent,
                 mask.into(),
@@ -152,11 +152,11 @@ impl<'a> ServerHandle<'a> {
         &self,
         principal: &Principal,
         kvno: krb5_sys::krb5_kvno,
-    ) -> Result<KeyDataVec, KadmError> {
+    ) -> Result<KeyDataVec, Error> {
         let mut key_data = std::ptr::null_mut();
         let mut key_count = 0;
         unsafe {
-            KadmError::from_ret(krb5_sys::kadm5_get_principal_keys(
+            Error::from_ret(krb5_sys::kadm5_get_principal_keys(
                 self.raw,
                 principal.raw,
                 kvno,
@@ -174,7 +174,7 @@ impl<'a> ServerHandle<'a> {
 impl<'a> Drop for ServerHandle<'a> {
     fn drop(&mut self) {
         unsafe {
-            KadmError::from_ret(krb5_sys::kadm5_destroy(self.raw))
+            Error::from_ret(krb5_sys::kadm5_destroy(self.raw))
                 .expect("failed to destroy kadmin5 server handle");
         }
     }
@@ -216,7 +216,7 @@ impl KeyDataVec<'_> {
 }
 impl Drop for KeyDataVec<'_> {
     fn drop(&mut self) {
-        KadmError::from_ret(unsafe {
+        Error::from_ret(unsafe {
             krb5_sys::kadm5_free_kadm5_key_data(self.ctx.raw, self.key_count, self.raw)
         })
         .unwrap()

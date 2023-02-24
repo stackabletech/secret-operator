@@ -3,10 +3,7 @@ use std::{
     io::{stdin, BufReader},
 };
 
-use krb5::{
-    kadm5::{self, KadmError},
-    Keytab,
-};
+use krb5::{kadm5, Keytab};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -72,7 +69,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     for princ_req in req.principals {
         let princ = krb.parse_name(&princ_req.name)?;
         match kadmin.create_principal(&princ) {
-            Err(KadmError { code, .. }) if code.0 == kadm5::error_code::DUP => {
+            Err(kadm5::Error { code, .. }) if code.0 == kadm5::error_code::DUP => {
                 println!("principal already exists, reusing")
             }
             res => res?,
