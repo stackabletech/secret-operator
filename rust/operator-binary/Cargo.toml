@@ -9,36 +9,36 @@ repository = "https://github.com/stackabletech/secret-operator"
 publish = false
 
 [dependencies]
-anyhow = "1.0.64"
-async-trait = "0.1.57"
+anyhow = "1.0.68"
+async-trait = "0.1.61"
 clap = "4.0"
-futures = "0.3.24"
-libc = "0.2.132"
-openssl = "0.10.41"
+futures = "0.3.25"
+libc = "0.2.139"
+openssl = "0.10.45"
 pin-project = "1.0.12"
 prost = "0.11"
 prost-types = "0.11"
-serde = "1.0.144"
-serde_json = "1.0.85"
-snafu = "0.7.1"
+serde = "1.0.152"
+serde_json = "1.0.91"
+snafu = "0.7.4"
 socket2 = { version = "0.4.7", features = ["all"] }
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.27.1" }
 sys-mount = { version = "1.5.1", default-features = false }
-time = "0.3.14"
+time = "0.3.17"
 tokio = { version = "1.23.1", features = ["full"] }
-tokio-stream = { version = "0.1.9", features = ["net"] }
+tokio-stream = { version = "0.1.11", features = ["net"] }
 tonic = "0.8"
 tonic-reflection = "0.6.0"
-tracing = "0.1.36"
+tracing = "0.1.37"
 
-h2 = "=0.3.7" # Need to keep this in sync with our patched h2 build
+h2 = "=0.3.15" # Need to keep this in sync with our patched h2 build
 uuid = { version = "1.2.2", features = ["v4"] }
 
 [dev-dependencies]
-time = { version = "0.3.14", features = ["parsing"] }
+time = { version = "0.3.17", features = ["parsing"] }
 
 [build-dependencies]
-built = { version = "0.5.1", features = ["chrono", "git2"] }
+built = { version = "0.5.2", features = ["chrono", "git2"] }
 tonic-build = "0.8"
 
 [features]
