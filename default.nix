@@ -12,9 +12,9 @@
       };
       krb5-sys = attrs: {
         nativeBuildInputs = [ pkgs.pkg-config ];
-        buildInputs = [ (pkgs.enableDebugging pkgs.libkrb5) ];
+        buildInputs = [ (pkgs.enableDebugging pkgs.krb5) ];
         LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
-        BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.stdenv.glibc.dev}/include -I${pkgs.clang.cc.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang.cc}/include";
+        BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.glibc.dev}/include -I${pkgs.clang.cc.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang.cc}/include";
       };
     };
   }
@@ -33,11 +33,38 @@ rec {
   dockerImage = pkgs.dockerTools.streamLayeredImage {
     name = dockerName;
     tag = dockerTag;
-    contents = [ pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal pkgs.krb5 pkgs.vim ];
+    contents = [ pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal pkgs.krb5 pkgs.vim cargo.workspaceMembers.krb5-cli.build ];
     config = {
       Cmd = [
         # "${pkgs.gdb}/bin/gdbserver" ":9999"
         (build+"/bin/stackable-secret-operator") "run"
+      ];
+      Env = [
+        "PD=${pkgs.writeText "pd" (builtins.toJSON {
+          admin_keytab_path = "/kt/keytab";
+          admin_principal_name = "stackable-secret-operator@CLUSTER.LOCAL";
+          principals = [
+            { name = "bar"; }
+          ];
+        })}"
+        "KRB5_TRACE=/dev/stderr"
+        "KRB5_CONFIG=${pkgs.writeText "krb5.conf"
+          ''
+[libdefaults]
+default_realm = CLUSTER.LOCAL
+rdns = false
+dns_canonicalize_hostnames = false
+
+[realms]
+CLUSTER.LOCAL = {
+  kdc = krb5-kdc
+  admin_server = krb5-kdc
+}
+
+[domain_realm]
+cluster.local = CLUSTER.LOCAL
+.cluster.local = CLUSTER.LOCAL
+          ''}"
       ];
     };
   };
