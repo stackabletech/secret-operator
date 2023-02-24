@@ -7,11 +7,11 @@ pub mod kadm5;
 pub mod profile;
 
 #[derive(Debug)]
-pub struct KrbError {
+pub struct Error {
     message: String,
     code: krb5_sys::krb5_error_code,
 }
-impl KrbError {
+impl Error {
     // safety: must be called exactly once, immediately after each potentially
     // error-generating call that interacts with ctx
     // ctx should be None iff the error happened during ctx init
@@ -35,8 +35,8 @@ impl KrbError {
         }
     }
 }
-impl std::error::Error for KrbError {}
-impl Display for KrbError {
+impl std::error::Error for Error {}
+impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result where {
         // let msg = unsafe { CStr::from_ptr(krb5_sys::krb5_get_error_message(self.code.0)) };
         // f.write_str(&msg.to_string_lossy())
@@ -48,16 +48,16 @@ pub struct KrbContext {
     raw: krb5_sys::krb5_context,
 }
 impl KrbContext {
-    pub fn new_kadm5() -> Result<Self, KrbError> {
+    pub fn new_kadm5() -> Result<Self, Error> {
         let mut ctx = std::ptr::null_mut();
-        unsafe { KrbError::from_call_result(None, krb5_sys::kadm5_init_krb5_context(&mut ctx)) }?;
+        unsafe { Error::from_call_result(None, krb5_sys::kadm5_init_krb5_context(&mut ctx)) }?;
         Ok(Self { raw: ctx })
     }
 
-    pub fn from_profile(profile: &Profile) -> Result<Self, KrbError> {
+    pub fn from_profile(profile: &Profile) -> Result<Self, Error> {
         let mut ctx = std::ptr::null_mut();
         unsafe {
-            KrbError::from_call_result(
+            Error::from_call_result(
                 None,
                 krb5_sys::krb5_init_context_profile(profile.raw, 0, &mut ctx),
             )
@@ -65,10 +65,10 @@ impl KrbContext {
         Ok(Self { raw: ctx })
     }
 
-    pub fn parse_name(&self, princ_name: &CStr) -> Result<Principal, KrbError> {
+    pub fn parse_name(&self, princ_name: &CStr) -> Result<Principal, Error> {
         let mut principal = std::ptr::null_mut();
         unsafe {
-            KrbError::from_call_result(
+            Error::from_call_result(
                 None,
                 krb5_sys::krb5_parse_name(self.raw, princ_name.as_ptr(), &mut principal),
             )
@@ -116,13 +116,10 @@ pub struct Keytab<'a> {
     raw: krb5_sys::krb5_keytab,
 }
 impl<'a> Keytab<'a> {
-    pub fn resolve(ctx: &'a KrbContext, name: &CStr) -> Result<Self, KrbError> {
+    pub fn resolve(ctx: &'a KrbContext, name: &CStr) -> Result<Self, Error> {
         let mut raw = std::ptr::null_mut();
         unsafe {
-            KrbError::from_call_result(
-                Some(ctx),
-                krb5_kt_resolve(ctx.raw, name.as_ptr(), &mut raw),
-            )?
+            Error::from_call_result(Some(ctx), krb5_kt_resolve(ctx.raw, name.as_ptr(), &mut raw))?
         }
         Ok(Self { ctx, raw })
     }
@@ -132,14 +129,14 @@ impl<'a> Keytab<'a> {
         principal: &Principal,
         kvno: krb5_sys::krb5_kvno,
         keyblock: &KeyblockRef,
-    ) -> Result<(), KrbError> {
+    ) -> Result<(), Error> {
         unsafe {
             let mut entry: krb5_sys::krb5_keytab_entry = std::mem::zeroed();
             entry.principal = principal.raw;
             entry.vno = kvno;
             entry.key = keyblock.raw.read();
             // safety: krb5_kt_add_entry is responsible for copying entry as needed
-            KrbError::from_call_result(
+            Error::from_call_result(
                 Some(self.ctx),
                 krb5_sys::krb5_kt_add_entry(self.ctx.raw, self.raw, &mut entry),
             )
@@ -149,7 +146,7 @@ impl<'a> Keytab<'a> {
 impl Drop for Keytab<'_> {
     fn drop(&mut self) {
         unsafe {
-            KrbError::from_call_result(
+            Error::from_call_result(
                 Some(self.ctx),
                 krb5_sys::krb5_kt_close(self.ctx.raw, self.raw),
             )
