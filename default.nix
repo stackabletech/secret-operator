@@ -39,35 +39,9 @@ rec {
         # "${pkgs.gdb}/bin/gdbserver" ":9999"
         (build+"/bin/stackable-secret-operator") "run"
       ];
-      Env = [
-        "PD=${pkgs.writeText "pd" (builtins.toJSON {
-          admin_keytab_path = "/kt/keytab";
-          admin_principal_name = "stackable-secret-operator";
-          pod_keytab_path = "/pod-kt";
-          principals = [
-            { name = "bar"; }
-            { name = "baz"; }
-          ];
-        })}"
-        "KRB5_TRACE=/dev/stderr"
-        "KRB5_CONFIG=${pkgs.writeText "krb5.conf"
-          ''
-[libdefaults]
-default_realm = CLUSTER.LOCAL
-rdns = false
-dns_canonicalize_hostnames = false
-
-[realms]
-CLUSTER.LOCAL = {
-  kdc = krb5-kdc
-  admin_server = krb5-kdc
-}
-
-[domain_realm]
-cluster.local = CLUSTER.LOCAL
-.cluster.local = CLUSTER.LOCAL
-          ''}"
-      ];
+      # Env = [
+      #   "KRB5_TRACE=/dev/stderr"
+      # ];
     };
   };
   docker = pkgs.linkFarm "secret-operator-docker" [

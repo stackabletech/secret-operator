@@ -7,6 +7,7 @@ use std::{
 use krb5::{kadm5, Keytab};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use tracing::info;
 
 #[derive(Deserialize)]
 struct Request {
@@ -25,8 +26,8 @@ struct Response {}
 
 #[derive(Debug, Snafu)]
 enum Error {
-    #[snafu(display("failed to parse request"))]
-    ParseRequest { source: serde_json::Error },
+    #[snafu(display("failed to deserialize request"))]
+    DeserializeRequest { source: serde_json::Error },
     #[snafu(display("failed to init krb5 context"))]
     KrbInit { source: krb5::Error },
     #[snafu(display("failed to init kadmin server handle"))]
@@ -62,15 +63,15 @@ enum Error {
 
 fn run() -> Result<Response, Error> {
     let req = serde_json::from_reader::<_, Request>(BufReader::new(stdin().lock()))
-        .context(ParseRequestSnafu)?;
+        .context(DeserializeRequestSnafu)?;
     let config_params = krb5::kadm5::ConfigParams::default();
-    eprintln!("initing context");
+    info!("initing context");
     let krb = krb5::KrbContext::new_kadm5().context(KrbInitSnafu)?;
     let admin_principal_name =
         CString::new(req.admin_principal_name).context(DecodeAdminPrincipalNameSnafu)?;
     let admin_keytab_path =
         CString::new(req.admin_keytab_path).context(DecodeAdminKeytabPathSnafu)?;
-    eprintln!("initing kadmin");
+    info!("initing kadmin");
     let kadmin = krb5::kadm5::ServerHandle::new(
         &krb,
         &admin_principal_name,
@@ -96,7 +97,7 @@ fn run() -> Result<Response, Error> {
             })?;
         match kadmin.create_principal(&princ) {
             Err(kadm5::Error { code, .. }) if code.0 == kadm5::error_code::DUP => {
-                eprintln!("principal {princ} already exists, reusing")
+                info!("principal {princ} already exists, reusing")
             }
             res => res.context(CreatePrincipalSnafu { principal: &princ })?,
         }
@@ -136,6 +137,9 @@ impl<T: std::error::Error> Display for Report<T> {
 }
 
 fn main() {
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .init();
     let res = run().map_err(|err| Report::from(err).to_string());
     println!("{}", serde_json::to_string_pretty(&res).unwrap());
     std::process::exit(res.is_ok().into());

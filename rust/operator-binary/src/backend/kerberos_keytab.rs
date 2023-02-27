@@ -1,13 +1,13 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_krb5_provision_keytab::provision_keytab;
 use stackable_operator::k8s_openapi::api::core::v1::{Secret, SecretReference};
 use tempfile::tempdir;
 use tokio::{
     fs::File,
     io::{AsyncReadExt, AsyncWriteExt},
-    process::Command,
 };
 
 use crate::crd::{Hostname, InvalidKerberosPrincipal, KerberosPrincipal};
@@ -31,16 +31,12 @@ pub enum Error {
     WriteConfig { source: std::io::Error },
     #[snafu(display("failed to write admin keytab"))]
     WriteAdminKeytab { source: std::io::Error },
-    #[snafu(display("failed to spawn kadmin"))]
-    SpawnKadmin { source: std::io::Error },
+    #[snafu(display("failed to provision keytab"))]
+    ProvisionKeytab {
+        source: stackable_krb5_provision_keytab::Error,
+    },
     #[snafu(display("generated invalid Kerberos principal for pod"))]
     PodPrincipal { source: InvalidKerberosPrincipal },
-    #[snafu(display("kadmin failed to add principal to keytab, with status {status} and message {keytab_add_msg:?} (additionally, got message {add_principal_msg:?} when creating principal)"))]
-    AddToKeytab {
-        status: std::process::ExitStatus,
-        keytab_add_msg: String,
-        add_principal_msg: String,
-    },
     #[snafu(display("failed to read keytab"))]
     ReadKeytab { source: std::io::Error },
 }
@@ -53,9 +49,8 @@ impl SecretBackendError for Error {
             Error::TempSetup { .. } => tonic::Code::Unavailable,
             Error::WriteConfig { .. } => tonic::Code::Unavailable,
             Error::WriteAdminKeytab { .. } => tonic::Code::Unavailable,
-            Error::SpawnKadmin { .. } => tonic::Code::FailedPrecondition,
+            Error::ProvisionKeytab { .. } => tonic::Code::Unavailable,
             Error::PodPrincipal { .. } => tonic::Code::FailedPrecondition,
-            Error::AddToKeytab { .. } => tonic::Code::Unavailable,
             Error::ReadKeytab { .. } => tonic::Code::Unavailable,
         }
     }
@@ -174,24 +169,36 @@ cluster.local = {realm_name}
                 .context(WriteAdminKeytabSnafu)?;
         }
         let keytab_file_path = tmp.path().join("pod-keytab");
+        let mut pod_principals: Vec<KerberosPrincipal> = Vec::new();
         for service_name in &selector.kerberos_service_names {
             for scope in &selector.scope {
                 for addr in selector.scope_addresses(&pod_info, scope) {
                     if let Address::Dns(hostname) = addr {
-                        add_principal_to_keytab(
-                            &profile_file_path,
-                            admin_principal,
-                            &admin_keytab_file_path,
-                            &format!("{service_name}/{hostname}")
+                        pod_principals.push(
+                            format!("{service_name}/{hostname}")
                                 .try_into()
                                 .context(PodPrincipalSnafu)?,
-                            &keytab_file_path,
-                        )
-                        .await?;
+                        );
                     }
                 }
             }
         }
+        provision_keytab(
+            &profile_file_path,
+            &stackable_krb5_provision_keytab::Request {
+                admin_keytab_path: admin_keytab_file_path,
+                admin_principal_name: admin_principal.to_string(),
+                pod_keytab_path: keytab_file_path.clone(),
+                principals: pod_principals
+                    .into_iter()
+                    .map(|princ| stackable_krb5_provision_keytab::PrincipalRequest {
+                        name: princ.to_string(),
+                    })
+                    .collect(),
+            },
+        )
+        .await
+        .context(ProvisionKeytabSnafu)?;
         let mut keytab_data = Vec::new();
         let mut keytab_file = File::open(keytab_file_path)
             .await
@@ -207,84 +214,5 @@ cluster.local = {realm_name}
             ]
             .into(),
         ))
-        // let profile_file_path = profile_file.path().as_os_str().as_bytes();
-        // let config_params = krb5::ConfigParams {
-        //     default_realm: Some(CString::new("CLUSTER.LOCAL").unwrap()),
-        //     admin_server: Some(CString::new("krb5-kdc").unwrap()),
-        //     kadmind_port: Some(749),
-        // };
-        // let mut profile = krb5::Profile::from_path(&CString::new(profile_file_path).unwrap())
-        //     .context(ProfileInitSnafu)?;
-        // dbg!(profile_file.keep().unwrap());
-        // profile
-        //     .set(
-        //         &[
-        //             &CString::new("realms").unwrap(),
-        //             &CString::new("CLUSTER.LOCAL").unwrap(),
-        //             &CString::new("kdc").unwrap(),
-        //         ],
-        //         &CString::new("krb5-kdc").unwrap(),
-        //     )
-        //     .context(ProfileConfigSnafu)?;
-        // profile.flush().context(ProfileConfigSnafu)?;
-        // let krb = krb5::KrbContext::from_profile(&profile).context(KrbInitSnafu)?;
-        // let kadmin = krb5::ServerHandle::new(
-        //     &krb,
-        //     &CString::new("stackable-secret-operator@CLUSTER.LOCAL").unwrap(),
-        //     &krb5::Credential::ServiceKey {
-        //         keytab: CString::new("/keytab/kt").unwrap(),
-        //         service_name: CString::new("stackable-secret-operator@CLUSTER.LOCAL").unwrap(),
-        //     },
-        //     &config_params,
-        // )
-        // .context(KadminInitSnafu)?;
-        // todo!()
     }
-}
-
-#[tracing::instrument]
-async fn add_principal_to_keytab(
-    config_path: &Path,
-    admin_principal: &KerberosPrincipal,
-    admin_keytab: &Path,
-    pod_principal: &KerberosPrincipal,
-    pod_keytab: &Path,
-) -> Result<(), Error> {
-    let addprinc_output = Command::new("kadmin")
-        .arg("-p")
-        .arg(admin_principal)
-        .arg("-kt")
-        .arg(admin_keytab)
-        .args(["add_principal", "-randkey"])
-        .arg(pod_principal)
-        .env("KRB5_CONFIG", config_path)
-        .output()
-        .await
-        .context(SpawnKadminSnafu)?;
-    if !addprinc_output.status.success() {
-        // Try to keep going, the principal might already exist
-        tracing::info!("failed to create principal, assuming it already exists")
-    }
-    let ktadd_output = Command::new("kadmin")
-        .arg("-p")
-        .arg(admin_principal)
-        .arg("-kt")
-        .arg(admin_keytab)
-        // Principal may already be mounted into other pods, so do not regenerate the key
-        .args(["ktadd", "-norandkey", "-k"])
-        .arg(pod_keytab)
-        .arg(pod_principal)
-        .env("KRB5_CONFIG", config_path)
-        .output()
-        .await
-        .context(SpawnKadminSnafu)?;
-    if !ktadd_output.status.success() {
-        return AddToKeytabSnafu {
-            status: ktadd_output.status,
-            keytab_add_msg: String::from_utf8_lossy(&ktadd_output.stderr),
-            add_principal_msg: String::from_utf8_lossy(&addprinc_output.stderr),
-        }
-        .fail();
-    }
-    Ok(())
 }
