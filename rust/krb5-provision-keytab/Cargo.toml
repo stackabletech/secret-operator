@@ -1,5 +1,5 @@
 [package]
-name = "krb5-cli"
+name = "stackable-krb5-provision-keytab"
 version = "0.1.0"
 edition = "2021"
 
