@@ -98,6 +98,28 @@ impl Drop for Principal<'_> {
         }
     }
 }
+impl Display for Principal<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut raw_name = std::ptr::null_mut();
+        let unparse_result = unsafe {
+            Error::from_call_result(
+                Some(self.ctx),
+                krb5_sys::krb5_unparse_name(self.ctx.raw, self.raw, &mut raw_name),
+            )
+        };
+        match unparse_result {
+            Ok(()) => {
+                let write_result = {
+                    let name = unsafe { CStr::from_ptr(raw_name) }.to_string_lossy();
+                    f.write_str(&name)
+                };
+                unsafe { krb5_sys::krb5_free_unparsed_name(self.ctx.raw, raw_name) }
+                write_result
+            }
+            Err(_) => f.write_str("(invalid)"),
+        }
+    }
+}
 
 pub struct KeyblockRef<'a> {
     ctx: &'a KrbContext,

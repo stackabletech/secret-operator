@@ -42,9 +42,11 @@ rec {
       Env = [
         "PD=${pkgs.writeText "pd" (builtins.toJSON {
           admin_keytab_path = "/kt/keytab";
-          admin_principal_name = "stackable-secret-operator@CLUSTER.LOCAL";
+          admin_principal_name = "stackable-secret-operator";
+          pod_keytab_path = "/pod-kt";
           principals = [
             { name = "bar"; }
+            { name = "baz"; }
           ];
         })}"
         "KRB5_TRACE=/dev/stderr"
