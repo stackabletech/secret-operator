@@ -6,3 +6,5 @@ Compared to `kadmin`, it speaks a simple JSON based format that is designed not 
 
 It has to run as a separate short-lived process, because the kadm5 libraries are hard-coded to read
 configuration from certain environment variables: https://mailman.mit.edu/pipermail/kerberos/2022-April/022804.html.
+
+THE INTERFACE IS NOT CONSIDERED STABLE FOR OUTSIDE USE.

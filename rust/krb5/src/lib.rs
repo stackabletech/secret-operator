@@ -120,6 +120,11 @@ impl Display for Principal<'_> {
         }
     }
 }
+impl From<&Principal<'_>> for String {
+    fn from(princ: &Principal<'_>) -> Self {
+        princ.to_string()
+    }
+}
 
 pub struct KeyblockRef<'a> {
     ctx: &'a KrbContext,
