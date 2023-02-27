@@ -66,7 +66,7 @@ fn run() -> Result<Response, Error> {
         .context(DeserializeRequestSnafu)?;
     let config_params = krb5::kadm5::ConfigParams::default();
     info!("initing context");
-    let krb = krb5::KrbContext::new_kadm5().context(KrbInitSnafu)?;
+    let krb = krb5::KrbContext::new().context(KrbInitSnafu)?;
     let admin_principal_name =
         CString::new(req.admin_principal_name).context(DecodeAdminPrincipalNameSnafu)?;
     let admin_keytab_path =
@@ -89,7 +89,7 @@ fn run() -> Result<Response, Error> {
     .context(ResolvePodKeytabSnafu)?;
     for princ_req in req.principals {
         let princ = krb
-            .parse_name(
+            .parse_principal_name(
                 &CString::new(princ_req.name.as_str()).context(DecodePodPrincipalNameSnafu)?,
             )
             .context(ParsePrincipalSnafu {

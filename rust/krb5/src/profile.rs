@@ -24,15 +24,22 @@ impl Display for ProfileError {
     }
 }
 
+/// A Kerberos configuration profile. This is equivalent to a krb5.conf file.
+///
+/// Any modifications made are lost when dropped. In other words, [`Drop::drop`] is equivalent to
+/// [`krb5_sys::profile_abandon`], _not_ [`krb5_sys::profile_release`]. To save any changes, use
+/// [`Self::flush`].
 pub struct Profile {
     pub(super) raw: *mut krb5_sys::_profile_t,
 }
 impl Profile {
+    /// Create a new empty profile.
     pub fn new() -> Result<Self, ProfileError> {
         // profile segfaults on writes if there isn't at least one file specified
         Self::from_path(&CString::new("/dev/null").unwrap())
     }
 
+    /// Load a profile from a file.
     pub fn from_path(path: &CStr) -> Result<Self, ProfileError> {
         let mut files = [
             path.as_ptr(),
@@ -46,6 +53,7 @@ impl Profile {
         Ok(Self { raw: profile })
     }
 
+    /// Set a configuration value.
     pub fn set(&mut self, key_path: &[&CStr], value: &CStr) -> Result<(), ProfileError> {
         let mut key_path = key_path
             .iter()
@@ -58,6 +66,7 @@ impl Profile {
         })
     }
 
+    /// Save any modifications made to the file, if it was created using [`Self::from_path`].
     pub fn flush(&mut self) -> Result<(), ProfileError> {
         ProfileError::from_code(unsafe { krb5_sys::profile_flush(self.raw) })
     }
