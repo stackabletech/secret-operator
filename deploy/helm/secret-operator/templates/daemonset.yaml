@@ -49,8 +49,6 @@ spec:
               mountPropagation: Bidirectional
             - name: tmp
               mountPath: /tmp
-            - name: kt
-              mountPath: /kt
         - name: external-provisioner
           image: k8s.gcr.io/sig-storage/csi-provisioner:v3.1.0
           args:
@@ -84,9 +82,6 @@ spec:
             path: {{ .Values.kubeletDir }}/pods/
         - name: tmp
           emptyDir: {}
-        - name: kt
-          secret:
-            secretName: secret-provisioner-keytab
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
