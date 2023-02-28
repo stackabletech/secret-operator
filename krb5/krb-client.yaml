@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: client
-          image: docker.stackable.tech/teozkr/krb5
+          image: docker.stackable.tech/natkr/krb5/krb5:1.18.2-stackable23.4.0-rc2
           tty: true
           stdin: true
           env:

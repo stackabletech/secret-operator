@@ -13,14 +13,14 @@ spec:
     spec:
       initContainers:
       - name: init
-        image: docker.stackable.tech/teozkr/krb5
+        image: docker.stackable.tech/natkr/krb5/krb5:1.18.2-stackable23.4.0-rc2
         args:
         - sh
         - -euo
         - pipefail
         - -c
         - |
-          test -e /var/lib/krb5kdc/principal || kdb5_util create -s -P asdf
+          test -e /var/kerberos/krb5kdc/principal || kdb5_util create -s -P asdf
           kadmin.local get_principal -terse root || kadmin.local add_principal -pw asdf root
           kadmin.local get_principal -terse root/admin || kadmin.local add_principal -pw asdf root/admin
         env:
@@ -29,11 +29,11 @@ spec:
         volumeMounts:
         - mountPath: /stackable/config
           name: config
-        - mountPath: /var/lib/krb5kdc
+        - mountPath: /var/kerberos/krb5kdc
           name: data
       containers:
       - name: kdc
-        image: docker.stackable.tech/teozkr/krb5
+        image: docker.stackable.tech/natkr/krb5/krb5:1.18.2-stackable23.4.0-rc2
         args:
         - krb5kdc
         - -n
@@ -43,10 +43,10 @@ spec:
         volumeMounts:
         - mountPath: /stackable/config
           name: config
-        - mountPath: /var/lib/krb5kdc
+        - mountPath: /var/kerberos/krb5kdc
           name: data
       - name: kadmind
-        image: docker.stackable.tech/teozkr/krb5
+        image: docker.stackable.tech/natkr/krb5/krb5:1.18.2-stackable23.4.0-rc2
         args:
         - kadmind
         - -nofork
@@ -56,10 +56,10 @@ spec:
         volumeMounts:
         - mountPath: /stackable/config
           name: config
-        - mountPath: /var/lib/krb5kdc
+        - mountPath: /var/kerberos/krb5kdc
           name: data
       - name: client
-        image: docker.stackable.tech/teozkr/krb5
+        image: docker.stackable.tech/natkr/krb5/krb5:1.18.2-stackable23.4.0-rc2
         tty: true
         stdin: true
         env:

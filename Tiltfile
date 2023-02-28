@@ -34,6 +34,5 @@ k8s_yaml(helm_non_crds)
 k8s_yaml('examples/simple-consumer-nginx.yaml')
 k8s_yaml('examples/simple-consumer-shell.yaml')
 
-docker_build('docker.stackable.tech/teozkr/krb5', 'krb5')
 k8s_yaml('krb5/krb5.yaml')
 k8s_yaml('krb5/krb-client.yaml')
