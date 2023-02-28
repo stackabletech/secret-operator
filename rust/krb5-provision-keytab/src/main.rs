@@ -4,7 +4,10 @@ use std::{
     io::{stdin, BufReader},
 };
 
-use krb5::{kadm5, Keytab};
+use krb5::{
+    kadm5::{self, KVNO_ALL},
+    Keytab,
+};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tracing::info;
@@ -102,7 +105,7 @@ fn run() -> Result<Response, Error> {
             res => res.context(CreatePrincipalSnafu { principal: &princ })?,
         }
         let keys = kadmin
-            .get_principal_keys(&princ, 1)
+            .get_principal_keys(&princ, KVNO_ALL)
             .context(GetPrincipalKeysSnafu { principal: &princ })?;
         for key in keys.keys() {
             kt.add(&princ, key.kvno, &key.keyblock)

@@ -138,6 +138,8 @@ impl<'a> ServerHandle<'a> {
     }
 
     /// Get the keys of a principal.
+    ///
+    /// `kvno` may specify a specific key version to retrieve. Set to [`KVNO_ALL`] to retrieve all keys.
     pub fn get_principal_keys(
         &self,
         principal: &Principal,
@@ -169,6 +171,8 @@ impl<'a> Drop for ServerHandle<'a> {
         }
     }
 }
+/// Parameter for [`ServerHandle::get_principal_keys`] that returns all keys, regardless of KVNO.
+pub const KVNO_ALL: krb5_sys::krb5_kvno = 0;
 
 /// An unowned reference to a [`Principal`]'s key.
 // SAFETY: 'a must not outlive the object that owns the `KeyDataRef`

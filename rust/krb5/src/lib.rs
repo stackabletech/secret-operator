@@ -1,6 +1,7 @@
-/// Safe wrapper library for libkrb5 and libkadm5
-///
-/// The primary entry point is [`KrbContext`].
+//! Safe wrapper library for libkrb5 and libkadm5
+//!
+//! The primary entry point is [`KrbContext`].
+
 use std::{ffi::CStr, fmt::Display};
 
 use krb5_sys::krb5_kt_resolve;

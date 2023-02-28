@@ -1,3 +1,5 @@
+//! API wrapper for accessing
+
 use std::{
     path::{Path, PathBuf},
     process::Stdio,
