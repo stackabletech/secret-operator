@@ -22,6 +22,8 @@ NOTE: Only ephemeral volumes are supported, the Secret Operator does *not* suppo
 
 *Required*: true
 
+*Backends*: All
+
 The name of the xref:secretclass.adoc[] that is responsible for providing this secret.
 
 === `secrets.stackable.tech/scope`
@@ -30,4 +32,17 @@ The name of the xref:secretclass.adoc[] that is responsible for providing this s
 
 *Default value*: no scopes
 
+*Backends*: All
+
 The xref:scope.adoc[scopes] used to select or provision the secret. Multiple scopes should be separated by commas (`,`), and scope parameters are separated by equals signs (`=`) where applicable.
+
+=== `secrets.stackable.tech/kerberos.service.names`
+
+*Required*: false
+
+*Default value*: HTTP
+
+*Backends*: xref:secretclass.adoc#backend-kerberoskeytab[]
+
+The service names to be prepended to the provisioned principals. The provisioned principals will have the form `service/scope@realm`. Multiple service names should
+be separated by commas (`,`).
