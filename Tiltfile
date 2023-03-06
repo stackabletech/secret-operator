@@ -35,10 +35,3 @@ helm_crds, helm_non_crds = filter_yaml(
    kind = "^CustomResourceDefinition$",
 )
 k8s_yaml(helm_non_crds)
-
-# Load examples
-k8s_yaml('examples/simple-consumer-nginx.yaml')
-k8s_yaml('examples/simple-consumer-shell.yaml')
-
-k8s_yaml('krb5/krb5.yaml')
-k8s_yaml('krb5/krb-client.yaml')
