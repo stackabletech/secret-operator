@@ -19,8 +19,10 @@ spec:
             klist -k /stackable/krb/keytab
             echo kiniting node
             kinit -kt /stackable/krb/keytab -p HTTP/$NODE_NAME
-            # echo kiniting pod
-            # kinit -kt /stackable/krb/keytab -p HTTP/$POD_NAME.$NAMESPACE.svc.cluster.local
+            echo kiniting service
+            kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.$NAMESPACE.svc.cluster.local
+            echo kiniting pod
+            kinit -kt /stackable/krb/keytab -p HTTP/$POD_NAME.krb5-client.$NAMESPACE.svc.cluster.local
           env:
             - name: KRB5_CONFIG
               value: /stackable/krb/krb5.conf
@@ -56,3 +58,13 @@ spec:
                     storage: "1"
       restartPolicy: Never
       terminationGracePeriodSeconds: 0
+      subdomain: krb5-client
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: krb5-client
+spec:
+  ports:
+    - name: bogus
+      port: 9999
