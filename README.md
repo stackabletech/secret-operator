@@ -17,7 +17,7 @@ It is part of the Stackable Data Platform, a curated selection of the best open 
 
 ## Installation
 
-You can install the operator using [stackablectl or helm](https://docs.stackable.tech/secret/stable/getting_started/installation.html).
+You can install the operator using [stackablectl or helm](https://docs.stackable.tech/secret-operator/stable/installation.html).
 
 Read on to get started with it, or see it in action in one of our [demos](https://stackable.tech/en/demos/).
 

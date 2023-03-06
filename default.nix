@@ -4,8 +4,11 @@
 , cargo ? import ./Cargo.nix {
     inherit nixpkgs pkgs; release = false;
     defaultCrateOverrides = pkgs.defaultCrateOverrides // {
+      prost-build = attrs: {
+        buildInputs = [ pkgs.protobuf ];
+      };
       tonic-reflection = attrs: {
-        buildInputs = [ pkgs.protobuf pkgs.rustfmt ];
+        buildInputs = [ pkgs.rustfmt ];
       };
       stackable-secret-operator = attrs: {
         buildInputs = [ pkgs.protobuf pkgs.rustfmt ];
@@ -18,16 +21,16 @@
       };
     };
   }
-, dockerName ? "docker.stackable.tech/sandbox/secret-operator"
+, meta ? pkgs.lib.importJSON ./nix/meta.json
+, dockerName ? "docker.stackable.tech/sandbox/${meta.operator.name}"
 , dockerTag ? null
 }:
 rec {
-  inherit pkgs;
-
-  build = cargo.workspaceMembers.stackable-secret-operator.build;
-  crds = pkgs.runCommand "secret-operator-crds.yaml" {}
+  build = cargo.allWorkspaceMembers;
+  entrypoint = build+"/bin/stackable-${meta.operator.name}";
+  crds = pkgs.runCommand "${meta.operator.name}-crds.yaml" {}
   ''
-    ${build}/bin/stackable-secret-operator crd > $out
+    ${entrypoint} crd > $out
   '';
 
   dockerImage = pkgs.dockerTools.streamLayeredImage {
@@ -35,16 +38,17 @@ rec {
     tag = dockerTag;
     contents = [ pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal pkgs.krb5 pkgs.vim cargo.workspaceMembers.stackable-krb5-provision-keytab.build ];
     config = {
-      Cmd = [
-        # "${pkgs.gdb}/bin/gdbserver" ":9999"
-        (build+"/bin/stackable-secret-operator") "run"
-      ];
-      # Env = [
-      #   "KRB5_TRACE=/dev/stderr"
-      # ];
+    Env =
+      let
+        fileRefVars = {
+          PRODUCT_CONFIG = deploy/config-spec/properties.yaml;
+        };
+      in pkgs.lib.concatLists (pkgs.lib.mapAttrsToList (env: path: pkgs.lib.optional (pkgs.lib.pathExists path) "${env}=${path}") fileRefVars);
+      Entrypoint = [ entrypoint ];
+      Cmd = [ "run" ];
     };
   };
-  docker = pkgs.linkFarm "secret-operator-docker" [
+  docker = pkgs.linkFarm "listener-operator-docker" [
     {
       name = "load-image";
       path = dockerImage;
@@ -68,6 +72,6 @@ rec {
   ];
 
   # need to use vendored crate2nix because of https://github.com/kolloch/crate2nix/issues/264
-  crate2nix = pkgs.callPackage sources.crate2nix {};
+  crate2nix = import sources.crate2nix {};
   tilt = pkgs.tilt;
 }
