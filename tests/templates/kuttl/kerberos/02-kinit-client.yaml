@@ -10,19 +10,19 @@ spec:
         - name: client
           image: docker.stackable.tech/natkr/krb5/krb5:1.18.2-stackable23.4.0-rc2
           command:
-          - bash
+            - bash
           args:
-          - -c
-          - |
-            set -euo pipefail
-            echo listing keytab contents
-            klist -k /stackable/krb/keytab
-            echo kiniting node
-            kinit -kt /stackable/krb/keytab -p HTTP/$NODE_NAME
-            echo kiniting service
-            kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.$NAMESPACE.svc.cluster.local
-            echo kiniting pod
-            kinit -kt /stackable/krb/keytab -p HTTP/$POD_NAME.krb5-client.$NAMESPACE.svc.cluster.local
+            - -c
+            - |
+              set -euo pipefail
+              echo listing keytab contents
+              klist -k /stackable/krb/keytab
+              echo kiniting node
+              kinit -kt /stackable/krb/keytab -p HTTP/$NODE_NAME
+              echo kiniting service
+              kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.$NAMESPACE.svc.cluster.local
+              echo kiniting pod
+              kinit -kt /stackable/krb/keytab -p HTTP/$POD_NAME.krb5-client.$NAMESPACE.svc.cluster.local
           env:
             - name: KRB5_CONFIG
               value: /stackable/krb/krb5.conf
