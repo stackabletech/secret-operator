@@ -43,7 +43,7 @@ jobs:
         with:
           key: udeps
       - run: cargo install cargo-udeps
-      - run: cargo udeps
+      - run: cargo udeps --workspace
 
   # This job evaluates the github environment to determine why this action is running and selects the appropriate
   # target repository for published Helm charts based on this.

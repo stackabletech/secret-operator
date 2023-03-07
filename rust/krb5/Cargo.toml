@@ -12,5 +12,3 @@ publish = false
 
 [dependencies]
 krb5-sys = { path = "../krb5-sys" }
-snafu = "0.7.0"
-tempfile = "3.3.0"

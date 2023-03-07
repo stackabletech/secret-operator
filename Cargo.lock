@@ -1026,8 +1026,6 @@ name = "krb5"
 version = "0.0.0-dev"
 dependencies = [
  "krb5-sys",
- "snafu",
- "tempfile",
 ]
 
 [[package]]
@@ -2024,7 +2022,6 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
- "tempfile",
  "tokio",
  "tracing",
  "tracing-subscriber",
