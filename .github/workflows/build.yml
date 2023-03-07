@@ -31,8 +31,7 @@ jobs:
     env:
       RUSTC_BOOTSTRAP: 1
     steps:
-      - &stepHostDeps
-        name: Install host dependencies
+      - name: Install host dependencies
         run: |
           sudo apt-get update
           sudo apt-get install protobuf-compiler krb5-user
@@ -128,7 +127,10 @@ jobs:
     name: Run Clippy
     runs-on: ubuntu-latest
     steps:
-      - *stepHostDeps
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install protobuf-compiler krb5-user
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: recursive
@@ -156,7 +158,10 @@ jobs:
     name: Run RustDoc
     runs-on: ubuntu-latest
     steps:
-      - *stepHostDeps
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install protobuf-compiler krb5-user
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: recursive
@@ -172,7 +177,10 @@ jobs:
     name: Run Cargo Tests
     runs-on: ubuntu-latest
     steps:
-      - *stepHostDeps
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install protobuf-compiler krb5-user
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: recursive
@@ -224,7 +232,10 @@ jobs:
     name: Check if committed Helm charts are up to date
     runs-on: ubuntu-latest
     steps:
-      - *stepHostDeps
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install protobuf-compiler krb5-user
       - name: Checkout
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
@@ -279,7 +290,10 @@ jobs:
     outputs:
       IMAGE_TAG: ${{ steps.printtag.outputs.IMAGE_TAG }}
     steps:
-      - *stepHostDeps
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install protobuf-compiler krb5-user
       - name: Checkout
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
