@@ -35,8 +35,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install protobuf-compiler krb5-user
-      - name: Install krb5
-        run: sudo apt-get install krb5-user
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: recursive
