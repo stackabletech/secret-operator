@@ -25,12 +25,11 @@ RUN microdnf install -y yum krb5-libs libkadm5 \
 
 COPY LICENSE /licenses/LICENSE
 
-COPY --from=builder /app/stackable-secret-operator /
-COPY --from=builder /app/stackable-krb5-provision-keytab /usr/local/bin
+COPY --from=builder /app/* /usr/local/bin
 
 RUN groupadd -g 1000 stackable && adduser -u 1000 -g stackable -c 'Stackable Operator' stackable
 
 USER stackable:stackable
 
-ENTRYPOINT ["/stackable-secret-operator"]
+ENTRYPOINT ["stackable-secret-operator"]
 CMD ["run"]

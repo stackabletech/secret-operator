@@ -36,7 +36,7 @@ rec {
   dockerImage = pkgs.dockerTools.streamLayeredImage {
     name = dockerName;
     tag = dockerTag;
-    contents = [ pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal pkgs.krb5 pkgs.vim cargo.workspaceMembers.stackable-krb5-provision-keytab.build ];
+    contents = [ pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal pkgs.krb5 pkgs.vim build ];
     config = {
     Env =
       let
