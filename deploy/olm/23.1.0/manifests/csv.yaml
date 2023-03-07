@@ -119,7 +119,7 @@ spec:
                     image: docker.stackable.tech/stackable/tools:0.2.0-stackable0.3.0 # TODO e.g. use tag or different image
                     imagePullPolicy: IfNotPresent
                     resources: {}
-                    command: ["bash", "-c", "echo 'Deploying secret-operator manifests' && kubectl apply -f /manifests/ && echo 'Successfully deployed secret-operator manifests' && sleep infinity"]
+                    command: ["bash", "-c", "echo 'Deploying secret-operator manifests' && export SECRET_OPERATOR_DEPLOYER_DEPLOYMENT_UID=$(kubectl get deployment secret-operator-deployer -o go-template='{{.metadata.uid}}') && kubectl apply -f /manifests/ && echo 'Successfully deployed secret-operator manifests' && sleep infinity"]
                     volumeMounts:
                       - name: manifests
                         mountPath: /manifests
