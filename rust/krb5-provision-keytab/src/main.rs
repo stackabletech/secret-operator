@@ -8,24 +8,9 @@ use krb5::{
     kadm5::{self, KVNO_ALL},
     Keytab,
 };
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use stackable_krb5_provision_keytab::{Request, Response};
 use tracing::info;
-
-#[derive(Deserialize)]
-struct Request {
-    admin_keytab_path: String,
-    admin_principal_name: String,
-    pod_keytab_path: String,
-    principals: Vec<PrincipalRequest>,
-}
-#[derive(Deserialize)]
-struct PrincipalRequest {
-    name: String,
-}
-
-#[derive(Serialize)]
-struct Response {}
 
 #[derive(Debug, Snafu)]
 enum Error {
@@ -72,8 +57,8 @@ fn run() -> Result<Response, Error> {
     let krb = krb5::KrbContext::new().context(KrbInitSnafu)?;
     let admin_principal_name =
         CString::new(req.admin_principal_name).context(DecodeAdminPrincipalNameSnafu)?;
-    let admin_keytab_path =
-        CString::new(req.admin_keytab_path).context(DecodeAdminKeytabPathSnafu)?;
+    let admin_keytab_path = CString::new(&*req.admin_keytab_path.as_os_str().to_string_lossy())
+        .context(DecodeAdminKeytabPathSnafu)?;
     info!("initing kadmin");
     let kadmin = krb5::kadm5::ServerHandle::new(
         &krb,
@@ -87,7 +72,8 @@ fn run() -> Result<Response, Error> {
     .context(KadminInitSnafu)?;
     let mut kt = Keytab::resolve(
         &krb,
-        &CString::new(req.pod_keytab_path).context(DecodePodKeytabPathSnafu)?,
+        &CString::new(&*req.pod_keytab_path.as_os_str().to_string_lossy())
+            .context(DecodePodKeytabPathSnafu)?,
     )
     .context(ResolvePodKeytabSnafu)?;
     for princ_req in req.principals {
