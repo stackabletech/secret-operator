@@ -102,6 +102,17 @@ spec:
                 - delete
                 - patch
             - apiGroups:
+                - secrets.stackable.tech
+              resources:
+                - secretclasses
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - delete
+                - patch
+            - apiGroups:
                 - security.openshift.io
               resources:
                 - securitycontextconstraints
