@@ -136,6 +136,7 @@ impl SecretBackend for KerberosKeytab {
 default_realm = {realm_name}
 rdns = false
 dns_canonicalize_hostnames = false
+udp_preference_limit = 1
 
 [realms]
 {realm_name} = {{
