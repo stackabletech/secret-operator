@@ -6,7 +6,6 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- operator-rs: 0.25.0 -> 0.27.1 ([#212]).
 - Shortened the registration socket path for Microk8s compatibility ([#231]).
   - After upgrading you will need to
     `rmdir /var/lib/kubelet/plugins_registry/secrets.stackable.tech-reg.sock` manually.
@@ -14,9 +13,16 @@ All notable changes to this project will be documented in this file.
 - Made kubeletDir configurable ([#232]).
   - Microk8s users will need to `--set kubeletDir=/var/snap/microk8s/common/var/lib/kubelet`.
 
-[#212]: https://github.com/stackabletech/secret-operator/pull/212
 [#231]: https://github.com/stackabletech/secret-operator/pull/231
 [#232]: https://github.com/stackabletech/secret-operator/pull/232
+
+## [23.1.0] - 2023-01-23
+
+### Changed
+
+- operator-rs: 0.25.0 -> 0.27.1 ([#212]).
+
+[#212]: https://github.com/stackabletech/secret-operator/pull/212
 
 ## [0.6.0] - 2022-11-07
 
