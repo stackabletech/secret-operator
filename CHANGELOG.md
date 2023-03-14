@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added `kerberosKeytab` provisioner backend ([#99]).
+
 ### Changed
 
 - Shortened the registration socket path for Microk8s compatibility ([#231]).
@@ -13,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Made kubeletDir configurable ([#232]).
   - Microk8s users will need to `--set kubeletDir=/var/snap/microk8s/common/var/lib/kubelet`.
 
+[#99]: https://github.com/stackabletech/secret-operator/pull/99
 [#231]: https://github.com/stackabletech/secret-operator/pull/231
 [#232]: https://github.com/stackabletech/secret-operator/pull/232
 
