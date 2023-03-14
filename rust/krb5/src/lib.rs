@@ -155,6 +155,66 @@ pub struct KeyblockRef<'a> {
     raw: *const krb5_sys::krb5_keyblock,
 }
 
+/// An owned reference to a Kerberos keyblock.
+pub struct Keyblock<'a> {
+    ctx: &'a KrbContext,
+    raw: *mut krb5_sys::krb5_keyblock,
+}
+impl<'a> Keyblock<'a> {
+    pub fn new(
+        ctx: &'a KrbContext,
+        enctype: krb5_sys::krb5_enctype,
+        len: u64,
+    ) -> Result<Self, Error> {
+        unsafe {
+            let mut keyblock: *mut krb5_sys::krb5_keyblock = std::ptr::null_mut();
+            Error::from_call_result(
+                Some(ctx),
+                krb5_sys::krb5_init_keyblock(ctx.raw, enctype, len, &mut keyblock),
+            )?;
+            let mut kb = Self { ctx, raw: keyblock };
+            // krb5_init_keyblock does not guarantee that the keyblock is zeroed, so let's clear it ourselves to avoid leaks
+            kb.contents_mut().fill(0);
+            Ok(kb)
+        }
+    }
+
+    // SAFETY: we own raw, so it is valid for as long as the reference to &śelf
+    pub fn contents_mut(&mut self) -> &mut [u8] {
+        unsafe {
+            let raw = *self.raw;
+            if raw.length > 0 {
+                std::slice::from_raw_parts_mut(
+                    raw.contents,
+                    raw.length
+                        .try_into()
+                        .expect("keyblock length must fit within usize"),
+                )
+            } else {
+                // contents are not allocated for length=0, but slice requires that the ptr is non-null and "valid"
+                &mut []
+            }
+        }
+    }
+
+    // Ideally this would be a Deref impl, but we don't have a KeyblockRef we can borrow
+    // SAFETY: the KeyblockRef must not outlive the &self-ref
+    #[allow(clippy::needless_lifetimes)]
+    pub fn as_ref<'b>(&'b self) -> KeyblockRef<'b> {
+        KeyblockRef {
+            ctx: self.ctx,
+            raw: self.raw,
+        }
+    }
+}
+impl<'a> Drop for Keyblock<'a> {
+    fn drop(&mut self) {
+        unsafe {
+            krb5_sys::krb5_free_keyblock(self.ctx.raw, self.raw);
+        }
+    }
+}
+
 /// A Kerberos keytab.
 pub struct Keytab<'a> {
     ctx: &'a KrbContext,

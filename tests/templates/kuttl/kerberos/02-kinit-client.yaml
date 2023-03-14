@@ -16,7 +16,7 @@ spec:
             - |
               set -euo pipefail
               echo listing keytab contents
-              klist -k /stackable/krb/keytab
+              klist -k /stackable/krb/keytab -teKC
               echo kiniting node
               kinit -kt /stackable/krb/keytab -p HTTP/$NODE_NAME
               echo kiniting service

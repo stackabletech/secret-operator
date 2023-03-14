@@ -6,7 +6,7 @@ use std::{
 
 use krb5::{
     kadm5::{self, KVNO_ALL},
-    Keytab,
+    Keyblock, Keytab,
 };
 use snafu::{ResultExt, Snafu};
 use stackable_krb5_provision_keytab::{Request, Response};
@@ -45,8 +45,13 @@ enum Error {
         source: kadm5::Error,
         principal: String,
     },
-    #[snafu(display("failed to add key to keytab"))]
-    AddToKeytab { source: krb5::Error },
+    #[snafu(display("failed to create dummy key"))]
+    CreateDummyKey { source: krb5::Error },
+    #[snafu(display("failed to add key for principal {principal} to keytab"))]
+    AddToKeytab {
+        source: krb5::Error,
+        principal: String,
+    },
 }
 
 fn run() -> Result<Response, Error> {
@@ -76,6 +81,28 @@ fn run() -> Result<Response, Error> {
             .context(DecodePodKeytabPathSnafu)?,
     )
     .context(ResolvePodKeytabSnafu)?;
+
+    // Insert an invalid dummy principal to ensure that the Keytab is always created, even if no principals are provisioned
+    let dummy_principal_name = "_dummy_principal@MISSING.REALM";
+    let dummy_principal = krb
+        .parse_principal_name(
+            &CString::new(dummy_principal_name).expect("dummy principal name must be valid"),
+        )
+        .context(ParsePrincipalSnafu {
+            principal: dummy_principal_name,
+        })?;
+    kt.add(
+        &dummy_principal,
+        0,
+        // keyblock len must be >0, or kt.add() will always fail
+        &Keyblock::new(&krb, 0, 1)
+            .context(CreateDummyKeySnafu)?
+            .as_ref(),
+    )
+    .context(AddToKeytabSnafu {
+        principal: &dummy_principal,
+    })?;
+
     for princ_req in req.principals {
         let princ = krb
             .parse_principal_name(
@@ -95,7 +122,7 @@ fn run() -> Result<Response, Error> {
             .context(GetPrincipalKeysSnafu { principal: &princ })?;
         for key in keys.keys() {
             kt.add(&princ, key.kvno, &key.keyblock)
-                .context(AddToKeytabSnafu)?;
+                .context(AddToKeytabSnafu { principal: &princ })?;
         }
     }
     Ok(Response {})
