@@ -31,8 +31,9 @@ spec:
                 annotations:
                   # Use search parameters declared in SecretClass/secret to resolve this secret
                   secrets.stackable.tech/class: secret
-                  # The secret depends on the node, for a `k8sSearch` `SecretClass` this means that the the `Secret` must have the label `secrets.stackable.tech/node: ${pod.spec.nodeName}`
-                  secrets.stackable.tech/scope: node
+                  # Uncomment if the secret depends on the node,
+                  # for a `k8sSearch` `SecretClass` this means that the the `Secret` must have the label `secrets.stackable.tech/node: ${pod.spec.nodeName}`
+                  # secrets.stackable.tech/scope: node
               spec:
                 storageClassName: secrets.stackable.tech
                 accessModes:
@@ -59,8 +60,8 @@ metadata:
   name: secret-consumer-shell-secret
   labels:
     secrets.stackable.tech/class: secret
-    # Comment in if you want to pin the referring Pods to a specific Node,
-    # e.g. because you credentials in this Secret are only valid for a specific node
+    # Uncomment if you want to pin the consuming Pods to a specific Node,
+    # e.g. because the credentials in this Secret are only valid for a specific node
     # secrets.stackable.tech/node: kind-control-plane
     type: custom-secret
 stringData:
