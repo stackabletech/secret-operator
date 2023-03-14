@@ -23,8 +23,8 @@ pub enum Error {
         source: stackable_operator::error::Error,
         secret: SecretReference,
     },
-    #[snafu(display(r#"admin keytab {secret:?} does not contain field "keytab""#))]
-    NoAdminKeytabFieldInSecret { secret: SecretReference },
+    #[snafu(display(r#"admin keytab {secret:?} does not contain key "keytab""#))]
+    NoAdminKeytabKeyInSecret { secret: SecretReference },
     #[snafu(display("failed to create temp dir"))]
     TempSetup { source: std::io::Error },
     #[snafu(display("failed to write Kerberos configuration"))]
@@ -45,7 +45,7 @@ impl SecretBackendError for Error {
         match self {
             Error::InvalidSecretRef { .. } => tonic::Code::FailedPrecondition,
             Error::LoadAdminKeytab { .. } => tonic::Code::FailedPrecondition,
-            Error::NoAdminKeytabFieldInSecret { .. } => tonic::Code::FailedPrecondition,
+            Error::NoAdminKeytabKeyInSecret { .. } => tonic::Code::FailedPrecondition,
             Error::TempSetup { .. } => tonic::Code::Unavailable,
             Error::WriteConfig { .. } => tonic::Code::Unavailable,
             Error::WriteAdminKeytab { .. } => tonic::Code::Unavailable,
@@ -97,7 +97,7 @@ impl KerberosKeytab {
             .data
             .unwrap_or_default()
             .remove("keytab")
-            .context(NoAdminKeytabFieldInSecretSnafu {
+            .context(NoAdminKeytabKeyInSecretSnafu {
                 secret: admin_keytab_secret_ref.clone(),
             })?
             .0;
