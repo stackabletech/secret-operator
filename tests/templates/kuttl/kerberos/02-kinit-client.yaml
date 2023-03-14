@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
         - name: client
-          image: docker.stackable.tech/natkr/krb5/krb5:1.18.2-stackable23.4.0-rc2
+          image: docker.stackable.tech/stackable/krb5:1.18.2-stackable23.4.0-rc1
           command:
             - bash
           args:
