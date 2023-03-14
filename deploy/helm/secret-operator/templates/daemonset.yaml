@@ -47,6 +47,8 @@ spec:
             - name: mountpoint
               mountPath: {{ .Values.kubeletDir }}/pods
               mountPropagation: Bidirectional
+            - name: tmp
+              mountPath: /tmp
         - name: external-provisioner
           image: "{{ .Values.csiProvisioner.image.repository }}:{{ .Values.csiProvisioner.image.tag }}"
           imagePullPolicy: {{ .Values.csiProvisioner.image.pullPolicy }}
@@ -80,6 +82,8 @@ spec:
         - name: mountpoint
           hostPath:
             path: {{ .Values.kubeletDir }}/pods/
+        - name: tmp
+          emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

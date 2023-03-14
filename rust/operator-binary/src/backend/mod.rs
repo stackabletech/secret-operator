@@ -2,12 +2,13 @@
 
 pub mod dynamic;
 pub mod k8s_search;
+pub mod kerberos_keytab;
 pub mod pod_info;
 pub mod scope;
 pub mod tls;
 
 use async_trait::async_trait;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use stackable_operator::k8s_openapi::chrono::{DateTime, FixedOffset};
 use std::{
     collections::{HashMap, HashSet},
@@ -17,6 +18,7 @@ use std::{
 
 pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
+pub use kerberos_keytab::KerberosKeytab;
 pub use tls::TlsGenerate;
 
 use pod_info::Address;
@@ -50,6 +52,13 @@ pub struct SecretVolumeSelector {
     /// The name of the `Pod`'s `Namespace`, provided by Kubelet
     #[serde(rename = "csi.storage.k8s.io/pod.namespace")]
     pub namespace: String,
+
+    #[serde(
+        rename = "secrets.stackable.tech/kerberos.service.names",
+        default = "SecretVolumeSelector::default_kerberos_service_names",
+        deserialize_with = "SecretVolumeSelector::deserialize_str_vec"
+    )]
+    pub kerberos_service_names: Vec<String>,
 }
 
 impl SecretVolumeSelector {
@@ -85,6 +94,15 @@ impl SecretVolumeSelector {
                 name, self.namespace
             ))],
         }
+    }
+
+    fn default_kerberos_service_names() -> Vec<String> {
+        vec!["HTTP".to_string()]
+    }
+
+    fn deserialize_str_vec<'de, D: Deserializer<'de>>(de: D) -> Result<Vec<String>, D::Error> {
+        let full_str = String::deserialize(de)?;
+        Ok(full_str.split(',').map(str::to_string).collect())
     }
 }
 

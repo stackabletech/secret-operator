@@ -12,6 +12,7 @@ custom_build(
     registry + '/' + operator_name,
     'nix shell -f . crate2nix -c crate2nix generate && nix-build . -A docker --argstr dockerName "${EXPECTED_REGISTRY}/' + operator_name + '" && ./result/load-image | docker load',
     deps=['rust', 'Cargo.toml', 'Cargo.lock', 'default.nix', "nix", 'build.rs', 'vendor'],
+    ignore=['*.~undo-tree~'],
     # ignore=['result*', 'Cargo.nix', 'target', *.yaml],
     outputs_image_ref_to='result/ref',
 )

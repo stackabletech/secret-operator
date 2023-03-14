@@ -18,18 +18,18 @@ LABEL name="Stackable Operator for Stackable Secret Operator" \
   description="Deploy and manage Stackable Secret Operator clusters."
 
 # Update image
-RUN microdnf install -y yum \
+RUN microdnf install -y yum krb5-libs libkadm5 \
   && yum -y update-minimal --security --sec-severity=Important --sec-severity=Critical \
   && yum clean all \
   && microdnf clean all
 
 COPY LICENSE /licenses/LICENSE
 
-COPY --from=builder /app/stackable-secret-operator /
+COPY --from=builder /app/* /usr/local/bin/
 
 RUN groupadd -g 1000 stackable && adduser -u 1000 -g stackable -c 'Stackable Operator' stackable
 
 USER stackable:stackable
 
-ENTRYPOINT ["/stackable-secret-operator"]
+ENTRYPOINT ["stackable-secret-operator"]
 CMD ["run"]
