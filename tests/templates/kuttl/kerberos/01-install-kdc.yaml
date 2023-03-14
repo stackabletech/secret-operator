@@ -130,8 +130,6 @@ data:
 
     [realms]
     CLUSTER.LOCAL = {
-     kdc = krb5-kdc.default.svc.cluster.local
-     admin_server = krb5-kdc.default.svc.cluster.local
      acl_file = /stackable/config/kadm5.acl
      disable_encrypted_timestamp = false
     }
