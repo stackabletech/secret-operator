@@ -59,7 +59,9 @@ metadata:
   name: secret-consumer-shell-secret
   labels:
     secrets.stackable.tech/class: secret
-    secrets.stackable.tech/node: kind-control-plane
+    # Comment in if you want to pin the referring Pods to a specific Node,
+    # e.g. because you credentials in this Secret are only valid for a specific node
+    # secrets.stackable.tech/node: kind-control-plane
     type: custom-secret
 stringData:
   boo: spooky, indeed!
