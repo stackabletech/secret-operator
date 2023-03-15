@@ -169,7 +169,7 @@ impl SecretProvisionerNode {
             )
             .context(publish_error::MountSnafu { path: target_path })?;
         } else {
-            tracing::info!("running in unprivileged mode, not creating mount for secret volume");
+            tracing::info!("Running in unprivileged mode, not creating mount for secret volume");
         }
         // User: root/secret-operator
         // Group: Controlled by Pod.securityContext.fsGroup, the actual application
