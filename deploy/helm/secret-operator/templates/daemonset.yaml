@@ -41,12 +41,16 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+            - name: PRIVILEGED
+              value: {{ .Values.securityContext.privileged | quote }}
           volumeMounts:
             - name: csi
               mountPath: /csi
             - name: mountpoint
               mountPath: {{ .Values.kubeletDir }}/pods
+              {{- if .Values.securityContext.privileged }}
               mountPropagation: Bidirectional
+              {{- end }}
             - name: tmp
               mountPath: /tmp
         - name: external-provisioner
