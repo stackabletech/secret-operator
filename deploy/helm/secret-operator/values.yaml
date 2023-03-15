@@ -35,6 +35,9 @@ podSecurityContext: {}
 securityContext:
   # secret-operator requires root permissions
   runAsUser: 0
+  # It is strongly recommended to run secret-operator as a privileged container, since
+  # it enables additional protections for the secret contents.
+  # Unprivileged mode is EXPERIMENTAL and requires manual migration for an existing cluster.
   privileged: true
   # capabilities:
   #   drop:
