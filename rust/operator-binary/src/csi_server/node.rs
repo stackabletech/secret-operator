@@ -306,28 +306,34 @@ impl Node for SecretProvisionerNode {
         &self,
         request: Request<NodePublishVolumeRequest>,
     ) -> Result<Response<NodePublishVolumeResponse>, Status> {
-        let request = request.into_inner();
-        let target_path = PathBuf::from(request.target_path);
-        tracing::info!(
-            volume.path = %target_path.display(),
-            "Received NodePublishVolume request"
-        );
-        let selector =
-            SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
-                .context(publish_error::InvalidSelectorSnafu)?;
-        let pod_info = self.get_pod_info(&selector).await?;
-        let backend = backend::dynamic::from_selector(&self.client, &selector)
-            .await
-            .context(publish_error::InitBackendSnafu)?;
-        let data = backend
-            .get_secret_data(&selector, pod_info)
-            .await
-            .context(publish_error::BackendGetSecretDataSnafu)?;
-        self.tag_pod(&self.client, &request.volume_id, &selector, &data)
-            .await?;
-        self.prepare_secret_dir(&target_path).await?;
-        self.save_secret_data(&target_path, &data).await?;
-        Ok(Response::new(NodePublishVolumeResponse {}))
+        log_if_endpoint_error(
+            "failed to publish volume",
+            async move {
+                let request = request.into_inner();
+                let target_path = PathBuf::from(request.target_path);
+                tracing::info!(
+                    volume.path = %target_path.display(),
+                    "Received NodePublishVolume request"
+                );
+                let selector =
+                    SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
+                        .context(publish_error::InvalidSelectorSnafu)?;
+                let pod_info = self.get_pod_info(&selector).await?;
+                let backend = backend::dynamic::from_selector(&self.client, &selector)
+                    .await
+                    .context(publish_error::InitBackendSnafu)?;
+                let data = backend
+                    .get_secret_data(&selector, pod_info)
+                    .await
+                    .context(publish_error::BackendGetSecretDataSnafu)?;
+                self.tag_pod(&self.client, &request.volume_id, &selector, &data)
+                    .await?;
+                self.prepare_secret_dir(&target_path).await?;
+                self.save_secret_data(&target_path, &data).await?;
+                Ok(Response::new(NodePublishVolumeResponse {}))
+            }
+            .await,
+        )
     }
 
     // Called when a pod is terminated that contained a volume created by this provider.
@@ -338,14 +344,20 @@ impl Node for SecretProvisionerNode {
         &self,
         request: Request<NodeUnpublishVolumeRequest>,
     ) -> Result<Response<NodeUnpublishVolumeResponse>, Status> {
-        let request = request.into_inner();
-        let target_path = PathBuf::from(request.target_path);
-        tracing::info!(
-            volume.path = %target_path.display(),
-            "Received NodeUnpublishVolume request"
-        );
-        self.clean_secret_dir(&target_path).await?;
-        Ok(Response::new(NodeUnpublishVolumeResponse {}))
+        log_if_endpoint_error(
+            "Failed to unpublish volume",
+            async move {
+                let request = request.into_inner();
+                let target_path = PathBuf::from(request.target_path);
+                tracing::info!(
+                    volume.path = %target_path.display(),
+                    "Received NodeUnpublishVolume request"
+                );
+                self.clean_secret_dir(&target_path).await?;
+                Ok(Response::new(NodeUnpublishVolumeResponse {}))
+            }
+            .await,
+        )
     }
 
     async fn node_get_volume_stats(
@@ -383,4 +395,14 @@ impl Node for SecretProvisionerNode {
             }),
         }))
     }
+}
+
+fn log_if_endpoint_error<T, E: std::error::Error + 'static>(
+    error_msg: &str,
+    res: Result<T, E>,
+) -> Result<T, E> {
+    if let Err(err) = &res {
+        tracing::warn!(error = err as &dyn std::error::Error, "{error_msg}");
+    }
+    res
 }
