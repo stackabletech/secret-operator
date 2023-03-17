@@ -1,6 +1,9 @@
-use std::path::PathBuf;
+use std::{ffi::CString, path::PathBuf};
 
 use async_trait::async_trait;
+use byteorder::{LittleEndian, WriteBytesExt};
+use krb5::Keyblock;
+use ldap3::{LdapConnAsync, LdapConnSettings};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_krb5_provision_keytab::provision_keytab;
 use stackable_operator::k8s_openapi::api::core::v1::{Secret, SecretReference};
@@ -10,7 +13,9 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
 };
 
-use crate::crd::{Hostname, InvalidKerberosPrincipal, KerberosPrincipal};
+use crate::crd::{
+    Hostname, InvalidKerberosPrincipal, KerberosKeytabBackendAdmin, KerberosPrincipal,
+};
 
 use super::{pod_info::Address, SecretBackend, SecretBackendError, SecretContents};
 
@@ -59,7 +64,7 @@ impl SecretBackendError for Error {
 pub struct KerberosProfile {
     pub realm_name: Hostname,
     pub kdc: Hostname,
-    pub admin_server: Hostname,
+    pub admin: KerberosKeytabBackendAdmin,
 }
 
 pub struct KerberosKeytab {
@@ -123,11 +128,18 @@ impl SecretBackend for KerberosKeytab {
                 KerberosProfile {
                     realm_name,
                     kdc,
-                    admin_server,
+                    admin,
                 },
             admin_keytab,
             admin_principal,
         } = self;
+
+        let admin_server_clause = match admin {
+            KerberosKeytabBackendAdmin::Mit { admin_server } => {
+                format!("  admin_server = {admin_server}")
+            }
+            KerberosKeytabBackendAdmin::ActiveDirectory { .. } => String::new(),
+        };
 
         let tmp = tempdir().context(TempSetupSnafu)?;
         let profile = format!(
@@ -141,7 +153,7 @@ udp_preference_limit = 1
 [realms]
 {realm_name} = {{
   kdc = {kdc}
-  admin_server = {admin_server}
+{admin_server_clause}
 }}
 
 [domain_realm]
@@ -184,22 +196,116 @@ cluster.local = {realm_name}
                 }
             }
         }
-        provision_keytab(
-            &profile_file_path,
-            &stackable_krb5_provision_keytab::Request {
-                admin_keytab_path: admin_keytab_file_path,
-                admin_principal_name: admin_principal.to_string(),
-                pod_keytab_path: keytab_file_path.clone(),
-                principals: pod_principals
-                    .into_iter()
-                    .map(|princ| stackable_krb5_provision_keytab::PrincipalRequest {
-                        name: princ.to_string(),
-                    })
-                    .collect(),
-            },
-        )
-        .await
-        .context(ProvisionKeytabSnafu)?;
+        match admin {
+            KerberosKeytabBackendAdmin::Mit { .. } => {
+                provision_keytab(
+                    &profile_file_path,
+                    &stackable_krb5_provision_keytab::Request {
+                        admin_keytab_path: admin_keytab_file_path,
+                        admin_principal_name: admin_principal.to_string(),
+                        pod_keytab_path: keytab_file_path.clone(),
+                        principals: pod_principals
+                            .into_iter()
+                            .map(|princ| stackable_krb5_provision_keytab::PrincipalRequest {
+                                name: princ.to_string(),
+                            })
+                            .collect(),
+                    },
+                )
+                .await
+                .context(ProvisionKeytabSnafu)?;
+            }
+            KerberosKeytabBackendAdmin::ActiveDirectory { ldap_server } => {
+                let (ldap_conn, mut ldap) = LdapConnAsync::with_settings(
+                    LdapConnSettings::new()
+                        // FIXME: This is obviously not a good idea
+                        .set_no_tls_verify(true),
+                    &format!("ldaps://{ldap_server}"),
+                )
+                .await
+                .unwrap();
+                ldap3::drive!(ldap_conn);
+                ldap.simple_bind("Nat", "Asdf1234").await.unwrap();
+                let realm_dn = realm_name
+                    .split('.')
+                    .map(|part| format!("DC={part}"))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                let mut created_principals = Vec::new();
+                for principal in pod_principals {
+                    tracing::info!(?principal, "Creating principal");
+                    let principal_cn = ldap3::dn_escape(&*principal);
+                    let password = "asdfasdf";
+                    let password_ad_encoded = {
+                        let mut pwd_utf16le = Vec::new();
+                        format!("\"{password}\"").encode_utf16().for_each(|word| {
+                            WriteBytesExt::write_u16::<LittleEndian>(&mut pwd_utf16le, word)
+                                .unwrap()
+                        });
+                        pwd_utf16le
+                    };
+                    // FIXME: AD restricts RDNs to 64 characters
+                    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
+                    let user_dn = format!("CN={principal_cn},CN=Users,{realm_dn}",);
+                    ldap.add(
+                        &user_dn,
+                        vec![
+                            ("cn".as_bytes(), [principal_cn.as_bytes()].into()),
+                            ("objectClass".as_bytes(), ["user".as_bytes()].into()),
+                            ("instanceType".as_bytes(), ["4".as_bytes()].into()),
+                            (
+                                "objectCategory".as_bytes(),
+                                ["CN=Container,CN=Schema,CN=Configuration,DC=sble,DC=test"
+                                    .as_bytes()]
+                                .into(),
+                            ),
+                            ("unicodePwd".as_bytes(), [&*password_ad_encoded].into()),
+                            ("userAccountControl".as_bytes(), ["66048".as_bytes()].into()),
+                            (
+                                "userPrincipalName".as_bytes(),
+                                [format!("{principal}@{realm_name}").as_bytes()].into(),
+                            ),
+                        ],
+                    )
+                    .await
+                    .unwrap()
+                    .success()
+                    .unwrap();
+                    created_principals.push((principal, password));
+                }
+                let krb = krb5::KrbContext::from_profile(
+                    &krb5::profile::Profile::from_path(
+                        &CString::new(&*profile_file_path.as_os_str().to_string_lossy()).unwrap(),
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+                let mut kt = krb5::Keytab::resolve(
+                    &krb,
+                    &CString::new(&*keytab_file_path.as_os_str().to_string_lossy()).unwrap(),
+                )
+                .unwrap();
+                for (principal, password) in created_principals {
+                    let krb_principal = krb
+                        .parse_principal_name(&CString::new(&*principal).unwrap())
+                        .unwrap();
+                    tracing::info!(?principal, salt = ?krb_principal.default_salt(), "salting the earth!");
+                    kt.add(
+                        &krb_principal,
+                        0,
+                        &Keyblock::from_password(
+                            &krb,
+                            krb5::enctype::AES256_CTS_HMAC_SHA1_96,
+                            &CString::new(password).unwrap(),
+                            &krb_principal.default_salt().unwrap(),
+                        )
+                        .unwrap()
+                        .as_ref(),
+                    )
+                    .unwrap();
+                }
+            }
+        }
         let mut keytab_data = Vec::new();
         let mut keytab_file = File::open(keytab_file_path)
             .await

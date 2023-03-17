@@ -2,7 +2,10 @@
 //!
 //! The primary entry point is [`KrbContext`].
 
-use std::{ffi::CStr, fmt::Display};
+use std::{
+    ffi::CStr,
+    fmt::{Debug, Display},
+};
 
 use krb5_sys::krb5_kt_resolve;
 use profile::Profile;
@@ -111,6 +114,21 @@ pub struct Principal<'a> {
     ctx: &'a KrbContext,
     raw: krb5_sys::krb5_principal,
 }
+impl<'a> Principal<'a> {
+    pub fn default_salt(&self) -> Result<KrbData<'a>, Error> {
+        unsafe {
+            let mut salt = std::mem::zeroed::<krb5_sys::krb5_data>();
+            Error::from_call_result(
+                Some(self.ctx),
+                krb5_sys::krb5_principal2salt(self.ctx.raw, self.raw, &mut salt),
+            )?;
+            Ok(KrbData {
+                ctx: self.ctx,
+                raw: salt,
+            })
+        }
+    }
+}
 impl Drop for Principal<'_> {
     fn drop(&mut self) {
         unsafe {
@@ -179,6 +197,37 @@ impl<'a> Keyblock<'a> {
         }
     }
 
+    pub fn from_password(
+        ctx: &'a KrbContext,
+        enctype: krb5_sys::krb5_enctype,
+        password: &CStr,
+        salt: &KrbData,
+    ) -> Result<Self, Error> {
+        let kb = Self::new(
+            ctx, enctype,
+            // not that we have a reason to use a preinitialized keyblock,
+            // but `krb5_c_string_to_key` doesn't free or reuse an existing
+            // (non-null) keyblock's contents
+            0,
+        )?;
+        let password_data = krb5_sys::krb5_data {
+            magic: krb5_sys::krb5_error_code(0),
+            length: password
+                .to_bytes()
+                .len()
+                .try_into()
+                .expect("password length must fit within u32"),
+            data: password.as_ptr().cast::<i8>().cast_mut(),
+        };
+        unsafe {
+            Error::from_call_result(
+                Some(ctx),
+                krb5_sys::krb5_c_string_to_key(ctx.raw, enctype, &password_data, &salt.raw, kb.raw),
+            )?;
+        }
+        Ok(kb)
+    }
+
     // SAFETY: we own raw, so it is valid for as long as the reference to &śelf
     pub fn contents_mut(&mut self) -> &mut [u8] {
         unsafe {
@@ -213,6 +262,12 @@ impl<'a> Drop for Keyblock<'a> {
             krb5_sys::krb5_free_keyblock(self.ctx.raw, self.raw);
         }
     }
+}
+
+/// Well-known encryption types. This is not exhaustive.
+pub mod enctype {
+    pub const AES256_CTS_HMAC_SHA1_96: krb5_sys::krb5_enctype =
+        krb5_sys::ENCTYPE_AES256_CTS_HMAC_SHA1_96 as i32;
 }
 
 /// A Kerberos keytab.
@@ -266,5 +321,28 @@ impl Drop for Keytab<'_> {
             )
             .unwrap()
         }
+    }
+}
+
+/// Opaque Kerberos data
+pub struct KrbData<'a> {
+    ctx: &'a KrbContext,
+    raw: krb5_sys::krb5_data,
+}
+impl Debug for KrbData<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let slice = unsafe {
+            std::slice::from_raw_parts(
+                self.raw.data.cast::<u8>(),
+                self.raw.length.try_into().unwrap(),
+            )
+        };
+        let s = std::str::from_utf8(slice).unwrap();
+        Debug::fmt(s, f)
+    }
+}
+impl Drop for KrbData<'_> {
+    fn drop(&mut self) {
+        unsafe { krb5_sys::krb5_free_data_contents(self.ctx.raw, &mut self.raw) }
     }
 }

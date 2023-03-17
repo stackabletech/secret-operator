@@ -19,6 +19,7 @@ fn main() {
         .allowlist_function("^profile_.*")
         .allowlist_var("KRB5_.*")
         .allowlist_var("KADM5_.*")
+        .allowlist_var("ENCTYPE_.*")
         .new_type_alias("krb5_error_code")
         .new_type_alias("kadm5_ret_t")
         .must_use_type("krb5_error_code")

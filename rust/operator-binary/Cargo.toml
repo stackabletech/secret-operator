@@ -35,6 +35,9 @@ tracing = "0.1.36"
 h2 = "=0.3.7" # Need to keep this in sync with our patched h2 build
 uuid = { version = "1.2.2", features = ["v4"] }
 stackable-krb5-provision-keytab = { path = "../krb5-provision-keytab" }
+krb5 = { path = "../krb5" }
+ldap3 = { version = "0.11.1", default-features = false, features = ["gssapi", "tls"] }
+byteorder = "1.4.3"
 
 
 [dev-dependencies]

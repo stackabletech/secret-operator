@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, fmt::Display};
+use std::{ffi::OsStr, fmt::Display, ops::Deref};
 
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -65,9 +65,18 @@ pub struct AutoTlsCa {
 pub struct KerberosKeytabBackend {
     pub realm_name: Hostname,
     pub kdc: Hostname,
-    pub admin_server: Hostname,
+    pub admin: KerberosKeytabBackendAdmin,
     pub admin_keytab_secret: SecretReference,
     pub admin_principal: KerberosPrincipal,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum KerberosKeytabBackendAdmin {
+    #[serde(rename_all = "camelCase")]
+    Mit { admin_server: Hostname },
+    #[serde(rename_all = "camelCase")]
+    ActiveDirectory { ldap_server: Hostname },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
@@ -102,6 +111,13 @@ impl From<Hostname> for String {
 impl Display for Hostname {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
+    }
+}
+impl Deref for Hostname {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -143,8 +159,10 @@ impl Display for KerberosPrincipal {
         f.write_str(&self.0)
     }
 }
-impl AsRef<OsStr> for KerberosPrincipal {
-    fn as_ref(&self) -> &OsStr {
-        self.0.as_ref()
+impl Deref for KerberosPrincipal {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

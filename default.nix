@@ -19,6 +19,12 @@
         LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
         BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.glibc.dev}/include -I${pkgs.clang.cc.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang.cc}/include";
       };
+      libgssapi-sys = attrs: {
+        nativeBuildInputs = [ pkgs.pkg-config ];
+        buildInputs = [ (pkgs.enableDebugging pkgs.krb5) ];
+        LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
+        BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.glibc.dev}/include -I${pkgs.clang.cc.lib}/lib/clang/${pkgs.lib.getVersion pkgs.clang.cc}/include";
+      };
     };
   }
 , meta ? pkgs.lib.importJSON ./nix/meta.json
@@ -44,7 +50,8 @@ rec {
           PRODUCT_CONFIG = deploy/config-spec/properties.yaml;
         };
       in pkgs.lib.concatLists (pkgs.lib.mapAttrsToList (env: path: pkgs.lib.optional (pkgs.lib.pathExists path) "${env}=${path}") fileRefVars);
-      Entrypoint = [ entrypoint ];
+      Entrypoint = [ #"${pkgs.gdb}/bin/gdbserver" ":5555"
+      entrypoint ];
       Cmd = [ "run" ];
     };
   };

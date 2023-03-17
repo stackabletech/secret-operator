@@ -109,7 +109,7 @@ pub async fn from_class(
         crd::SecretClassBackend::KerberosKeytab(crd::KerberosKeytabBackend {
             realm_name,
             kdc,
-            admin_server,
+            admin,
             admin_keytab_secret,
             admin_principal,
         }) => from(
@@ -118,7 +118,7 @@ pub async fn from_class(
                 KerberosProfile {
                     realm_name,
                     kdc,
-                    admin_server,
+                    admin,
                 },
                 &admin_keytab_secret,
                 admin_principal,

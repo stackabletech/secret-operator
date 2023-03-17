@@ -1,5 +1,7 @@
 ---
 dimensions: []
 tests:
-  - name: kerberos
+  # - name: kerberos
+  #   dimensions: []
+  - name: kerberos-ad
     dimensions: []
