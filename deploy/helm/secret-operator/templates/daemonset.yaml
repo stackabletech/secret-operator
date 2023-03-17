@@ -41,10 +41,6 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-            - name: SECRET_PROVISIONER_LOG
-              value: info,ldap3=trace
-            - name: SSLKEYLOGFILE
-              value: /keylog/keylog
           volumeMounts:
             - name: csi
               mountPath: /csi
@@ -53,8 +49,6 @@ spec:
               mountPropagation: Bidirectional
             - name: tmp
               mountPath: /tmp
-            - name: keylog
-              mountPath: /keylog
         - name: external-provisioner
           image: "{{ .Values.csiProvisioner.image.repository }}:{{ .Values.csiProvisioner.image.tag }}"
           imagePullPolicy: {{ .Values.csiProvisioner.image.pullPolicy }}
@@ -90,9 +84,6 @@ spec:
             path: {{ .Values.kubeletDir }}/pods/
         - name: tmp
           emptyDir: {}
-        - name: keylog
-          hostPath:
-            path: /secret-operator-keylog
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
