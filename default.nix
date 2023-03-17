@@ -50,8 +50,7 @@ rec {
           PRODUCT_CONFIG = deploy/config-spec/properties.yaml;
         };
       in pkgs.lib.concatLists (pkgs.lib.mapAttrsToList (env: path: pkgs.lib.optional (pkgs.lib.pathExists path) "${env}=${path}") fileRefVars);
-      Entrypoint = [ #"${pkgs.gdb}/bin/gdbserver" ":5555"
-      entrypoint ];
+      Entrypoint = [ entrypoint ];
       Cmd = [ "run" ];
     };
   };
