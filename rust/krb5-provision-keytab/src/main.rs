@@ -249,6 +249,9 @@ async fn run() -> Result<Response, Error> {
                     .unwrap()
                     .success()
                     .unwrap();
+                    // CONCURRENCY: ldap.add() will only succeed once per principal, so
+                    // we are by definition the unique writer of this key.
+                    // FIXME: What about cases where ldap.add() succeeds but not the cache write?
                     kube.merge_patch(
                         &password_cache,
                         &Secret {
