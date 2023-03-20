@@ -8,4 +8,4 @@ kind: Job
 metadata:
   name: krb5-client
 status:
-  succeeded: 1
+  succeeded: 5
