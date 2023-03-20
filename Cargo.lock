@@ -2153,7 +2153,9 @@ dependencies = [
 name = "stackable-krb5-provision-keytab"
 version = "0.0.0-dev"
 dependencies = [
+ "byteorder",
  "krb5",
+ "ldap3",
  "serde",
  "serde_json",
  "snafu",
@@ -2214,12 +2216,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "built",
- "byteorder",
  "clap 4.0.26",
  "futures",
  "h2",
- "krb5",
- "ldap3",
  "libc",
  "openssl",
  "pin-project",

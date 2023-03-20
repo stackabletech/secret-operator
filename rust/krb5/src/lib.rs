@@ -5,6 +5,7 @@
 use std::{
     ffi::CStr,
     fmt::{Debug, Display},
+    ops::Deref,
 };
 
 use krb5_sys::krb5_kt_resolve;
@@ -98,12 +99,43 @@ impl KrbContext {
             raw: principal,
         })
     }
+
+    pub fn default_realm(&self) -> Result<DefaultRealm, Error> {
+        let mut realm: *mut i8 = std::ptr::null_mut();
+        unsafe {
+            Error::from_call_result(
+                Some(self),
+                krb5_sys::krb5_get_default_realm(self.raw, &mut realm),
+            )?;
+            Ok(DefaultRealm {
+                ctx: self,
+                raw: realm,
+            })
+        }
+    }
 }
 impl Drop for KrbContext {
     fn drop(&mut self) {
         unsafe {
             krb5_sys::krb5_free_context(self.raw);
         }
+    }
+}
+
+pub struct DefaultRealm<'a> {
+    ctx: &'a KrbContext,
+    raw: *const i8,
+}
+impl Deref for DefaultRealm<'_> {
+    type Target = CStr;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { CStr::from_ptr(self.raw) }
+    }
+}
+impl Drop for DefaultRealm<'_> {
+    fn drop(&mut self) {
+        unsafe { krb5_sys::krb5_free_default_realm(self.ctx.raw, self.raw.cast_mut()) }
     }
 }
 

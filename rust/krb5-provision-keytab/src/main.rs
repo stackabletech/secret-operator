@@ -4,12 +4,14 @@ use std::{
     io::{stdin, BufReader},
 };
 
+use byteorder::{LittleEndian, WriteBytesExt};
 use krb5::{
     kadm5::{self, KVNO_ALL},
     Keyblock, Keytab,
 };
+use ldap3::{LdapConn, LdapConnSettings};
 use snafu::{ResultExt, Snafu};
-use stackable_krb5_provision_keytab::{Request, Response};
+use stackable_krb5_provision_keytab::{AdminBackend, Request, Response};
 use tracing::info;
 
 #[derive(Debug, Snafu)]
@@ -54,6 +56,15 @@ enum Error {
     },
 }
 
+enum AdminConnection<'a> {
+    Mit {
+        kadmin: krb5::kadm5::ServerHandle<'a>,
+    },
+    ActiveDirectory {
+        ldap: ldap3::LdapConn,
+    },
+}
+
 fn run() -> Result<Response, Error> {
     let req = serde_json::from_reader::<_, Request>(BufReader::new(stdin().lock()))
         .context(DeserializeRequestSnafu)?;
@@ -65,16 +76,32 @@ fn run() -> Result<Response, Error> {
     let admin_keytab_path = CString::new(&*req.admin_keytab_path.as_os_str().to_string_lossy())
         .context(DecodeAdminKeytabPathSnafu)?;
     info!("initing kadmin");
-    let kadmin = krb5::kadm5::ServerHandle::new(
-        &krb,
-        &admin_principal_name,
-        None,
-        &krb5::kadm5::Credential::ServiceKey {
-            keytab: admin_keytab_path,
+
+    let mut admin = match req.admin_backend {
+        AdminBackend::Mit => AdminConnection::Mit {
+            kadmin: krb5::kadm5::ServerHandle::new(
+                &krb,
+                &admin_principal_name,
+                None,
+                &krb5::kadm5::Credential::ServiceKey {
+                    keytab: admin_keytab_path,
+                },
+                &config_params,
+            )
+            .context(KadminInitSnafu)?,
         },
-        &config_params,
-    )
-    .context(KadminInitSnafu)?;
+        AdminBackend::ActiveDirectory { ldap_server } => {
+            let mut ldap = LdapConn::with_settings(
+                LdapConnSettings::new()
+                    // FIXME: This is obviously not a good idea
+                    .set_no_tls_verify(true),
+                &format!("ldaps://{ldap_server}"),
+            )
+            .unwrap();
+            ldap.sasl_gssapi_bind(&ldap_server).unwrap();
+            AdminConnection::ActiveDirectory { ldap }
+        }
+    };
     let mut kt = Keytab::resolve(
         &krb,
         &CString::new(&*req.pod_keytab_path.as_os_str().to_string_lossy())
@@ -109,20 +136,88 @@ fn run() -> Result<Response, Error> {
                 &CString::new(princ_req.name.as_str()).context(DecodePodPrincipalNameSnafu)?,
             )
             .context(ParsePrincipalSnafu {
-                principal: princ_req.name,
+                principal: &princ_req.name,
             })?;
-        match kadmin.create_principal(&princ) {
-            Err(kadm5::Error { code, .. }) if code.0 == kadm5::error_code::DUP => {
-                info!("principal {princ} already exists, reusing")
+        match &mut admin {
+            AdminConnection::Mit { kadmin } => {
+                match kadmin.create_principal(&princ) {
+                    Err(kadm5::Error { code, .. }) if code.0 == kadm5::error_code::DUP => {
+                        info!("principal {princ} already exists, reusing")
+                    }
+                    res => res.context(CreatePrincipalSnafu { principal: &princ })?,
+                }
+                let keys = kadmin
+                    .get_principal_keys(&princ, KVNO_ALL)
+                    .context(GetPrincipalKeysSnafu { principal: &princ })?;
+                for key in keys.keys() {
+                    kt.add(&princ, key.kvno, &key.keyblock)
+                        .context(AddToKeytabSnafu { principal: &princ })?;
+                }
             }
-            res => res.context(CreatePrincipalSnafu { principal: &princ })?,
-        }
-        let keys = kadmin
-            .get_principal_keys(&princ, KVNO_ALL)
-            .context(GetPrincipalKeysSnafu { principal: &princ })?;
-        for key in keys.keys() {
-            kt.add(&princ, key.kvno, &key.keyblock)
-                .context(AddToKeytabSnafu { principal: &princ })?;
+            AdminConnection::ActiveDirectory { ldap } => {
+                let realm_name = krb.default_realm().unwrap();
+                let realm_name = realm_name.to_string_lossy();
+                let realm_dn = realm_name
+                    .split('.')
+                    .map(|part| format!("DC={part}"))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                tracing::info!(principal = ?princ_req.name, "Creating principal");
+                let principal_cn = ldap3::dn_escape(&*princ_req.name);
+                let password = "asdfasdf";
+                let password_ad_encoded = {
+                    let mut pwd_utf16le = Vec::new();
+                    format!("\"{password}\"").encode_utf16().for_each(|word| {
+                        WriteBytesExt::write_u16::<LittleEndian>(&mut pwd_utf16le, word).unwrap()
+                    });
+                    pwd_utf16le
+                };
+                // FIXME: AD restricts RDNs to 64 characters
+                let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
+                let user_dn = format!("CN={principal_cn},CN=Users,{realm_dn}",);
+                ldap.add(
+                    &user_dn,
+                    vec![
+                        ("cn".as_bytes(), [principal_cn.as_bytes()].into()),
+                        ("objectClass".as_bytes(), ["user".as_bytes()].into()),
+                        ("instanceType".as_bytes(), ["4".as_bytes()].into()),
+                        (
+                            "objectCategory".as_bytes(),
+                            [
+                                "CN=Container,CN=Schema,CN=Configuration,DC=sble,DC=test"
+                                    .as_bytes(),
+                            ]
+                            .into(),
+                        ),
+                        ("unicodePwd".as_bytes(), [&*password_ad_encoded].into()),
+                        ("userAccountControl".as_bytes(), ["66048".as_bytes()].into()),
+                        (
+                            "userPrincipalName".as_bytes(),
+                            [
+                                format!("{principal}@{realm_name}", principal = princ_req.name)
+                                    .as_bytes(),
+                            ]
+                            .into(),
+                        ),
+                    ],
+                )
+                .unwrap()
+                .success()
+                .unwrap();
+                kt.add(
+                    &princ,
+                    0,
+                    &Keyblock::from_password(
+                        &krb,
+                        krb5::enctype::AES256_CTS_HMAC_SHA1_96,
+                        &CString::new(password).unwrap(),
+                        &princ.default_salt().unwrap(),
+                    )
+                    .unwrap()
+                    .as_ref(),
+                )
+                .unwrap();
+            }
         }
     }
     Ok(Response {})
