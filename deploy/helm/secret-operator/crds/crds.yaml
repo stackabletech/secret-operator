@@ -75,6 +75,45 @@ spec:
                       type: object
                     kerberosKeytab:
                       properties:
+                        admin:
+                          oneOf:
+                            - required:
+                                - mit
+                            - required:
+                                - activeDirectory
+                          properties:
+                            activeDirectory:
+                              properties:
+                                ldapServer:
+                                  type: string
+                                passwordCacheSecret:
+                                  description: SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace
+                                  properties:
+                                    name:
+                                      description: name is unique within a namespace to reference a secret resource.
+                                      type: string
+                                    namespace:
+                                      description: namespace defines the space within which the secret name must be unique.
+                                      type: string
+                                  type: object
+                                schemaDistinguishedName:
+                                  type: string
+                                userDistinguishedName:
+                                  type: string
+                              required:
+                                - ldapServer
+                                - passwordCacheSecret
+                                - schemaDistinguishedName
+                                - userDistinguishedName
+                              type: object
+                            mit:
+                              properties:
+                                adminServer:
+                                  type: string
+                              required:
+                                - adminServer
+                              type: object
+                          type: object
                         adminKeytabSecret:
                           description: SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace
                           properties:
@@ -87,16 +126,14 @@ spec:
                           type: object
                         adminPrincipal:
                           type: string
-                        adminServer:
-                          type: string
                         kdc:
                           type: string
                         realmName:
                           type: string
                       required:
+                        - admin
                         - adminKeytabSecret
                         - adminPrincipal
-                        - adminServer
                         - kdc
                         - realmName
                       type: object
