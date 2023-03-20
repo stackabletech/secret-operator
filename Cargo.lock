@@ -2159,6 +2159,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
+ "stackable-operator",
  "tokio",
  "tracing",
  "tracing-subscriber",
