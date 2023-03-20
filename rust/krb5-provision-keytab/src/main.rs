@@ -176,6 +176,7 @@ async fn run() -> Result<Response, Error> {
                 let kube = stackable_operator::client::create_client(None)
                     .await
                     .unwrap();
+                let princ_name = princ.to_string();
                 let mut password_cache = kube
                     .get::<Secret>(
                         password_cache_secret.name.as_deref().unwrap(),
@@ -183,7 +184,7 @@ async fn run() -> Result<Response, Error> {
                     )
                     .await
                     .unwrap();
-                let password_cache_key = princ_req.name.replace(['/', '@'], "--");
+                let password_cache_key = princ_name.replace(['/', '@'], "--");
                 let password = if let Some(pw) = password_cache
                     .data
                     .get_or_insert_with(BTreeMap::default)
@@ -210,6 +211,8 @@ async fn run() -> Result<Response, Error> {
                         .join(",");
                     tracing::info!(principal = ?princ_req.name, "Creating principal");
                     let principal_cn = ldap3::dn_escape(&*princ_req.name);
+                    // FIXME: AD restricts RDNs to 64 characters
+                    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
                     let password = generate_ad_password(40);
                     let password_ad_encoded = {
                         let mut pwd_utf16le = Vec::new();
@@ -219,8 +222,6 @@ async fn run() -> Result<Response, Error> {
                         });
                         pwd_utf16le
                     };
-                    // FIXME: AD restricts RDNs to 64 characters
-                    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
                     let user_dn = format!("CN={principal_cn},CN=Users,{realm_dn}",);
                     ldap.add(
                         &user_dn,
@@ -238,11 +239,7 @@ async fn run() -> Result<Response, Error> {
                             ("userAccountControl".as_bytes(), ["66048".as_bytes()].into()),
                             (
                                 "userPrincipalName".as_bytes(),
-                                [
-                                    format!("{principal}@{realm_name}", principal = princ_req.name)
-                                        .as_bytes(),
-                                ]
-                                .into(),
+                                [princ_name.as_bytes()].into(),
                             ),
                         ],
                     )
