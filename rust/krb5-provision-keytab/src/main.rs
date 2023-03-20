@@ -11,6 +11,7 @@ use krb5::{
     Keyblock, Keytab,
 };
 use ldap3::{LdapConnAsync, LdapConnSettings};
+use rand::{seq::SliceRandom, thread_rng, CryptoRng};
 use snafu::{ResultExt, Snafu};
 use stackable_krb5_provision_keytab::{AdminBackend, Request, Response};
 use stackable_operator::k8s_openapi::{
@@ -209,7 +210,7 @@ async fn run() -> Result<Response, Error> {
                         .join(",");
                     tracing::info!(principal = ?princ_req.name, "Creating principal");
                     let principal_cn = ldap3::dn_escape(&*princ_req.name);
-                    let password = "asdfasdf";
+                    let password = generate_ad_password(40);
                     let password_ad_encoded = {
                         let mut pwd_utf16le = Vec::new();
                         format!("\"{password}\"").encode_utf16().for_each(|word| {
@@ -255,7 +256,9 @@ async fn run() -> Result<Response, Error> {
                     kube.merge_patch(
                         &password_cache,
                         &Secret {
-                            data: Some([(password_cache_key, ByteString(password.into()))].into()),
+                            data: Some(
+                                [(password_cache_key, ByteString(password.as_str().into()))].into(),
+                            ),
                             ..Secret::default()
                         },
                     )
@@ -314,4 +317,21 @@ async fn main() {
     let res = run().await.map_err(|err| Report::from(err).to_string());
     println!("{}", serde_json::to_string_pretty(&res).unwrap());
     std::process::exit(res.is_ok().into());
+}
+
+fn generate_ad_password(len: usize) -> String {
+    let mut rng = thread_rng();
+    // Assert that `rng` is crypto-safe
+    let _: &dyn CryptoRng = &rng;
+    // Allow all ASCII alphanumeric characters as well as punctuation
+    // Exclude double quotes (") since they are used by the AD password update protocol...
+    let dict: Vec<char> = (1..=127)
+        .filter_map(char::from_u32)
+        .filter(|c| *c != '"' && (c.is_ascii_alphanumeric() || c.is_ascii_punctuation()))
+        .collect();
+    let pw = (0..len)
+        .map(|_| *dict.choose(&mut rng).unwrap())
+        .collect::<String>();
+    assert_eq!(pw.len(), len);
+    pw
 }
