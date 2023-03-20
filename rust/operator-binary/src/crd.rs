@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, fmt::Display, ops::Deref};
+use std::{fmt::Display, ops::Deref};
 
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -79,6 +79,8 @@ pub enum KerberosKeytabBackendAdmin {
     ActiveDirectory {
         ldap_server: Hostname,
         password_cache_secret: SecretReference,
+        user_distinguished_name: String,
+        schema_distinguished_name: String,
     },
 }
 

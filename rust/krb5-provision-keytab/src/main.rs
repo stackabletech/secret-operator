@@ -69,6 +69,8 @@ enum AdminConnection<'a> {
     ActiveDirectory {
         ldap: ldap3::Ldap,
         password_cache_secret: SecretReference,
+        user_distinguished_name: String,
+        schema_distinguished_name: String,
     },
 }
 
@@ -100,6 +102,8 @@ async fn run() -> Result<Response, Error> {
         AdminBackend::ActiveDirectory {
             ldap_server,
             password_cache_secret,
+            user_distinguished_name,
+            schema_distinguished_name,
         } => {
             let (ldap_conn, mut ldap) = LdapConnAsync::with_settings(
                 LdapConnSettings::new()
@@ -114,6 +118,8 @@ async fn run() -> Result<Response, Error> {
             AdminConnection::ActiveDirectory {
                 ldap,
                 password_cache_secret,
+                user_distinguished_name,
+                schema_distinguished_name,
             }
         }
     };
@@ -172,6 +178,8 @@ async fn run() -> Result<Response, Error> {
             AdminConnection::ActiveDirectory {
                 ldap,
                 password_cache_secret,
+                user_distinguished_name,
+                schema_distinguished_name,
             } => {
                 let kube = stackable_operator::client::create_client(None)
                     .await
@@ -202,13 +210,6 @@ async fn run() -> Result<Response, Error> {
                         cache_key = password_cache_key,
                         "did not find principal in key cache, creating"
                     );
-                    let realm_name = krb.default_realm().unwrap();
-                    let realm_name = realm_name.to_string_lossy();
-                    let realm_dn = realm_name
-                        .split('.')
-                        .map(|part| format!("DC={part}"))
-                        .collect::<Vec<_>>()
-                        .join(",");
                     tracing::info!(principal = ?princ_req.name, "Creating principal");
                     let principal_cn = ldap3::dn_escape(&*princ_req.name);
                     // FIXME: AD restricts RDNs to 64 characters
@@ -222,7 +223,7 @@ async fn run() -> Result<Response, Error> {
                         });
                         pwd_utf16le
                     };
-                    let user_dn = format!("CN={principal_cn},CN=Users,{realm_dn}",);
+                    let user_dn = format!("CN={principal_cn},{user_distinguished_name}",);
                     ldap.add(
                         &user_dn,
                         vec![
@@ -231,9 +232,8 @@ async fn run() -> Result<Response, Error> {
                             ("instanceType".as_bytes(), ["4".as_bytes()].into()),
                             (
                                 "objectCategory".as_bytes(),
-                                ["CN=Container,CN=Schema,CN=Configuration,DC=sble,DC=test"
-                                    .as_bytes()]
-                                .into(),
+                                [format!("CN=Container,{schema_distinguished_name}").as_bytes()]
+                                    .into(),
                             ),
                             ("unicodePwd".as_bytes(), [&*password_ad_encoded].into()),
                             ("userAccountControl".as_bytes(), ["66048".as_bytes()].into()),

@@ -28,6 +28,8 @@ pub enum AdminBackend {
     ActiveDirectory {
         ldap_server: String,
         password_cache_secret: SecretReference,
+        user_distinguished_name: String,
+        schema_distinguished_name: String,
     },
 }
 
