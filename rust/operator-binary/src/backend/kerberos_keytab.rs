@@ -209,11 +209,13 @@ cluster.local = {realm_name}
                     KerberosKeytabBackendAdmin::Mit { .. } => {
                         stackable_krb5_provision_keytab::AdminBackend::Mit
                     }
-                    KerberosKeytabBackendAdmin::ActiveDirectory { ldap_server } => {
-                        stackable_krb5_provision_keytab::AdminBackend::ActiveDirectory {
-                            ldap_server: ldap_server.to_string(),
-                        }
-                    }
+                    KerberosKeytabBackendAdmin::ActiveDirectory {
+                        ldap_server,
+                        password_cache_secret,
+                    } => stackable_krb5_provision_keytab::AdminBackend::ActiveDirectory {
+                        ldap_server: ldap_server.to_string(),
+                        password_cache_secret: password_cache_secret.clone(),
+                    },
                 },
             },
         )

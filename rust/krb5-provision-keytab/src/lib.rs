@@ -7,6 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use stackable_operator::k8s_openapi::api::core::v1::SecretReference;
 use tokio::{io::AsyncWriteExt, process::Command};
 
 #[derive(Serialize, Deserialize)]
@@ -24,7 +25,10 @@ pub struct PrincipalRequest {
 #[derive(Serialize, Deserialize)]
 pub enum AdminBackend {
     Mit,
-    ActiveDirectory { ldap_server: String },
+    ActiveDirectory {
+        ldap_server: String,
+        password_cache_secret: SecretReference,
+    },
 }
 
 #[derive(Serialize, Deserialize)]

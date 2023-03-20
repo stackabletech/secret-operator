@@ -13,7 +13,10 @@ use krb5::{
 use ldap3::{LdapConnAsync, LdapConnSettings};
 use snafu::{ResultExt, Snafu};
 use stackable_krb5_provision_keytab::{AdminBackend, Request, Response};
-use stackable_operator::k8s_openapi::{api::core::v1::Secret, ByteString};
+use stackable_operator::k8s_openapi::{
+    api::core::v1::{Secret, SecretReference},
+    ByteString,
+};
 use tracing::info;
 
 #[derive(Debug, Snafu)]
@@ -64,6 +67,7 @@ enum AdminConnection<'a> {
     },
     ActiveDirectory {
         ldap: ldap3::Ldap,
+        password_cache_secret: SecretReference,
     },
 }
 
@@ -92,7 +96,10 @@ async fn run() -> Result<Response, Error> {
             )
             .context(KadminInitSnafu)?,
         },
-        AdminBackend::ActiveDirectory { ldap_server } => {
+        AdminBackend::ActiveDirectory {
+            ldap_server,
+            password_cache_secret,
+        } => {
             let (ldap_conn, mut ldap) = LdapConnAsync::with_settings(
                 LdapConnSettings::new()
                     // FIXME: This is obviously not a good idea
@@ -103,7 +110,10 @@ async fn run() -> Result<Response, Error> {
             .unwrap();
             ldap3::drive!(ldap_conn);
             ldap.sasl_gssapi_bind(&ldap_server).await.unwrap();
-            AdminConnection::ActiveDirectory { ldap }
+            AdminConnection::ActiveDirectory {
+                ldap,
+                password_cache_secret,
+            }
         }
     };
     let mut kt = Keytab::resolve(
@@ -158,12 +168,18 @@ async fn run() -> Result<Response, Error> {
                         .context(AddToKeytabSnafu { principal: &princ })?;
                 }
             }
-            AdminConnection::ActiveDirectory { ldap } => {
+            AdminConnection::ActiveDirectory {
+                ldap,
+                password_cache_secret,
+            } => {
                 let kube = stackable_operator::client::create_client(None)
                     .await
                     .unwrap();
                 let mut password_cache = kube
-                    .get::<Secret>("ad-cred-cache", "default")
+                    .get::<Secret>(
+                        password_cache_secret.name.as_deref().unwrap(),
+                        password_cache_secret.namespace.as_deref().unwrap(),
+                    )
                     .await
                     .unwrap();
                 let password_cache_key = princ_req.name.replace(['/', '@'], "--");
@@ -237,7 +253,6 @@ async fn run() -> Result<Response, Error> {
                         &password_cache,
                         &Secret {
                             data: Some([(password_cache_key, ByteString(password.into()))].into()),
-                            // metadata: None,
                             ..Secret::default()
                         },
                     )

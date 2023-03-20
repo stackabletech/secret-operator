@@ -4,8 +4,21 @@ kind: Job
 metadata:
   name: krb5-client
 spec:
+  completions: 5
+  parallelism: 5
   template:
+    metadata:
+      labels:
+        job: krb5-client
     spec:
+      # Push pods towards executing on the same nodes, to artificially trigger principal conflicts
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  job: krb5-client
+              topologyKey: kubernetes.io/hostname
       containers:
         - name: client
           image: docker.stackable.tech/stackable/krb5:1.18.2-stackable23.4.0-rc1
