@@ -241,6 +241,16 @@ async fn run() -> Result<Response, Error> {
                                 "userPrincipalName".as_bytes(),
                                 [princ_name.as_bytes()].into(),
                             ),
+                            (
+                                "servicePrincipalName".as_bytes(),
+                                // FIXME: Assumes that principal request is given without realm, unparse without realm instead
+                                [princ_req.name.as_bytes()].into(),
+                            ),
+                            (
+                                // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-kile/6cfc7b50-11ed-4b4d-846d-6f08f0812919
+                                "msDS-SupportedEncryptionTypes".as_bytes(),
+                                ["24".as_bytes()].into(),
+                            ),
                         ],
                     )
                     .await
