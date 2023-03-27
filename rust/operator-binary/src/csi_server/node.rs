@@ -134,6 +134,7 @@ impl From<UnpublishError> for Status {
 pub struct SecretProvisionerNode {
     pub client: stackable_operator::client::Client,
     pub node_name: String,
+    pub privileged: bool,
 }
 
 impl SecretProvisionerNode {
@@ -158,14 +159,18 @@ impl SecretProvisionerNode {
                 _ => return Err(err).context(publish_error::CreateDirSnafu { path: target_path }),
             },
         }
-        Mount::new(
-            "",
-            target_path,
-            "tmpfs",
-            MountFlags::NODEV | MountFlags::NOEXEC | MountFlags::NOSUID,
-            None,
-        )
-        .context(publish_error::MountSnafu { path: target_path })?;
+        if self.privileged {
+            Mount::new(
+                "",
+                target_path,
+                "tmpfs",
+                MountFlags::NODEV | MountFlags::NOEXEC | MountFlags::NOSUID,
+                None,
+            )
+            .context(publish_error::MountSnafu { path: target_path })?;
+        } else {
+            tracing::info!("Running in unprivileged mode, not creating mount for secret volume");
+        }
         // User: root/secret-operator
         // Group: Controlled by Pod.securityContext.fsGroup, the actual application
         // (when running as unprivileged user)
@@ -260,23 +265,37 @@ impl SecretProvisionerNode {
     }
 
     async fn clean_secret_dir(&self, target_path: &Path) -> Result<(), UnpublishError> {
-        match unmount(target_path, UnmountFlags::empty()) {
-            Ok(_) => {}
-            Err(err) => match err.kind() {
-                std::io::ErrorKind::NotFound => {
-                    tracing::warn!(volume.path = %target_path.display(), "Tried to delete volume path that does not exist, assuming it was already deleted");
-                    return Ok(());
-                }
-                std::io::ErrorKind::InvalidInput => {
-                    tracing::warn!(volume.path = %target_path.display(), "Tried to unmount volume path that is not mounted, trying to delete it anyway");
-                }
-                _ => return Err(err).context(unpublish_error::UnmountSnafu { path: target_path }),
-            },
-        };
-        tokio::fs::remove_dir(&target_path)
-            .await
-            .context(unpublish_error::DeleteSnafu { path: target_path })?;
-        Ok(())
+        // unmount() fails unconditionally with PermissionDenied when running in an unprivileged container,
+        // even if it wouldn't be sensible to even try anyway (such as when there is no volume mount).
+        if self.privileged {
+            match unmount(target_path, UnmountFlags::empty()) {
+                Ok(_) => {}
+                Err(err) => match err.kind() {
+                    std::io::ErrorKind::NotFound => {
+                        tracing::warn!(volume.path = %target_path.display(), "Tried to unmount volume path that does not exist, assuming it was already deleted");
+                        return Ok(());
+                    }
+                    std::io::ErrorKind::InvalidInput => {
+                        tracing::warn!(volume.path = %target_path.display(), "Tried to unmount volume path that is not mounted, trying to delete it anyway");
+                    }
+                    _ => {
+                        return Err(err)
+                            .context(unpublish_error::UnmountSnafu { path: target_path })
+                    }
+                },
+            };
+        }
+        // There is no mount in unprivileged mode, so we need to remove all contents in that case.
+        // This may still apply to privileged mode, in case users are migrating from unprivileged to privileged mode.
+        match tokio::fs::remove_dir_all(&target_path).await {
+            Ok(_) => Ok(()),
+            // We already catch this above when running in privileged mode, but in unprivileged mode this is still possible
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                tracing::warn!(volume.path = %target_path.display(), "Tried to delete volume path that does not exist, assuming it was already deleted");
+                Ok(())
+            }
+            Err(err) => Err(err).context(unpublish_error::DeleteSnafu { path: target_path }),
+        }
     }
 }
 
@@ -306,28 +325,34 @@ impl Node for SecretProvisionerNode {
         &self,
         request: Request<NodePublishVolumeRequest>,
     ) -> Result<Response<NodePublishVolumeResponse>, Status> {
-        let request = request.into_inner();
-        let target_path = PathBuf::from(request.target_path);
-        tracing::info!(
-            volume.path = %target_path.display(),
-            "Received NodePublishVolume request"
-        );
-        let selector =
-            SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
-                .context(publish_error::InvalidSelectorSnafu)?;
-        let pod_info = self.get_pod_info(&selector).await?;
-        let backend = backend::dynamic::from_selector(&self.client, &selector)
-            .await
-            .context(publish_error::InitBackendSnafu)?;
-        let data = backend
-            .get_secret_data(&selector, pod_info)
-            .await
-            .context(publish_error::BackendGetSecretDataSnafu)?;
-        self.tag_pod(&self.client, &request.volume_id, &selector, &data)
-            .await?;
-        self.prepare_secret_dir(&target_path).await?;
-        self.save_secret_data(&target_path, &data).await?;
-        Ok(Response::new(NodePublishVolumeResponse {}))
+        log_if_endpoint_error(
+            "failed to publish volume",
+            async move {
+                let request = request.into_inner();
+                let target_path = PathBuf::from(request.target_path);
+                tracing::info!(
+                    volume.path = %target_path.display(),
+                    "Received NodePublishVolume request"
+                );
+                let selector =
+                    SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
+                        .context(publish_error::InvalidSelectorSnafu)?;
+                let pod_info = self.get_pod_info(&selector).await?;
+                let backend = backend::dynamic::from_selector(&self.client, &selector)
+                    .await
+                    .context(publish_error::InitBackendSnafu)?;
+                let data = backend
+                    .get_secret_data(&selector, pod_info)
+                    .await
+                    .context(publish_error::BackendGetSecretDataSnafu)?;
+                self.tag_pod(&self.client, &request.volume_id, &selector, &data)
+                    .await?;
+                self.prepare_secret_dir(&target_path).await?;
+                self.save_secret_data(&target_path, &data).await?;
+                Ok(Response::new(NodePublishVolumeResponse {}))
+            }
+            .await,
+        )
     }
 
     // Called when a pod is terminated that contained a volume created by this provider.
@@ -338,14 +363,20 @@ impl Node for SecretProvisionerNode {
         &self,
         request: Request<NodeUnpublishVolumeRequest>,
     ) -> Result<Response<NodeUnpublishVolumeResponse>, Status> {
-        let request = request.into_inner();
-        let target_path = PathBuf::from(request.target_path);
-        tracing::info!(
-            volume.path = %target_path.display(),
-            "Received NodeUnpublishVolume request"
-        );
-        self.clean_secret_dir(&target_path).await?;
-        Ok(Response::new(NodeUnpublishVolumeResponse {}))
+        log_if_endpoint_error(
+            "Failed to unpublish volume",
+            async move {
+                let request = request.into_inner();
+                let target_path = PathBuf::from(request.target_path);
+                tracing::info!(
+                    volume.path = %target_path.display(),
+                    "Received NodeUnpublishVolume request"
+                );
+                self.clean_secret_dir(&target_path).await?;
+                Ok(Response::new(NodeUnpublishVolumeResponse {}))
+            }
+            .await,
+        )
     }
 
     async fn node_get_volume_stats(
@@ -383,4 +414,14 @@ impl Node for SecretProvisionerNode {
             }),
         }))
     }
+}
+
+fn log_if_endpoint_error<T, E: std::error::Error + 'static>(
+    error_msg: &str,
+    res: Result<T, E>,
+) -> Result<T, E> {
+    if let Err(err) = &res {
+        tracing::warn!(error = err as &dyn std::error::Error, "{error_msg}");
+    }
+    res
 }

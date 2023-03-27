@@ -1,3 +1,4 @@
+use anyhow::Context;
 use clap::{crate_description, crate_version, Parser};
 use csi_server::{
     controller::SecretProvisionerController, identity::SecretProvisionerIdentity,
@@ -35,6 +36,14 @@ struct SecretOperatorRun {
     csi_endpoint: PathBuf,
     #[clap(long, env)]
     node_name: String,
+    /// Unprivileged mode disables any features that require running secret-operator in a privileged container.
+    ///
+    /// Currently, this means that:
+    /// - Secret volumes will be stored on disk, rather than in a ramdisk
+    ///
+    /// Unprivileged mode is EXPERIMENTAL and heavily discouraged, since it increases the risk of leaking secrets.
+    #[clap(long, env)]
+    privileged: bool,
     /// Tracing log collector system
     #[arg(long, env, default_value_t, value_enum)]
     pub tracing_target: TracingTarget,
@@ -56,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
             csi_endpoint,
             node_name,
             tracing_target,
+            privileged,
         }) => {
             stackable_operator::logging::initialize_logging(
                 "SECRET_PROVISIONER_LOG",
@@ -92,10 +102,16 @@ async fn main() -> anyhow::Result<()> {
                 .add_service(ControllerServer::new(SecretProvisionerController {
                     client: client.clone(),
                 }))
-                .add_service(NodeServer::new(SecretProvisionerNode { client, node_name }))
+                .add_service(NodeServer::new(SecretProvisionerNode {
+                    client,
+                    node_name,
+                    privileged,
+                }))
                 .serve_with_incoming_shutdown(
-                    UnixListenerStream::new(uds_bind_private(csi_endpoint)?)
-                        .map_ok(TonicUnixStream),
+                    UnixListenerStream::new(
+                        uds_bind_private(csi_endpoint).context("failed to bind CSI listener")?,
+                    )
+                    .map_ok(TonicUnixStream),
                     sigterm.recv().map(|_| ()),
                 )
                 .await?;
