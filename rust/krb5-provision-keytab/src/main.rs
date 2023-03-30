@@ -1,24 +1,16 @@
 use std::{
-    collections::BTreeMap,
     ffi::{CString, NulError},
     fmt::Display,
     io::{stdin, BufReader},
 };
 
-use byteorder::{LittleEndian, WriteBytesExt};
-use krb5::{
-    kadm5::{self, KVNO_ALL},
-    Keyblock, Keytab,
-};
-use ldap3::{LdapConnAsync, LdapConnSettings};
-use rand::{seq::SliceRandom, thread_rng, CryptoRng};
+use krb5::{kadm5, Keyblock, Keytab};
 use snafu::{ResultExt, Snafu};
 use stackable_krb5_provision_keytab::{AdminBackend, Request, Response};
-use stackable_operator::k8s_openapi::{
-    api::core::v1::{Secret, SecretReference},
-    ByteString,
-};
 use tracing::info;
+
+mod active_directory;
+mod mit;
 
 #[derive(Debug, Snafu)]
 enum Error {
@@ -26,6 +18,10 @@ enum Error {
     DeserializeRequest { source: serde_json::Error },
     #[snafu(display("failed to init krb5 context"))]
     KrbInit { source: krb5::Error },
+    #[snafu(display("failed to init MIT admin client"))]
+    MitAdminInit { source: mit::Error },
+    #[snafu(display("failed to init Active Directory admin client"))]
+    ActiveDirectoryInit { source: active_directory::Error },
     #[snafu(display("failed to init kadmin server handle"))]
     KadminInit { source: kadm5::Error },
     #[snafu(display("failed to decode admin principal name"))]
@@ -43,41 +39,33 @@ enum Error {
         source: krb5::Error,
         principal: String,
     },
+    #[snafu(display("failed to prepare principal {principal} (backend: MIT)"))]
+    PreparePrincipalMit {
+        source: mit::Error,
+        principal: String,
+    },
+    #[snafu(display("failed to prepare principal {principal} (backend: Active Directory)"))]
+    PreparePrincipalActiveDirectory {
+        source: active_directory::Error,
+        principal: String,
+    },
     #[snafu(display("failed to create principal {principal}"))]
     CreatePrincipal {
         source: kadm5::Error,
         principal: String,
     },
-    #[snafu(display("failed to get keys for principal {principal}"))]
-    GetPrincipalKeys {
-        source: kadm5::Error,
-        principal: String,
-    },
-    #[snafu(display("failed to create dummy key"))]
-    CreateDummyKey { source: krb5::Error },
-    #[snafu(display("failed to add key for principal {principal} to keytab"))]
-    AddToKeytab {
-        source: krb5::Error,
-        principal: String,
-    },
+    #[snafu(display("failed to add dummy key keytab"))]
+    AddDummyToKeytab { source: krb5::Error },
 }
 
 enum AdminConnection<'a> {
-    Mit {
-        kadmin: krb5::kadm5::ServerHandle<'a>,
-    },
-    ActiveDirectory {
-        ldap: ldap3::Ldap,
-        password_cache_secret: SecretReference,
-        user_distinguished_name: String,
-        schema_distinguished_name: String,
-    },
+    Mit(mit::MitAdmin<'a>),
+    ActiveDirectory(active_directory::AdAdmin<'a>),
 }
 
 async fn run() -> Result<Response, Error> {
     let req = serde_json::from_reader::<_, Request>(BufReader::new(stdin().lock()))
         .context(DeserializeRequestSnafu)?;
-    let config_params = krb5::kadm5::ConfigParams::default();
     info!("initing context");
     let krb = krb5::KrbContext::new().context(KrbInitSnafu)?;
     let admin_principal_name =
@@ -87,41 +75,26 @@ async fn run() -> Result<Response, Error> {
     info!("initing kadmin");
 
     let mut admin = match req.admin_backend {
-        AdminBackend::Mit => AdminConnection::Mit {
-            kadmin: krb5::kadm5::ServerHandle::new(
-                &krb,
-                &admin_principal_name,
-                None,
-                &krb5::kadm5::Credential::ServiceKey {
-                    keytab: admin_keytab_path,
-                },
-                &config_params,
-            )
-            .context(KadminInitSnafu)?,
-        },
+        AdminBackend::Mit => AdminConnection::Mit(
+            mit::MitAdmin::connect(&krb, &admin_principal_name, &admin_keytab_path)
+                .context(MitAdminInitSnafu)?,
+        ),
         AdminBackend::ActiveDirectory {
             ldap_server,
             password_cache_secret,
             user_distinguished_name,
             schema_distinguished_name,
-        } => {
-            let (ldap_conn, mut ldap) = LdapConnAsync::with_settings(
-                LdapConnSettings::new()
-                    // FIXME: This is obviously not a good idea
-                    .set_no_tls_verify(true),
-                &format!("ldaps://{ldap_server}"),
-            )
-            .await
-            .unwrap();
-            ldap3::drive!(ldap_conn);
-            ldap.sasl_gssapi_bind(&ldap_server).await.unwrap();
-            AdminConnection::ActiveDirectory {
-                ldap,
+        } => AdminConnection::ActiveDirectory(
+            active_directory::AdAdmin::connect(
+                &ldap_server,
+                &krb,
                 password_cache_secret,
                 user_distinguished_name,
                 schema_distinguished_name,
-            }
-        }
+            )
+            .await
+            .unwrap(),
+        ),
     };
     let mut kt = Keytab::resolve(
         &krb,
@@ -144,12 +117,10 @@ async fn run() -> Result<Response, Error> {
         0,
         // keyblock len must be >0, or kt.add() will always fail
         &Keyblock::new(&krb, 0, 1)
-            .context(CreateDummyKeySnafu)?
+            .context(AddDummyToKeytabSnafu)?
             .as_ref(),
     )
-    .context(AddToKeytabSnafu {
-        principal: &dummy_principal,
-    })?;
+    .context(AddDummyToKeytabSnafu)?;
 
     for princ_req in req.principals {
         let princ = krb
@@ -160,133 +131,13 @@ async fn run() -> Result<Response, Error> {
                 principal: &princ_req.name,
             })?;
         match &mut admin {
-            AdminConnection::Mit { kadmin } => {
-                match kadmin.create_principal(&princ) {
-                    Err(kadm5::Error { code, .. }) if code.0 == kadm5::error_code::DUP => {
-                        info!("principal {princ} already exists, reusing")
-                    }
-                    res => res.context(CreatePrincipalSnafu { principal: &princ })?,
-                }
-                let keys = kadmin
-                    .get_principal_keys(&princ, KVNO_ALL)
-                    .context(GetPrincipalKeysSnafu { principal: &princ })?;
-                for key in keys.keys() {
-                    kt.add(&princ, key.kvno, &key.keyblock)
-                        .context(AddToKeytabSnafu { principal: &princ })?;
-                }
-            }
-            AdminConnection::ActiveDirectory {
-                ldap,
-                password_cache_secret,
-                user_distinguished_name,
-                schema_distinguished_name,
-            } => {
-                let kube = stackable_operator::client::create_client(None)
-                    .await
-                    .unwrap();
-                let princ_name = princ.to_string();
-                let mut password_cache = kube
-                    .get::<Secret>(
-                        password_cache_secret.name.as_deref().unwrap(),
-                        password_cache_secret.namespace.as_deref().unwrap(),
-                    )
-                    .await
-                    .unwrap();
-                let password_cache_key = princ_name.replace(['/', '@'], "--");
-                let password = if let Some(pw) = password_cache
-                    .data
-                    .get_or_insert_with(BTreeMap::default)
-                    .get(&password_cache_key)
-                {
-                    tracing::info!(
-                        principal = princ_req.name,
-                        cache_key = password_cache_key,
-                        "found principal in key cache, reusing"
-                    );
-                    pw.0.clone()
-                } else {
-                    tracing::info!(
-                        principal = princ_req.name,
-                        cache_key = password_cache_key,
-                        "did not find principal in key cache, creating"
-                    );
-                    tracing::info!(principal = ?princ_req.name, "Creating principal");
-                    let principal_cn = ldap3::dn_escape(&*princ_req.name);
-                    // FIXME: AD restricts RDNs to 64 characters
-                    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
-                    let password = generate_ad_password(40);
-                    let password_ad_encoded = {
-                        let mut pwd_utf16le = Vec::new();
-                        format!("\"{password}\"").encode_utf16().for_each(|word| {
-                            WriteBytesExt::write_u16::<LittleEndian>(&mut pwd_utf16le, word)
-                                .unwrap()
-                        });
-                        pwd_utf16le
-                    };
-                    let user_dn = format!("CN={principal_cn},{user_distinguished_name}",);
-                    ldap.add(
-                        &user_dn,
-                        vec![
-                            ("cn".as_bytes(), [principal_cn.as_bytes()].into()),
-                            ("objectClass".as_bytes(), ["user".as_bytes()].into()),
-                            ("instanceType".as_bytes(), ["4".as_bytes()].into()),
-                            (
-                                "objectCategory".as_bytes(),
-                                [format!("CN=Container,{schema_distinguished_name}").as_bytes()]
-                                    .into(),
-                            ),
-                            ("unicodePwd".as_bytes(), [&*password_ad_encoded].into()),
-                            ("userAccountControl".as_bytes(), ["66048".as_bytes()].into()),
-                            (
-                                "userPrincipalName".as_bytes(),
-                                [princ_name.as_bytes()].into(),
-                            ),
-                            (
-                                "servicePrincipalName".as_bytes(),
-                                // FIXME: Assumes that principal request is given without realm, unparse without realm instead
-                                [princ_req.name.as_bytes()].into(),
-                            ),
-                            (
-                                // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-kile/6cfc7b50-11ed-4b4d-846d-6f08f0812919
-                                "msDS-SupportedEncryptionTypes".as_bytes(),
-                                ["24".as_bytes()].into(),
-                            ),
-                        ],
-                    )
-                    .await
-                    .unwrap()
-                    .success()
-                    .unwrap();
-                    // CONCURRENCY: ldap.add() will only succeed once per principal, so
-                    // we are by definition the unique writer of this key.
-                    // FIXME: What about cases where ldap.add() succeeds but not the cache write?
-                    kube.merge_patch(
-                        &password_cache,
-                        &Secret {
-                            data: Some(
-                                [(password_cache_key, ByteString(password.as_str().into()))].into(),
-                            ),
-                            ..Secret::default()
-                        },
-                    )
-                    .await
-                    .unwrap();
-                    Vec::<u8>::from(password)
-                };
-                kt.add(
-                    &princ,
-                    0,
-                    &Keyblock::from_password(
-                        &krb,
-                        krb5::enctype::AES256_CTS_HMAC_SHA1_96,
-                        &CString::new(password).unwrap(),
-                        &princ.default_salt().unwrap(),
-                    )
-                    .unwrap()
-                    .as_ref(),
-                )
-                .unwrap();
-            }
+            AdminConnection::Mit(mit) => mit
+                .create_and_add_principal_to_keytab(&princ, &mut kt)
+                .context(PreparePrincipalMitSnafu { principal: &princ })?,
+            AdminConnection::ActiveDirectory(ad) => ad
+                .create_and_add_principal_to_keytab(&princ, &mut kt)
+                .await
+                .context(PreparePrincipalActiveDirectorySnafu { principal: &princ })?,
         }
     }
     Ok(Response {})
@@ -324,21 +175,4 @@ async fn main() {
     let res = run().await.map_err(|err| Report::from(err).to_string());
     println!("{}", serde_json::to_string_pretty(&res).unwrap());
     std::process::exit(res.is_ok().into());
-}
-
-fn generate_ad_password(len: usize) -> String {
-    let mut rng = thread_rng();
-    // Assert that `rng` is crypto-safe
-    let _: &dyn CryptoRng = &rng;
-    // Allow all ASCII alphanumeric characters as well as punctuation
-    // Exclude double quotes (") since they are used by the AD password update protocol...
-    let dict: Vec<char> = (1..=127)
-        .filter_map(char::from_u32)
-        .filter(|c| *c != '"' && (c.is_ascii_alphanumeric() || c.is_ascii_punctuation()))
-        .collect();
-    let pw = (0..len)
-        .map(|_| *dict.choose(&mut rng).unwrap())
-        .collect::<String>();
-    assert_eq!(pw.len(), len);
-    pw
 }

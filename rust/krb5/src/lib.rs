@@ -3,7 +3,7 @@
 //! The primary entry point is [`KrbContext`].
 
 use std::{
-    ffi::CStr,
+    ffi::{c_int, CStr},
     fmt::{Debug, Display},
     ops::Deref,
 };
@@ -160,6 +160,27 @@ impl<'a> Principal<'a> {
             })
         }
     }
+
+    pub fn unparse(&self, options: PrincipalUnparseOptions) -> Result<String, Error> {
+        let mut raw_name = std::ptr::null_mut();
+        unsafe {
+            Error::from_call_result(
+                Some(self.ctx),
+                krb5_sys::krb5_unparse_name_flags(
+                    self.ctx.raw,
+                    self.raw,
+                    options.to_flags(),
+                    &mut raw_name,
+                ),
+            )?;
+        };
+        // We need to take ownership before freeing it
+        let name: String = unsafe { CStr::from_ptr(raw_name) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe { krb5_sys::krb5_free_unparsed_name(self.ctx.raw, raw_name) }
+        Ok(name)
+    }
 }
 impl Drop for Principal<'_> {
     fn drop(&mut self) {
@@ -170,29 +191,40 @@ impl Drop for Principal<'_> {
 }
 impl Display for Principal<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut raw_name = std::ptr::null_mut();
-        let unparse_result = unsafe {
-            Error::from_call_result(
-                Some(self.ctx),
-                krb5_sys::krb5_unparse_name(self.ctx.raw, self.raw, &mut raw_name),
-            )
-        };
-        match unparse_result {
-            Ok(()) => {
-                let write_result = {
-                    let name = unsafe { CStr::from_ptr(raw_name) }.to_string_lossy();
-                    f.write_str(&name)
-                };
-                unsafe { krb5_sys::krb5_free_unparsed_name(self.ctx.raw, raw_name) }
-                write_result
-            }
-            Err(_) => f.write_str("(invalid)"),
-        }
+        let name = self.unparse(PrincipalUnparseOptions::default());
+        f.write_str(name.as_deref().unwrap_or("(invalid)"))
     }
 }
 impl From<&Principal<'_>> for String {
     fn from(princ: &Principal<'_>) -> Self {
         princ.to_string()
+    }
+}
+
+#[derive(Default, Clone, Copy)]
+pub struct PrincipalUnparseOptions {
+    pub realm: PrincipalRealmDisplayMode,
+    pub for_display: bool,
+}
+#[derive(Default, Clone, Copy)]
+pub enum PrincipalRealmDisplayMode {
+    #[default]
+    Always,
+    IfForeign,
+    Never,
+}
+impl PrincipalUnparseOptions {
+    fn to_flags(self) -> c_int {
+        let realm = match self.realm {
+            PrincipalRealmDisplayMode::Always => 0,
+            PrincipalRealmDisplayMode::IfForeign => krb5_sys::KRB5_PRINCIPAL_UNPARSE_SHORT as c_int,
+            PrincipalRealmDisplayMode::Never => krb5_sys::KRB5_PRINCIPAL_UNPARSE_NO_REALM as c_int,
+        };
+        let for_display = match self.for_display {
+            true => krb5_sys::KRB5_PRINCIPAL_UNPARSE_DISPLAY as c_int,
+            false => 0,
+        };
+        realm | for_display
     }
 }
 
