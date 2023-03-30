@@ -82,10 +82,10 @@ spec:
                           properties:
                             mit:
                               properties:
-                                adminServer:
+                                kadminServer:
                                   type: string
                               required:
-                                - adminServer
+                                - kadminServer
                               type: object
                           type: object
                         adminKeytabSecret:

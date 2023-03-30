@@ -74,7 +74,7 @@ pub struct KerberosKeytabBackend {
 #[serde(rename_all = "camelCase")]
 pub enum KerberosKeytabBackendAdmin {
     #[serde(rename_all = "camelCase")]
-    Mit { admin_server: Hostname },
+    Mit { kadmin_server: Hostname },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
