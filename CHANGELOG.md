@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added `kerberosKeytab` provisioner backend ([#99]).
+- Added `kerberosKeytab` provisioner backend ([#99], [#257]).
 
 ### Changed
 
@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 [#99]: https://github.com/stackabletech/secret-operator/pull/99
 [#231]: https://github.com/stackabletech/secret-operator/pull/231
 [#232]: https://github.com/stackabletech/secret-operator/pull/232
+[#257]: https://github.com/stackabletech/secret-operator/pull/257
 
 ## [23.1.0] - 2023-01-23
 
