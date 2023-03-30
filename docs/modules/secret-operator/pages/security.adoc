@@ -1,6 +1,6 @@
 = Security
 
-== Container Privileges
+== Container privileges
 
 By default, the Secret Operator runs as privileged root containers. This is done for three reasons:
 
