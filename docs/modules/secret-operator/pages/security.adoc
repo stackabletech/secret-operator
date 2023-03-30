@@ -2,7 +2,7 @@
 
 == Container privileges
 
-By default, the Secret Operator runs as privileged root containers. This is done for three reasons:
+By default, the Secret Operator runs as a set of privileged root containers. This is done for three reasons:
 
 1. We need to run as root to have permission to create the Unix Domain Socket hosting the Container Storage interface (CSI)
    driver.
