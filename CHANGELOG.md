@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Shortened the registration socket path for Microk8s compatibility ([#231]).
-  - The old CSI registration path will be automatically migrated during upgrade ([#258]).
+  - The old CSI registration path will be automatically migrated during upgrade ([#258], [#260]).
   - You might need to manually remove `/var/lib/kubelet/plugins_registry/secrets.stackable.tech-reg.sock` when downgrading
 - Made kubeletDir configurable ([#232]).
   - Microk8s users will need to `--set kubeletDir=/var/snap/microk8s/common/var/lib/kubelet`.
@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file.
 [#252]: https://github.com/stackabletech/secret-operator/pull/252
 [#257]: https://github.com/stackabletech/secret-operator/pull/257
 [#258]: https://github.com/stackabletech/secret-operator/pull/258
+[#260]: https://github.com/stackabletech/secret-operator/pull/260
 
 ## [23.1.0] - 2023-01-23
 
