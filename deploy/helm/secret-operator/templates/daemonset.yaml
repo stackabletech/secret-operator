@@ -97,6 +97,8 @@ spec:
           volumeMounts:
             - name: registration-sock
               mountPath: /registration
+          securityContext:
+            runAsUser: 0
       volumes:
         - name: registration-sock
           hostPath:
