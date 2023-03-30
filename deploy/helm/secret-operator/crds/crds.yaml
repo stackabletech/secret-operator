@@ -75,6 +75,19 @@ spec:
                       type: object
                     kerberosKeytab:
                       properties:
+                        admin:
+                          oneOf:
+                            - required:
+                                - mit
+                          properties:
+                            mit:
+                              properties:
+                                kadminServer:
+                                  type: string
+                              required:
+                                - kadminServer
+                              type: object
+                          type: object
                         adminKeytabSecret:
                           description: SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace
                           properties:
@@ -87,16 +100,14 @@ spec:
                           type: object
                         adminPrincipal:
                           type: string
-                        adminServer:
-                          type: string
                         kdc:
                           type: string
                         realmName:
                           type: string
                       required:
+                        - admin
                         - adminKeytabSecret
                         - adminPrincipal
-                        - adminServer
                         - kdc
                         - realmName
                       type: object

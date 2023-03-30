@@ -59,7 +59,7 @@ impl SecretBackendError for Error {
 pub struct KerberosProfile {
     pub realm_name: Hostname,
     pub kdc: Hostname,
-    pub admin_server: Hostname,
+    pub kadmin_server: Hostname,
 }
 
 pub struct KerberosKeytab {
@@ -123,7 +123,7 @@ impl SecretBackend for KerberosKeytab {
                 KerberosProfile {
                     realm_name,
                     kdc,
-                    admin_server,
+                    kadmin_server,
                 },
             admin_keytab,
             admin_principal,
@@ -141,7 +141,7 @@ udp_preference_limit = 1
 [realms]
 {realm_name} = {{
   kdc = {kdc}
-  admin_server = {admin_server}
+  admin_server = {kadmin_server}
 }}
 
 [domain_realm]
