@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added `kerberosKeytab` provisioner backend ([#99], [#257]).
+- Added `kerberosKeytab` provisioner backend using MIT Kerberos ([#99], [#257]).
 - Added experimental unprivileged mode ([#252]).
 
 ### Changed
