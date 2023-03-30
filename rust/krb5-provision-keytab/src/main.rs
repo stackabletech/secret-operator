@@ -93,7 +93,7 @@ async fn run() -> Result<Response, Error> {
                 schema_distinguished_name,
             )
             .await
-            .unwrap(),
+            .context(ActiveDirectoryInitSnafu)?,
         ),
     };
     let mut kt = Keytab::resolve(
