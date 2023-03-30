@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added `kerberosKeytab` provisioner backend ([#99]).
+- Added `kerberosKeytab` provisioner backend using MIT Kerberos ([#99], [#257]).
 - Added experimental unprivileged mode ([#252]).
 
 ### Changed
@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 [#231]: https://github.com/stackabletech/secret-operator/pull/231
 [#232]: https://github.com/stackabletech/secret-operator/pull/232
 [#252]: https://github.com/stackabletech/secret-operator/pull/252
+[#257]: https://github.com/stackabletech/secret-operator/pull/257
 [#258]: https://github.com/stackabletech/secret-operator/pull/258
 
 ## [23.1.0] - 2023-01-23
