@@ -78,6 +78,7 @@ pub enum KerberosKeytabBackendAdmin {
     #[serde(rename_all = "camelCase")]
     ActiveDirectory {
         ldap_server: Hostname,
+        ldap_tls_ca_secret: SecretReference,
         password_cache_secret: SecretReference,
         user_distinguished_name: String,
         schema_distinguished_name: String,

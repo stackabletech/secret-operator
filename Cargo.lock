@@ -2156,6 +2156,7 @@ dependencies = [
  "byteorder",
  "krb5",
  "ldap3",
+ "native-tls",
  "rand",
  "serde",
  "serde_json",

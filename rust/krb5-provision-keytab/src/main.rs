@@ -81,6 +81,7 @@ async fn run() -> Result<Response, Error> {
         ),
         AdminBackend::ActiveDirectory {
             ldap_server,
+            ldap_tls_ca_secret,
             password_cache_secret,
             user_distinguished_name,
             schema_distinguished_name,
@@ -88,6 +89,7 @@ async fn run() -> Result<Response, Error> {
             active_directory::AdAdmin::connect(
                 &ldap_server,
                 &krb,
+                ldap_tls_ca_secret,
                 password_cache_secret,
                 user_distinguished_name,
                 schema_distinguished_name,

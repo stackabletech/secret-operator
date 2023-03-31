@@ -19,6 +19,21 @@ use stackable_operator::{
 
 #[derive(Debug, Snafu)]
 pub enum Error {
+    #[snafu(display("LDAP TLS CA reference is invalid"))]
+    LdapTlsCaReferenceInvalid { source: IncompleteSecretRef },
+    #[snafu(display("failed to retrieve LDAP TLS CA {ca_ref}"))]
+    GetLdapTlsCa {
+        source: stackable_operator::error::Error,
+        ca_ref: FullSecretRef,
+    },
+    #[snafu(display("LDAP TLS CA secret is missing required key {key}"))]
+    LdapTlsCaKeyMissing { key: String },
+    #[snafu(display("failed to parse LDAP TLS CA"))]
+    ParseLdapTlsCa { source: native_tls::Error },
+    #[snafu(display("password cache reference is invalid"))]
+    PasswordCacheReferenceInvalid { source: IncompleteSecretRef },
+    #[snafu(display("failed to configure LDAP TLS"))]
+    ConfigureLdapTls { source: native_tls::Error },
     #[snafu(display("failed to connect to LDAP server"))]
     ConnectLdap { source: ldap3::LdapError },
     #[snafu(display("failed to authenticate to LDAP server"))]
@@ -30,17 +45,15 @@ pub enum Error {
 
     #[snafu(display("failed to unparse Kerberos principal"))]
     UnparsePrincipal { source: krb5::Error },
-    #[snafu(display("password cache is missing {field}"))]
-    PasswordCacheReferenceFieldMissing { field: String },
     #[snafu(display("failed to get password cache {password_cache_ref}"))]
     GetPasswordCache {
         source: stackable_operator::error::Error,
-        password_cache_ref: PasswordCacheRef,
+        password_cache_ref: FullSecretRef,
     },
     #[snafu(display("failed to update password cache {password_cache_ref}"))]
     UpdatePasswordCache {
         source: stackable_operator::error::Error,
-        password_cache_ref: PasswordCacheRef,
+        password_cache_ref: FullSecretRef,
     },
     #[snafu(display("failed to create LDAP user"))]
     CreateLdapUser { source: ldap3::LdapError },
@@ -49,7 +62,7 @@ pub enum Error {
     ))]
     CreateLdapUserConflict {
         source: ldap3::LdapError,
-        password_cache_ref: PasswordCacheRef,
+        password_cache_ref: FullSecretRef,
     },
     #[snafu(display("failed to decode generated password"))]
     DecodePassword { source: NulError },
@@ -65,7 +78,7 @@ pub struct AdAdmin<'a> {
     ldap: Ldap,
     krb: &'a KrbContext,
     kube: stackable_operator::client::Client,
-    password_cache_ref: PasswordCacheRef,
+    password_cache_ref: FullSecretRef,
     user_distinguished_name: String,
     schema_distinguished_name: String,
 }
@@ -74,14 +87,21 @@ impl<'a> AdAdmin<'a> {
     pub async fn connect(
         ldap_server: &str,
         krb: &'a KrbContext,
+        ldap_tls_ca_secret: SecretReference,
         password_cache_secret: SecretReference,
         user_distinguished_name: String,
         schema_distinguished_name: String,
     ) -> Result<AdAdmin<'a>> {
+        let kube = stackable_operator::client::create_client(None)
+            .await
+            .context(KubeInitSnafu)?;
+        let ldap_tls = native_tls::TlsConnector::builder()
+            .disable_built_in_roots(true)
+            .add_root_certificate(get_ldap_ca_certificate(&kube, ldap_tls_ca_secret).await?)
+            .build()
+            .context(ConfigureLdapTlsSnafu)?;
         let (ldap_conn, mut ldap) = LdapConnAsync::with_settings(
-            LdapConnSettings::new()
-                // FIXME: This is obviously not a good idea
-                .set_no_tls_verify(true),
+            LdapConnSettings::new().set_connector(ldap_tls),
             &format!("ldaps://{ldap_server}"),
         )
         .await
@@ -90,14 +110,13 @@ impl<'a> AdAdmin<'a> {
         ldap.sasl_gssapi_bind(ldap_server)
             .await
             .context(LdapAuthnSnafu)?;
-        let kube = stackable_operator::client::create_client(None)
-            .await
-            .context(KubeInitSnafu)?;
         Ok(Self {
             ldap,
             krb,
             kube,
-            password_cache_ref: password_cache_secret.try_into()?,
+            password_cache_ref: password_cache_secret
+                .try_into()
+                .context(PasswordCacheReferenceInvalidSnafu)?,
             user_distinguished_name,
             schema_distinguished_name,
         })
@@ -239,36 +258,63 @@ impl<'a> AdAdmin<'a> {
     }
 }
 
+#[derive(Debug, Snafu)]
+#[snafu(display("secret ref is missing {field}"))]
+pub struct IncompleteSecretRef {
+    field: String,
+}
 #[derive(Debug, Clone)]
-pub struct PasswordCacheRef {
+pub struct FullSecretRef {
     name: String,
     namespace: String,
 }
-impl TryFrom<SecretReference> for PasswordCacheRef {
-    type Error = Error;
+impl TryFrom<SecretReference> for FullSecretRef {
+    type Error = IncompleteSecretRef;
 
-    fn try_from(secret_ref: SecretReference) -> Result<Self> {
+    fn try_from(secret_ref: SecretReference) -> Result<Self, IncompleteSecretRef> {
         Ok(Self {
             name: secret_ref
                 .name
-                .context(PasswordCacheReferenceFieldMissingSnafu { field: "name" })?,
+                .context(IncompleteSecretRefSnafu { field: "name" })?,
             namespace: secret_ref
                 .namespace
-                .context(PasswordCacheReferenceFieldMissingSnafu { field: "namespace" })?,
+                .context(IncompleteSecretRefSnafu { field: "namespace" })?,
         })
     }
 }
-impl From<&PasswordCacheRef> for PasswordCacheRef {
-    fn from(pcr: &PasswordCacheRef) -> Self {
+impl From<&FullSecretRef> for FullSecretRef {
+    fn from(pcr: &FullSecretRef) -> Self {
         pcr.clone()
     }
 }
-impl Display for PasswordCacheRef {
+impl Display for FullSecretRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         ObjectRef::<Secret>::new(&self.name)
             .within(&self.namespace)
             .fmt(f)
     }
+}
+
+async fn get_ldap_ca_certificate(
+    kube: &stackable_operator::client::Client,
+    ca_secret_ref: SecretReference,
+) -> Result<native_tls::Certificate> {
+    let ca_secret_ref: FullSecretRef = ca_secret_ref
+        .try_into()
+        .context(LdapTlsCaReferenceInvalidSnafu)?;
+    let ca_secret = kube
+        .get::<Secret>(&ca_secret_ref.name, &ca_secret_ref.namespace)
+        .await
+        .context(GetLdapTlsCaSnafu {
+            ca_ref: ca_secret_ref,
+        })?;
+    let ca_key = "ca.crt";
+    let ca_cert_pem = ca_secret
+        .data
+        .and_then(|mut d| d.remove(ca_key))
+        .map(|ca| ca.0)
+        .context(LdapTlsCaKeyMissingSnafu { key: ca_key })?;
+    native_tls::Certificate::from_pem(&ca_cert_pem).context(ParseLdapTlsCaSnafu)
 }
 
 fn generate_ad_password(len: usize) -> String {

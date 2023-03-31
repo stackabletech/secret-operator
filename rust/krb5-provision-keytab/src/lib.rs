@@ -27,6 +27,7 @@ pub enum AdminBackend {
     Mit,
     ActiveDirectory {
         ldap_server: String,
+        ldap_tls_ca_secret: SecretReference,
         password_cache_secret: SecretReference,
         user_distinguished_name: String,
         schema_distinguished_name: String,

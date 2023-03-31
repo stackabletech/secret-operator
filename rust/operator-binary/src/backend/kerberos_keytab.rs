@@ -211,11 +211,13 @@ cluster.local = {realm_name}
                     }
                     KerberosKeytabBackendAdmin::ActiveDirectory {
                         ldap_server,
+                        ldap_tls_ca_secret,
                         password_cache_secret,
                         user_distinguished_name,
                         schema_distinguished_name,
                     } => stackable_krb5_provision_keytab::AdminBackend::ActiveDirectory {
                         ldap_server: ldap_server.to_string(),
+                        ldap_tls_ca_secret: ldap_tls_ca_secret.clone(),
                         password_cache_secret: password_cache_secret.clone(),
                         user_distinguished_name: user_distinguished_name.clone(),
                         schema_distinguished_name: schema_distinguished_name.clone(),
