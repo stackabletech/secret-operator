@@ -170,14 +170,6 @@ impl<'a> AdAdmin<'a> {
             // FIXME: AD restricts RDNs to 64 characters
             let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
             let password = generate_ad_password(40);
-            let password_ad_encoded = {
-                let mut pwd_utf16le = Vec::new();
-                format!("\"{password}\"").encode_utf16().for_each(|word| {
-                    WriteBytesExt::write_u16::<LittleEndian>(&mut pwd_utf16le, word)
-                        .expect("writing into a string is infallible")
-                });
-                pwd_utf16le
-            };
             let user_dn = format!("CN={principal_cn},{}", self.user_distinguished_name);
             let create_user_result =
                 self.ldap
@@ -193,7 +185,10 @@ impl<'a> AdAdmin<'a> {
                                     .as_bytes()]
                                 .into(),
                             ),
-                            ("unicodePwd".as_bytes(), [&*password_ad_encoded].into()),
+                            (
+                                "unicodePwd".as_bytes(),
+                                [&*encode_password_for_ad_update(&password)].into(),
+                            ),
                             ("userAccountControl".as_bytes(), ["66048".as_bytes()].into()),
                             (
                                 "userPrincipalName".as_bytes(),
@@ -332,4 +327,13 @@ fn generate_ad_password(len: usize) -> String {
         .collect::<String>();
     assert_eq!(pw.len(), len);
     pw
+}
+
+fn encode_password_for_ad_update(password: &str) -> Vec<u8> {
+    let mut pwd_utf16le = Vec::new();
+    format!("\"{password}\"").encode_utf16().for_each(|word| {
+        WriteBytesExt::write_u16::<LittleEndian>(&mut pwd_utf16le, word)
+            .expect("writing into a string is infallible")
+    });
+    pwd_utf16le
 }
