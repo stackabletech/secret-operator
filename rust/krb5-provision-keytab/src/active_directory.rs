@@ -133,73 +133,27 @@ impl<'a> AdAdmin<'a> {
         let princ_name = principal
             .unparse(PrincipalUnparseOptions::default())
             .context(UnparsePrincipalSnafu)?;
-        let princ_name_realmless = principal
-            .unparse(PrincipalUnparseOptions {
-                realm: krb5::PrincipalRealmDisplayMode::Never,
-                ..Default::default()
-            })
-            .context(UnparsePrincipalSnafu)?;
         let password_cache_key = princ_name.replace(['/', '@'], "--");
-        let password =
-            self.password_cache
-                // CONCURRENCY: ldap.add() will only succeed once per principal, so
-                // we are by definition the unique writer of this key.
-                .get_or_insert(&password_cache_key, |ctx| async {
-                    tracing::info!("creating principal");
-                    let principal_cn = ldap3::dn_escape(&princ_name);
-                    // FIXME: AD restricts RDNs to 64 characters
-                    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
-                    let password = generate_ad_password(40);
-                    let user_dn = format!("CN={principal_cn},{}", self.user_distinguished_name);
-                    let create_user_result = self
-                        .ldap
-                        .add(
-                            &user_dn,
-                            vec![
-                                ("cn".as_bytes(), [principal_cn.as_bytes()].into()),
-                                ("objectClass".as_bytes(), ["user".as_bytes()].into()),
-                                ("instanceType".as_bytes(), ["4".as_bytes()].into()),
-                                (
-                                    "objectCategory".as_bytes(),
-                                    [format!("CN=Container,{}", self.schema_distinguished_name)
-                                        .as_bytes()]
-                                    .into(),
-                                ),
-                                (
-                                    "unicodePwd".as_bytes(),
-                                    [&*encode_password_for_ad_update(&password)].into(),
-                                ),
-                                ("userAccountControl".as_bytes(), ["66048".as_bytes()].into()),
-                                (
-                                    "userPrincipalName".as_bytes(),
-                                    [princ_name.as_bytes()].into(),
-                                ),
-                                (
-                                    "servicePrincipalName".as_bytes(),
-                                    [princ_name_realmless.as_bytes()].into(),
-                                ),
-                                (
-                                    // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-kile/6cfc7b50-11ed-4b4d-846d-6f08f0812919
-                                    "msDS-SupportedEncryptionTypes".as_bytes(),
-                                    ["24".as_bytes()].into(),
-                                ),
-                            ],
-                        )
-                        .await
-                        .context(CreateLdapUserSnafu)?;
-                    match create_user_result.rc {
-                        LDAP_RESULT_CODE_ENTRY_ALREADY_EXISTS => create_user_result
-                            .success()
-                            .context(CreateLdapUserConflictSnafu {
-                                password_cache_ref: ctx.cache_ref,
-                            })?,
-                        _ => create_user_result.success().context(CreateLdapUserSnafu)?,
-                    };
-                    Ok(password.into_bytes())
-                })
-                .await
-                // FIXME: What about cases where ldap.add() succeeds but not the cache write?
-                .context(PasswordCacheSnafu)??;
+        let password = self
+            .password_cache
+            // CONCURRENCY: ldap.add() will only succeed once per principal, so
+            // we are by definition the unique writer of this key.
+            .get_or_insert(&password_cache_key, |ctx| async {
+                let password = generate_ad_password(40);
+                create_ad_user(
+                    &mut self.ldap,
+                    principal,
+                    &password,
+                    &self.user_distinguished_name,
+                    &self.schema_distinguished_name,
+                    ctx.cache_ref,
+                )
+                .await?;
+                Ok(password.into_bytes())
+            })
+            .await
+            // FIXME: What about cases where ldap.add() succeeds but not the cache write?
+            .context(PasswordCacheSnafu)??;
         let password_c = CString::new(password).context(DecodePasswordSnafu)?;
         principal
             .default_salt()
@@ -263,4 +217,85 @@ fn encode_password_for_ad_update(password: &str) -> Vec<u8> {
             .expect("writing into a string is infallible")
     });
     pwd_utf16le
+}
+
+#[tracing::instrument(skip(ldap, principal, password), fields(%principal))]
+async fn create_ad_user(
+    ldap: &mut Ldap,
+    principal: &Principal<'_>,
+    password: &str,
+    user_dn_base: &str,
+    schema_dn_base: &str,
+    password_cache_ref: FullSecretRef,
+) -> Result<()> {
+    // Flags are a subset of https://learn.microsoft.com/en-us/troubleshoot/windows-server/identity/useraccountcontrol-manipulate-account-properties
+    const AD_UAC_NORMAL_ACCOUNT: u32 = 0x0200;
+    const AD_UAC_DONT_EXPIRE_PASSWORD: u32 = 0x1_0000;
+
+    // Flags are a subset of https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-kile/6cfc7b50-11ed-4b4d-846d-6f08f0812919
+    const AD_ENCTYPE_AES128_HMAC_SHA1: u32 = 0x08;
+    const AD_ENCTYPE_AES256_HMAC_SHA1: u32 = 0x10;
+
+    tracing::info!("creating principal");
+    let princ_name = principal
+        .unparse(PrincipalUnparseOptions::default())
+        .context(UnparsePrincipalSnafu)?;
+    let princ_name_realmless = principal
+        .unparse(PrincipalUnparseOptions {
+            realm: krb5::PrincipalRealmDisplayMode::Never,
+            ..Default::default()
+        })
+        .context(UnparsePrincipalSnafu)?;
+    let principal_cn = ldap3::dn_escape(&princ_name);
+    // FIXME: AD restricts RDNs to 64 characters
+    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
+    let create_user_result = ldap
+        .add(
+            &format!("CN={principal_cn},{user_dn_base}"),
+            vec![
+                ("cn".as_bytes(), [principal_cn.as_bytes()].into()),
+                ("objectClass".as_bytes(), ["user".as_bytes()].into()),
+                ("instanceType".as_bytes(), ["4".as_bytes()].into()),
+                (
+                    "objectCategory".as_bytes(),
+                    [format!("CN=Container,{schema_dn_base}").as_bytes()].into(),
+                ),
+                (
+                    "unicodePwd".as_bytes(),
+                    [&*encode_password_for_ad_update(password)].into(),
+                ),
+                (
+                    "userAccountControl".as_bytes(),
+                    [(AD_UAC_NORMAL_ACCOUNT | AD_UAC_DONT_EXPIRE_PASSWORD)
+                        .to_string()
+                        .as_bytes()]
+                    .into(),
+                ),
+                (
+                    "userPrincipalName".as_bytes(),
+                    [princ_name.as_bytes()].into(),
+                ),
+                (
+                    "servicePrincipalName".as_bytes(),
+                    [princ_name_realmless.as_bytes()].into(),
+                ),
+                (
+                    // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-kile/6cfc7b50-11ed-4b4d-846d-6f08f0812919
+                    "msDS-SupportedEncryptionTypes".as_bytes(),
+                    [(AD_ENCTYPE_AES128_HMAC_SHA1 | AD_ENCTYPE_AES256_HMAC_SHA1)
+                        .to_string()
+                        .as_bytes()]
+                    .into(),
+                ),
+            ],
+        )
+        .await
+        .context(CreateLdapUserSnafu)?;
+    match create_user_result.rc {
+        LDAP_RESULT_CODE_ENTRY_ALREADY_EXISTS => create_user_result
+            .success()
+            .context(CreateLdapUserConflictSnafu { password_cache_ref })?,
+        _ => create_user_result.success().context(CreateLdapUserSnafu)?,
+    };
+    Ok(())
 }
