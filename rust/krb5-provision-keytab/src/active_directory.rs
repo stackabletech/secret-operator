@@ -1,20 +1,15 @@
-use std::{
-    collections::BTreeMap,
-    ffi::{CString, NulError},
-    fmt::Display,
-};
+use std::ffi::{CString, NulError};
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use krb5::{Keyblock, Keytab, KrbContext, Principal, PrincipalUnparseOptions};
 use ldap3::{Ldap, LdapConnAsync, LdapConnSettings};
 use rand::{seq::SliceRandom, thread_rng, CryptoRng};
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::{
-    k8s_openapi::{
-        api::core::v1::{Secret, SecretReference},
-        ByteString,
-    },
-    kube::runtime::reflector::ObjectRef,
+use stackable_operator::k8s_openapi::api::core::v1::{Secret, SecretReference};
+
+use crate::{
+    credential_cache::{self, CredentialCache},
+    secret_ref::{FullSecretRef, IncompleteSecretRef},
 };
 
 #[derive(Debug, Snafu)]
@@ -32,6 +27,8 @@ pub enum Error {
     ParseLdapTlsCa { source: native_tls::Error },
     #[snafu(display("password cache reference is invalid"))]
     PasswordCacheReferenceInvalid { source: IncompleteSecretRef },
+    #[snafu(display("password cache error"))]
+    PasswordCache { source: credential_cache::Error },
     #[snafu(display("failed to configure LDAP TLS"))]
     ConfigureLdapTls { source: native_tls::Error },
     #[snafu(display("failed to connect to LDAP server"))]
@@ -77,8 +74,7 @@ const LDAP_RESULT_CODE_ENTRY_ALREADY_EXISTS: u32 = 68;
 pub struct AdAdmin<'a> {
     ldap: Ldap,
     krb: &'a KrbContext,
-    kube: stackable_operator::client::Client,
-    password_cache_ref: FullSecretRef,
+    password_cache: CredentialCache,
     user_distinguished_name: String,
     schema_distinguished_name: String,
 }
@@ -110,13 +106,19 @@ impl<'a> AdAdmin<'a> {
         ldap.sasl_gssapi_bind(ldap_server)
             .await
             .context(LdapAuthnSnafu)?;
+        let password_cache = CredentialCache::new(
+            "AD passwords",
+            kube,
+            password_cache_secret
+                .try_into()
+                .context(PasswordCacheReferenceInvalidSnafu)?,
+        )
+        .await
+        .context(PasswordCacheSnafu)?;
         Ok(Self {
             ldap,
             krb,
-            kube,
-            password_cache_ref: password_cache_secret
-                .try_into()
-                .context(PasswordCacheReferenceInvalidSnafu)?,
+            password_cache,
             user_distinguished_name,
             schema_distinguished_name,
         })
@@ -137,105 +139,67 @@ impl<'a> AdAdmin<'a> {
                 ..Default::default()
             })
             .context(UnparsePrincipalSnafu)?;
-        let mut password_cache = self
-            .kube
-            .get::<Secret>(
-                &self.password_cache_ref.name,
-                &self.password_cache_ref.namespace,
-            )
-            .await
-            .with_context(|_| GetPasswordCacheSnafu {
-                password_cache_ref: &self.password_cache_ref,
-            })?;
         let password_cache_key = princ_name.replace(['/', '@'], "--");
-        let password = if let Some(pw) = password_cache
-            .data
-            .get_or_insert_with(BTreeMap::default)
-            .get(&password_cache_key)
-        {
-            tracing::info!(
-                cache = %self.password_cache_ref,
-                cache_key = password_cache_key,
-                "found principal in password cache, reusing"
-            );
-            pw.0.clone()
-        } else {
-            tracing::info!(
-                cache = %self.password_cache_ref,
-                cache_key = password_cache_key,
-                "did not find principal in password cache, creating"
-            );
-            tracing::info!("creating principal");
-            let principal_cn = ldap3::dn_escape(&princ_name);
-            // FIXME: AD restricts RDNs to 64 characters
-            let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
-            let password = generate_ad_password(40);
-            let user_dn = format!("CN={principal_cn},{}", self.user_distinguished_name);
-            let create_user_result =
-                self.ldap
-                    .add(
-                        &user_dn,
-                        vec![
-                            ("cn".as_bytes(), [principal_cn.as_bytes()].into()),
-                            ("objectClass".as_bytes(), ["user".as_bytes()].into()),
-                            ("instanceType".as_bytes(), ["4".as_bytes()].into()),
-                            (
-                                "objectCategory".as_bytes(),
-                                [format!("CN=Container,{}", self.schema_distinguished_name)
-                                    .as_bytes()]
-                                .into(),
-                            ),
-                            (
-                                "unicodePwd".as_bytes(),
-                                [&*encode_password_for_ad_update(&password)].into(),
-                            ),
-                            ("userAccountControl".as_bytes(), ["66048".as_bytes()].into()),
-                            (
-                                "userPrincipalName".as_bytes(),
-                                [princ_name.as_bytes()].into(),
-                            ),
-                            (
-                                "servicePrincipalName".as_bytes(),
-                                [princ_name_realmless.as_bytes()].into(),
-                            ),
-                            (
-                                // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-kile/6cfc7b50-11ed-4b4d-846d-6f08f0812919
-                                "msDS-SupportedEncryptionTypes".as_bytes(),
-                                ["24".as_bytes()].into(),
-                            ),
-                        ],
-                    )
-                    .await
-                    .context(CreateLdapUserSnafu)?;
-            match create_user_result.rc {
-                LDAP_RESULT_CODE_ENTRY_ALREADY_EXISTS => {
-                    create_user_result
-                        .success()
-                        .context(CreateLdapUserConflictSnafu {
-                            password_cache_ref: &self.password_cache_ref,
-                        })?
-                }
-                _ => create_user_result.success().context(CreateLdapUserSnafu)?,
-            };
-            // CONCURRENCY: ldap.add() will only succeed once per principal, so
-            // we are by definition the unique writer of this key.
-            // FIXME: What about cases where ldap.add() succeeds but not the cache write?
-            self.kube
-                .merge_patch(
-                    &password_cache,
-                    &Secret {
-                        data: Some(
-                            [(password_cache_key, ByteString(password.as_str().into()))].into(),
-                        ),
-                        ..Secret::default()
-                    },
-                )
+        let password =
+            self.password_cache
+                // CONCURRENCY: ldap.add() will only succeed once per principal, so
+                // we are by definition the unique writer of this key.
+                .get_or_insert(&password_cache_key, |ctx| async {
+                    tracing::info!("creating principal");
+                    let principal_cn = ldap3::dn_escape(&princ_name);
+                    // FIXME: AD restricts RDNs to 64 characters
+                    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
+                    let password = generate_ad_password(40);
+                    let user_dn = format!("CN={principal_cn},{}", self.user_distinguished_name);
+                    let create_user_result = self
+                        .ldap
+                        .add(
+                            &user_dn,
+                            vec![
+                                ("cn".as_bytes(), [principal_cn.as_bytes()].into()),
+                                ("objectClass".as_bytes(), ["user".as_bytes()].into()),
+                                ("instanceType".as_bytes(), ["4".as_bytes()].into()),
+                                (
+                                    "objectCategory".as_bytes(),
+                                    [format!("CN=Container,{}", self.schema_distinguished_name)
+                                        .as_bytes()]
+                                    .into(),
+                                ),
+                                (
+                                    "unicodePwd".as_bytes(),
+                                    [&*encode_password_for_ad_update(&password)].into(),
+                                ),
+                                ("userAccountControl".as_bytes(), ["66048".as_bytes()].into()),
+                                (
+                                    "userPrincipalName".as_bytes(),
+                                    [princ_name.as_bytes()].into(),
+                                ),
+                                (
+                                    "servicePrincipalName".as_bytes(),
+                                    [princ_name_realmless.as_bytes()].into(),
+                                ),
+                                (
+                                    // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-kile/6cfc7b50-11ed-4b4d-846d-6f08f0812919
+                                    "msDS-SupportedEncryptionTypes".as_bytes(),
+                                    ["24".as_bytes()].into(),
+                                ),
+                            ],
+                        )
+                        .await
+                        .context(CreateLdapUserSnafu)?;
+                    match create_user_result.rc {
+                        LDAP_RESULT_CODE_ENTRY_ALREADY_EXISTS => create_user_result
+                            .success()
+                            .context(CreateLdapUserConflictSnafu {
+                                password_cache_ref: ctx.cache_ref,
+                            })?,
+                        _ => create_user_result.success().context(CreateLdapUserSnafu)?,
+                    };
+                    Ok(password.into_bytes())
+                })
                 .await
-                .context(UpdatePasswordCacheSnafu {
-                    password_cache_ref: &self.password_cache_ref,
-                })?;
-            Vec::<u8>::from(password)
-        };
+                // FIXME: What about cases where ldap.add() succeeds but not the cache write?
+                .context(PasswordCacheSnafu)??;
         let password_c = CString::new(password).context(DecodePasswordSnafu)?;
         principal
             .default_salt()
@@ -250,43 +214,6 @@ impl<'a> AdAdmin<'a> {
             .and_then(|key| kt.add(principal, 0, &key.as_ref()))
             .context(AddToKeytabSnafu)?;
         Ok(())
-    }
-}
-
-#[derive(Debug, Snafu)]
-#[snafu(display("secret ref is missing {field}"))]
-pub struct IncompleteSecretRef {
-    field: String,
-}
-#[derive(Debug, Clone)]
-pub struct FullSecretRef {
-    name: String,
-    namespace: String,
-}
-impl TryFrom<SecretReference> for FullSecretRef {
-    type Error = IncompleteSecretRef;
-
-    fn try_from(secret_ref: SecretReference) -> Result<Self, IncompleteSecretRef> {
-        Ok(Self {
-            name: secret_ref
-                .name
-                .context(IncompleteSecretRefSnafu { field: "name" })?,
-            namespace: secret_ref
-                .namespace
-                .context(IncompleteSecretRefSnafu { field: "namespace" })?,
-        })
-    }
-}
-impl From<&FullSecretRef> for FullSecretRef {
-    fn from(pcr: &FullSecretRef) -> Self {
-        pcr.clone()
-    }
-}
-impl Display for FullSecretRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        ObjectRef::<Secret>::new(&self.name)
-            .within(&self.namespace)
-            .fmt(f)
     }
 }
 

@@ -10,7 +10,9 @@ use stackable_krb5_provision_keytab::{AdminBackend, Request, Response};
 use tracing::info;
 
 mod active_directory;
+mod credential_cache;
 mod mit;
+mod secret_ref;
 
 #[derive(Debug, Snafu)]
 enum Error {

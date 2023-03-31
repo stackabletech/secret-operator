@@ -26,6 +26,7 @@ pub struct SecretClassSpec {
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::large_enum_variant)]
 pub enum SecretClassBackend {
     K8sSearch(K8sSearchBackend),
     AutoTls(AutoTlsBackend),

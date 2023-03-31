@@ -23,3 +23,4 @@ byteorder = "1.4.3"
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.27.1" }
 rand = "0.8.5"
 native-tls = "0.2.11"
+futures = "0.3.28"
