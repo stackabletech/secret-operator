@@ -4,8 +4,8 @@
 
 By default, the Secret Operator runs as a set of privileged root containers. This is done for three reasons:
 
-1. We need to run as root to have permission to create the Unix Domain Socket hosting the Container Storage interface (CSI)
-   driver.
+1. We need to run as root to have permission to create the Unix domain socket hosting the Container Storage interface (CSI)
+   driver. The Kubelet communicates with the CSI driver over this socket.
 2. We need to run as root to have permission to write secret material into the pods' volume paths, as directed
    by the CSI.
 3. We need to run as a privileged container in order to be able to mount the volume folders as RAM disks, in order to avoid
