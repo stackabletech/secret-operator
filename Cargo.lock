@@ -1049,6 +1049,7 @@ name = "krb5"
 version = "0.0.0-dev"
 dependencies = [
  "krb5-sys",
+ "snafu",
 ]
 
 [[package]]

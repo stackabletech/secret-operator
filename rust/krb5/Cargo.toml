@@ -12,3 +12,4 @@ publish = false
 
 [dependencies]
 krb5-sys = { path = "../krb5-sys" }
+snafu = "0.7.4"

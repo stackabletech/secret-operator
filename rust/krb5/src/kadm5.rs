@@ -219,6 +219,6 @@ impl Drop for KeyDataVec<'_> {
         Error::from_ret(unsafe {
             krb5_sys::kadm5_free_kadm5_key_data(self.ctx.raw, self.key_count, self.raw)
         })
-        .unwrap()
+        .expect("failed to destroy keydata vector")
     }
 }
