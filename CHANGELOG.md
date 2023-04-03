@@ -6,20 +6,24 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added `kerberosKeytab` provisioner backend ([#99]).
+- Added `kerberosKeytab` provisioner backend using MIT Kerberos ([#99], [#257]).
+- Added experimental unprivileged mode ([#252]).
 
 ### Changed
 
 - Shortened the registration socket path for Microk8s compatibility ([#231]).
-  - After upgrading you will need to
-    `rmdir /var/lib/kubelet/plugins_registry/secrets.stackable.tech-reg.sock` manually.
-    This applies to *all* users, not just Microk8s.
+  - The old CSI registration path will be automatically migrated during upgrade ([#258], [#260]).
+  - You might need to manually remove `/var/lib/kubelet/plugins_registry/secrets.stackable.tech-reg.sock` when downgrading
 - Made kubeletDir configurable ([#232]).
   - Microk8s users will need to `--set kubeletDir=/var/snap/microk8s/common/var/lib/kubelet`.
 
 [#99]: https://github.com/stackabletech/secret-operator/pull/99
 [#231]: https://github.com/stackabletech/secret-operator/pull/231
 [#232]: https://github.com/stackabletech/secret-operator/pull/232
+[#252]: https://github.com/stackabletech/secret-operator/pull/252
+[#257]: https://github.com/stackabletech/secret-operator/pull/257
+[#258]: https://github.com/stackabletech/secret-operator/pull/258
+[#260]: https://github.com/stackabletech/secret-operator/pull/260
 
 ## [23.1.0] - 2023-01-23
 
@@ -72,7 +76,7 @@ All notable changes to this project will be documented in this file.
 
 - `autoTls` CA generation now requires opt-in ([#77]).
   - The default `tls` `SecretClass` now has this opt-in by default.
-  
+
 ### Removed
 
 - `k8sSearch` backend's option `secretLabels` has been removed ([#123]).

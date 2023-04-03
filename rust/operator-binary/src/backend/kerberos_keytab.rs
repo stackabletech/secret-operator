@@ -132,8 +132,8 @@ impl SecretBackend for KerberosKeytab {
         } = self;
 
         let admin_server_clause = match admin {
-            KerberosKeytabBackendAdmin::Mit { admin_server } => {
-                format!("  admin_server = {admin_server}")
+            KerberosKeytabBackendAdmin::Mit { kadmin_server } => {
+                format!("  admin_server = {kadmin_server}")
             }
             KerberosKeytabBackendAdmin::ActiveDirectory { .. } => String::new(),
         };

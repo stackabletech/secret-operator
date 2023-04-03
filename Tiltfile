@@ -29,6 +29,8 @@ helm_crds, helm_non_crds = filter_yaml(
       name=operator_name,
       set=[
          'image.repository=' + registry + '/' + operator_name,
+         # Uncomment to enable unprivileged mode
+         # 'securityContext.privileged=false',
       ],
    ),
    api_version = "^apiextensions\\.k8s\\.io/.*$",
