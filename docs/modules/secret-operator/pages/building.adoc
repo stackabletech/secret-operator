@@ -85,3 +85,13 @@ done
 ----
 
 NOTE: This is _not_ persistent, and must be re-executed every time the cluster (or a node in it) is restarted.
+
+== Local builds
+
+Local builds (outside of the tools mentioned above) require the openssl, krb5, and Clang libraries, as well as
+pkg-config and protoc. On Ubuntu, this means running:
+
+[source,console]
+----
+$ sudo apt install libssl-dev libkrb5-dev libclang-dev pkg-config protobuf-compiler
+----
