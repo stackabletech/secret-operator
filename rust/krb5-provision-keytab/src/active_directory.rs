@@ -133,7 +133,7 @@ impl<'a> AdAdmin<'a> {
         let princ_name = principal
             .unparse(PrincipalUnparseOptions::default())
             .context(UnparsePrincipalSnafu)?;
-        let password_cache_key = princ_name.replace(['/', '@'], "--");
+        let password_cache_key = princ_name.replace(['/', '@'], "__");
         let password = self
             .password_cache
             // CONCURRENCY: ldap.add() will only succeed once per principal, so
