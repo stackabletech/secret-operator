@@ -114,6 +114,7 @@ impl KrbContext {
         })
     }
 
+    /// Get the default realm configured for this context.
     pub fn default_realm(&self) -> Result<DefaultRealm, Error> {
         let mut realm: *mut i8 = std::ptr::null_mut();
         unsafe {
@@ -136,6 +137,9 @@ impl Drop for KrbContext {
     }
 }
 
+/// The default realm name for a [`KrbContext`].
+///
+/// Created by [`KrbContext::default_realm`].
 pub struct DefaultRealm<'a> {
     ctx: &'a KrbContext,
     raw: *const i8,
@@ -161,6 +165,7 @@ pub struct Principal<'a> {
     raw: krb5_sys::krb5_principal,
 }
 impl<'a> Principal<'a> {
+    /// The default salt when deriving keys for this principal.
     pub fn default_salt(&self) -> Result<KrbData<'a>, Error> {
         unsafe {
             let mut salt = std::mem::zeroed::<krb5_sys::krb5_data>();
@@ -175,6 +180,9 @@ impl<'a> Principal<'a> {
         }
     }
 
+    /// Converts the parsed principal back into a string representation.
+    ///
+    /// The [`Display`] instance is equivalent to `self.unparse(PrincipalUnparseOptions::default())`.
     pub fn unparse(&self, options: PrincipalUnparseOptions) -> Result<String, Error> {
         let mut raw_name = std::ptr::null_mut();
         unsafe {
@@ -215,16 +223,24 @@ impl From<&Principal<'_>> for String {
     }
 }
 
+/// Optional settings for [`Principal::unparse`].
 #[derive(Default, Clone, Copy)]
 pub struct PrincipalUnparseOptions {
+    /// Controls whether the realm is included.
     pub realm: PrincipalRealmDisplayMode,
+    /// Special characters are not quoted in display mode, even if this would generate a principal string that cannot be parsed.
     pub for_display: bool,
 }
+
+/// See [`PrincipalUnparseOptions::realm`].
 #[derive(Default, Clone, Copy)]
 pub enum PrincipalRealmDisplayMode {
+    /// The realm is always included.
     #[default]
     Always,
+    /// The realm is only included if it is not the default realm.
     IfForeign,
+    /// The realm is never included. This may create ambiguity in multi-realm configurations.
     Never,
 }
 impl PrincipalUnparseOptions {
@@ -257,6 +273,7 @@ pub struct Keyblock<'a> {
     raw: *mut krb5_sys::krb5_keyblock,
 }
 impl<'a> Keyblock<'a> {
+    /// Create a new zero-initialized keyblock of a given size.
     pub fn new(
         ctx: &'a KrbContext,
         enctype: krb5_sys::krb5_enctype,
@@ -275,6 +292,11 @@ impl<'a> Keyblock<'a> {
         }
     }
 
+    /// Derive a key from a given password.
+    ///
+    /// Some well-known `enctype` values are available in [`enctype`].
+    ///
+    /// `salt` may be generated using [`Principal::default_salt`].
     pub fn from_password(
         ctx: &'a KrbContext,
         enctype: krb5_sys::krb5_enctype,
