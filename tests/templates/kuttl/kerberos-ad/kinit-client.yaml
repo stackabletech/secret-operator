@@ -1,3 +1,4 @@
+# must be applied by a command step, since the secretclass name depends on the (random) test namespace
 ---
 apiVersion: batch/v1
 kind: Job
