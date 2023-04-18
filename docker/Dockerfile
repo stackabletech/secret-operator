@@ -18,10 +18,13 @@ LABEL name="Stackable Operator for Stackable Secret Operator" \
   description="Deploy and manage Stackable Secret Operator clusters."
 
 # Update image
-RUN microdnf install -y yum krb5-libs libkadm5 \
+RUN microdnf install -y yum \
   && yum -y update-minimal --security --sec-severity=Important --sec-severity=Critical \
   && yum clean all \
   && microdnf clean all
+
+# Install kerberos client libraries
+RUN microdnf install -y krb5-libs libkadm5 && microdnf clean all
 
 COPY LICENSE /licenses/LICENSE
 
