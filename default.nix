@@ -36,14 +36,21 @@ rec {
   dockerImage = pkgs.dockerTools.streamLayeredImage {
     name = dockerName;
     tag = dockerTag;
-    contents = [ pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal pkgs.krb5 pkgs.vim build ];
+    contents = [
+      # Common debugging tools
+      pkgs.bashInteractive pkgs.coreutils pkgs.util-linuxMinimal
+      # Kerberos 5 must be installed globally to load plugins correctly
+      pkgs.krb5
+      # Make the whole cargo workspace available on $PATH
+      build
+    ];
     config = {
-    Env =
-      let
-        fileRefVars = {
-          PRODUCT_CONFIG = deploy/config-spec/properties.yaml;
-        };
-      in pkgs.lib.concatLists (pkgs.lib.mapAttrsToList (env: path: pkgs.lib.optional (pkgs.lib.pathExists path) "${env}=${path}") fileRefVars);
+      Env =
+        let
+          fileRefVars = {
+            PRODUCT_CONFIG = deploy/config-spec/properties.yaml;
+          };
+        in pkgs.lib.concatLists (pkgs.lib.mapAttrsToList (env: path: pkgs.lib.optional (pkgs.lib.pathExists path) "${env}=${path}") fileRefVars);
       Entrypoint = [ entrypoint ];
       Cmd = [ "run" ];
     };
