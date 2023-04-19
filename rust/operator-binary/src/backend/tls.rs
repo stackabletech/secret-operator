@@ -374,7 +374,8 @@ mod tests {
         assert_eq!(
             time_datetime_to_chrono(
                 time::OffsetDateTime::parse("2021-02-04T05:23:00.123+01:00", &Rfc3339).unwrap()
-            ),
+            )
+            .unwrap(),
             chrono::DateTime::parse_from_rfc3339("2021-02-04T06:23:00.123+02:00").unwrap()
         );
     }
