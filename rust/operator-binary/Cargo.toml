@@ -32,7 +32,7 @@ tonic = "0.8"
 tonic-reflection = "0.6.0"
 tracing = "0.1.36"
 
-h2 = "=0.3.7" # Need to keep this in sync with our patched h2 build
+h2 = "=0.3.18" # Need to keep this in sync with our patched h2 build
 uuid = { version = "1.2.2", features = ["v4"] }
 stackable-krb5-provision-keytab = { path = "../krb5-provision-keytab" }
 
