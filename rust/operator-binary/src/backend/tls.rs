@@ -67,6 +67,8 @@ pub enum Error {
         source: stackable_operator::error::Error,
         secret: ObjectRef<Secret>,
     },
+    #[snafu(display("invalid certificate lifetime"))]
+    InvalidCertLifetime { source: DateTimeOutOfBoundsError },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -87,6 +89,7 @@ impl SecretBackendError for Error {
             Error::BuildCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SaveCaCertificate { .. } => tonic::Code::Unavailable,
+            Error::InvalidCertLifetime { .. } => tonic::Code::Internal,
         }
     }
 }
@@ -335,13 +338,28 @@ impl SecretBackend for TlsGenerate {
             ]
             .into(),
         )
-        .expires_after(time_datetime_to_chrono(expire_pod_after)))
+        .expires_after(
+            time_datetime_to_chrono(expire_pod_after).context(InvalidCertLifetimeSnafu)?,
+        ))
     }
 }
 
-fn time_datetime_to_chrono(dt: time::OffsetDateTime) -> chrono::DateTime<FixedOffset> {
-    let tz = chrono::FixedOffset::east(dt.offset().whole_seconds());
-    tz.timestamp(dt.unix_timestamp(), dt.nanosecond())
+#[derive(Snafu, Debug)]
+#[snafu(module)]
+pub enum DateTimeOutOfBoundsError {
+    #[snafu(display("datetime is invalid"))]
+    DateTime,
+    #[snafu(display("time zone is out of bounds"))]
+    TimeZone,
+}
+fn time_datetime_to_chrono(
+    dt: time::OffsetDateTime,
+) -> Result<chrono::DateTime<FixedOffset>, DateTimeOutOfBoundsError> {
+    let tz = chrono::FixedOffset::east_opt(dt.offset().whole_seconds())
+        .context(date_time_out_of_bounds_error::TimeZoneSnafu)?;
+    tz.timestamp_opt(dt.unix_timestamp(), dt.nanosecond())
+        .earliest()
+        .context(date_time_out_of_bounds_error::DateTimeSnafu)
 }
 
 #[cfg(test)]
@@ -356,7 +374,8 @@ mod tests {
         assert_eq!(
             time_datetime_to_chrono(
                 time::OffsetDateTime::parse("2021-02-04T05:23:00.123+01:00", &Rfc3339).unwrap()
-            ),
+            )
+            .unwrap(),
             chrono::DateTime::parse_from_rfc3339("2021-02-04T06:23:00.123+02:00").unwrap()
         );
     }
