@@ -10,7 +10,6 @@ All notable changes to this project will be documented in this file.
 
 [#271]: https://github.com/stackabletech/zookeeper-operator/pull/271
 
-
 ## [23.4.0] - 2023-04-17
 
 ### Added
