@@ -1023,14 +1023,14 @@ dependencies = [
 
 [[package]]
 name = "krb5"
-version = "23.4.0"
+version = "23.4.1"
 dependencies = [
  "krb5-sys",
 ]
 
 [[package]]
 name = "krb5-sys"
-version = "23.4.0"
+version = "23.4.1"
 dependencies = [
  "bindgen",
  "pkg-config",
@@ -2016,7 +2016,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-krb5-provision-keytab"
-version = "23.4.0"
+version = "23.4.1"
 dependencies = [
  "krb5",
  "serde",
@@ -2074,7 +2074,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-secret-operator"
-version = "23.4.0"
+version = "23.4.1"
 dependencies = [
  "anyhow",
  "async-trait",
