@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Generate OLM bundle for Release 23.4.0 ([#271]).
+
+[#271]: https://github.com/stackabletech/zookeeper-operator/pull/271
+
+## [23.4.0] - 2023-04-17
+
+### Added
+
 - Added `kerberosKeytab` provisioner backend using MIT Kerberos ([#99], [#257]).
 - Added experimental unprivileged mode ([#252]).
 
