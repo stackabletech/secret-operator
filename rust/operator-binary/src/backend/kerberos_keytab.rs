@@ -10,7 +10,9 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
 };
 
-use crate::crd::{Hostname, InvalidKerberosPrincipal, KerberosPrincipal};
+use crate::crd::{
+    Hostname, InvalidKerberosPrincipal, KerberosKeytabBackendAdmin, KerberosPrincipal,
+};
 
 use super::{pod_info::Address, SecretBackend, SecretBackendError, SecretContents};
 
@@ -59,7 +61,7 @@ impl SecretBackendError for Error {
 pub struct KerberosProfile {
     pub realm_name: Hostname,
     pub kdc: Hostname,
-    pub kadmin_server: Hostname,
+    pub admin: KerberosKeytabBackendAdmin,
 }
 
 pub struct KerberosKeytab {
@@ -123,11 +125,18 @@ impl SecretBackend for KerberosKeytab {
                 KerberosProfile {
                     realm_name,
                     kdc,
-                    kadmin_server,
+                    admin,
                 },
             admin_keytab,
             admin_principal,
         } = self;
+
+        let admin_server_clause = match admin {
+            KerberosKeytabBackendAdmin::Mit { kadmin_server } => {
+                format!("  admin_server = {kadmin_server}")
+            }
+            KerberosKeytabBackendAdmin::ActiveDirectory { .. } => String::new(),
+        };
 
         let tmp = tempdir().context(TempSetupSnafu)?;
         let profile = format!(
@@ -141,7 +150,7 @@ udp_preference_limit = 1
 [realms]
 {realm_name} = {{
   kdc = {kdc}
-  admin_server = {kadmin_server}
+{admin_server_clause}
 }}
 
 [domain_realm]
@@ -196,6 +205,24 @@ cluster.local = {realm_name}
                         name: princ.to_string(),
                     })
                     .collect(),
+                admin_backend: match admin {
+                    KerberosKeytabBackendAdmin::Mit { .. } => {
+                        stackable_krb5_provision_keytab::AdminBackend::Mit
+                    }
+                    KerberosKeytabBackendAdmin::ActiveDirectory {
+                        ldap_server,
+                        ldap_tls_ca_secret,
+                        password_cache_secret,
+                        user_distinguished_name,
+                        schema_distinguished_name,
+                    } => stackable_krb5_provision_keytab::AdminBackend::ActiveDirectory {
+                        ldap_server: ldap_server.to_string(),
+                        ldap_tls_ca_secret: ldap_tls_ca_secret.clone(),
+                        password_cache_secret: password_cache_secret.clone(),
+                        user_distinguished_name: user_distinguished_name.clone(),
+                        schema_distinguished_name: schema_distinguished_name.clone(),
+                    },
+                },
             },
         )
         .await

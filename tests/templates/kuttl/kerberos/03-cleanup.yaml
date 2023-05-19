@@ -1,8 +1,0 @@
-# secretclasses are not namespaced, so we need to clean them up ourselves
----
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-delete:
-  - apiVersion: secrets.stackable.tech/v1alpha1
-    kind: SecretClass
-    name: kuttl-secret-operator-kerberos-kerberos

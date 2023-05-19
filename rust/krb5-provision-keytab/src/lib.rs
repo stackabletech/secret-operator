@@ -7,6 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use stackable_operator::k8s_openapi::api::core::v1::SecretReference;
 use tokio::{io::AsyncWriteExt, process::Command};
 
 #[derive(Serialize, Deserialize)]
@@ -15,10 +16,22 @@ pub struct Request {
     pub admin_principal_name: String,
     pub pod_keytab_path: PathBuf,
     pub principals: Vec<PrincipalRequest>,
+    pub admin_backend: AdminBackend,
 }
 #[derive(Serialize, Deserialize)]
 pub struct PrincipalRequest {
     pub name: String,
+}
+#[derive(Serialize, Deserialize)]
+pub enum AdminBackend {
+    Mit,
+    ActiveDirectory {
+        ldap_server: String,
+        ldap_tls_ca_secret: SecretReference,
+        password_cache_secret: SecretReference,
+        user_distinguished_name: String,
+        schema_distinguished_name: String,
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -48,6 +61,10 @@ pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<
     let mut child = Command::new("stackable-krb5-provision-keytab")
         .kill_on_drop(true)
         .env("KRB5_CONFIG", krb5_config_path)
+        // ldap3 uses the default client keytab to authenticate to the LDAP server
+        .env("KRB5_CLIENT_KTNAME", &req.admin_keytab_path)
+        // avoid leaking credentials between secret volumes/secretclasses
+        .env("KRB5CCNAME", "MEMORY")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()

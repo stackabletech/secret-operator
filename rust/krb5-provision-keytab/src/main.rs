@@ -4,13 +4,15 @@ use std::{
     io::{stdin, BufReader},
 };
 
-use krb5::{
-    kadm5::{self, KVNO_ALL},
-    Keyblock, Keytab,
-};
+use krb5::{kadm5, Keyblock, Keytab};
 use snafu::{ResultExt, Snafu};
-use stackable_krb5_provision_keytab::{Request, Response};
+use stackable_krb5_provision_keytab::{AdminBackend, Request, Response};
 use tracing::info;
+
+mod active_directory;
+mod credential_cache;
+mod mit;
+mod secret_ref;
 
 #[derive(Debug, Snafu)]
 enum Error {
@@ -18,6 +20,10 @@ enum Error {
     DeserializeRequest { source: serde_json::Error },
     #[snafu(display("failed to init krb5 context"))]
     KrbInit { source: krb5::Error },
+    #[snafu(display("failed to init MIT admin client"))]
+    MitAdminInit { source: mit::Error },
+    #[snafu(display("failed to init Active Directory admin client"))]
+    ActiveDirectoryInit { source: active_directory::Error },
     #[snafu(display("failed to init kadmin server handle"))]
     KadminInit { source: kadm5::Error },
     #[snafu(display("failed to decode admin principal name"))]
@@ -35,29 +41,33 @@ enum Error {
         source: krb5::Error,
         principal: String,
     },
+    #[snafu(display("failed to prepare principal {principal} (backend: MIT)"))]
+    PreparePrincipalMit {
+        source: mit::Error,
+        principal: String,
+    },
+    #[snafu(display("failed to prepare principal {principal} (backend: Active Directory)"))]
+    PreparePrincipalActiveDirectory {
+        source: active_directory::Error,
+        principal: String,
+    },
     #[snafu(display("failed to create principal {principal}"))]
     CreatePrincipal {
         source: kadm5::Error,
         principal: String,
     },
-    #[snafu(display("failed to get keys for principal {principal}"))]
-    GetPrincipalKeys {
-        source: kadm5::Error,
-        principal: String,
-    },
-    #[snafu(display("failed to create dummy key"))]
-    CreateDummyKey { source: krb5::Error },
-    #[snafu(display("failed to add key for principal {principal} to keytab"))]
-    AddToKeytab {
-        source: krb5::Error,
-        principal: String,
-    },
+    #[snafu(display("failed to add dummy key keytab"))]
+    AddDummyToKeytab { source: krb5::Error },
 }
 
-fn run() -> Result<Response, Error> {
+enum AdminConnection<'a> {
+    Mit(mit::MitAdmin<'a>),
+    ActiveDirectory(active_directory::AdAdmin<'a>),
+}
+
+async fn run() -> Result<Response, Error> {
     let req = serde_json::from_reader::<_, Request>(BufReader::new(stdin().lock()))
         .context(DeserializeRequestSnafu)?;
-    let config_params = krb5::kadm5::ConfigParams::default();
     info!("initing context");
     let krb = krb5::KrbContext::new().context(KrbInitSnafu)?;
     let admin_principal_name =
@@ -65,16 +75,31 @@ fn run() -> Result<Response, Error> {
     let admin_keytab_path = CString::new(&*req.admin_keytab_path.as_os_str().to_string_lossy())
         .context(DecodeAdminKeytabPathSnafu)?;
     info!("initing kadmin");
-    let kadmin = krb5::kadm5::ServerHandle::new(
-        &krb,
-        &admin_principal_name,
-        None,
-        &krb5::kadm5::Credential::ServiceKey {
-            keytab: admin_keytab_path,
-        },
-        &config_params,
-    )
-    .context(KadminInitSnafu)?;
+
+    let mut admin = match req.admin_backend {
+        AdminBackend::Mit => AdminConnection::Mit(
+            mit::MitAdmin::connect(&krb, &admin_principal_name, &admin_keytab_path)
+                .context(MitAdminInitSnafu)?,
+        ),
+        AdminBackend::ActiveDirectory {
+            ldap_server,
+            ldap_tls_ca_secret,
+            password_cache_secret,
+            user_distinguished_name,
+            schema_distinguished_name,
+        } => AdminConnection::ActiveDirectory(
+            active_directory::AdAdmin::connect(
+                &ldap_server,
+                &krb,
+                ldap_tls_ca_secret,
+                password_cache_secret,
+                user_distinguished_name,
+                schema_distinguished_name,
+            )
+            .await
+            .context(ActiveDirectoryInitSnafu)?,
+        ),
+    };
     let mut kt = Keytab::resolve(
         &krb,
         &CString::new(&*req.pod_keytab_path.as_os_str().to_string_lossy())
@@ -96,12 +121,10 @@ fn run() -> Result<Response, Error> {
         0,
         // keyblock len must be >0, or kt.add() will always fail
         &Keyblock::new(&krb, 0, 1)
-            .context(CreateDummyKeySnafu)?
+            .context(AddDummyToKeytabSnafu)?
             .as_ref(),
     )
-    .context(AddToKeytabSnafu {
-        principal: &dummy_principal,
-    })?;
+    .context(AddDummyToKeytabSnafu)?;
 
     for princ_req in req.principals {
         let princ = krb
@@ -109,20 +132,16 @@ fn run() -> Result<Response, Error> {
                 &CString::new(princ_req.name.as_str()).context(DecodePodPrincipalNameSnafu)?,
             )
             .context(ParsePrincipalSnafu {
-                principal: princ_req.name,
+                principal: &princ_req.name,
             })?;
-        match kadmin.create_principal(&princ) {
-            Err(kadm5::Error { code, .. }) if code.0 == kadm5::error_code::DUP => {
-                info!("principal {princ} already exists, reusing")
-            }
-            res => res.context(CreatePrincipalSnafu { principal: &princ })?,
-        }
-        let keys = kadmin
-            .get_principal_keys(&princ, KVNO_ALL)
-            .context(GetPrincipalKeysSnafu { principal: &princ })?;
-        for key in keys.keys() {
-            kt.add(&princ, key.kvno, &key.keyblock)
-                .context(AddToKeytabSnafu { principal: &princ })?;
+        match &mut admin {
+            AdminConnection::Mit(mit) => mit
+                .create_and_add_principal_to_keytab(&princ, &mut kt)
+                .context(PreparePrincipalMitSnafu { principal: &princ })?,
+            AdminConnection::ActiveDirectory(ad) => ad
+                .create_and_add_principal_to_keytab(&princ, &mut kt)
+                .await
+                .context(PreparePrincipalActiveDirectorySnafu { principal: &princ })?,
         }
     }
     Ok(Response {})
@@ -152,11 +171,12 @@ impl<T: std::error::Error> Display for Report<T> {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .init();
-    let res = run().map_err(|err| Report::from(err).to_string());
+    let res = run().await.map_err(|err| Report::from(err).to_string());
     println!("{}", serde_json::to_string_pretty(&res).unwrap());
     std::process::exit(res.is_ok().into());
 }

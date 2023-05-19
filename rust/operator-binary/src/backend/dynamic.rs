@@ -118,9 +118,7 @@ pub async fn from_class(
                 KerberosProfile {
                     realm_name,
                     kdc,
-                    kadmin_server: match admin {
-                        crd::KerberosKeytabBackendAdmin::Mit { kadmin_server } => kadmin_server,
-                    },
+                    admin,
                 },
                 &admin_keytab_secret,
                 admin_principal,

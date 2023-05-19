@@ -79,7 +79,44 @@ spec:
                           oneOf:
                             - required:
                                 - mit
+                            - required:
+                                - activeDirectory
                           properties:
+                            activeDirectory:
+                              properties:
+                                ldapServer:
+                                  type: string
+                                ldapTlsCaSecret:
+                                  description: SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace
+                                  properties:
+                                    name:
+                                      description: name is unique within a namespace to reference a secret resource.
+                                      type: string
+                                    namespace:
+                                      description: namespace defines the space within which the secret name must be unique.
+                                      type: string
+                                  type: object
+                                passwordCacheSecret:
+                                  description: SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace
+                                  properties:
+                                    name:
+                                      description: name is unique within a namespace to reference a secret resource.
+                                      type: string
+                                    namespace:
+                                      description: namespace defines the space within which the secret name must be unique.
+                                      type: string
+                                  type: object
+                                schemaDistinguishedName:
+                                  type: string
+                                userDistinguishedName:
+                                  type: string
+                              required:
+                                - ldapServer
+                                - ldapTlsCaSecret
+                                - passwordCacheSecret
+                                - schemaDistinguishedName
+                                - userDistinguishedName
+                              type: object
                             mit:
                               properties:
                                 kadminServer:

@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, fmt::Display};
+use std::{fmt::Display, ops::Deref};
 
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -26,6 +26,7 @@ pub struct SecretClassSpec {
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::large_enum_variant)]
 pub enum SecretClassBackend {
     K8sSearch(K8sSearchBackend),
     AutoTls(AutoTlsBackend),
@@ -75,6 +76,14 @@ pub struct KerberosKeytabBackend {
 pub enum KerberosKeytabBackendAdmin {
     #[serde(rename_all = "camelCase")]
     Mit { kadmin_server: Hostname },
+    #[serde(rename_all = "camelCase")]
+    ActiveDirectory {
+        ldap_server: Hostname,
+        ldap_tls_ca_secret: SecretReference,
+        password_cache_secret: SecretReference,
+        user_distinguished_name: String,
+        schema_distinguished_name: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
@@ -109,6 +118,13 @@ impl From<Hostname> for String {
 impl Display for Hostname {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
+    }
+}
+impl Deref for Hostname {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -150,8 +166,10 @@ impl Display for KerberosPrincipal {
         f.write_str(&self.0)
     }
 }
-impl AsRef<OsStr> for KerberosPrincipal {
-    fn as_ref(&self) -> &OsStr {
-        self.0.as_ref()
+impl Deref for KerberosPrincipal {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
