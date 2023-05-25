@@ -8,7 +8,11 @@ All notable changes to this project will be documented in this file.
 
 - Generate OLM bundle for Release 23.4.0 ([#271]).
 
-[#271]: https://github.com/stackabletech/zookeeper-operator/pull/271
+### Changed
+
+- `operator-rs` `0.27.1` -> `0.41.0` ([#275]).
+
+[#275]: https://github.com/stackabletech/secret-operator/pull/275
 
 ## [23.4.0] - 2023-04-17
 
