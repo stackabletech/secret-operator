@@ -41,6 +41,14 @@ Helm will deploy the operator in Kubernetes containers and apply the CRDs. You'r
 Microk8s uses a non-standard Kubelet state directory. Installing secret-operator on Microk8s requires the argument
 `--set kubeletDir=/var/snap/microk8s/common/var/lib/kubelet` to be added to the `helm install` command.
 
+=== HUAWEI cloud
+
+In some cases HUAWEI cloud has the kubelet directory located at `/mnt/paas/kubernetes/kubelet`, resulting in the following error:
+
+`failed to publish volume error=status: Unavailable, message: "failed to create secret parent dir /mnt/paas/kubernetes/kubelet/pods/<POD_ID>/volumes/kubernetes.io~csi/pvc-<PVC_ID>/mount: No such file or directory (os error 2)"`
+
+In case you are encountering the mentioned error (or secret-operator does not work on your HUAWEI cloud at all), you need to add the argument `--set kubeletDir=/mnt/paas/kubernetes/kubelet` to the `helm install` command.
+
 == Building the operator from source
 
 See xref:building.adoc[] for more information.
