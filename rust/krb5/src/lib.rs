@@ -3,7 +3,7 @@
 //! The primary entry point is [`KrbContext`].
 
 use std::{
-    ffi::{c_int, CStr},
+    ffi::{c_char, c_int, CStr},
     fmt::{Debug, Display},
     ops::Deref,
 };
@@ -116,7 +116,7 @@ impl KrbContext {
 
     /// Get the default realm configured for this context.
     pub fn default_realm(&self) -> Result<DefaultRealm, Error> {
-        let mut realm: *mut i8 = std::ptr::null_mut();
+        let mut realm: *mut c_char = std::ptr::null_mut();
         unsafe {
             Error::from_call_result(
                 Some(self),
@@ -142,7 +142,7 @@ impl Drop for KrbContext {
 /// Created by [`KrbContext::default_realm`].
 pub struct DefaultRealm<'a> {
     ctx: &'a KrbContext,
-    raw: *const i8,
+    raw: *const c_char,
 }
 impl Deref for DefaultRealm<'_> {
     type Target = CStr;
@@ -319,7 +319,7 @@ impl<'a> Keyblock<'a> {
                 .context(StringTooLongSnafu {
                     string_name: "password",
                 })?,
-            data: password.as_ptr().cast::<i8>().cast_mut(),
+            data: password.as_ptr().cast::<c_char>().cast_mut(),
         };
         unsafe {
             Error::from_call_result(

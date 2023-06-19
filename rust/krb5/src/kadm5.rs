@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_int, CStr, CString},
+    ffi::{c_char, c_int, CStr, CString},
     fmt::Display,
     slice,
 };
@@ -62,11 +62,11 @@ impl ConfigParams {
     fn as_c(&self) -> krb5_sys::kadm5_config_params {
         let mut c = unsafe { std::mem::zeroed::<krb5_sys::kadm5_config_params>() };
         if let Some(default_realm) = &self.default_realm {
-            c.realm = default_realm.as_ptr() as *mut i8;
+            c.realm = default_realm.as_ptr() as *mut c_char;
             c.mask |= i64::from(krb5_sys::KADM5_CONFIG_REALM);
         }
         if let Some(admin_server) = &self.admin_server {
-            c.admin_server = admin_server.as_ptr() as *mut i8;
+            c.admin_server = admin_server.as_ptr() as *mut c_char;
             c.mask |= i64::from(krb5_sys::KADM5_CONFIG_ADMIN_SERVER);
         }
         if let Some(kadmind_port) = self.kadmind_port {
