@@ -11,8 +11,10 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - `operator-rs` `0.27.1` -> `0.41.0` ([#275]).
+- Removed dummy key from generated Kerberos keytab ([#285]).
 
 [#275]: https://github.com/stackabletech/secret-operator/pull/275
+[#285]: https://github.com/stackabletech/secret-operator/pull/285
 
 ## [23.4.0] - 2023-04-17
 
