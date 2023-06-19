@@ -56,8 +56,10 @@ enum Error {
         source: kadm5::Error,
         principal: String,
     },
-    #[snafu(display("failed to add dummy key keytab"))]
+    #[snafu(display("failed to add dummy key to keytab"))]
     AddDummyToKeytab { source: krb5::Error },
+    #[snafu(display("failed to remove dummy key from keytab"))]
+    RemoveDummyFromKeytab { source: krb5::Error },
 }
 
 enum AdminConnection<'a> {
@@ -116,15 +118,20 @@ async fn run() -> Result<Response, Error> {
         .context(ParsePrincipalSnafu {
             principal: dummy_principal_name,
         })?;
+    let dummy_kvno = 0;
     kt.add(
         &dummy_principal,
-        0,
+        dummy_kvno,
         // keyblock len must be >0, or kt.add() will always fail
         &Keyblock::new(&krb, 0, 1)
             .context(AddDummyToKeytabSnafu)?
             .as_ref(),
     )
     .context(AddDummyToKeytabSnafu)?;
+    // Remove dummy key once we have forced the keytab to be created,
+    // to avoid tools trying to use it to authenticate
+    kt.remove(&dummy_principal, dummy_kvno)
+        .context(RemoveDummyFromKeytabSnafu)?;
 
     for princ_req in req.principals {
         let princ = krb

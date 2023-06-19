@@ -413,6 +413,23 @@ impl<'a> Keytab<'a> {
             )
         }
     }
+
+    /// Remove the specified key from the keytab.
+    pub fn remove(
+        &mut self,
+        principal: &Principal,
+        kvno: krb5_sys::krb5_kvno,
+    ) -> Result<(), Error> {
+        unsafe {
+            let mut entry: krb5_sys::krb5_keytab_entry = std::mem::zeroed();
+            entry.principal = principal.raw;
+            entry.vno = kvno;
+            Error::from_call_result(
+                Some(self.ctx),
+                krb5_sys::krb5_kt_remove_entry(self.ctx.raw, self.raw, &mut entry),
+            )
+        }
+    }
 }
 impl Drop for Keytab<'_> {
     fn drop(&mut self) {
