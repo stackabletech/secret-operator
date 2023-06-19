@@ -3,7 +3,7 @@
 //! The primary entry point is [`KrbContext`].
 
 use std::{
-    ffi::{c_int, CStr, c_char},
+    ffi::{c_char, c_int, CStr},
     fmt::{Debug, Display},
     ops::Deref,
 };
