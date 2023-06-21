@@ -24,6 +24,8 @@ pub use tls::TlsGenerate;
 use pod_info::Address;
 use scope::SecretScope;
 
+use crate::format::{SecretData, SecretFormat};
+
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
 /// Fields beginning with `csi.storage.k8s.io/` are provided by the Kubelet
@@ -108,17 +110,17 @@ impl SecretVolumeSelector {
 
 type SecretFiles = HashMap<PathBuf, Vec<u8>>;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct SecretContents {
-    pub files: SecretFiles,
+    pub data: SecretData,
     pub expires_after: Option<DateTime<FixedOffset>>,
 }
 
 impl SecretContents {
-    fn new(files: SecretFiles) -> Self {
+    fn new(data: SecretData) -> Self {
         Self {
-            files,
-            ..Self::default()
+            data,
+            expires_after: None,
         }
     }
 

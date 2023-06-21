@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_krb5_provision_keytab::provision_keytab;
@@ -10,8 +8,9 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
 };
 
-use crate::crd::{
-    Hostname, InvalidKerberosPrincipal, KerberosKeytabBackendAdmin, KerberosPrincipal,
+use crate::{
+    crd::{Hostname, InvalidKerberosPrincipal, KerberosKeytabBackendAdmin, KerberosPrincipal},
+    format::{well_known, SecretData, WellKnownSecretData},
 };
 
 use super::{pod_info::Address, SecretBackend, SecretBackendError, SecretContents};
@@ -235,12 +234,11 @@ cluster.local = {realm_name}
             .read_to_end(&mut keytab_data)
             .await
             .context(ReadKeytabSnafu)?;
-        Ok(SecretContents::new(
-            [
-                (PathBuf::from("keytab"), keytab_data),
-                (PathBuf::from("krb5.conf"), profile.into_bytes()),
-            ]
-            .into(),
-        ))
+        Ok(SecretContents::new(SecretData::WellKnown(
+            WellKnownSecretData::KerberosKeytab(well_known::KerberosKeytab {
+                keytab: keytab_data,
+                krb5_conf: profile.into_bytes(),
+            }),
+        )))
     }
 }

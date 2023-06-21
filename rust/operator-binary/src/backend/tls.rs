@@ -29,6 +29,8 @@ use stackable_operator::{
 };
 use time::{Duration, OffsetDateTime};
 
+use crate::format::{well_known, SecretData, WellKnownSecretData};
+
 use super::{
     pod_info::{Address, PodInfo},
     SecretBackend, SecretBackendError, SecretContents,
@@ -315,32 +317,25 @@ impl SecretBackend for TlsGenerate {
             })
             .context(BuildCertificateSnafu { tpe: CertType::Pod })?
             .build();
-        Ok(SecretContents::new(
-            [
-                (
-                    "ca.crt".into(),
-                    self.ca_cert
+        Ok(
+            SecretContents::new(SecretData::WellKnown(WellKnownSecretData::PemCertificate(
+                well_known::PemCertificate {
+                    ca_pem: self
+                        .ca_cert
                         .to_pem()
                         .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
-                ),
-                (
-                    "tls.crt".into(),
-                    pod_cert
+                    certificate_pem: pod_cert
                         .to_pem()
                         .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
-                ),
-                (
-                    "tls.key".into(),
-                    pod_key
+                    key_pem: pod_key
                         .private_key_to_pem_pkcs8()
                         .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
-                ),
-            ]
-            .into(),
+                },
+            )))
+            .expires_after(
+                time_datetime_to_chrono(expire_pod_after).context(InvalidCertLifetimeSnafu)?,
+            ),
         )
-        .expires_after(
-            time_datetime_to_chrono(expire_pod_after).context(InvalidCertLifetimeSnafu)?,
-        ))
     }
 }
 

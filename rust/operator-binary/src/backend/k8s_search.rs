@@ -9,7 +9,7 @@ use stackable_operator::{
     kube::api::ListParams,
 };
 
-use crate::crd::SearchNamespace;
+use crate::{crd::SearchNamespace, format::SecretData};
 
 use super::{
     pod_info::PodInfo, scope::SecretScope, SecretBackend, SecretBackendError, SecretContents,
@@ -80,14 +80,14 @@ impl SecretBackend for K8sSearch {
             .into_iter()
             .next()
             .context(NoSecretSnafu { label_selector })?;
-        Ok(SecretContents::new(
+        Ok(SecretContents::new(SecretData::Unknown(
             secret
                 .data
                 .unwrap_or_default()
                 .into_iter()
                 .map(|(k, v)| (k.into(), v.0))
                 .collect(),
-        ))
+        )))
     }
 
     async fn get_qualified_node_names(

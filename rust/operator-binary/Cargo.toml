@@ -35,6 +35,7 @@ tracing = "0.1.36"
 h2 = "=0.3.18" # Need to keep this in sync with our patched h2 build
 uuid = { version = "1.2.2", features = ["v4"] }
 stackable-krb5-provision-keytab = { path = "../krb5-provision-keytab" }
+strum = { version = "0.25.0", features = ["derive"] }
 
 
 [dev-dependencies]

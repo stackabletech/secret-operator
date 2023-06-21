@@ -185,7 +185,7 @@ impl SecretProvisionerNode {
     async fn save_secret_data(
         &self,
         target_path: &Path,
-        data: &SecretContents,
+        data: SecretContents,
     ) -> Result<(), PublishError> {
         let create_secret = {
             let mut opts = OpenOptions::new();
@@ -197,7 +197,7 @@ impl SecretProvisionerNode {
                 .mode(0o640);
             opts
         };
-        for (k, v) in &data.files {
+        for (k, v) in data.data.into_files() {
             let item_path = target_path.join(k);
             if let Some(item_path_parent) = item_path.parent() {
                 create_dir_all(item_path_parent)
@@ -210,7 +210,7 @@ impl SecretProvisionerNode {
                 .open(&item_path)
                 .await
                 .context(publish_error::CreateFileSnafu { path: &item_path })?
-                .write_all(v)
+                .write_all(&v)
                 .await
                 .context(publish_error::WriteFileSnafu { path: item_path })?;
         }
@@ -348,7 +348,7 @@ impl Node for SecretProvisionerNode {
                 self.tag_pod(&self.client, &request.volume_id, &selector, &data)
                     .await?;
                 self.prepare_secret_dir(&target_path).await?;
-                self.save_secret_data(&target_path, &data).await?;
+                self.save_secret_data(&target_path, data).await?;
                 Ok(Response::new(NodePublishVolumeResponse {}))
             }
             .await,
