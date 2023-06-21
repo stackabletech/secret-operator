@@ -14,20 +14,20 @@ const FILE_KERBEROS_KEYTAB_KEYTAB: &str = "keytab";
 const FILE_KERBEROS_KEYTAB_KRB5_CONF: &str = "krb5.conf";
 
 #[derive(Debug)]
-pub struct PemCertificate {
+pub struct Tls {
     pub certificate_pem: Vec<u8>,
     pub key_pem: Vec<u8>,
     pub ca_pem: Vec<u8>,
 }
 
 #[derive(Debug)]
-pub struct Pkcs12Certificate {
+pub struct TlsPkcs12 {
     pub keystore: Vec<u8>,
     pub truststore: Vec<u8>,
 }
 
 #[derive(Debug)]
-pub struct KerberosKeytab {
+pub struct Kerberos {
     pub keytab: Vec<u8>,
     pub krb5_conf: Vec<u8>,
 }
@@ -39,15 +39,15 @@ pub struct KerberosKeytab {
     serde(rename_all = "kebab-case")
 )]
 pub enum WellKnownSecretData {
-    PemCertificate(PemCertificate),
-    Pkcs12Certificate(Pkcs12Certificate),
-    KerberosKeytab(KerberosKeytab),
+    Tls(Tls),
+    TlsPkcs12(TlsPkcs12),
+    Kerberos(Kerberos),
 }
 
 impl WellKnownSecretData {
     pub fn into_files(self) -> SecretFiles {
         match self {
-            WellKnownSecretData::PemCertificate(PemCertificate {
+            WellKnownSecretData::Tls(Tls {
                 certificate_pem,
                 key_pem,
                 ca_pem,
@@ -57,7 +57,7 @@ impl WellKnownSecretData {
                 (FILE_PEM_CERT_CA.to_string(), ca_pem),
             ]
             .into(),
-            WellKnownSecretData::Pkcs12Certificate(Pkcs12Certificate {
+            WellKnownSecretData::TlsPkcs12(TlsPkcs12 {
                 keystore,
                 truststore,
             }) => [
@@ -65,7 +65,7 @@ impl WellKnownSecretData {
                 (FILE_PKCS12_CERT_TRUSTSTORE.to_string(), truststore),
             ]
             .into(),
-            WellKnownSecretData::KerberosKeytab(KerberosKeytab { keytab, krb5_conf }) => [
+            WellKnownSecretData::Kerberos(Kerberos { keytab, krb5_conf }) => [
                 (FILE_KERBEROS_KEYTAB_KEYTAB.to_string(), keytab),
                 (FILE_KERBEROS_KEYTAB_KRB5_CONF.to_string(), krb5_conf),
             ]
@@ -80,29 +80,22 @@ impl WellKnownSecretData {
                 .context(from_files_error::MissingRequiredFileSnafu { format, file })
         };
 
-        if let Ok(certificate_pem) = take_file(SecretFormat::PemCertificate, FILE_PEM_CERT_CERT) {
-            let mut take_file = |file| take_file(SecretFormat::PemCertificate, file);
-            Ok(WellKnownSecretData::PemCertificate(PemCertificate {
+        if let Ok(certificate_pem) = take_file(SecretFormat::Tls, FILE_PEM_CERT_CERT) {
+            let mut take_file = |file| take_file(SecretFormat::Tls, file);
+            Ok(WellKnownSecretData::Tls(Tls {
                 certificate_pem,
                 key_pem: take_file(FILE_PEM_CERT_KEY)?,
                 ca_pem: take_file(FILE_PEM_CERT_CA)?,
             }))
-        } else if let Ok(keystore) =
-            take_file(SecretFormat::Pkcs12Certificate, FILE_PKCS12_CERT_KEYSTORE)
-        {
-            Ok(WellKnownSecretData::Pkcs12Certificate(Pkcs12Certificate {
+        } else if let Ok(keystore) = take_file(SecretFormat::TlsPkcs12, FILE_PKCS12_CERT_KEYSTORE) {
+            Ok(WellKnownSecretData::TlsPkcs12(TlsPkcs12 {
                 keystore,
-                truststore: take_file(
-                    SecretFormat::Pkcs12Certificate,
-                    FILE_PKCS12_CERT_TRUSTSTORE,
-                )?,
+                truststore: take_file(SecretFormat::TlsPkcs12, FILE_PKCS12_CERT_TRUSTSTORE)?,
             }))
-        } else if let Ok(keytab) =
-            take_file(SecretFormat::KerberosKeytab, FILE_KERBEROS_KEYTAB_KEYTAB)
-        {
-            Ok(WellKnownSecretData::KerberosKeytab(KerberosKeytab {
+        } else if let Ok(keytab) = take_file(SecretFormat::Kerberos, FILE_KERBEROS_KEYTAB_KEYTAB) {
+            Ok(WellKnownSecretData::Kerberos(Kerberos {
                 keytab,
-                krb5_conf: take_file(SecretFormat::KerberosKeytab, FILE_KERBEROS_KEYTAB_KRB5_CONF)?,
+                krb5_conf: take_file(SecretFormat::Kerberos, FILE_KERBEROS_KEYTAB_KRB5_CONF)?,
             }))
         } else {
             from_files_error::UnknownFormatSnafu {

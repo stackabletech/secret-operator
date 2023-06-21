@@ -6,8 +6,8 @@ use snafu::{ResultExt, Snafu};
 use crate::format::utils::split_pem_certificates;
 
 use super::{
-    well_known::{PemCertificate, Pkcs12Certificate, WellKnownSecretData},
-    SecretFormat,
+    well_known::{Tls, TlsPkcs12},
+    SecretFormat, WellKnownSecretData,
 };
 
 pub fn convert(
@@ -18,9 +18,9 @@ pub fn convert(
         // Converting into the current format is always a no-op
         (from, to) if SecretFormat::from(&from) == to => Ok(from),
 
-        (WellKnownSecretData::PemCertificate(pem), SecretFormat::Pkcs12Certificate) => Ok(
-            WellKnownSecretData::Pkcs12Certificate(convert_pem_cert_to_pkcs12(pem)?),
-        ),
+        (WellKnownSecretData::Tls(pem), SecretFormat::TlsPkcs12) => {
+            Ok(WellKnownSecretData::TlsPkcs12(convert_tls_to_pkcs12(pem)?))
+        }
 
         (from, to) => NoValidConversionSnafu { from, to }.fail(),
     }
@@ -37,13 +37,11 @@ pub enum ConvertError {
         display("failed to convert from PEM certificate to PKCS#12"),
         context(false)
     )]
-    PemCertToPkcs12 { source: PemCertToPkcs12Error },
+    TlsToPkcs12 { source: TlsToPkcs12Error },
 }
 
-pub fn convert_pem_cert_to_pkcs12(
-    pem: PemCertificate,
-) -> Result<Pkcs12Certificate, PemCertToPkcs12Error> {
-    use pem_cert_to_pkcs12_error::*;
+pub fn convert_tls_to_pkcs12(pem: Tls) -> Result<TlsPkcs12, TlsToPkcs12Error> {
+    use tls_to_pkcs12_error::*;
     let cert = X509::from_pem(&pem.certificate_pem).context(LoadCertSnafu)?;
     let key = PKey::private_key_from_pem(&pem.key_pem).context(LoadKeySnafu)?;
 
@@ -56,7 +54,7 @@ pub fn convert_pem_cert_to_pkcs12(
 
     let mut pkcs_builder = Pkcs12::builder();
 
-    Ok(Pkcs12Certificate {
+    Ok(TlsPkcs12 {
         truststore: pkcs_builder
             .ca(ca_stack)
             .build2("")
@@ -73,7 +71,7 @@ pub fn convert_pem_cert_to_pkcs12(
 
 #[derive(Snafu, Debug)]
 #[snafu(module)]
-pub enum PemCertToPkcs12Error {
+pub enum TlsToPkcs12Error {
     LoadCert { source: OpensslError },
     LoadKey { source: OpensslError },
     LoadCa { source: OpensslError },

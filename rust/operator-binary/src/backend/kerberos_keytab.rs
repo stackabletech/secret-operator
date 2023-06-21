@@ -235,7 +235,7 @@ cluster.local = {realm_name}
             .await
             .context(ReadKeytabSnafu)?;
         Ok(SecretContents::new(SecretData::WellKnown(
-            WellKnownSecretData::KerberosKeytab(well_known::KerberosKeytab {
+            WellKnownSecretData::Kerberos(well_known::Kerberos {
                 keytab: keytab_data,
                 krb5_conf: profile.into_bytes(),
             }),

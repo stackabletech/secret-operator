@@ -318,8 +318,8 @@ impl SecretBackend for TlsGenerate {
             .context(BuildCertificateSnafu { tpe: CertType::Pod })?
             .build();
         Ok(
-            SecretContents::new(SecretData::WellKnown(WellKnownSecretData::PemCertificate(
-                well_known::PemCertificate {
+            SecretContents::new(SecretData::WellKnown(WellKnownSecretData::Tls(
+                well_known::Tls {
                     ca_pem: self
                         .ca_cert
                         .to_pem()
