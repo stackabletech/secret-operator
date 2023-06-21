@@ -10,11 +10,7 @@ pub mod tls;
 use async_trait::async_trait;
 use serde::{Deserialize, Deserializer};
 use stackable_operator::k8s_openapi::chrono::{DateTime, FixedOffset};
-use std::{
-    collections::{HashMap, HashSet},
-    convert::Infallible,
-    path::PathBuf,
-};
+use std::{collections::HashSet, convert::Infallible};
 
 pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
@@ -54,7 +50,18 @@ pub struct SecretVolumeSelector {
     /// The name of the `Pod`'s `Namespace`, provided by Kubelet
     #[serde(rename = "csi.storage.k8s.io/pod.namespace")]
     pub namespace: String,
+    /// The desired format of the mounted secrets
+    ///
+    /// Currently supported formats:
+    /// - (TLS) `pem-certificate` - A Kubernetes-style triple of PEM-encoded certificate files (`tls.crt`, `tls.key`, `ca.crt`).
+    /// - (TLS) `pkcs12-certificate` - A PKCS#12 trust store named `truststore.p12`.
+    /// - (Kerberos) `kerberos-keytab` - A Kerberos keytab named `keytab`.
+    ///
+    /// Defaults to passing through the native format of the secret backend.
+    #[serde(rename = "secrets.stackable.tech/secret.format")]
+    pub format: Option<SecretFormat>,
 
+    /// The Kerberos service names (`SERVICE_NAME/hostname@realm`)
     #[serde(
         rename = "secrets.stackable.tech/kerberos.service.names",
         default = "SecretVolumeSelector::default_kerberos_service_names",
@@ -107,8 +114,6 @@ impl SecretVolumeSelector {
         Ok(full_str.split(',').map(str::to_string).collect())
     }
 }
-
-type SecretFiles = HashMap<PathBuf, Vec<u8>>;
 
 #[derive(Debug)]
 pub struct SecretContents {

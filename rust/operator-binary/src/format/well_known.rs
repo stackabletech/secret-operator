@@ -1,4 +1,5 @@
 use super::{convert, ConvertError, SecretFiles};
+use serde::Deserialize;
 use snafu::{OptionExt, Snafu};
 use strum::EnumDiscriminants;
 
@@ -32,7 +33,11 @@ pub struct KerberosKeytab {
 }
 
 #[derive(Debug, EnumDiscriminants)]
-#[strum_discriminants(name(SecretFormat))]
+#[strum_discriminants(
+    name(SecretFormat),
+    derive(Deserialize),
+    serde(rename_all = "kebab-case")
+)]
 pub enum WellKnownSecretData {
     PemCertificate(PemCertificate),
     Pkcs12Certificate(Pkcs12Certificate),

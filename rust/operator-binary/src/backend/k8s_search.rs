@@ -5,7 +5,9 @@ use std::collections::{BTreeMap, HashSet};
 use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    k8s_openapi::{api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector},
+    k8s_openapi::{
+        api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector, ByteString,
+    },
     kube::api::ListParams,
 };
 
@@ -85,7 +87,7 @@ impl SecretBackend for K8sSearch {
                 .data
                 .unwrap_or_default()
                 .into_iter()
-                .map(|(k, v)| (k.into(), v.0))
+                .map(|(k, ByteString(v))| (k, v))
                 .collect(),
         )))
     }
