@@ -58,7 +58,11 @@ pub struct SecretVolumeSelector {
     /// - (Kerberos) `kerberos-keytab` - A Kerberos keytab named `keytab`.
     ///
     /// Defaults to passing through the native format of the secret backend.
-    #[serde(rename = "secrets.stackable.tech/secret.format")]
+    #[serde(
+        rename = "secrets.stackable.tech/format",
+        deserialize_with = "SecretVolumeSelector::deserialize_some",
+        default
+    )]
     pub format: Option<SecretFormat>,
 
     /// The Kerberos service names (`SERVICE_NAME/hostname@realm`)
@@ -107,6 +111,12 @@ impl SecretVolumeSelector {
 
     fn default_kerberos_service_names() -> Vec<String> {
         vec!["HTTP".to_string()]
+    }
+
+    fn deserialize_some<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
+        de: D,
+    ) -> Result<Option<T>, D::Error> {
+        T::deserialize(de).map(Some)
     }
 
     fn deserialize_str_vec<'de, D: Deserializer<'de>>(de: D) -> Result<Vec<String>, D::Error> {
