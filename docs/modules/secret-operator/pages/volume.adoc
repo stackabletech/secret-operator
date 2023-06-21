@@ -36,6 +36,16 @@ The name of the xref:secretclass.adoc[] that is responsible for providing this s
 
 The xref:scope.adoc[scopes] used to select or provision the secret. Multiple scopes should be separated by commas (`,`), and scope parameters are separated by equals signs (`=`) where applicable.
 
+=== `secrets.stackable.tech/format`
+
+*Required*: false
+
+*Default value*: default format of backend
+
+*Backends*: All
+
+The xref:secretclass.adoc#format[] that the secret should be written as.
+
 === `secrets.stackable.tech/kerberos.service.names`
 
 *Required*: false
