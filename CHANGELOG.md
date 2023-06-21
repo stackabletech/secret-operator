@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Generate OLM bundle for Release 23.4.0 ([#271]).
+- Added support for converting secrets (including generating PKCS#12 bundles) ([#286]).
 
 ### Changed
 
@@ -15,6 +16,7 @@ All notable changes to this project will be documented in this file.
 
 [#275]: https://github.com/stackabletech/secret-operator/pull/275
 [#285]: https://github.com/stackabletech/secret-operator/pull/285
+[#286]: https://github.com/stackabletech/secret-operator/pull/286
 
 ## [23.4.0] - 2023-04-17
 
