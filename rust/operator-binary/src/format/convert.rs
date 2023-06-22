@@ -1,5 +1,9 @@
 use openssl::{
-    error::ErrorStack as OpensslError, pkcs12::Pkcs12, pkey::PKey, stack::Stack, x509::X509,
+    error::ErrorStack as OpensslError,
+    pkcs12::Pkcs12,
+    pkey::PKey,
+    stack::Stack,
+    x509::{X509Ref, X509},
 };
 use snafu::{ResultExt, Snafu};
 
@@ -52,15 +56,10 @@ pub fn convert_tls_to_pkcs12(pem: Tls) -> Result<TlsPkcs12, TlsToPkcs12Error> {
             .context(LoadCertSnafu)?;
     }
 
-    let mut pkcs_builder = Pkcs12::builder();
-
     Ok(TlsPkcs12 {
-        truststore: pkcs_builder
+        truststore: pkcs12_truststore(&ca_stack)?,
+        keystore: Pkcs12::builder()
             .ca(ca_stack)
-            .build2("")
-            .and_then(|store| store.to_der())
-            .context(BuildTruststoreSnafu)?,
-        keystore: pkcs_builder
             .cert(&cert)
             .pkey(&key)
             .build2("")
@@ -69,12 +68,61 @@ pub fn convert_tls_to_pkcs12(pem: Tls) -> Result<TlsPkcs12, TlsToPkcs12Error> {
     })
 }
 
+fn pkcs12_truststore<'a>(
+    ca_list: impl IntoIterator<Item = &'a X509Ref>,
+) -> Result<Vec<u8>, TlsToPkcs12Error> {
+    // We can't use OpenSSL's `Pkcs12`, since it doesn't let us add new attributes to the SafeBags being created,
+    // and Java refuses to trust CA bags without the `java_trusted_ca_oid` attribute set.
+    // OpenSSL's current master branch contains the `PKCS12_create_ex2` function
+    // (https://www.openssl.org/docs/manmaster/man3/PKCS12_create_ex.html), but it is not currently in
+    // OpenSSL 3.1 (as of 3.1.1), and it is not wrapped by rust-openssl.
+
+    let java_trusted_ca_oid =
+        yasna::models::ObjectIdentifier::from_slice(&[2, 16, 840, 1, 113894, 746875, 1, 1]);
+    let mut truststore_bags = Vec::new();
+    for ca in ca_list {
+        truststore_bags.push(p12::SafeBag {
+            bag: p12::SafeBagKind::CertBag(p12::CertBag::X509(
+                ca.to_der()
+                    .context(tls_to_pkcs12_error::SerializeCaForTruststoreSnafu)?,
+            )),
+            attributes: vec![p12::PKCS12Attribute::Other(p12::OtherAttribute {
+                oid: java_trusted_ca_oid.clone(),
+                data: Vec::new(),
+            })],
+        });
+    }
+    let truststore_data = yasna::construct_der(|w| {
+        w.write_sequence_of(|w| {
+            p12::ContentInfo::Data(yasna::construct_der(|w| {
+                w.write_sequence_of(|w| {
+                    for bag in truststore_bags {
+                        bag.write(w.next())
+                    }
+                })
+            }))
+            .write(w.next());
+        })
+    });
+    Ok(p12::PFX {
+        version: 3,
+        mac_data: Some(p12::MacData::new(&truststore_data, b"")),
+        auth_safe: p12::ContentInfo::Data(truststore_data),
+    }
+    .to_der())
+}
+
 #[derive(Snafu, Debug)]
 #[snafu(module)]
 pub enum TlsToPkcs12Error {
+    #[snafu(display("failed to load certificate"))]
     LoadCert { source: OpensslError },
+    #[snafu(display("failed to load private key"))]
     LoadKey { source: OpensslError },
+    #[snafu(display("failed to load CA certificate"))]
     LoadCa { source: OpensslError },
+    #[snafu(display("failed to build keystore"))]
     BuildKeystore { source: OpensslError },
-    BuildTruststore { source: OpensslError },
+    #[snafu(display("failed to serialize CA certificate for truststore"))]
+    SerializeCaForTruststore { source: OpensslError },
 }
