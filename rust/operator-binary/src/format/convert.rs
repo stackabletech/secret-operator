@@ -77,8 +77,11 @@ fn pkcs12_truststore<'a>(
     // (https://www.openssl.org/docs/manmaster/man3/PKCS12_create_ex.html), but it is not currently in
     // OpenSSL 3.1 (as of 3.1.1), and it is not wrapped by rust-openssl.
 
-    let java_trusted_ca_oid =
+    // Required for Java to trust the certificate, from
+    // https://github.com/openjdk/jdk/blob/990e3a700dce3441bd9506ca571c1790e57849a9/src/java.base/share/classes/sun/security/util/KnownOIDs.java#L414-L415
+    let java_oracle_trusted_key_usage_oid =
         yasna::models::ObjectIdentifier::from_slice(&[2, 16, 840, 1, 113894, 746875, 1, 1]);
+
     let mut truststore_bags = Vec::new();
     for ca in ca_list {
         truststore_bags.push(p12::SafeBag {
@@ -87,7 +90,7 @@ fn pkcs12_truststore<'a>(
                     .context(tls_to_pkcs12_error::SerializeCaForTruststoreSnafu)?,
             )),
             attributes: vec![p12::PKCS12Attribute::Other(p12::OtherAttribute {
-                oid: java_trusted_ca_oid.clone(),
+                oid: java_oracle_trusted_key_usage_oid.clone(),
                 data: Vec::new(),
             })],
         });
