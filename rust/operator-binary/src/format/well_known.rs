@@ -80,8 +80,8 @@ impl WellKnownSecretData {
                 .context(from_files_error::MissingRequiredFileSnafu { format, file })
         };
 
-        if let Ok(certificate_pem) = take_file(SecretFormat::Tls, FILE_PEM_CERT_CERT) {
-            let mut take_file = |file| take_file(SecretFormat::Tls, file);
+        if let Ok(certificate_pem) = take_file(SecretFormat::TlsPem, FILE_PEM_CERT_CERT) {
+            let mut take_file = |file| take_file(SecretFormat::TlsPem, file);
             Ok(WellKnownSecretData::TlsPem(TlsPem {
                 certificate_pem,
                 key_pem: take_file(FILE_PEM_CERT_KEY)?,
