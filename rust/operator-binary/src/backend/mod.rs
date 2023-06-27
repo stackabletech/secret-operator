@@ -53,9 +53,9 @@ pub struct SecretVolumeSelector {
     /// The desired format of the mounted secrets
     ///
     /// Currently supported formats:
-    /// - (TLS) `pem-certificate` - A Kubernetes-style triple of PEM-encoded certificate files (`tls.crt`, `tls.key`, `ca.crt`).
-    /// - (TLS) `pkcs12-certificate` - A PKCS#12 trust store named `truststore.p12`.
-    /// - (Kerberos) `kerberos-keytab` - A Kerberos keytab named `keytab`.
+    /// - `tls-pem` - A Kubernetes-style triple of PEM-encoded certificate files (`tls.crt`, `tls.key`, `ca.crt`).
+    /// - `tls-pkcs12` - A PKCS#12 key store named `keystore.p12` and truststore named `truststore.p12`.
+    /// - `kerberos` - A Kerberos keytab named `keytab`, along with a `krb5.conf`.
     ///
     /// Defaults to passing through the native format of the secret backend.
     #[serde(
