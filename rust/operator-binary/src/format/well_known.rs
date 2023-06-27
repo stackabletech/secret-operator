@@ -14,7 +14,7 @@ const FILE_KERBEROS_KEYTAB_KEYTAB: &str = "keytab";
 const FILE_KERBEROS_KEYTAB_KRB5_CONF: &str = "krb5.conf";
 
 #[derive(Debug)]
-pub struct Tls {
+pub struct TlsPem {
     pub certificate_pem: Vec<u8>,
     pub key_pem: Vec<u8>,
     pub ca_pem: Vec<u8>,
@@ -39,7 +39,7 @@ pub struct Kerberos {
     serde(rename_all = "kebab-case")
 )]
 pub enum WellKnownSecretData {
-    Tls(Tls),
+    TlsPem(TlsPem),
     TlsPkcs12(TlsPkcs12),
     Kerberos(Kerberos),
 }
@@ -47,7 +47,7 @@ pub enum WellKnownSecretData {
 impl WellKnownSecretData {
     pub fn into_files(self) -> SecretFiles {
         match self {
-            WellKnownSecretData::Tls(Tls {
+            WellKnownSecretData::TlsPem(TlsPem {
                 certificate_pem,
                 key_pem,
                 ca_pem,
@@ -82,7 +82,7 @@ impl WellKnownSecretData {
 
         if let Ok(certificate_pem) = take_file(SecretFormat::Tls, FILE_PEM_CERT_CERT) {
             let mut take_file = |file| take_file(SecretFormat::Tls, file);
-            Ok(WellKnownSecretData::Tls(Tls {
+            Ok(WellKnownSecretData::TlsPem(TlsPem {
                 certificate_pem,
                 key_pem: take_file(FILE_PEM_CERT_KEY)?,
                 ca_pem: take_file(FILE_PEM_CERT_CA)?,

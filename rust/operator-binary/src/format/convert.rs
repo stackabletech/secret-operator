@@ -10,7 +10,7 @@ use snafu::{ResultExt, Snafu};
 use crate::format::utils::split_pem_certificates;
 
 use super::{
-    well_known::{Tls, TlsPkcs12},
+    well_known::{TlsPem, TlsPkcs12},
     SecretFormat, WellKnownSecretData,
 };
 
@@ -22,7 +22,7 @@ pub fn convert(
         // Converting into the current format is always a no-op
         (from, to) if SecretFormat::from(&from) == to => Ok(from),
 
-        (WellKnownSecretData::Tls(pem), SecretFormat::TlsPkcs12) => {
+        (WellKnownSecretData::TlsPem(pem), SecretFormat::TlsPkcs12) => {
             Ok(WellKnownSecretData::TlsPkcs12(convert_tls_to_pkcs12(pem)?))
         }
 
@@ -44,7 +44,7 @@ pub enum ConvertError {
     TlsToPkcs12 { source: TlsToPkcs12Error },
 }
 
-pub fn convert_tls_to_pkcs12(pem: Tls) -> Result<TlsPkcs12, TlsToPkcs12Error> {
+pub fn convert_tls_to_pkcs12(pem: TlsPem) -> Result<TlsPkcs12, TlsToPkcs12Error> {
     use tls_to_pkcs12_error::*;
     let cert = X509::from_pem(&pem.certificate_pem).context(LoadCertSnafu)?;
     let key = PKey::private_key_from_pem(&pem.key_pem).context(LoadKeySnafu)?;
