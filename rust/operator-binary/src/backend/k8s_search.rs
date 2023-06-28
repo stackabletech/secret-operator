@@ -5,11 +5,13 @@ use std::collections::{BTreeMap, HashSet};
 use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    k8s_openapi::{api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector},
+    k8s_openapi::{
+        api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector, ByteString,
+    },
     kube::api::ListParams,
 };
 
-use crate::crd::SearchNamespace;
+use crate::{crd::SearchNamespace, format::SecretData};
 
 use super::{
     pod_info::PodInfo, scope::SecretScope, SecretBackend, SecretBackendError, SecretContents,
@@ -80,14 +82,14 @@ impl SecretBackend for K8sSearch {
             .into_iter()
             .next()
             .context(NoSecretSnafu { label_selector })?;
-        Ok(SecretContents::new(
+        Ok(SecretContents::new(SecretData::Unknown(
             secret
                 .data
                 .unwrap_or_default()
                 .into_iter()
-                .map(|(k, v)| (k.into(), v.0))
+                .map(|(k, ByteString(v))| (k, v))
                 .collect(),
-        ))
+        )))
     }
 
     async fn get_qualified_node_names(

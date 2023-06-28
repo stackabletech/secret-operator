@@ -10,11 +10,7 @@ pub mod tls;
 use async_trait::async_trait;
 use serde::{Deserialize, Deserializer};
 use stackable_operator::k8s_openapi::chrono::{DateTime, FixedOffset};
-use std::{
-    collections::{HashMap, HashSet},
-    convert::Infallible,
-    path::PathBuf,
-};
+use std::{collections::HashSet, convert::Infallible};
 
 pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
@@ -23,6 +19,8 @@ pub use tls::TlsGenerate;
 
 use pod_info::Address;
 use scope::SecretScope;
+
+use crate::format::{SecretData, SecretFormat};
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
@@ -52,7 +50,22 @@ pub struct SecretVolumeSelector {
     /// The name of the `Pod`'s `Namespace`, provided by Kubelet
     #[serde(rename = "csi.storage.k8s.io/pod.namespace")]
     pub namespace: String,
+    /// The desired format of the mounted secrets
+    ///
+    /// Currently supported formats:
+    /// - `tls-pem` - A Kubernetes-style triple of PEM-encoded certificate files (`tls.crt`, `tls.key`, `ca.crt`).
+    /// - `tls-pkcs12` - A PKCS#12 key store named `keystore.p12` and truststore named `truststore.p12`.
+    /// - `kerberos` - A Kerberos keytab named `keytab`, along with a `krb5.conf`.
+    ///
+    /// Defaults to passing through the native format of the secret backend.
+    #[serde(
+        rename = "secrets.stackable.tech/format",
+        deserialize_with = "SecretVolumeSelector::deserialize_some",
+        default
+    )]
+    pub format: Option<SecretFormat>,
 
+    /// The Kerberos service names (`SERVICE_NAME/hostname@realm`)
     #[serde(
         rename = "secrets.stackable.tech/kerberos.service.names",
         default = "SecretVolumeSelector::default_kerberos_service_names",
@@ -100,25 +113,29 @@ impl SecretVolumeSelector {
         vec!["HTTP".to_string()]
     }
 
+    fn deserialize_some<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
+        de: D,
+    ) -> Result<Option<T>, D::Error> {
+        T::deserialize(de).map(Some)
+    }
+
     fn deserialize_str_vec<'de, D: Deserializer<'de>>(de: D) -> Result<Vec<String>, D::Error> {
         let full_str = String::deserialize(de)?;
         Ok(full_str.split(',').map(str::to_string).collect())
     }
 }
 
-type SecretFiles = HashMap<PathBuf, Vec<u8>>;
-
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct SecretContents {
-    pub files: SecretFiles,
+    pub data: SecretData,
     pub expires_after: Option<DateTime<FixedOffset>>,
 }
 
 impl SecretContents {
-    fn new(files: SecretFiles) -> Self {
+    fn new(data: SecretData) -> Self {
         Self {
-            files,
-            ..Self::default()
+            data,
+            expires_after: None,
         }
     }
 

@@ -2,6 +2,7 @@ use crate::{
     backend::{
         self, pod_info, pod_info::PodInfo, SecretBackendError, SecretContents, SecretVolumeSelector,
     },
+    format::{self, SecretFormat},
     grpc::csi::v1::{
         node_server::Node, NodeExpandVolumeRequest, NodeExpandVolumeResponse,
         NodeGetCapabilitiesRequest, NodeGetCapabilitiesResponse, NodeGetInfoRequest,
@@ -58,6 +59,8 @@ enum PublishError {
         source: std::io::Error,
         path: PathBuf,
     },
+    #[snafu(display("failed to convert secret data into desired format"))]
+    FormatData { source: format::IntoFilesError },
     #[snafu(display("failed to set volume permissions for {}", path.display()))]
     SetDirPermissions {
         source: std::io::Error,
@@ -94,6 +97,7 @@ impl From<PublishError> for Status {
             }
             PublishError::CreateDir { .. } => Status::unavailable(full_msg),
             PublishError::Mount { .. } => Status::unavailable(full_msg),
+            PublishError::FormatData { .. } => Status::unavailable(full_msg),
             PublishError::SetDirPermissions { .. } => Status::unavailable(full_msg),
             PublishError::CreateFile { .. } => Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
@@ -185,7 +189,8 @@ impl SecretProvisionerNode {
     async fn save_secret_data(
         &self,
         target_path: &Path,
-        data: &SecretContents,
+        data: SecretContents,
+        format: Option<SecretFormat>,
     ) -> Result<(), PublishError> {
         let create_secret = {
             let mut opts = OpenOptions::new();
@@ -197,7 +202,11 @@ impl SecretProvisionerNode {
                 .mode(0o640);
             opts
         };
-        for (k, v) in &data.files {
+        for (k, v) in data
+            .data
+            .into_files(format)
+            .context(publish_error::FormatDataSnafu)?
+        {
             let item_path = target_path.join(k);
             if let Some(item_path_parent) = item_path.parent() {
                 create_dir_all(item_path_parent)
@@ -210,7 +219,7 @@ impl SecretProvisionerNode {
                 .open(&item_path)
                 .await
                 .context(publish_error::CreateFileSnafu { path: &item_path })?
-                .write_all(v)
+                .write_all(&v)
                 .await
                 .context(publish_error::WriteFileSnafu { path: item_path })?;
         }
@@ -348,7 +357,8 @@ impl Node for SecretProvisionerNode {
                 self.tag_pod(&self.client, &request.volume_id, &selector, &data)
                     .await?;
                 self.prepare_secret_dir(&target_path).await?;
-                self.save_secret_data(&target_path, &data).await?;
+                self.save_secret_data(&target_path, data, selector.format)
+                    .await?;
                 Ok(Response::new(NodePublishVolumeResponse {}))
             }
             .await,
