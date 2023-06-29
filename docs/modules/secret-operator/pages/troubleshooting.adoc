@@ -1,0 +1,17 @@
+= Troubleshooting
+
+== My secret-consuming Pods get stuck `Pending`!
+
+. Does the `Pod` have any events relating to scheduling? (`kubectl describe pod/$POD_NAME`)
+. Is the `PersistentVolumeClaim` being created? It should have the name `$POD_NAME-$VOLUME_NAME`.
+. Is the `PersistentVolumeClaim` bound to a `PersistentVolume`? If not:
+.. Does the `PersistentVolumeClaim` have any relevant events? (`kubectl describe pvc/$PVC_NAME`)
+.. If the `PersistentVolumeClaim` has no relevant events (or only an event that it is waiting for a volume to be provisioned),
+   check the logs of the secret-operator sidecar container named `external-provisioner`.
+.. Does the `PersistentVolumeClaim` have a `StorageClass` set?
+.. Is the `StorageClass` configured to use the provisioner named `secrets.stackable.tech`?
+. Does the `PersistentVolume` have any relevant events? (`kubectl describe pv/$PV_NAME`)
+. Is the `CSIDriver` object named `secrets.stackable.tech` configured correctly?
+. Is the CSI driver registered on the relevant `CSINode` objects? (`kubectl get csinode/$NODE_NAME -o yaml` should contain the driver `secrets.stackable.tech`)
+. Does the secret-operator sidecar container named `node-driver-registrar` have any relevant log entries?
+. Does the kubelet have any relevant log entries?
