@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- crds/crds.yaml
+- templates/csidriver.yaml
+- templates/deployment.yaml
+- templates/secretclasses.yaml
+- templates/storageclass.yaml
