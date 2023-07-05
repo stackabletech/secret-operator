@@ -46,15 +46,38 @@ securityContext:
   # runAsNonRoot: true
   # runAsUser: 1000
 
+controller:
+  externalProvisioner:
+    resources:
+      # Resource requests and limits for the external-provisioner container
+      # Please note: currently this is rolled out per node, but that may change
+      # in the future.
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
 node:
-  resources:
-    # Resource limits that are applied to the daemonset deployed by this helm chart
-    limits:
-      cpu: 100m
-      memory: 128Mi
-    requests:
-      cpu: 100m
-      memory: 128Mi
+  driver:
+    resources:
+      # Resource requests and limits for the per node driver container
+      limits:
+        cpu: 200m
+        memory: 128Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+  driverRegistrar:
+    resources:
+      # Resource requests and limits for the container running the registrar component per node
+      limits:
+        cpu: 300m
+        memory: 128Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
 
 nodeSelector: {}
 
