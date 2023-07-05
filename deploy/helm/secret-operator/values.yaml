@@ -64,7 +64,7 @@ node:
     resources:
       # Resource requests and limits for the per node driver container
       limits:
-        cpu: 200m
+        cpu: 100m
         memory: 128Mi
       requests:
         cpu: 100m
@@ -73,7 +73,7 @@ node:
     resources:
       # Resource requests and limits for the container running the registrar component per node
       limits:
-        cpu: 300m
+        cpu: 100m
         memory: 128Mi
       requests:
         cpu: 100m
