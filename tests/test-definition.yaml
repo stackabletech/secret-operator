@@ -3,6 +3,8 @@ dimensions: []
 tests:
   - name: kerberos
     dimensions: []
-  # # Requires manual connection to an AD cluster
-  # - name: kerberos-ad
-  #   dimensions: []
+    # Requires manual connection to an AD cluster
+    # - name: kerberos-ad
+    #   dimensions: []
+suites:
+  - name: nightly
