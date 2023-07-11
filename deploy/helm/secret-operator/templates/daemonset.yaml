@@ -57,7 +57,7 @@ spec:
           image: "{{ .Values.csiProvisioner.image.repository }}:{{ .Values.csiProvisioner.image.tag }}"
           imagePullPolicy: {{ .Values.csiProvisioner.image.pullPolicy }}
           resources:
-            {{ .Values.controller.externalProvisioner.resources | toYaml | nindent 12 }}
+            {{ .Values.csiProvisioner.resources | toYaml | nindent 12 }}
           args:
             - --csi-address=/csi/csi.sock
             - --feature-gates=Topology=true
@@ -69,7 +69,7 @@ spec:
           image: "{{ .Values.csiNodeDriverRegistrar.image.repository }}:{{ .Values.csiNodeDriverRegistrar.image.tag }}"
           imagePullPolicy: {{ .Values.csiNodeDriverRegistrar.image.pullPolicy }}
           resources:
-            {{ .Values.node.driverRegistrar.resources | toYaml | nindent 12 }}
+            {{ .Values.csiNodeDriverRegistrar.resources | toYaml | nindent 12 }}
           args:
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path={{ .Values.kubeletDir }}/plugins/secrets.stackable.tech/csi.sock
