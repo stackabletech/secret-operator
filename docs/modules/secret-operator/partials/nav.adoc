@@ -9,4 +9,5 @@
 ** xref:secret-operator:scope.adoc[]
 ** xref:secret-operator:volume.adoc[]
 * xref:secret-operator:security.adoc[]
+* xref:secret-operator:troubleshooting.adoc[]
 
