@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- `operator-rs` `0.27.1` -> `0.41.0` ([#275]).
+- `operator-rs` `0.27.1` -> `0.44.0` ([#275], [#294]).
 - Removed dummy key from generated Kerberos keytab ([#285]).
 - [BREAKING] Daemonset for SecretOperator now assign resource requests and limits to all containers and init containers. Users who have configured resource limits previously in the 'values.yaml' file will need to move the configured limits from `.resources` to `.node.driver.resources` for them to be honored going forward ([#289]).
 
@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 [#285]: https://github.com/stackabletech/secret-operator/pull/285
 [#286]: https://github.com/stackabletech/secret-operator/pull/286
 [#289]: https://github.com/stackabletech/secret-operator/pull/289
+[#294]: https://github.com/stackabletech/secret-operator/pull/294
 
 ## [23.4.0] - 2023-04-17
 
