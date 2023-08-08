@@ -44,7 +44,7 @@ yasna = "0.5.2"
 time = { version = "0.3.14", features = ["parsing"] }
 
 [build-dependencies]
-built = { version = "0.5.1", features = ["chrono", "git2"] }
+built = { version = "0.6.1", features = ["chrono", "git2"] }
 tonic-build = "0.8"
 
 [features]
