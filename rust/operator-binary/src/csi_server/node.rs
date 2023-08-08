@@ -164,14 +164,11 @@ impl SecretProvisionerNode {
             },
         }
         if self.privileged {
-            Mount::new(
-                "",
-                target_path,
-                "tmpfs",
-                MountFlags::NODEV | MountFlags::NOEXEC | MountFlags::NOSUID,
-                None,
-            )
-            .context(publish_error::MountSnafu { path: target_path })?;
+            Mount::builder()
+                .fstype("tmpfs")
+                .flags(MountFlags::NODEV | MountFlags::NOEXEC | MountFlags::NOSUID)
+                .mount("", target_path)
+                .context(publish_error::MountSnafu { path: target_path })?;
         } else {
             tracing::info!("Running in unprivileged mode, not creating mount for secret volume");
         }
