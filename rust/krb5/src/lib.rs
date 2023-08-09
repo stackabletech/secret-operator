@@ -277,7 +277,7 @@ impl<'a> Keyblock<'a> {
     pub fn new(
         ctx: &'a KrbContext,
         enctype: krb5_sys::krb5_enctype,
-        len: u64,
+        len: usize,
     ) -> Result<Self, Error> {
         unsafe {
             let mut keyblock: *mut krb5_sys::krb5_keyblock = std::ptr::null_mut();
