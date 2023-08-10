@@ -2,8 +2,8 @@
 
 This is an operator for Kubernetes that provisions and injects secrets into Kubernetes Pods.
 
-Kubernetes Secret objects contain sensitive payloads such as passwords, tokens or keys. These objects
-are usually self contained and static in the sense their contents remain unchanged as long as their owners
+Kubernetes `Secret` objects contain sensitive payloads such as passwords, tokens or keys. These objects
+are usually self-contained and static in the sense their contents remain unchanged as long as their owners
 do not update them.
 
 The Stackable Secret Operator enhances the functionality of Kubernetes Secrets by introducing the concept of a
