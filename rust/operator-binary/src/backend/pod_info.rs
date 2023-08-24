@@ -2,15 +2,12 @@
 
 use std::{collections::HashMap, net::IpAddr};
 
-use csi_grpc::listop::v1::listener_node_client::ListenerNodeClient;
-use futures::{FutureExt, StreamExt};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::listener::PodListeners,
     k8s_openapi::api::core::v1::{Node, Pod},
     kube::runtime::reflector::ObjectRef,
 };
-use tonic::{body::BoxBody, client::GrpcService, transport::Channel};
 
 #[derive(Debug, Snafu)]
 #[snafu(module)]
@@ -42,7 +39,6 @@ pub struct PodInfo {
 impl PodInfo {
     pub async fn from_pod(
         client: &stackable_operator::client::Client,
-        listop_client: &mut ListenerNodeClient<Channel>,
         pod: Pod,
     ) -> Result<Self, FromPodError> {
         let node_name = pod

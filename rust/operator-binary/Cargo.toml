@@ -10,7 +10,6 @@ publish = false
 
 [dependencies]
 stackable-krb5-provision-keytab = { path = "../krb5-provision-keytab" }
-csi-grpc = { path = "../../../lb-operator/rust/csi-grpc" }
 
 anyhow.workspace = true
 async-trait.workspace = true
