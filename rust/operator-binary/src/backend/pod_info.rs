@@ -6,6 +6,7 @@ use csi_grpc::listop::v1::listener_node_client::ListenerNodeClient;
 use futures::{FutureExt, StreamExt};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
+    commons::listener::PodListeners,
     k8s_openapi::api::core::v1::{Node, Pod},
     kube::runtime::reflector::ObjectRef,
 };
@@ -55,46 +56,13 @@ impl PodInfo {
             .with_context(|_| from_pod_error::GetNodeSnafu {
                 node: ObjectRef::new(&node_name),
             })?;
-        let listener_volume_names = ["listener"];
-        // let listener_volume_names = pod
-        //     .spec
-        //     .iter()
-        //     .flat_map(|spec| &spec.volumes)
-        //     .flatten()
-        //     // .flat_map(|volume| volume.ephemeral.as_ref()?.volume_claim_template.as_ref())
-        //     .filter(|volume| {
-        //         dbg!(volume);
-        //         volume.ephemeral.as_ref().and_then(|v| {
-        //             v.volume_claim_template
-        //                 .as_ref()?
-        //                 .spec
-        //                 .storage_class_name
-        //                 .as_deref()
-        //         }) == Some("listeners.stackable.tech")
-        //     })
-        //     .map(|volume| &volume.name)
-        //     .collect::<Vec<_>>();
-        let mut listener_addresses = HashMap::new();
-        for listener_name in listener_volume_names {
-            listener_addresses.insert(
-                listener_name.to_string(),
-                listop_client
-                    .get_local_listener_addresses_for_pod(
-                        csi_grpc::listop::v1::GetLocalListenerAddressesForPodRequest {
-                            namespace: pod.metadata.namespace.clone().unwrap(),
-                            pod: pod.metadata.name.clone().unwrap(),
-                            listener: listener_name.to_string(),
-                        },
-                    )
-                    .await
-                    .unwrap()
-                    .into_inner()
-                    .ingresses
-                    .into_iter()
-                    .map(|ingress| ingress.address)
-                    .collect::<Vec<_>>(),
-            );
-        }
+        let listeners = client
+            .get::<PodListeners>(
+                &format!("pod-{}", pod.metadata.uid.as_deref().unwrap()),
+                pod.metadata.namespace.as_deref().unwrap(),
+            )
+            .await
+            .unwrap();
         Ok(Self {
             // This will generally be empty, since Kubernetes assigns pod IPs *after* CSI plugins are successful
             pod_ips: pod
@@ -119,7 +87,20 @@ impl PodInfo {
                         .context(from_pod_error::IllegalIpSnafu { ip: &ip.address })
                 })
                 .collect::<Result<_, _>>()?,
-            listener_addresses,
+            listener_addresses: listeners
+                .spec
+                .listeners
+                .into_iter()
+                .map(|(listener, ingresses)| {
+                    (
+                        listener,
+                        ingresses
+                            .into_iter()
+                            .map(|ingr| ingr.address)
+                            .collect::<Vec<_>>(),
+                    )
+                })
+                .collect::<HashMap<_, _>>(),
         })
     }
 }
