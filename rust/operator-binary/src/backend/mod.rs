@@ -106,6 +106,13 @@ impl SecretVolumeSelector {
                 "{}.{}.svc.cluster.local",
                 name, self.namespace
             ))],
+            scope::SecretScope::Listener { name } => dbg!(&pod_info.listener_addresses)
+                .get(name)
+                .expect(&format!("no addresses found for listener {name}"))
+                .iter()
+                .cloned()
+                .map(Address::Dns)
+                .collect::<Vec<_>>(),
         }
     }
 

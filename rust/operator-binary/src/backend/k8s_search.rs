@@ -135,6 +135,7 @@ fn build_label_selector_query(
             SecretScope::Service { name } => {
                 label_selector.insert(LABEL_SCOPE_SERVICE.to_string(), name.clone());
             }
+            SecretScope::Listener { name } => todo!(),
         }
     }
     stackable_operator::label_selector::convert_label_selector_to_query_string(&LabelSelector {

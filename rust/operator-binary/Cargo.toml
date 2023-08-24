@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 stackable-krb5-provision-keytab = { path = "../krb5-provision-keytab" }
+csi-grpc = { path = "../../../lb-operator/rust/csi-grpc" }
 
 anyhow.workspace = true
 async-trait.workspace = true
@@ -38,6 +39,8 @@ tonic.workspace = true
 tracing.workspace = true
 uuid.workspace = true
 yasna.workspace = true
+tower = "0.4.13"
+reqwest = "0.11.19"
 
 [dev-dependencies]
 time.workspace = true

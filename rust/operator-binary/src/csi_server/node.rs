@@ -13,6 +13,8 @@ use crate::{
     },
     utils::{error_full_message, FmtByteSlice},
 };
+use csi_grpc::listop::v1::listener_node_client::ListenerNodeClient;
+use futures::lock::Mutex;
 use openssl::sha::Sha256;
 use serde::{de::IntoDeserializer, Deserialize};
 use snafu::{ResultExt, Snafu};
@@ -28,7 +30,7 @@ use tokio::{
     fs::{create_dir_all, OpenOptions},
     io::AsyncWriteExt,
 };
-use tonic::{Request, Response, Status};
+use tonic::{transport::Channel, Request, Response, Status};
 
 use super::controller::TOPOLOGY_NODE;
 
@@ -137,6 +139,7 @@ impl From<UnpublishError> for Status {
 // secrets for pods that get scheduled on that node.
 pub struct SecretProvisionerNode {
     pub client: stackable_operator::client::Client,
+    pub listop_client: Mutex<ListenerNodeClient<Channel>>,
     pub node_name: String,
     pub privileged: bool,
 }
@@ -148,7 +151,8 @@ impl SecretProvisionerNode {
             .get::<Pod>(&selector.pod, &selector.namespace)
             .await
             .context(publish_error::GetPodSnafu)?;
-        PodInfo::from_pod(&self.client, pod)
+        let mut listop_client = self.listop_client.lock().await;
+        PodInfo::from_pod(&self.client, &mut *listop_client, pod)
             .await
             .context(publish_error::ParsePodSnafu)
     }

@@ -9,6 +9,7 @@ pub enum SecretScope {
     Node,
     Pod,
     Service { name: String },
+    Listener { name: String },
 }
 
 #[derive(Debug, Snafu)]
@@ -30,6 +31,12 @@ impl SecretScope {
             "node" => Self::Node,
             "pod" => Self::Pod,
             "service" => Self::Service {
+                name: param
+                    .take()
+                    .context(deserialize_error::ScopeRequiresParamSnafu { tpe })?
+                    .to_string(),
+            },
+            "listener" => Self::Listener {
                 name: param
                     .take()
                     .context(deserialize_error::ScopeRequiresParamSnafu { tpe })?

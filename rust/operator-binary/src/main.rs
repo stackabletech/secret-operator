@@ -1,18 +1,23 @@
 use anyhow::Context;
 use clap::{crate_description, crate_version, Parser};
+use csi_grpc::listop::v1::listener_node_client::ListenerNodeClient;
 use csi_server::{
     controller::SecretProvisionerController, identity::SecretProvisionerIdentity,
     node::SecretProvisionerNode,
 };
-use futures::{FutureExt, TryStreamExt};
+use futures::{lock::Mutex, FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
 use stackable_operator::{logging::TracingTarget, CustomResourceExt};
 use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::{
+    net::UnixStream,
+    signal::unix::{signal, SignalKind},
+};
 use tokio_stream::wrappers::UnixListenerStream;
-use tonic::transport::Server;
+use tonic::transport::{Endpoint, Server, Uri};
+use tower::service_fn;
 use utils::{uds_bind_private, TonicUnixStream};
 
 mod backend;
@@ -35,6 +40,8 @@ struct Opts {
 struct SecretOperatorRun {
     #[clap(long, env)]
     csi_endpoint: PathBuf,
+    #[clap(long, env)]
+    listop: PathBuf,
     #[clap(long, env)]
     node_name: String,
     /// Unprivileged mode disables any features that require running secret-operator in a privileged container.
@@ -64,6 +71,7 @@ async fn main() -> anyhow::Result<()> {
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun {
             csi_endpoint,
+            listop,
             node_name,
             tracing_target,
             privileged,
@@ -92,6 +100,7 @@ async fn main() -> anyhow::Result<()> {
                 let _ = std::fs::remove_file(&csi_endpoint);
             }
             let mut sigterm = signal(SignalKind::terminate())?;
+            let listop = &*Box::leak(Box::new(listop));
             Server::builder()
                 .add_service(
                     tonic_reflection::server::Builder::configure()
@@ -105,6 +114,13 @@ async fn main() -> anyhow::Result<()> {
                 }))
                 .add_service(NodeServer::new(SecretProvisionerNode {
                     client,
+                    listop_client: Mutex::new(ListenerNodeClient::new(
+                        Endpoint::from_static("http://[::]")
+                            .connect_with_connector(service_fn(move |_: Uri| {
+                                UnixStream::connect(listop)
+                            }))
+                            .await?,
+                    )),
                     node_name,
                     privileged,
                 }))
