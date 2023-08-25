@@ -102,13 +102,13 @@ pub async fn from_class(
                     secret,
                     auto_generate,
                 },
-            max_cert_lifetime,
+            max_certificate_lifetime,
         }) => from(
             super::TlsGenerate::get_or_create_k8s_certificate(
                 client,
                 &secret,
                 auto_generate,
-                max_cert_lifetime,
+                max_certificate_lifetime,
             )
             .await?,
         ),

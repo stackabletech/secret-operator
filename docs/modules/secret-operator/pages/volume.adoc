@@ -49,6 +49,19 @@ The xref:secretclass.adoc#format[format] that the secret should be written as.
 
 This can be either the default output format of the xref:secretclass.adoc#backend[backend], or a format that it defines a conversion into.
 
+=== `secrets.stackable.tech/autotls.cert.lifetime`
+
+*Required*: false
+
+*Default value*: `maxCertificateLifetime` set on the SecretClass
+
+*Backends*: xref:secretclass.adoc#backend-autotls[]
+
+The lifetime the created certificate should have.
+Please note that you can not request a lifetime longer than allowed by `maxCertificateLifetime` on the SecretClass.
+If you do so, `maxCertificateLifetime` will be used as the certificate lifetime, to adhere to the requirements
+set by the admin that created the SecretClass.
+
 === `secrets.stackable.tech/kerberos.service.names`
 
 *Required*: false

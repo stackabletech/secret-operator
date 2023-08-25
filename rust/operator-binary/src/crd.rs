@@ -55,10 +55,10 @@ pub struct AutoTlsBackend {
     #[serde(default = "default_cert_lifetime", with = "humantime_serde")]
     #[schemars(with = "String")]
     /// Maximum lifetime the created certificates could have.
-    /// Clients can request shorter-lived certificates, in case they request a longer lifetime than allowed
-    /// by this setting, the lifetime will be the minimum of both.
-    /// Must be at least `1d`.
-    pub max_cert_lifetime: Duration,
+    /// Clients can request shorter-lived certificates.
+    /// In case they request a longer lifetime than allowed by this setting, the lifetime will be the minimum of both,
+    /// so this setting takes precedence.
+    pub max_certificate_lifetime: Duration,
 }
 
 fn default_cert_lifetime() -> Duration {
@@ -227,7 +227,7 @@ mod test {
                         },
                         auto_generate: false,
                     },
-                    max_cert_lifetime: DEFAULT_MAX_CERT_LIFETIME,
+                    max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
                 })
             }
         );
@@ -245,7 +245,7 @@ mod test {
                   name: secret-provisioner-tls-ca
                   namespace: default
                 autoGenerate: true
-              maxCertLifetime: 14d
+              maxCertificateLifetime: 31d
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(input);
         let secret_class: SecretClass =
@@ -261,7 +261,7 @@ mod test {
                         },
                         auto_generate: true,
                     },
-                    max_cert_lifetime: Duration::from_secs(14 * 24 * 60 * 60),
+                    max_certificate_lifetime: Duration::from_secs(31 * 24 * 60 * 60),
                 })
             }
         );

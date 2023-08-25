@@ -38,9 +38,22 @@ use super::{
     SecretBackend, SecretBackendError, SecretContents,
 };
 
+/// As the Pods will be evicted [`EXPIRE_PODS_BEFORE_CERT_EXPIRES_PERIOD`] before
+/// the cert actually expires, this results in a restart in approx every 2 weeks,
+/// which matches the rolling re-deploy of k8s nodes of e.g.:
+/// * 1 week for IONOS
+/// * 2 weeks for some on-prem k8s clusters
 pub const DEFAULT_MAX_CERT_LIFETIME: std::time::Duration =
-    std::time::Duration::from_secs(7 * 24 * 60 * 60);
+    std::time::Duration::from_secs(15 * 24 * 60 * 60);
+/// This needs to be sufficiently larger than [`EXPIRE_PODS_BEFORE_CERT_EXPIRES_PERIOD`], so that the
+/// Pod does not immediately gets evicted once it's created.
 pub const MIN_MAX_CERT_LIFETIME: Duration = Duration::days(1);
+
+/// When a StatefulSet has many Pods (e.g. 80 HDFS datanodes or Trino workers) a rolling
+/// redeployment can take multiple hours. When the certificates of all datanodes expire approximately
+/// at the same time and PodDisruptionBudgets are in place, Pods can need to this time to properly shut down,
+/// so we need to evict them enough time in advance
+pub const EXPIRE_PODS_BEFORE_CERT_EXPIRES_PERIOD: Duration = Duration::hours(6);
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -298,11 +311,7 @@ impl SecretBackend for TlsGenerate {
         let cert_lifetime = autotls_cert_lifetime.unwrap_or(self.max_cert_lifetime);
         let cert_lifetime = min(cert_lifetime, self.max_cert_lifetime);
         let not_after = now + cert_lifetime;
-        // When a StatefulSet has many Pods (e.g. 80 HDFS datanodes or Trino workers) a rolling
-        // redeployment can take multiple hours. When the certificates of all datanodes expire approximately
-        // at the same time and PodDisruptionBudgets are in place, Pods can need to this time to properly shut down,
-        // so we need to evict them enough time in advance
-        let expire_pod_after = not_after - Duration::hours(6);
+        let expire_pod_after = not_after - EXPIRE_PODS_BEFORE_CERT_EXPIRES_PERIOD;
         let conf = Conf::new(ConfMethod::default()).unwrap();
         let pod_key = Rsa::generate(2048)
             .and_then(PKey::try_from)

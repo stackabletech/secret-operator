@@ -53,9 +53,9 @@ spec:
                           required:
                             - secret
                           type: object
-                        maxCertLifetime:
-                          default: 7days
-                          description: Maximum lifetime the created certificates could have. Clients can request shorter-lived certificates, in case they request a longer lifetime than allowed by this setting, the lifetime will be the minimum of both. Must be at least `1d`.
+                        maxCertificateLifetime:
+                          default: 15days
+                          description: Maximum lifetime the created certificates could have. Clients can request shorter-lived certificates. In case they request a longer lifetime than allowed by this setting, the lifetime will be the minimum of both.
                           type: string
                       required:
                         - ca
