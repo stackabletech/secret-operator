@@ -68,10 +68,14 @@ pub struct SecretVolumeSelector {
     /// The Kerberos service names (`SERVICE_NAME/hostname@realm`)
     #[serde(
         rename = "secrets.stackable.tech/kerberos.service.names",
-        default = "SecretVolumeSelector::default_kerberos_service_names",
-        deserialize_with = "SecretVolumeSelector::deserialize_str_vec"
+        deserialize_with = "SecretVolumeSelector::deserialize_str_vec",
+        default = "SecretVolumeSelector::default_kerberos_service_names"
     )]
     pub kerberos_service_names: Vec<String>,
+
+    /// The TLS cert lifetime (`1d`, `7d`, `1m` or `1y`)
+    #[serde(rename = "secrets.stackable.tech/autotls.cert.lifetime", default)]
+    pub autotls_cert_lifetime: Option<std::time::Duration>,
 }
 
 impl SecretVolumeSelector {

@@ -16,6 +16,7 @@ async-trait.workspace = true
 clap.workspace = true
 futures.workspace = true
 h2.workspace = true
+humantime-serde.workspace = true
 libc.workspace = true
 openssl.workspace = true
 p12.workspace = true
@@ -40,7 +41,7 @@ uuid.workspace = true
 yasna.workspace = true
 
 [dev-dependencies]
-time.workspace = true
+serde_yaml.workspace = true
 
 [build-dependencies]
 built.workspace = true

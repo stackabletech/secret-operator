@@ -1,5 +1,7 @@
 //! Dynamically provisions TLS certificates
 
+use std::cmp::min;
+
 use async_trait::async_trait;
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},
@@ -27,7 +29,7 @@ use stackable_operator::{
     },
     kube::runtime::reflector::ObjectRef,
 };
-use time::{Duration, OffsetDateTime};
+use time::{error::ConversionRange, Duration, OffsetDateTime};
 
 use crate::format::{well_known, SecretData, WellKnownSecretData};
 
@@ -35,6 +37,10 @@ use super::{
     pod_info::{Address, PodInfo},
     SecretBackend, SecretBackendError, SecretContents,
 };
+
+pub const DEFAULT_MAX_CERT_LIFETIME: std::time::Duration =
+    std::time::Duration::from_secs(7 * 24 * 60 * 60);
+pub const MIN_MAX_CERT_LIFETIME: Duration = Duration::days(1);
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -71,6 +77,18 @@ pub enum Error {
     },
     #[snafu(display("invalid certificate lifetime"))]
     InvalidCertLifetime { source: DateTimeOutOfBoundsError },
+    #[snafu(display("failed to parse max certificate lifetime \"{lifetime:?}\""))]
+    InvalidMaxCertLifetime {
+        source: ConversionRange,
+        lifetime: std::time::Duration,
+    },
+    #[snafu(display(
+        "too short max certificate lifetime \"{lifetime:?}\", must be at least \"{min_lifetime:?}\""
+    ))]
+    TooShortMaxCertLifetime {
+        lifetime: Duration,
+        min_lifetime: Duration,
+    },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -92,6 +110,8 @@ impl SecretBackendError for Error {
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SaveCaCertificate { .. } => tonic::Code::Unavailable,
             Error::InvalidCertLifetime { .. } => tonic::Code::Internal,
+            Error::InvalidMaxCertLifetime { .. } => tonic::Code::InvalidArgument,
+            Error::TooShortMaxCertLifetime { .. } => tonic::Code::InvalidArgument,
         }
     }
 }
@@ -99,10 +119,11 @@ impl SecretBackendError for Error {
 pub struct TlsGenerate {
     ca_cert: X509,
     ca_key: PKey<Private>,
+    max_cert_lifetime: Duration,
 }
 
 impl TlsGenerate {
-    pub fn new_self_signed() -> Result<Self> {
+    pub fn new_self_signed(max_cert_lifetime: Duration) -> Result<Self> {
         let subject_name = X509NameBuilder::new()
             .and_then(|mut name| {
                 name.append_entry_by_nid(Nid::COMMONNAME, "secret-operator self-signed")?;
@@ -153,7 +174,11 @@ impl TlsGenerate {
             })
             .context(BuildCertificateSnafu { tpe: CertType::Ca })?
             .build();
-        Ok(Self { ca_key, ca_cert })
+        Ok(Self {
+            ca_key,
+            ca_cert,
+            max_cert_lifetime,
+        })
     }
 
     /// Check if a signing CA has already been instantiated in a specified Kubernetes secret - if
@@ -166,7 +191,21 @@ impl TlsGenerate {
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
         auto_generate_if_missing: bool,
+        max_cert_lifetime: std::time::Duration,
     ) -> Result<Self> {
+        let max_cert_lifetime =
+            max_cert_lifetime
+                .try_into()
+                .context(InvalidMaxCertLifetimeSnafu {
+                    lifetime: max_cert_lifetime,
+                })?;
+        if max_cert_lifetime < MIN_MAX_CERT_LIFETIME {
+            TooShortMaxCertLifetimeSnafu {
+                lifetime: max_cert_lifetime,
+                min_lifetime: MIN_MAX_CERT_LIFETIME,
+            }
+            .fail()?;
+        }
         let (k8s_secret_name, k8s_ns) = match secret_ref {
             SecretReference {
                 name: Some(name),
@@ -193,11 +232,12 @@ impl TlsGenerate {
                         &ca_data.get("ca.crt").context(MissingCaCertificateSnafu)?.0,
                     )
                     .context(LoadCertificateSnafu { tpe: CertType::Ca })?,
+                    max_cert_lifetime,
                 }
             }
             Err(_) if auto_generate_if_missing => {
                 // Failed to get existing cert, try to create a new self-signed one
-                let ca = Self::new_self_signed()?;
+                let ca = Self::new_self_signed(max_cert_lifetime)?;
                 // Use create rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
                 client
                     .create(&Secret {
@@ -252,8 +292,17 @@ impl SecretBackend for TlsGenerate {
     ) -> Result<SecretContents, Self::Error> {
         let now = OffsetDateTime::now_utc();
         let not_before = now - Duration::minutes(5);
-        let not_after = now + Duration::days(1);
-        let expire_pod_after = not_after - Duration::minutes(30);
+        let autotls_cert_lifetime = selector
+            .autotls_cert_lifetime
+            .and_then(|l| l.try_into().ok());
+        let cert_lifetime = autotls_cert_lifetime.unwrap_or(self.max_cert_lifetime);
+        let cert_lifetime = min(cert_lifetime, self.max_cert_lifetime);
+        let not_after = now + cert_lifetime;
+        // When a StatefulSet has many Pods (e.g. 80 HDFS datanodes or Trino workers) a rolling
+        // redeployment can take multiple hours. When the certificates of all datanodes expire approximately
+        // at the same time and PodDisruptionBudgets are in place, Pods can need to this time to properly shut down,
+        // so we need to evict them enough time in advance
+        let expire_pod_after = not_after - Duration::hours(6);
         let conf = Conf::new(ConfMethod::default()).unwrap();
         let pod_key = Rsa::generate(2048)
             .and_then(PKey::try_from)
