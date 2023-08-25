@@ -59,6 +59,7 @@ rules:
   - apiGroups:
       - listeners.stackable.tech
     resources:
+      - listenerclasses
       - podlistenerses
     verbs:
       - get

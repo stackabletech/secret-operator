@@ -91,6 +91,8 @@ impl PodInfo {
                     (
                         listener,
                         ingresses
+                            .ingress_addresses
+                            .unwrap()
                             .into_iter()
                             .map(|ingr| ingr.address)
                             .collect::<Vec<_>>(),

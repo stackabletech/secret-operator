@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::{
-    backend::{self, SecretBackendError, SecretVolumeSelector},
+    backend::{self, scope::SecretScope, SecretBackendError, SecretVolumeSelector},
     grpc::csi::{
         self,
         v1::{
@@ -15,7 +15,9 @@ use crate::{
 use serde::{de::IntoDeserializer, Deserialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    k8s_openapi::api::core::v1::PersistentVolumeClaim, kube::runtime::reflector::ObjectRef,
+    commons::listener::{Listener, ListenerClass, ServiceType},
+    k8s_openapi::api::core::v1::{PersistentVolumeClaim, Pod},
+    kube::runtime::reflector::ObjectRef,
 };
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
@@ -146,7 +148,89 @@ impl Controller for SecretProvisionerController {
         let request = request.into_inner();
         let params = CreateVolumeParams::deserialize(request.parameters.into_deserializer())
             .context(create_volume_error::InvalidParamsSnafu)?;
-        let (pvc_selector, selector) = self.get_pvc_secret_selector(&params).await?;
+        let (mut pvc_selector, mut selector) = self.get_pvc_secret_selector(&params).await?;
+
+        let pod = self
+            .client
+            .get::<Pod>(&selector.pod, &selector.namespace)
+            .await
+            .unwrap();
+        let mut has_node_listener = false;
+        for scope in &selector.scope {
+            if let SecretScope::Listener {
+                name: listener_volume_name,
+            } = scope
+            {
+                let listener_volume = pod
+                    .spec
+                    .as_ref()
+                    .and_then(|ps| {
+                        ps.volumes
+                            .as_ref()?
+                            .iter()
+                            .find(|v| &v.name == listener_volume_name)
+                    })
+                    .unwrap();
+                let listener_pvc_meta = if let Some(ephemeral) = &listener_volume.ephemeral {
+                    Cow::Borrowed(
+                        ephemeral
+                            .volume_claim_template
+                            .as_ref()
+                            .and_then(|pvct| pvct.metadata.as_ref())
+                            .unwrap(),
+                    )
+                } else if let Some(claim) = &listener_volume.persistent_volume_claim {
+                    Cow::Owned(
+                        self.client
+                            .get::<PersistentVolumeClaim>(&claim.claim_name, &selector.namespace)
+                            .await
+                            .unwrap()
+                            .metadata,
+                    )
+                } else {
+                    panic!("{listener_volume_name} is not a supported listener volume type")
+                };
+                let listener_class_name = if let Some(listener_class_name) = listener_pvc_meta
+                    .annotations
+                    .as_ref()
+                    .and_then(|ann| ann.get("listeners.stackable.tech/listener-class"))
+                {
+                    Cow::Borrowed(listener_class_name)
+                } else if let Some(listener_name) = listener_pvc_meta
+                    .annotations
+                    .as_ref()
+                    .and_then(|ann| ann.get("listeners.stackable.tech/listener-name"))
+                {
+                    Cow::Owned(
+                        self.client
+                            .get::<Listener>(listener_name, &selector.namespace)
+                            .await
+                            .unwrap()
+                            .spec
+                            .class_name
+                            .unwrap(),
+                    )
+                } else {
+                    panic!("could not find listener type for {listener_volume_name}")
+                };
+                let listener_class = self
+                    .client
+                    .get::<ListenerClass>(dbg!(&listener_class_name), &())
+                    .await
+                    .unwrap();
+                if matches!(listener_class.spec.service_type, ServiceType::NodePort) {
+                    has_node_listener = true;
+                }
+            }
+        }
+        if has_node_listener {
+            selector.scope.push(SecretScope::Node);
+            pvc_selector
+                .get_mut("secrets.stackable.tech/scope")
+                .unwrap()
+                .push_str(",node");
+        }
+
         let backend = backend::dynamic::from_selector(&self.client, &selector)
             .await
             .context(create_volume_error::InitBackendSnafu)?;

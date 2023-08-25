@@ -2558,7 +2558,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator"
 version = "0.46.0"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=feature/podlisteners#c9fd08c50d73ecddfd6d8c88004e406765ec8c8a"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=feature/podlisteners#2a76ef0efeee73ddb001504f146b4c36026c7410"
 dependencies = [
  "chrono",
  "clap",
@@ -2592,7 +2592,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator-derive"
 version = "0.46.0"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=feature/podlisteners#c9fd08c50d73ecddfd6d8c88004e406765ec8c8a"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=feature/podlisteners#2a76ef0efeee73ddb001504f146b4c36026c7410"
 dependencies = [
  "darling 0.20.3",
  "proc-macro2",
