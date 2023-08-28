@@ -1,6 +1,6 @@
 //! Queries the Kubernetes API for predefined [`Secret`] objects
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{btree_map::Entry, BTreeMap, HashSet};
 
 use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -130,6 +130,7 @@ fn build_label_selector_query(
 ) -> Result<String, Error> {
     let mut label_selector =
         BTreeMap::from([(LABEL_CLASS.to_string(), vol_selector.class.to_string())]);
+    let mut listener_i = 0;
     for scope in &vol_selector.scope {
         match scope {
             SecretScope::Node => {
@@ -145,9 +146,10 @@ fn build_label_selector_query(
             }
             SecretScope::Listener { name } => {
                 label_selector.insert(
-                    LABEL_SCOPE_LISTENER.to_string(),
+                    format!("{LABEL_SCOPE_LISTENER}.{listener_i}"),
                     pod_listeners.volume_listeners[name].clone(),
                 );
+                listener_i += 1;
             }
         }
     }
