@@ -6,7 +6,9 @@ use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{
-        api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector, ByteString,
+        api::core::v1::{Pod, Secret},
+        apimachinery::pkg::apis::meta::v1::LabelSelector,
+        ByteString,
     },
     kube::api::ListParams,
 };
@@ -14,8 +16,9 @@ use stackable_operator::{
 use crate::{crd::SearchNamespace, format::SecretData};
 
 use super::{
-    pod_info::PodInfo, scope::SecretScope, SecretBackend, SecretBackendError, SecretContents,
-    SecretVolumeSelector,
+    pod_info::{PodInfo, PodListenerInfo},
+    scope::SecretScope,
+    SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
 };
 
 const LABEL_CLASS: &str = "secrets.stackable.tech/class";
@@ -71,7 +74,8 @@ impl SecretBackend for K8sSearch {
         selector: &SecretVolumeSelector,
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
-        let label_selector = build_label_selector_query(selector, Some(&pod_info))?;
+        let label_selector =
+            build_label_selector_query(selector, Some(&pod_info), &pod_info.listeners)?;
         let secret = self
             .client
             .list::<Secret>(
@@ -96,9 +100,11 @@ impl SecretBackend for K8sSearch {
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,
+        pod: &Pod,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
         if selector.scope.contains(&SecretScope::Node) {
-            let label_selector = build_label_selector_query(selector, None)?;
+            let pod_listeners = PodListenerInfo::from_pod(&self.client, pod).await;
+            let label_selector = build_label_selector_query(selector, None, &pod_listeners)?;
             Ok(Some(
                 self.client
                     .list::<Secret>(
@@ -120,6 +126,7 @@ impl SecretBackend for K8sSearch {
 fn build_label_selector_query(
     vol_selector: &SecretVolumeSelector,
     pod_info: Option<&PodInfo>,
+    pod_listeners: &PodListenerInfo,
 ) -> Result<String, Error> {
     let mut label_selector =
         BTreeMap::from([(LABEL_CLASS.to_string(), vol_selector.class.to_string())]);
@@ -137,7 +144,10 @@ fn build_label_selector_query(
                 label_selector.insert(LABEL_SCOPE_SERVICE.to_string(), name.clone());
             }
             SecretScope::Listener { name } => {
-                label_selector.insert(LABEL_SCOPE_LISTENER.to_string(), name.clone());
+                label_selector.insert(
+                    LABEL_SCOPE_LISTENER.to_string(),
+                    pod_listeners.volume_listeners[name].clone(),
+                );
             }
         }
     }

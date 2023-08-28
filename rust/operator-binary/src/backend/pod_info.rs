@@ -2,12 +2,15 @@
 
 use std::{collections::HashMap, net::IpAddr};
 
+use futures::StreamExt;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::listener::PodListeners,
-    k8s_openapi::api::core::v1::{Node, Pod},
+    k8s_openapi::api::core::v1::{Node, PersistentVolumeClaim, Pod},
     kube::runtime::reflector::ObjectRef,
 };
+
+use super::scope::SecretScope;
 
 #[derive(Debug, Snafu)]
 #[snafu(module)]
@@ -34,6 +37,7 @@ pub struct PodInfo {
     pub node_name: String,
     pub node_ips: Vec<IpAddr>,
     pub listener_addresses: HashMap<String, Vec<String>>,
+    pub listeners: PodListenerInfo,
 }
 
 impl PodInfo {
@@ -59,6 +63,7 @@ impl PodInfo {
             )
             .await
             .unwrap();
+        let listener_info = PodListenerInfo::from_pod(client, &pod).await;
         Ok(Self {
             // This will generally be empty, since Kubernetes assigns pod IPs *after* CSI plugins are successful
             pod_ips: pod
@@ -99,6 +104,7 @@ impl PodInfo {
                     )
                 })
                 .collect::<HashMap<_, _>>(),
+            listeners: listener_info,
         })
     }
 }
@@ -107,4 +113,52 @@ impl PodInfo {
 pub enum Address {
     Dns(String),
     Ip(IpAddr),
+}
+
+pub struct PodListenerInfo {
+    pub volume_pvcs: HashMap<String, String>,
+    pub volume_listeners: HashMap<String, String>,
+}
+
+impl PodListenerInfo {
+    pub async fn from_pod(client: &stackable_operator::client::Client, pod: &Pod) -> Self {
+        let volume_pvcs = pod
+            .spec
+            .iter()
+            .flat_map(|ps| &ps.volumes)
+            .flatten()
+            .filter_map(|vol| {
+                Some((
+                    vol.name.clone(),
+                    if vol.ephemeral.is_some() {
+                        format!("{}-{}", pod.metadata.name.as_deref().unwrap(), vol.name)
+                    } else {
+                        vol.persistent_volume_claim.as_ref()?.claim_name.clone()
+                    },
+                ))
+            })
+            .collect::<HashMap<_, _>>();
+        let volume_listeners = futures::stream::iter(&volume_pvcs)
+            .then(|(volume, pvc_name)| async move {
+                let pvc = client
+                    .get::<PersistentVolumeClaim>(
+                        pvc_name,
+                        pod.metadata.namespace.as_deref().unwrap(),
+                    )
+                    .await
+                    .unwrap();
+                let listener_name = pvc
+                    .metadata
+                    .annotations
+                    .and_then(|mut ann| ann.remove("listeners.stackable.tech/listener-name"))
+                    .unwrap_or(pvc_name.to_string());
+                (volume.to_string(), listener_name)
+            })
+            .collect::<HashMap<_, _>>()
+            .await;
+        PodListenerInfo {
+            volume_pvcs,
+            volume_listeners,
+        }
+    }
 }

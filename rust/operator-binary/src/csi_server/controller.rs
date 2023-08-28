@@ -235,7 +235,7 @@ impl Controller for SecretProvisionerController {
             .await
             .context(create_volume_error::InitBackendSnafu)?;
         let accessible_topology = match backend
-            .get_qualified_node_names(&selector)
+            .get_qualified_node_names(&selector, &pod)
             .await
             .context(create_volume_error::FindNodesSnafu)?
         {

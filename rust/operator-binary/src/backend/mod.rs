@@ -9,7 +9,10 @@ pub mod tls;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Deserializer};
-use stackable_operator::k8s_openapi::chrono::{DateTime, FixedOffset};
+use stackable_operator::k8s_openapi::{
+    api::core::v1::Pod,
+    chrono::{DateTime, FixedOffset},
+};
 use std::{collections::HashSet, convert::Infallible};
 
 pub use dynamic::Dynamic;
@@ -174,6 +177,7 @@ pub trait SecretBackend: Send + Sync {
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,
+        pod: &Pod,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
         // selector is unused in the stub implementation, but should still be used in all "real" impls
         let _ = selector;
