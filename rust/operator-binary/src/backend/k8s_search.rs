@@ -22,6 +22,7 @@ const LABEL_CLASS: &str = "secrets.stackable.tech/class";
 const LABEL_SCOPE_NODE: &str = "secrets.stackable.tech/node";
 const LABEL_SCOPE_POD: &str = "secrets.stackable.tech/pod";
 const LABEL_SCOPE_SERVICE: &str = "secrets.stackable.tech/service";
+const LABEL_SCOPE_LISTENER: &str = "secrets.stackable.tech/listener";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -135,9 +136,12 @@ fn build_label_selector_query(
             SecretScope::Service { name } => {
                 label_selector.insert(LABEL_SCOPE_SERVICE.to_string(), name.clone());
             }
-            SecretScope::Listener { name } => todo!(),
+            SecretScope::Listener { name } => {
+                label_selector.insert(LABEL_SCOPE_LISTENER.to_string(), name.clone());
+            }
         }
     }
+    dbg!(&label_selector);
     stackable_operator::label_selector::convert_label_selector_to_query_string(&LabelSelector {
         match_expressions: None,
         match_labels: Some(label_selector),
