@@ -5,7 +5,7 @@ use std::{collections::HashMap, net::IpAddr};
 use futures::StreamExt;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    commons::listener::PodListeners,
+    commons::listener::{AddressType, PodListeners},
     k8s_openapi::api::core::v1::{Node, PersistentVolumeClaim, Pod},
     kube::runtime::reflector::ObjectRef,
 };
@@ -36,7 +36,7 @@ pub struct PodInfo {
     pub service_name: Option<String>,
     pub node_name: String,
     pub node_ips: Vec<IpAddr>,
-    pub listener_addresses: HashMap<String, Vec<String>>,
+    pub listener_addresses: HashMap<String, Vec<Address>>,
     pub listeners: PodListenerInfo,
 }
 
@@ -99,7 +99,10 @@ impl PodInfo {
                             .ingress_addresses
                             .unwrap()
                             .into_iter()
-                            .map(|ingr| ingr.address)
+                            .map(|ingr| match ingr.address_type {
+                                AddressType::Hostname => Address::Dns(ingr.address),
+                                AddressType::Ip => Address::Ip(ingr.address.parse().unwrap()),
+                            })
                             .collect::<Vec<_>>(),
                     )
                 })
@@ -109,7 +112,7 @@ impl PodInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Address {
     Dns(String),
     Ip(IpAddr),

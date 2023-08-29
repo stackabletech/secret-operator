@@ -114,7 +114,6 @@ impl SecretVolumeSelector {
                 .expect(&format!("no addresses found for listener {name}"))
                 .iter()
                 .cloned()
-                .map(Address::Dns)
                 .collect::<Vec<_>>(),
         }
     }
