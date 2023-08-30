@@ -1,6 +1,6 @@
 //! Queries the Kubernetes API for predefined [`Secret`] objects
 
-use std::collections::{btree_map::Entry, BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
 use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};

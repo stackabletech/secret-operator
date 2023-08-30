@@ -10,8 +10,6 @@ use stackable_operator::{
     kube::runtime::reflector::ObjectRef,
 };
 
-use super::scope::SecretScope;
-
 #[derive(Debug, Snafu)]
 #[snafu(module)]
 #[allow(clippy::large_enum_variant)]

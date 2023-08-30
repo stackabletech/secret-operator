@@ -109,12 +109,11 @@ impl SecretVolumeSelector {
                 "{}.{}.svc.cluster.local",
                 name, self.namespace
             ))],
-            scope::SecretScope::Listener { name } => dbg!(&pod_info.listener_addresses)
+            scope::SecretScope::Listener { name } => pod_info
+                .listener_addresses
                 .get(name)
                 .expect(&format!("no addresses found for listener {name}"))
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>(),
+                .to_vec(),
         }
     }
 
@@ -178,8 +177,8 @@ pub trait SecretBackend: Send + Sync {
         selector: &SecretVolumeSelector,
         pod: &Pod,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
-        // selector is unused in the stub implementation, but should still be used in all "real" impls
-        let _ = selector;
+        // selector and pod are unused in the stub implementation, but should still be used in "real" impls
+        let _ = (selector, pod);
         Ok(None)
     }
 }
