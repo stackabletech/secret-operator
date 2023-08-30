@@ -148,7 +148,7 @@ impl SecretProvisionerNode {
             .get::<Pod>(&selector.pod, &selector.namespace)
             .await
             .context(publish_error::GetPodSnafu)?;
-        PodInfo::from_pod(&self.client, pod)
+        PodInfo::from_pod(&self.client, pod, &selector.scope)
             .await
             .context(publish_error::ParsePodSnafu)
     }

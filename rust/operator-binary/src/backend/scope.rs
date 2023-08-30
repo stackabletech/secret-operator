@@ -1,5 +1,7 @@
 //! See [`SecretScope`]
 
+use std::fmt::Display;
+
 use serde::{Deserialize, Deserializer};
 use snafu::{OptionExt, Snafu};
 
@@ -56,5 +58,15 @@ impl SecretScope {
             .split(',')
             .map(|s| Self::deserialize(s).map_err(<D::Error as serde::de::Error>::custom))
             .collect::<Result<Vec<_>, _>>()
+    }
+}
+impl Display for SecretScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SecretScope::Node => write!(f, "node"),
+            SecretScope::Pod => write!(f, "pod"),
+            SecretScope::Service { name } => write!(f, "service={name}"),
+            SecretScope::Listener { name } => write!(f, "listener={name}"),
+        }
     }
 }

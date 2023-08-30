@@ -9,6 +9,7 @@ pub mod tls;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Deserializer};
+use snafu::{OptionExt, Snafu};
 use stackable_operator::k8s_openapi::{
     api::core::v1::Pod,
     chrono::{DateTime, FixedOffset},
@@ -77,14 +78,22 @@ pub struct SecretVolumeSelector {
     pub kerberos_service_names: Vec<String>,
 }
 
+#[derive(Snafu, Debug)]
+#[snafu(module)]
+pub enum ScopeAddressesError {
+    #[snafu(display("no addresses found for listener {listener}"))]
+    NoListenerAddresses { listener: String },
+}
+
 impl SecretVolumeSelector {
     /// Returns all addresses associated with a certain [`SecretScope`]
     fn scope_addresses<'a>(
         &'a self,
         pod_info: &'a pod_info::PodInfo,
         scope: &scope::SecretScope,
-    ) -> Vec<Address> {
-        match scope {
+    ) -> Result<Vec<Address>, ScopeAddressesError> {
+        use scope_addresses_error::*;
+        Ok(match scope {
             scope::SecretScope::Node => {
                 let mut addrs = vec![Address::Dns(pod_info.node_name.clone())];
                 addrs.extend(pod_info.node_ips.iter().copied().map(Address::Ip));
@@ -112,9 +121,9 @@ impl SecretVolumeSelector {
             scope::SecretScope::Listener { name } => pod_info
                 .listener_addresses
                 .get(name)
-                .expect(&format!("no addresses found for listener {name}"))
+                .context(NoListenerAddressesSnafu { listener: name })?
                 .to_vec(),
-        }
+        })
     }
 
     fn default_kerberos_service_names() -> Vec<String> {

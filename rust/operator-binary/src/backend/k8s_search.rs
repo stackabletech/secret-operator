@@ -103,7 +103,9 @@ impl SecretBackend for K8sSearch {
         pod: &Pod,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
         if selector.scope.contains(&SecretScope::Node) {
-            let pod_info = SchedulingPodInfo::from_pod(&self.client, pod).await;
+            let pod_info = SchedulingPodInfo::from_pod(&self.client, pod, &selector.scope)
+                .await
+                .unwrap();
             let label_selector = build_label_selector_query(selector, None, &pod_info)?;
             Ok(Some(
                 self.client
