@@ -35,7 +35,7 @@ pub struct PodInfo {
     pub node_name: String,
     pub node_ips: Vec<IpAddr>,
     pub listener_addresses: HashMap<String, Vec<Address>>,
-    pub listeners: PodListenerInfo,
+    pub scheduling: SchedulingPodInfo,
 }
 
 impl PodInfo {
@@ -61,7 +61,7 @@ impl PodInfo {
             )
             .await
             .unwrap();
-        let listener_info = PodListenerInfo::from_pod(client, &pod).await;
+        let scheduling = SchedulingPodInfo::from_pod(client, &pod).await;
         Ok(Self {
             // This will generally be empty, since Kubernetes assigns pod IPs *after* CSI plugins are successful
             pod_ips: pod
@@ -105,7 +105,7 @@ impl PodInfo {
                     )
                 })
                 .collect::<HashMap<_, _>>(),
-            listeners: listener_info,
+            scheduling,
         })
     }
 }
@@ -116,12 +116,13 @@ pub enum Address {
     Ip(IpAddr),
 }
 
-pub struct PodListenerInfo {
+/// Validated metadata about a pod that may or may not be scheduled yet.
+pub struct SchedulingPodInfo {
     pub volume_pvcs: HashMap<String, String>,
     pub volume_listeners: HashMap<String, String>,
 }
 
-impl PodListenerInfo {
+impl SchedulingPodInfo {
     pub async fn from_pod(client: &stackable_operator::client::Client, pod: &Pod) -> Self {
         let volume_pvcs = pod
             .spec
@@ -157,7 +158,7 @@ impl PodListenerInfo {
             })
             .collect::<HashMap<_, _>>()
             .await;
-        PodListenerInfo {
+        SchedulingPodInfo {
             volume_pvcs,
             volume_listeners,
         }

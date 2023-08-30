@@ -16,7 +16,7 @@ use stackable_operator::{
 use crate::{crd::SearchNamespace, format::SecretData};
 
 use super::{
-    pod_info::{PodInfo, PodListenerInfo},
+    pod_info::{PodInfo, SchedulingPodInfo},
     scope::SecretScope,
     SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
 };
@@ -75,7 +75,7 @@ impl SecretBackend for K8sSearch {
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
         let label_selector =
-            build_label_selector_query(selector, Some(&pod_info), &pod_info.listeners)?;
+            build_label_selector_query(selector, Some(&pod_info), &pod_info.scheduling)?;
         let secret = self
             .client
             .list::<Secret>(
@@ -103,8 +103,8 @@ impl SecretBackend for K8sSearch {
         pod: &Pod,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
         if selector.scope.contains(&SecretScope::Node) {
-            let pod_listeners = PodListenerInfo::from_pod(&self.client, pod).await;
-            let label_selector = build_label_selector_query(selector, None, &pod_listeners)?;
+            let pod_info = SchedulingPodInfo::from_pod(&self.client, pod).await;
+            let label_selector = build_label_selector_query(selector, None, &pod_info)?;
             Ok(Some(
                 self.client
                     .list::<Secret>(
@@ -126,7 +126,7 @@ impl SecretBackend for K8sSearch {
 fn build_label_selector_query(
     vol_selector: &SecretVolumeSelector,
     pod_info: Option<&PodInfo>,
-    pod_listeners: &PodListenerInfo,
+    scheduling_pod_info: &SchedulingPodInfo,
 ) -> Result<String, Error> {
     let mut label_selector =
         BTreeMap::from([(LABEL_CLASS.to_string(), vol_selector.class.to_string())]);
@@ -147,7 +147,7 @@ fn build_label_selector_query(
             SecretScope::Listener { name } => {
                 label_selector.insert(
                     format!("{LABEL_SCOPE_LISTENER}.{listener_i}"),
-                    pod_listeners.volume_listeners[name].clone(),
+                    scheduling_pod_info.volume_listeners[name].clone(),
                 );
                 listener_i += 1;
             }
