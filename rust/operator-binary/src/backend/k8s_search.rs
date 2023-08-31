@@ -100,7 +100,7 @@ impl SecretBackend for K8sSearch {
         selector: &SecretVolumeSelector,
         pod_info: SchedulingPodInfo,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
-        if selector.scope.contains(&SecretScope::Node) {
+        if pod_info.has_node_scope {
             let label_selector = build_label_selector_query(selector, None, &pod_info)?;
             Ok(Some(
                 self.client
@@ -128,12 +128,15 @@ fn build_label_selector_query(
     let mut label_selector =
         BTreeMap::from([(LABEL_CLASS.to_string(), vol_selector.class.to_string())]);
     let mut listener_i = 0;
+    if scheduling_pod_info.has_node_scope {
+        if let Some(pod_info) = pod_info {
+            label_selector.insert(LABEL_SCOPE_NODE.to_string(), pod_info.node_name.clone());
+        }
+    }
     for scope in &vol_selector.scope {
         match scope {
             SecretScope::Node => {
-                if let Some(pod_info) = pod_info {
-                    label_selector.insert(LABEL_SCOPE_NODE.to_string(), pod_info.node_name.clone());
-                }
+                // already checked `scheduling_pod_info`, which also takes node listeners into account
             }
             SecretScope::Pod => {
                 label_selector.insert(LABEL_SCOPE_POD.to_string(), vol_selector.pod.clone());

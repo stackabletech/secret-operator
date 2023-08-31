@@ -4,7 +4,6 @@ use crate::{
     backend::{
         self,
         pod_info::{self, SchedulingPodInfo},
-        scope::SecretScope,
         SecretBackendError, SecretVolumeSelector,
     },
     grpc::csi::{
@@ -161,7 +160,7 @@ impl Controller for SecretProvisionerController {
         let request = request.into_inner();
         let params = CreateVolumeParams::deserialize(request.parameters.into_deserializer())
             .context(InvalidParamsSnafu)?;
-        let (mut pvc_selector, mut selector) = self.get_pvc_secret_selector(&params).await?;
+        let (pvc_selector, selector) = self.get_pvc_secret_selector(&params).await?;
 
         let pod = self
             .client
@@ -171,13 +170,6 @@ impl Controller for SecretProvisionerController {
         let pod_info = SchedulingPodInfo::from_pod(&self.client, &pod, &selector.scope)
             .await
             .context(ParsePodSnafu)?;
-        if pod_info.has_node_scope && !selector.scope.contains(&SecretScope::Node) {
-            selector.scope.push(SecretScope::Node);
-            pvc_selector
-                .get_mut("secrets.stackable.tech/scope")
-                .unwrap()
-                .push_str(",node");
-        }
 
         let backend = backend::dynamic::from_selector(&self.client, &selector)
             .await
