@@ -1,16 +1,22 @@
 //! See [`PodInfo`]
 
-use std::{collections::HashMap, net::IpAddr};
+use std::{
+    collections::{BTreeMap, HashMap},
+    net::IpAddr,
+};
 
 use futures::{StreamExt, TryStreamExt};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    commons::listener::{AddressType, PodListeners},
+    commons::listener::{AddressType, Listener, ListenerClass, PodListeners, ServiceType},
     k8s_openapi::api::core::v1::{Node, PersistentVolumeClaim, Pod},
     kube::runtime::reflector::ObjectRef,
 };
 
 use super::scope::SecretScope;
+
+const LISTENER_PVC_ANNOTATION_LISTENER_NAME: &str = "listeners.stackable.tech/listener-name";
+const LISTENER_PVC_ANNOTATION_LISTENER_CLASS: &str = "listeners.stackable.tech/listener-class";
 
 #[derive(Debug, Snafu)]
 #[snafu(module)]
@@ -39,6 +45,30 @@ pub enum FromPodError {
     #[snafu(display("fialed to get listener PVC {listener_pvc} for volume {listener_volume}"))]
     GetListenerPvc {
         source: stackable_operator::error::Error,
+        listener_volume: String,
+        listener_pvc: ObjectRef<PersistentVolumeClaim>,
+    },
+    #[snafu(display("failed to get {listener} for volume {listener_volume}"))]
+    GetListener {
+        source: stackable_operator::error::Error,
+        listener_volume: String,
+        listener: ObjectRef<Listener>,
+    },
+    #[snafu(display("failed to get {listener_class} for volume {listener_volume}"))]
+    GetListenerClass {
+        source: stackable_operator::error::Error,
+        listener_volume: String,
+        listener_class: ObjectRef<ListenerClass>,
+    },
+    #[snafu(display("{listener} has no class for volume {listener_volume}"))]
+    ListenerHasNoClass {
+        listener_volume: String,
+        listener: ObjectRef<Listener>,
+    },
+    #[snafu(display(
+        "{listener_pvc} has no listener or listener class for volume {listener_volume}"
+    ))]
+    UnresolvableListenerPvc {
         listener_volume: String,
         listener_pvc: ObjectRef<PersistentVolumeClaim>,
     },
@@ -84,7 +114,7 @@ impl PodInfo {
                 node: ObjectRef::new(&node_name),
             })?;
         let scheduling = SchedulingPodInfo::from_pod(client, &pod, scopes).await?;
-        let listener_addresses = if !scheduling.volume_listeners.is_empty() {
+        let listener_addresses = if !scheduling.volume_listener_names.is_empty() {
             let pod_listeners_name = format!(
                 "pod-{}",
                 pod.metadata.uid.as_deref().context(NoPodUidSnafu)?
@@ -171,8 +201,8 @@ pub enum Address {
 pub struct SchedulingPodInfo {
     pub namespace: String,
     pub pod_name: String,
-    pub volume_pvcs: HashMap<String, String>,
-    pub volume_listeners: HashMap<String, String>,
+    pub volume_listener_names: HashMap<String, String>,
+    pub has_node_scope: bool,
 }
 
 impl SchedulingPodInfo {
@@ -184,7 +214,7 @@ impl SchedulingPodInfo {
         use from_pod_error::*;
         let pod_name = pod.metadata.name.clone().context(NoPodNameSnafu)?;
         let namespace = pod.metadata.namespace.clone().context(NoNamespaceSnafu)?;
-        let volume_pvcs = pod
+        let volume_pvc_names = pod
             .spec
             .iter()
             .flat_map(|ps| &ps.volumes)
@@ -200,7 +230,7 @@ impl SchedulingPodInfo {
                 ))
             })
             .collect::<HashMap<_, _>>();
-        let volume_listeners = futures::stream::iter(scopes)
+        let volume_listener_pvcs = futures::stream::iter(scopes)
             .filter_map(|scope| async move {
                 match scope {
                     SecretScope::Listener { name } => Some(name),
@@ -210,7 +240,7 @@ impl SchedulingPodInfo {
             .map(|listener_volume| {
                 Ok((
                     listener_volume,
-                    volume_pvcs
+                    volume_pvc_names
                         .get(listener_volume)
                         .context(GetListenerVolumeSnafu { listener_volume })?,
                 ))
@@ -226,19 +256,79 @@ impl SchedulingPodInfo {
                             listener_pvc: ObjectRef::<PersistentVolumeClaim>::new(pvc_name)
                                 .within(namespace),
                         })?;
-                    let listener_name = pvc
-                        .metadata
-                        .annotations
-                        .and_then(|mut ann| ann.remove("listeners.stackable.tech/listener-name"))
-                        .unwrap_or(pvc_name.to_string());
-                    Ok((listener_volume.to_string(), listener_name))
+                    Ok((listener_volume, pvc_name, pvc))
                 }
             })
-            .try_collect::<HashMap<_, _>>()
+            .try_collect::<Vec<_>>()
             .await?;
+        let volume_listener_names = volume_listener_pvcs
+            .iter()
+            .map(|(listener_volume, pvc_name, pvc)| {
+                let listener_name = pvc
+                    .metadata
+                    .annotations
+                    .as_ref()
+                    .and_then(|ann| ann.get(LISTENER_PVC_ANNOTATION_LISTENER_NAME))
+                    .unwrap_or(pvc_name);
+                (listener_volume.to_string(), listener_name.to_string())
+            })
+            .collect::<HashMap<_, _>>();
+        let has_node_scope = scopes.contains(&SecretScope::Node)
+            || futures::stream::iter(volume_listener_pvcs)
+                .then(|(listener_volume, _, pvc)| {
+                    let client = client;
+                    let namespace = &namespace;
+                    async move {
+                        let empty = BTreeMap::new();
+                        let pvc_annotations = pvc.metadata.annotations.as_ref().unwrap_or(&empty);
+                        let listener: Listener;
+                        let listener_class_name = if let Some(cn) =
+                            pvc_annotations.get(LISTENER_PVC_ANNOTATION_LISTENER_CLASS)
+                        {
+                            cn
+                        } else if let Some(listener_name) =
+                            pvc_annotations.get(LISTENER_PVC_ANNOTATION_LISTENER_NAME)
+                        {
+                            listener = client
+                                .get::<Listener>(listener_name, namespace)
+                                .await
+                                .context(GetListenerSnafu {
+                                    listener_volume,
+                                    listener: ObjectRef::<Listener>::new(listener_name)
+                                        .within(namespace),
+                                })?;
+                            listener.spec.class_name.as_deref().context(
+                                ListenerHasNoClassSnafu {
+                                    listener_volume,
+                                    listener: ObjectRef::from_obj(&listener),
+                                },
+                            )?
+                        } else {
+                            return UnresolvableListenerPvcSnafu {
+                                listener_volume,
+                                listener_pvc: ObjectRef::from_obj(&pvc),
+                            }
+                            .fail();
+                        };
+                        let listener_class = client
+                            .get::<ListenerClass>(listener_class_name, &())
+                            .await
+                            .context(GetListenerClassSnafu {
+                                listener_volume,
+                                listener_class: ObjectRef::<ListenerClass>::new(
+                                    listener_class_name,
+                                ),
+                            })?;
+                        Ok(listener_class.spec.service_type == ServiceType::NodePort)
+                    }
+                })
+                .try_collect::<Vec<_>>()
+                .await?
+                .into_iter()
+                .any(|x| x);
         Ok(SchedulingPodInfo {
-            volume_pvcs,
-            volume_listeners,
+            volume_listener_names,
+            has_node_scope,
             pod_name,
             namespace,
         })

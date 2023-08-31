@@ -10,10 +10,7 @@ pub mod tls;
 use async_trait::async_trait;
 use serde::{Deserialize, Deserializer};
 use snafu::{OptionExt, Snafu};
-use stackable_operator::k8s_openapi::{
-    api::core::v1::Pod,
-    chrono::{DateTime, FixedOffset},
-};
+use stackable_operator::k8s_openapi::chrono::{DateTime, FixedOffset};
 use std::{collections::HashSet, convert::Infallible};
 
 pub use dynamic::Dynamic;
@@ -25,6 +22,8 @@ use pod_info::Address;
 use scope::SecretScope;
 
 use crate::format::{SecretData, SecretFormat};
+
+use self::pod_info::SchedulingPodInfo;
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
@@ -184,10 +183,10 @@ pub trait SecretBackend: Send + Sync {
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,
-        pod: &Pod,
+        pod_info: SchedulingPodInfo,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
-        // selector and pod are unused in the stub implementation, but should still be used in "real" impls
-        let _ = (selector, pod);
+        // selector and pod_info are unused in the stub implementation, but should still be used in "real" impls
+        let _ = (selector, pod_info);
         Ok(None)
     }
 }

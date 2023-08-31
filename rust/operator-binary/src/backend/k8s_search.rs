@@ -6,9 +6,7 @@ use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{
-        api::core::v1::{Pod, Secret},
-        apimachinery::pkg::apis::meta::v1::LabelSelector,
-        ByteString,
+        api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector, ByteString,
     },
     kube::api::ListParams,
 };
@@ -100,12 +98,9 @@ impl SecretBackend for K8sSearch {
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,
-        pod: &Pod,
+        pod_info: SchedulingPodInfo,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
         if selector.scope.contains(&SecretScope::Node) {
-            let pod_info = SchedulingPodInfo::from_pod(&self.client, pod, &selector.scope)
-                .await
-                .unwrap();
             let label_selector = build_label_selector_query(selector, None, &pod_info)?;
             Ok(Some(
                 self.client
@@ -149,13 +144,12 @@ fn build_label_selector_query(
             SecretScope::Listener { name } => {
                 label_selector.insert(
                     format!("{LABEL_SCOPE_LISTENER}.{listener_i}"),
-                    scheduling_pod_info.volume_listeners[name].clone(),
+                    scheduling_pod_info.volume_listener_names[name].clone(),
                 );
                 listener_i += 1;
             }
         }
     }
-    dbg!(&label_selector);
     stackable_operator::label_selector::convert_label_selector_to_query_string(&LabelSelector {
         match_expressions: None,
         match_labels: Some(label_selector),

@@ -2,12 +2,12 @@
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
-use stackable_operator::{k8s_openapi::api::core::v1::Pod, kube::runtime::reflector::ObjectRef};
+use stackable_operator::kube::runtime::reflector::ObjectRef;
 use std::{collections::HashSet, fmt::Display};
 
 use super::{
     kerberos_keytab::{self, KerberosProfile},
-    pod_info::PodInfo,
+    pod_info::{PodInfo, SchedulingPodInfo},
     tls, SecretBackend, SecretBackendError, SecretVolumeSelector,
 };
 use crate::crd::{self, SecretClass};
@@ -51,10 +51,10 @@ impl<B: SecretBackend + Send + Sync> SecretBackend for DynamicAdapter<B> {
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,
-        pod: &Pod,
+        pod_info: SchedulingPodInfo,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
         self.0
-            .get_qualified_node_names(selector, pod)
+            .get_qualified_node_names(selector, pod_info)
             .await
             .map_err(|err| DynError(Box::new(err)))
     }
