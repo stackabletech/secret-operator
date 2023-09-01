@@ -1,4 +1,5 @@
-# must be applied by a command step, since the secretclass name depends on the (random) test namespace
+# `$NAMESPACE` will be replaced with the namespace of the test case.
+# All other occurrences of `$` must be escaped with `\`.
 ---
 apiVersion: batch/v1
 kind: Job
@@ -21,11 +22,11 @@ spec:
               echo listing keytab contents
               klist -k /stackable/krb/keytab -teKC
               echo kiniting node
-              kinit -kt /stackable/krb/keytab -p HTTP/$NODE_NAME
+              kinit -kt /stackable/krb/keytab -p HTTP/\$NODE_NAME
               echo kiniting service
-              kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.$NAMESPACE.svc.cluster.local
+              kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.\$NAMESPACE.svc.cluster.local
               echo kiniting pod
-              kinit -kt /stackable/krb/keytab -p HTTP/$POD_NAME.krb5-client.$NAMESPACE.svc.cluster.local
+              kinit -kt /stackable/krb/keytab -p HTTP/\$POD_NAME.krb5-client.\$NAMESPACE.svc.cluster.local
           env:
             - name: KRB5_CONFIG
               value: /stackable/krb/krb5.conf
@@ -50,7 +51,6 @@ spec:
             volumeClaimTemplate:
               metadata:
                 annotations:
-                  # overridden by yq
                   secrets.stackable.tech/class: kerberos-$NAMESPACE
                   secrets.stackable.tech/scope: node,pod
               spec:
