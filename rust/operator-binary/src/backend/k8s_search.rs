@@ -37,6 +37,8 @@ pub enum Error {
     },
     #[snafu(display("no Secrets matched label selector {label_selector:?}"))]
     NoSecret { label_selector: String },
+    #[snafu(display("failed to find Listener name for volume {listener_volume}"))]
+    NoListener { listener_volume: String },
 }
 
 impl SecretBackendError for Error {
@@ -45,6 +47,7 @@ impl SecretBackendError for Error {
             Error::SecretSelector { .. } => tonic::Code::FailedPrecondition,
             Error::SecretQuery { .. } => tonic::Code::FailedPrecondition,
             Error::NoSecret { .. } => tonic::Code::FailedPrecondition,
+            Error::NoListener { .. } => tonic::Code::FailedPrecondition,
         }
     }
 }
@@ -73,7 +76,7 @@ impl SecretBackend for K8sSearch {
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
         let label_selector =
-            build_label_selector_query(selector, Some(&pod_info), &pod_info.scheduling)?;
+            build_label_selector_query(selector, LabelSelectorPodInfo::Scheduled(&pod_info))?;
         let secret = self
             .client
             .list::<Secret>(
@@ -101,11 +104,12 @@ impl SecretBackend for K8sSearch {
         pod_info: SchedulingPodInfo,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
         if pod_info.has_node_scope {
-            let label_selector = build_label_selector_query(selector, None, &pod_info)?;
+            let label_selector =
+                build_label_selector_query(selector, LabelSelectorPodInfo::Scheduling(&pod_info))?;
             Ok(Some(
                 self.client
                     .list::<Secret>(
-                        __self.search_ns_for_pod(selector),
+                        self.search_ns_for_pod(selector),
                         &ListParams::default().labels(&label_selector),
                     )
                     .await
@@ -120,23 +124,35 @@ impl SecretBackend for K8sSearch {
     }
 }
 
+enum LabelSelectorPodInfo<'a> {
+    Scheduling(&'a SchedulingPodInfo),
+    Scheduled(&'a PodInfo),
+}
+
 fn build_label_selector_query(
     vol_selector: &SecretVolumeSelector,
-    pod_info: Option<&PodInfo>,
-    scheduling_pod_info: &SchedulingPodInfo,
+    pod_info: LabelSelectorPodInfo,
 ) -> Result<String, Error> {
     let mut label_selector =
         BTreeMap::from([(LABEL_CLASS.to_string(), vol_selector.class.to_string())]);
     let mut listener_i = 0;
-    if scheduling_pod_info.has_node_scope {
-        if let Some(pod_info) = pod_info {
+    // Only include node selector once we are scheduled,
+    // until then we use the query to decide where scheduling should be possible!
+    if let LabelSelectorPodInfo::Scheduled(pod_info) = pod_info {
+        // k8sSearch doesn't take the scope's resolved addresses into account, so we need to check whether
+        // Listener scopes also imply Node
+        if pod_info.scheduling.has_node_scope {
             label_selector.insert(LABEL_SCOPE_NODE.to_string(), pod_info.node_name.clone());
         }
     }
+    let scheduling_pod_info = match pod_info {
+        LabelSelectorPodInfo::Scheduling(spi) => spi,
+        LabelSelectorPodInfo::Scheduled(pi) => &pi.scheduling,
+    };
     for scope in &vol_selector.scope {
         match scope {
             SecretScope::Node => {
-                // already checked `scheduling_pod_info`, which also takes node listeners into account
+                // already checked `pod_info.has_node_scope`, which also takes node listeners into account
             }
             SecretScope::Pod => {
                 label_selector.insert(LABEL_SCOPE_POD.to_string(), vol_selector.pod.clone());
@@ -147,7 +163,13 @@ fn build_label_selector_query(
             SecretScope::Listener { name } => {
                 label_selector.insert(
                     format!("{LABEL_SCOPE_LISTENER}.{listener_i}"),
-                    scheduling_pod_info.volume_listener_names[name].clone(),
+                    scheduling_pod_info
+                        .volume_listener_names
+                        .get(name)
+                        .context(NoListenerSnafu {
+                            listener_volume: name,
+                        })?
+                        .clone(),
                 );
                 listener_i += 1;
             }

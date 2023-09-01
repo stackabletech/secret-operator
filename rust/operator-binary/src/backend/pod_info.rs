@@ -2,7 +2,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
-    net::IpAddr,
+    net::{AddrParseError, IpAddr},
 };
 
 use futures::{StreamExt, TryStreamExt};
@@ -13,6 +13,8 @@ use stackable_operator::{
     kube::runtime::reflector::ObjectRef,
 };
 
+use crate::utils::trystream_any;
+
 use super::scope::SecretScope;
 
 const LISTENER_PVC_ANNOTATION_LISTENER_NAME: &str = "listeners.stackable.tech/listener-name";
@@ -22,10 +24,10 @@ const LISTENER_PVC_ANNOTATION_LISTENER_CLASS: &str = "listeners.stackable.tech/l
 #[snafu(module)]
 #[allow(clippy::large_enum_variant)]
 pub enum FromPodError {
-    #[snafu(display("failed to parse IP address {ip:?}"))]
-    IllegalIp {
+    #[snafu(display("failed to parse address {address:?}"))]
+    IllegalAddress {
         source: std::net::AddrParseError,
-        ip: String,
+        address: String,
     },
     #[snafu(display("pod has not yet been scheduled to a node"))]
     NoNode,
@@ -115,50 +117,9 @@ impl PodInfo {
             })?;
         let scheduling = SchedulingPodInfo::from_pod(client, &pod, scopes).await?;
         let listener_addresses = if !scheduling.volume_listener_names.is_empty() {
-            let pod_listeners_name = format!(
-                "pod-{}",
-                pod.metadata.uid.as_deref().context(NoPodUidSnafu)?
-            );
-            let listeners = client
-                .get::<PodListeners>(&pod_listeners_name, &scheduling.namespace)
-                .await
-                .context(GetPodListenersSnafu {
-                    pod_listeners: ObjectRef::<PodListeners>::new(&pod_listeners_name)
-                        .within(&scheduling.namespace),
-                    pod: ObjectRef::from_obj(&pod),
-                })?;
-            let listeners_ref = ObjectRef::from_obj(&listeners);
-            listeners
-                .spec
-                .listeners
-                .into_iter()
-                .map(|(listener, ingresses)| {
-                    let addresses =
-                        ingresses
-                            .ingress_addresses
-                            .context(NoPodListenerAddressesSnafu {
-                                pod_listeners: listeners_ref.clone(),
-                                listener: &listener,
-                            })?;
-                    Ok((
-                        listener,
-                        addresses
-                            .into_iter()
-                            .map(|ingr| {
-                                Ok(match ingr.address_type {
-                                    AddressType::Hostname => Address::Dns(ingr.address),
-                                    AddressType::Ip => Address::Ip(
-                                        ingr.address
-                                            .parse()
-                                            .context(IllegalIpSnafu { ip: ingr.address })?,
-                                    ),
-                                })
-                            })
-                            .collect::<Result<Vec<_>, FromPodError>>()?,
-                    ))
-                })
-                .collect::<Result<HashMap<_, _>, FromPodError>>()?
+            pod_listener_addresses(client, &pod, &scheduling).await?
         } else {
+            // We don't care about the listener addresses if there is no listener scope, so we can save the API call
             HashMap::new()
         };
         Ok(Self {
@@ -169,7 +130,10 @@ impl PodInfo {
                 .flat_map(|status| &status.pod_ips)
                 .flatten()
                 .flat_map(|ip| ip.ip.as_deref())
-                .map(|ip| ip.parse().context(from_pod_error::IllegalIpSnafu { ip }))
+                .map(|ip| {
+                    ip.parse()
+                        .context(from_pod_error::IllegalAddressSnafu { address: ip })
+                })
                 .collect::<Result<_, _>>()?,
             service_name: pod.spec.as_ref().and_then(|spec| spec.subdomain.clone()),
             node_name,
@@ -182,7 +146,9 @@ impl PodInfo {
                 .map(|ip| {
                     ip.address
                         .parse()
-                        .context(from_pod_error::IllegalIpSnafu { ip: &ip.address })
+                        .context(from_pod_error::IllegalAddressSnafu {
+                            address: &ip.address,
+                        })
                 })
                 .collect::<Result<_, _>>()?,
             listener_addresses,
@@ -196,12 +162,26 @@ pub enum Address {
     Dns(String),
     Ip(IpAddr),
 }
+impl TryFrom<(AddressType, &str)> for Address {
+    type Error = AddrParseError;
+
+    fn try_from((ty, address): (AddressType, &str)) -> Result<Self, Self::Error> {
+        Ok(match ty {
+            AddressType::Hostname => Address::Dns(address.to_string()),
+            AddressType::Ip => Address::Ip(address.parse()?),
+        })
+    }
+}
 
 /// Validated metadata about a pod that may or may not be scheduled yet.
 pub struct SchedulingPodInfo {
     pub namespace: String,
     pub pod_name: String,
+    /// Map from volume names to Listener names.
     pub volume_listener_names: HashMap<String, String>,
+    /// Whether the secret has a node or _node-equivalent_ scope.
+    ///
+    /// An example of a node-equivalent scope is a listener scope that refers to a node-scoped listener.
     pub has_node_scope: bool,
 }
 
@@ -274,58 +254,12 @@ impl SchedulingPodInfo {
             })
             .collect::<HashMap<_, _>>();
         let has_node_scope = scopes.contains(&SecretScope::Node)
-            || futures::stream::iter(volume_listener_pvcs)
-                .then(|(listener_volume, _, pvc)| {
-                    let client = client;
-                    let namespace = &namespace;
-                    async move {
-                        let empty = BTreeMap::new();
-                        let pvc_annotations = pvc.metadata.annotations.as_ref().unwrap_or(&empty);
-                        let listener: Listener;
-                        let listener_class_name = if let Some(cn) =
-                            pvc_annotations.get(LISTENER_PVC_ANNOTATION_LISTENER_CLASS)
-                        {
-                            cn
-                        } else if let Some(listener_name) =
-                            pvc_annotations.get(LISTENER_PVC_ANNOTATION_LISTENER_NAME)
-                        {
-                            listener = client
-                                .get::<Listener>(listener_name, namespace)
-                                .await
-                                .context(GetListenerSnafu {
-                                    listener_volume,
-                                    listener: ObjectRef::<Listener>::new(listener_name)
-                                        .within(namespace),
-                                })?;
-                            listener.spec.class_name.as_deref().context(
-                                ListenerHasNoClassSnafu {
-                                    listener_volume,
-                                    listener: ObjectRef::from_obj(&listener),
-                                },
-                            )?
-                        } else {
-                            return UnresolvableListenerPvcSnafu {
-                                listener_volume,
-                                listener_pvc: ObjectRef::from_obj(&pvc),
-                            }
-                            .fail();
-                        };
-                        let listener_class = client
-                            .get::<ListenerClass>(listener_class_name, &())
-                            .await
-                            .context(GetListenerClassSnafu {
-                                listener_volume,
-                                listener_class: ObjectRef::<ListenerClass>::new(
-                                    listener_class_name,
-                                ),
-                            })?;
-                        Ok(listener_class.spec.service_type == ServiceType::NodePort)
-                    }
-                })
-                .try_collect::<Vec<_>>()
-                .await?
-                .into_iter()
-                .any(|x| x);
+            || trystream_any(futures::stream::iter(volume_listener_pvcs).then(
+                |(listener_volume, _, pvc)| {
+                    listener_pvc_is_node_scoped(client, &namespace, listener_volume, pvc)
+                },
+            ))
+            .await?;
         Ok(SchedulingPodInfo {
             volume_listener_names,
             has_node_scope,
@@ -333,4 +267,98 @@ impl SchedulingPodInfo {
             namespace,
         })
     }
+}
+
+async fn listener_pvc_is_node_scoped(
+    client: &stackable_operator::client::Client,
+    namespace: &str,
+    listener_volume: &str,
+    pvc: PersistentVolumeClaim,
+) -> Result<bool, FromPodError> {
+    use from_pod_error::*;
+    let empty = BTreeMap::new();
+    let pvc_annotations = pvc.metadata.annotations.as_ref().unwrap_or(&empty);
+    let listener: Listener;
+    let listener_class_name = if let Some(cn) =
+        pvc_annotations.get(LISTENER_PVC_ANNOTATION_LISTENER_CLASS)
+    {
+        cn
+    } else if let Some(listener_name) = pvc_annotations.get(LISTENER_PVC_ANNOTATION_LISTENER_NAME) {
+        listener = client
+            .get::<Listener>(listener_name, namespace)
+            .await
+            .context(GetListenerSnafu {
+                listener_volume,
+                listener: ObjectRef::<Listener>::new(listener_name).within(namespace),
+            })?;
+        listener
+            .spec
+            .class_name
+            .as_deref()
+            .context(ListenerHasNoClassSnafu {
+                listener_volume,
+                listener: ObjectRef::from_obj(&listener),
+            })?
+    } else {
+        return UnresolvableListenerPvcSnafu {
+            listener_volume,
+            listener_pvc: ObjectRef::from_obj(&pvc),
+        }
+        .fail();
+    };
+    let listener_class = client
+        .get::<ListenerClass>(listener_class_name, &())
+        .await
+        .context(GetListenerClassSnafu {
+            listener_volume,
+            listener_class: ObjectRef::<ListenerClass>::new(listener_class_name),
+        })?;
+    Ok(listener_class.spec.service_type == ServiceType::NodePort)
+}
+
+async fn pod_listener_addresses(
+    client: &stackable_operator::client::Client,
+    pod: &Pod,
+    pod_info: &SchedulingPodInfo,
+) -> Result<HashMap<String, Vec<Address>>, FromPodError> {
+    use from_pod_error::*;
+    let pod_listeners_name = format!(
+        "pod-{}",
+        pod.metadata.uid.as_deref().context(NoPodUidSnafu)?
+    );
+    let listeners = client
+        .get::<PodListeners>(&pod_listeners_name, &pod_info.namespace)
+        .await
+        .context(GetPodListenersSnafu {
+            pod_listeners: ObjectRef::<PodListeners>::new(&pod_listeners_name)
+                .within(&pod_info.namespace),
+            pod: ObjectRef::from_obj(pod),
+        })?;
+    let listeners_ref = ObjectRef::from_obj(&listeners);
+    listeners
+        .spec
+        .listeners
+        .into_iter()
+        .map(|(listener, ingresses)| {
+            let addresses = ingresses
+                .ingress_addresses
+                .context(NoPodListenerAddressesSnafu {
+                    pod_listeners: listeners_ref.clone(),
+                    listener: &listener,
+                })?;
+            Ok((
+                listener,
+                addresses
+                    .into_iter()
+                    .map(|ingr| {
+                        (ingr.address_type, &*ingr.address).try_into().context(
+                            IllegalAddressSnafu {
+                                address: ingr.address,
+                            },
+                        )
+                    })
+                    .collect::<Result<Vec<_>, FromPodError>>()?,
+            ))
+        })
+        .collect::<Result<HashMap<_, _>, FromPodError>>()
 }

@@ -267,11 +267,11 @@ impl SecretBackend for TlsGenerate {
             .context(GenerateKeySnafu)?;
         let mut addresses = Vec::new();
         for scope in &selector.scope {
-            addresses.extend(selector.scope_addresses(&pod_info, scope).context(
-                ScopeAddressesSnafu {
-                    scope: scope.clone(),
-                },
-            )?);
+            addresses.extend(
+                selector
+                    .scope_addresses(&pod_info, scope)
+                    .context(ScopeAddressesSnafu { scope })?,
+            );
         }
         let pod_cert = X509Builder::new()
             .and_then(|mut x509| {

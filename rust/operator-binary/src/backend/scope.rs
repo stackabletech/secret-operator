@@ -13,6 +13,11 @@ pub enum SecretScope {
     Service { name: String },
     Listener { name: String },
 }
+impl From<&SecretScope> for SecretScope {
+    fn from(value: &SecretScope) -> Self {
+        value.clone()
+    }
+}
 
 #[derive(Debug, Snafu)]
 #[snafu(module)]
