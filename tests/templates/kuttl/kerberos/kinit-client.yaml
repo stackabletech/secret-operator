@@ -1,5 +1,5 @@
 # `$NAMESPACE` will be replaced with the namespace of the test case.
-# All other occurrences of `$` must be escaped with `\`.
+# All other occurrences of a dollar sign must be escaped with a backslash.
 ---
 apiVersion: batch/v1
 kind: Job
