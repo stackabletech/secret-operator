@@ -38,8 +38,6 @@ tonic.workspace = true
 tracing.workspace = true
 uuid.workspace = true
 yasna.workspace = true
-tower = "0.4.13"
-reqwest = "0.11.19"
 
 [dev-dependencies]
 time.workspace = true
