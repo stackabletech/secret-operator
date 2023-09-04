@@ -1,4 +1,4 @@
-# must be applied by a command step, since the secretclass name depends on the (random) test namespace
+# $NAMESPACE will be replaced with the namespace of the test case.
 ---
 apiVersion: batch/v1
 kind: Job
@@ -29,10 +29,6 @@ spec:
           env:
             - name: KRB5_CONFIG
               value: /stackable/krb/krb5.conf
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -50,7 +46,6 @@ spec:
             volumeClaimTemplate:
               metadata:
                 annotations:
-                  # overridden by yq
                   secrets.stackable.tech/class: kerberos-$NAMESPACE
                   secrets.stackable.tech/scope: node,pod
               spec:
