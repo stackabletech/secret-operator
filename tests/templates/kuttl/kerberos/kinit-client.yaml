@@ -1,5 +1,4 @@
 # $NAMESPACE will be replaced with the namespace of the test case.
-# All other occurrences of a dollar sign must be escaped with a backslash.
 ---
 apiVersion: batch/v1
 kind: Job
@@ -20,18 +19,14 @@ spec:
               echo listing keytab contents
               klist -k /stackable/krb/keytab -teKC
               echo kiniting node
-              kinit -kt /stackable/krb/keytab -p HTTP/\$NODE_NAME
+              kinit -kt /stackable/krb/keytab -p HTTP/$NODE_NAME
               echo kiniting service
-              kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.\$NAMESPACE.svc.cluster.local
+              kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.$NAMESPACE.svc.cluster.local
               echo kiniting pod
-              kinit -kt /stackable/krb/keytab -p HTTP/\$POD_NAME.krb5-client.\$NAMESPACE.svc.cluster.local
+              kinit -kt /stackable/krb/keytab -p HTTP/$POD_NAME.krb5-client.$NAMESPACE.svc.cluster.local
           env:
             - name: KRB5_CONFIG
               value: /stackable/krb/krb5.conf
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
             - name: POD_NAME
               valueFrom:
                 fieldRef:

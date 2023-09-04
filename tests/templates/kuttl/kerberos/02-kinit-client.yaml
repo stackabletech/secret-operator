@@ -2,7 +2,7 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: eval "echo \"$(cat kinit-client.yaml)\"" | kubectl apply -n $NAMESPACE -f -
+  - script: envsubst '$NAMESPACE' < kinit-client.yaml | kubectl apply -n $NAMESPACE -f -
 ---
 apiVersion: v1
 kind: Service
