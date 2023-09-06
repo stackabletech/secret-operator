@@ -105,9 +105,21 @@ impl WellKnownSecretData {
         }
     }
 
-    pub fn convert_to(self, to: SecretFormat) -> Result<Self, ConvertError> {
-        convert::convert(self, to)
+    pub fn convert_to(
+        self,
+        to: SecretFormat,
+        compat: &CompatibilityOptions,
+    ) -> Result<Self, ConvertError> {
+        convert::convert(self, to, compat)
     }
+}
+
+/// Options that some (legacy) applications require to ensure compatibility.
+///
+/// The expectation is that this will be unset the vast majority of the time.
+#[derive(Default)]
+pub struct CompatibilityOptions {
+    pub tls_pkcs12_password: Option<String>,
 }
 
 #[derive(Snafu, Debug)]

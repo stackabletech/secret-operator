@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use snafu::Snafu;
 
+use self::well_known::CompatibilityOptions;
 pub use self::{
     convert::ConvertError,
     well_known::{FromFilesError as ParseError, SecretFormat, WellKnownSecretData},
@@ -26,9 +27,13 @@ impl SecretData {
         }
     }
 
-    pub fn into_files(self, format: Option<SecretFormat>) -> Result<SecretFiles, IntoFilesError> {
+    pub fn into_files(
+        self,
+        format: Option<SecretFormat>,
+        compat: &CompatibilityOptions,
+    ) -> Result<SecretFiles, IntoFilesError> {
         if let Some(format) = format {
-            Ok(self.parse()?.convert_to(format)?.into_files())
+            Ok(self.parse()?.convert_to(format, compat)?.into_files())
         } else {
             Ok(match self {
                 SecretData::WellKnown(data) => data.into_files(),
