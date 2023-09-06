@@ -2,7 +2,7 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: yq eval '.metadata.name = "kerberos-" + strenv(NAMESPACE) | .spec.backend.kerberosKeytab |= (.adminKeytabSecret.namespace = strenv(NAMESPACE) | .kdc = "krb5-kdc." + strenv(NAMESPACE) + ".svc.cluster.local" | .admin.mit.kadminServer = .kdc)' secretclass.yaml | kubectl apply -f-
+  - script: envsubst '$NAMESPACE' < secretclass.yaml | kubectl apply -f -
 ---
 apiVersion: apps/v1
 kind: StatefulSet

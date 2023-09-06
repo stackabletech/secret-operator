@@ -2,7 +2,7 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: yq eval '.spec.template.spec.volumes |= map (.ephemeral.volumeClaimTemplate.metadata.annotations["secrets.stackable.tech/class"] = "kerberos-" + strenv(NAMESPACE))' kinit-client.yaml | kubectl -n $NAMESPACE apply -f-
+  - script: envsubst '$NAMESPACE' < kinit-client.yaml | kubectl apply -n $NAMESPACE -f -
 ---
 apiVersion: v1
 kind: Service
