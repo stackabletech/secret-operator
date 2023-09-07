@@ -1,7 +1,7 @@
 = Usage
 
 The operator injects secret data into xref:volume.adoc[] mounts that declare a CSI volume with `driver: secrets.stackable.tech`.
-  
+
 A minimal secret-consuming `Pod` looks like this:
 
 [source,yaml]

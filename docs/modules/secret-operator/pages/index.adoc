@@ -10,4 +10,3 @@ The Stackable Secret Operator enhances the functionality of Kubernetes Secrets b
 `SecretClass`. A `SecretClass` represents a reference to a source of sensitive data. In addition to Kubernetes
 `Secret` objects, the operator can provision Pods with TLS Certificates, Kerberos keytabs or authentication
 tokens from external services.
-
