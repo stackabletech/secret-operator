@@ -73,7 +73,7 @@ pub struct SecretVolumeSelector {
     )]
     pub kerberos_service_names: Vec<String>,
 
-    /// A password that the TLS PKCS#12 keystore should be protected using
+    /// The password used to encrypt the TLS PKCS#12 keystore
     ///
     /// Required for some applications that misbehave with blank keystore passwords (such as Hadoop).
     /// Has no effect if `format` is not `tls-pkcs12`.
