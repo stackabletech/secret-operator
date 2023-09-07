@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added listener scope for provisioned secrets ([#310]).
+
+### Changed
+
+- `operator-rs` `0.44.0` -> `0.48.0` ([#310]).
+
+[#310]: https://github.com/stackabletech/secret-operator/pull/310
+
 ## [23.7.0] - 2023-07-14
 
 ### Added
@@ -115,11 +125,13 @@ The easiest way to fix this is to perform a rolling reboot of all nodes after th
 This is a one-time migration.
 
 ### Changed
+
 - Store secrets on tmpfs ([#37]).
 - Locked down secret permissions by default ([#37]).
 - Operator-rs: 0.8.0 -> 0.10.0 ([#49]).
 
 ### Bugfixes
+
 - Fixed thread starvation and slow shutdowns ([#47]).
 
 [#37]: https://github.com/stackabletech/secret-operator/pull/37
@@ -129,4 +141,5 @@ This is a one-time migration.
 ## [0.1.0] - 2022-02-03
 
 ### Added
+
 - Initial release
