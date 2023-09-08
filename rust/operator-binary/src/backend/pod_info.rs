@@ -117,7 +117,7 @@ impl PodInfo {
             })?;
         let scheduling = SchedulingPodInfo::from_pod(client, &pod, scopes).await?;
         let listener_addresses = if !scheduling.volume_listener_names.is_empty() {
-            pod_listener_addresses(client, &pod, &scheduling).await?
+            pod_listener_addresses(client, &pod, &scheduling, scopes).await?
         } else {
             // We don't care about the listener addresses if there is no listener scope, so we can save the API call
             HashMap::new()
@@ -320,6 +320,7 @@ async fn pod_listener_addresses(
     client: &stackable_operator::client::Client,
     pod: &Pod,
     pod_info: &SchedulingPodInfo,
+    scopes: &[SecretScope],
 ) -> Result<HashMap<String, Vec<Address>>, FromPodError> {
     use from_pod_error::*;
     let pod_listeners_name = format!(
@@ -335,25 +336,30 @@ async fn pod_listener_addresses(
             pod: ObjectRef::from_obj(pod),
         })?;
     let listeners_ref = ObjectRef::from_obj(&listeners);
-    listeners
-        .spec
-        .listeners
-        .into_iter()
-        .map(|(listener, ingresses)| {
-            let addresses = ingresses
-                .ingress_addresses
+    scopes
+        .iter()
+        .filter_map(|scope| match scope {
+            SecretScope::Listener { name } => Some(name),
+            _ => None,
+        })
+        .map(|listener| {
+            let addresses = listeners
+                .spec
+                .listeners
+                .get(listener)
+                .and_then(|ingresses| ingresses.ingress_addresses.as_ref())
                 .context(NoPodListenerAddressesSnafu {
                     pod_listeners: listeners_ref.clone(),
-                    listener: &listener,
+                    listener,
                 })?;
             Ok((
-                listener,
+                listener.clone(),
                 addresses
-                    .into_iter()
+                    .iter()
                     .map(|ingr| {
                         (ingr.address_type, &*ingr.address).try_into().context(
                             IllegalAddressSnafu {
-                                address: ingr.address,
+                                address: &ingr.address,
                             },
                         )
                     })
