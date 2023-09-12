@@ -10,6 +10,9 @@
       tonic-reflection = attrs: {
         buildInputs = [ pkgs.rustfmt ];
       };
+      csi-grpc = attrs: {
+        nativeBuildInputs = [ pkgs.protobuf ];
+      };
       stackable-secret-operator = attrs: {
         buildInputs = [ pkgs.protobuf pkgs.rustfmt ];
       };
