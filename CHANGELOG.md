@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added support for encrypting PKCS#12 keystores ([#314]).
+
+[#314]: https://github.com/stackabletech/secret-operator/pull/314
+
 ## [23.7.0] - 2023-07-14
 
 ### Added
