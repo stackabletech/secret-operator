@@ -38,14 +38,14 @@ use super::{
     SecretBackend, SecretBackendError, SecretContents,
 };
 
-/// As the Pods will be evicted [`EXPIRE_PODS_BEFORE_CERT_EXPIRES_PERIOD`] before
+/// As the Pods will be evicted [`RESTART_PODS_BEFORE_CERT_EXPIRES_PERIOD`] before
 /// the cert actually expires, this results in a restart in approx every 2 weeks,
 /// which matches the rolling re-deploy of k8s nodes of e.g.:
 /// * 1 week for IONOS
 /// * 2 weeks for some on-prem k8s clusters
 pub const DEFAULT_MAX_CERT_LIFETIME: std::time::Duration =
     std::time::Duration::from_secs(15 * 24 * 60 * 60);
-/// This needs to be sufficiently larger than [`EXPIRE_PODS_BEFORE_CERT_EXPIRES_PERIOD`], so that the
+/// This needs to be sufficiently larger than [`RESTART_PODS_BEFORE_CERT_EXPIRES_PERIOD`], so that the
 /// Pod does not immediately gets evicted once it's created.
 pub const MIN_MAX_CERT_LIFETIME: Duration = Duration::days(1);
 
