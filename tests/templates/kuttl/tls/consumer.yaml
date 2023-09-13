@@ -16,30 +16,57 @@ spec:
             - -c
             - |
               set -euo pipefail
-              ls -la /stackable/tls
+              ls -la /stackable/tls-3d
+              ls -la /stackable/tls-42h
 
-              cat /stackable/tls/tls.crt | openssl x509 -noout -text
+              cat /stackable/tls-3d/tls.crt | openssl x509 -noout -text
+              cat /stackable/tls-42h/tls.crt | openssl x509 -noout -text
 
-              notAfter=`cat /stackable/tls/tls.crt | openssl x509 -noout -enddate| sed -e 's#notAfter=##'`
+              notAfter=`cat /stackable/tls-3d/tls.crt | openssl x509 -noout -enddate| sed -e 's#notAfter=##'`
               notAfterDate=`date -d "${notAfter}" '+%s'`
               nowDate=`date '+%s'`
               diff="$((${notAfterDate}-${nowDate}))"
+              if test "${diff}" -lt "$((71*3600))"; then echo "Cert had a lifetime of less than 71 hours!" && exit 1; fi
+              if test "${diff}" -gt "$((72*3600))"; then echo "Cert had a lifetime of greater than 72 hours!" && exit 1; fi
 
+              notAfter=`cat /stackable/tls-42h/tls.crt | openssl x509 -noout -enddate| sed -e 's#notAfter=##'`
+              notAfterDate=`date -d "${notAfter}" '+%s'`
+              nowDate=`date '+%s'`
+              diff="$((${notAfterDate}-${nowDate}))"
               if test "${diff}" -lt "$((41*3600))"; then echo "Cert had a lifetime of less than 41 hours!" && exit 1; fi
               if test "${diff}" -gt "$((42*3600))"; then echo "Cert had a lifetime of greater than 42 hours!" && exit 1; fi
 
-              cat /stackable/tls/tls.crt | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
+              cat /stackable/tls-3d/tls.crt | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
+              cat /stackable/tls-42h/tls.crt | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
           volumeMounts:
-            - mountPath: /stackable/tls
-              name: tls
+            - mountPath: /stackable/tls-3d
+              name: tls-3d
+            - mountPath: /stackable/tls-42h
+              name: tls-42h
       volumes:
-        - name: tls
+        - name: tls-3d
           ephemeral:
             volumeClaimTemplate:
               metadata:
                 annotations:
                   secrets.stackable.tech/class: tls-$NAMESPACE
                   secrets.stackable.tech/scope: node,pod,service=my-tls-service
+                  secrets.stackable.tech/backend.autotls.cert.lifetime: 3d
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+        - name: tls-42h
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls-$NAMESPACE-42h
+                  secrets.stackable.tech/scope: node,pod,service=my-tls-service
+                  secrets.stackable.tech/backend.autotls.cert.lifetime: 99y
               spec:
                 storageClassName: secrets.stackable.tech
                 accessModes:

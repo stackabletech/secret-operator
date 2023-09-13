@@ -22,7 +22,7 @@ use scope::SecretScope;
 
 use crate::format::{SecretData, SecretFormat};
 
-use self::tls::RESTART_PODS_BEFORE_CERT_EXPIRES_PERIOD;
+use self::tls::{DEFAULT_CERT_LIFETIME, DEFAULT_CERT_RESTART_BUFFER};
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
@@ -88,11 +88,11 @@ pub struct SecretVolumeSelector {
 
     /// The TLS cert lifetime (`1d`, `7d`, `1m` or `1y`).
     #[serde(
-        rename = "secrets.stackable.tech/autotls.cert.lifetime",
-        deserialize_with = "SecretVolumeSelector::deserialize_some_humantime",
-        default
+        rename = "secrets.stackable.tech/backend.autotls.cert.lifetime",
+        with = "humantime_serde",
+        default = "default_cert_lifetime"
     )]
-    pub autotls_cert_lifetime: Option<Duration>,
+    pub autotls_cert_lifetime: Duration,
 
     /// The amount of time the Pod using the cert gets restarted before the cert expires.
     /// Keep in mind that there can be multiple Pods - such as 80 datanodes - trying to
@@ -100,15 +100,19 @@ pub struct SecretVolumeSelector {
     /// in a rolling fashion.
     /// Format is `1d`, `7d`, `1m` or `1y`.
     #[serde(
-        rename = "secrets.stackable.tech/autotls.cert.restart-before-expiration",
+        rename = "secrets.stackable.tech/backend.autotls.cert.restart-buffer",
         with = "humantime_serde",
-        default = "default_autotls_cert_restart_before_expiration"
+        default = "default_cert_restart_buffer"
     )]
-    pub autotls_cert_restart_before_expiration: Duration,
+    pub autotls_cert_restart_buffer: Duration,
 }
 
-fn default_autotls_cert_restart_before_expiration() -> Duration {
-    RESTART_PODS_BEFORE_CERT_EXPIRES_PERIOD
+fn default_cert_restart_buffer() -> Duration {
+    DEFAULT_CERT_RESTART_BUFFER
+}
+
+fn default_cert_lifetime() -> Duration {
+    DEFAULT_CERT_LIFETIME
 }
 
 impl SecretVolumeSelector {
@@ -154,15 +158,6 @@ impl SecretVolumeSelector {
         de: D,
     ) -> Result<Option<T>, D::Error> {
         T::deserialize(de).map(Some)
-    }
-
-    fn deserialize_some_humantime<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
-        de: D,
-    ) -> Result<Option<T>, D::Error>
-    where
-        humantime_serde::Serde<T>: Deserialize<'de>,
-    {
-        humantime_serde::deserialize(de).map(Some)
     }
 
     fn deserialize_str_vec<'de, D: Deserializer<'de>>(de: D) -> Result<Vec<String>, D::Error> {
