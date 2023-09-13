@@ -53,7 +53,8 @@ pub const MIN_MAX_CERT_LIFETIME: Duration = Duration::days(1);
 /// redeployment can take multiple hours. When the certificates of all datanodes expire approximately
 /// at the same time and PodDisruptionBudgets are in place, Pods can need to this time to properly shut down,
 /// so we need to evict them enough time in advance
-pub const EXPIRE_PODS_BEFORE_CERT_EXPIRES_PERIOD: Duration = Duration::hours(6);
+pub const RESTART_PODS_BEFORE_CERT_EXPIRES_PERIOD: std::time::Duration =
+    std::time::Duration::from_secs(6 * 60 * 60);
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -90,6 +91,10 @@ pub enum Error {
     },
     #[snafu(display("invalid certificate lifetime"))]
     InvalidCertLifetime { source: DateTimeOutOfBoundsError },
+    #[snafu(display("invalid certificate lifetime"))]
+    InvalidCertLifetime2 { source: ConversionRange },
+    #[snafu(display("invalid restart before expiration time"))]
+    InvalidRestartBeforeExpirationLifetime { source: ConversionRange },
     #[snafu(display("failed to parse max certificate lifetime \"{lifetime:?}\""))]
     InvalidMaxCertLifetime {
         source: ConversionRange,
@@ -102,6 +107,8 @@ pub enum Error {
         lifetime: Duration,
         min_lifetime: Duration,
     },
+    #[snafu(display("invalid certificate lifetime, as - respecting the restart before expiration time - the Pod would have needed to be restarted in the past. The TLS cert lifetime needs to be at least the restart before expiration time!"))]
+    TooSortCertLifetime {},
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -125,6 +132,9 @@ impl SecretBackendError for Error {
             Error::InvalidCertLifetime { .. } => tonic::Code::Internal,
             Error::InvalidMaxCertLifetime { .. } => tonic::Code::InvalidArgument,
             Error::TooShortMaxCertLifetime { .. } => tonic::Code::InvalidArgument,
+            Error::InvalidCertLifetime2 { .. } => tonic::Code::InvalidArgument,
+            Error::InvalidRestartBeforeExpirationLifetime { .. } => tonic::Code::InvalidArgument,
+            Error::TooSortCertLifetime {} => tonic::Code::InvalidArgument,
         }
     }
 }
@@ -305,13 +315,31 @@ impl SecretBackend for TlsGenerate {
     ) -> Result<SecretContents, Self::Error> {
         let now = OffsetDateTime::now_utc();
         let not_before = now - Duration::minutes(5);
-        let autotls_cert_lifetime = selector
-            .autotls_cert_lifetime
-            .and_then(|l| l.try_into().ok());
+
+        // Extract and convert consumer input from the Volume annotations.
+        let autotls_cert_lifetime = match selector.autotls_cert_lifetime {
+            Some(autotls_cert_lifetime) => Some(
+                autotls_cert_lifetime
+                    .try_into()
+                    .context(InvalidCertLifetime2Snafu)?,
+            ),
+            None => None,
+        };
+        let restart_before_expiration: Duration = selector
+            .autotls_cert_restart_before_expiration
+            .try_into()
+            .context(InvalidRestartBeforeExpirationLifetimeSnafu)?;
+
+        // In case the consumer has nothing configured, the maximum from the SecretClass will be used
         let cert_lifetime = autotls_cert_lifetime.unwrap_or(self.max_cert_lifetime);
+        // In case the consumer has something configured, we need to check that it is not longer than allowed,
+        // by capping it to the maximum configured at the SecretClass.
         let cert_lifetime = min(cert_lifetime, self.max_cert_lifetime);
         let not_after = now + cert_lifetime;
-        let expire_pod_after = not_after - EXPIRE_PODS_BEFORE_CERT_EXPIRES_PERIOD;
+        let expire_pod_after = not_after - restart_before_expiration;
+        if expire_pod_after <= now {
+            TooSortCertLifetimeSnafu.fail()?;
+        }
         let conf = Conf::new(ConfMethod::default()).unwrap();
         let pod_key = Rsa::generate(2048)
             .and_then(PKey::try_from)

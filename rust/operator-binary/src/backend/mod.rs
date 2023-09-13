@@ -22,6 +22,8 @@ use scope::SecretScope;
 
 use crate::format::{SecretData, SecretFormat};
 
+use self::tls::RESTART_PODS_BEFORE_CERT_EXPIRES_PERIOD;
+
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
 /// Fields beginning with `csi.storage.k8s.io/` are provided by the Kubelet
@@ -84,13 +86,29 @@ pub struct SecretVolumeSelector {
     )]
     pub compat_tls_pkcs12_password: Option<String>,
 
-    /// The TLS cert lifetime (`1d`, `7d`, `1m` or `1y`)
+    /// The TLS cert lifetime (`1d`, `7d`, `1m` or `1y`).
     #[serde(
         rename = "secrets.stackable.tech/autotls.cert.lifetime",
         deserialize_with = "SecretVolumeSelector::deserialize_some_humantime",
         default
     )]
     pub autotls_cert_lifetime: Option<Duration>,
+
+    /// The amount of time the Pod using the cert gets restarted before the cert expires.
+    /// Keep in mind that there can be multiple Pods - such as 80 datanodes - trying to
+    /// shut down at the same time. It can take some hours until all Pods are restarted
+    /// in a rolling fashion.
+    /// Format is `1d`, `7d`, `1m` or `1y`.
+    #[serde(
+        rename = "secrets.stackable.tech/autotls.cert.restart-before-expiration",
+        with = "humantime_serde",
+        default = "default_autotls_cert_restart_before_expiration"
+    )]
+    pub autotls_cert_restart_before_expiration: Duration,
+}
+
+fn default_autotls_cert_restart_before_expiration() -> Duration {
+    RESTART_PODS_BEFORE_CERT_EXPIRES_PERIOD
 }
 
 impl SecretVolumeSelector {
