@@ -11,7 +11,7 @@ pub enum SecretScope {
     Node,
     Pod,
     Service { name: String },
-    Listener { name: String },
+    ListenerVolume { name: String },
 }
 impl From<&SecretScope> for SecretScope {
     fn from(value: &SecretScope) -> Self {
@@ -43,7 +43,7 @@ impl SecretScope {
                     .context(deserialize_error::ScopeRequiresParamSnafu { tpe })?
                     .to_string(),
             },
-            "listener" => Self::Listener {
+            "listener-volume" => Self::ListenerVolume {
                 name: param
                     .take()
                     .context(deserialize_error::ScopeRequiresParamSnafu { tpe })?
@@ -71,7 +71,7 @@ impl Display for SecretScope {
             SecretScope::Node => write!(f, "node"),
             SecretScope::Pod => write!(f, "pod"),
             SecretScope::Service { name } => write!(f, "service={name}"),
-            SecretScope::Listener { name } => write!(f, "listener={name}"),
+            SecretScope::ListenerVolume { name } => write!(f, "listener-volume={name}"),
         }
     }
 }

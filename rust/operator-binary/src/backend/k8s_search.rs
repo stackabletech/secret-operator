@@ -160,7 +160,7 @@ fn build_label_selector_query(
             SecretScope::Service { name } => {
                 label_selector.insert(LABEL_SCOPE_SERVICE.to_string(), name.clone());
             }
-            SecretScope::Listener { name } => {
+            SecretScope::ListenerVolume { name } => {
                 label_selector.insert(
                     format!("{LABEL_SCOPE_LISTENER}.{listener_i}"),
                     scheduling_pod_info

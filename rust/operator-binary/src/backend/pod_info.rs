@@ -213,7 +213,7 @@ impl SchedulingPodInfo {
         let volume_listener_pvcs = futures::stream::iter(scopes)
             .filter_map(|scope| async move {
                 match scope {
-                    SecretScope::Listener { name } => Some(name),
+                    SecretScope::ListenerVolume { name } => Some(name),
                     _ => None,
                 }
             })
@@ -339,7 +339,7 @@ async fn pod_listener_addresses(
     scopes
         .iter()
         .filter_map(|scope| match scope {
-            SecretScope::Listener { name } => Some(name),
+            SecretScope::ListenerVolume { name } => Some(name),
             _ => None,
         })
         .map(|listener| {

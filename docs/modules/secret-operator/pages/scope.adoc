@@ -27,16 +27,16 @@ The `pod` scope is resolved to the name of the Kubernetes `Pod`. This allows the
 The `service` scope allows `Pod` objects to specify custom scopes. This should typically correspond to `Service` objects that the
 `Pod` participate in.
 
-[#listener]
-=== `listener`
+[#listener-volume]
+=== `listener-volume`
 
-The `listener` scope allows `Pod` objects to request secrets corresponding to a xref::listener:volume.adoc[listener volume] that is bound to the same `Pod`.
+The `listener-volume` scope allows `Pod` objects to request secrets corresponding to a xref::listener:volume.adoc[listener volume] that is bound to the same `Pod`.
 
-The `listener` scope takes the name of the listener volume as a paremeter.
+The `listener-volume` scope takes the name of the listener volume as a paremeter.
 
 note:: The parameter is the name of the `Pod` 's _volume_, not the name of the `PersistentVolumeClaim`, `PersistentVolume`, or xref:listener-operator:listener.adoc[`Listener`].
 
-note:: The `listener` scope also implies the xref:#node[] scope for xref:listener-operator:listenerclass.adoc#servicetype-nodeport[`NodePort`] listeners.
+note:: The `listener-volume` scope also implies the xref:#node[] scope for xref:listener-operator:listenerclass.adoc#servicetype-nodeport[`NodePort`] listeners.
 
 == Example
 

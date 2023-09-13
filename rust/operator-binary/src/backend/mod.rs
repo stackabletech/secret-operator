@@ -117,7 +117,7 @@ impl SecretVolumeSelector {
                 "{}.{}.svc.cluster.local",
                 name, self.namespace
             ))],
-            scope::SecretScope::Listener { name } => pod_info
+            scope::SecretScope::ListenerVolume { name } => pod_info
                 .listener_addresses
                 .get(name)
                 .context(NoListenerAddressesSnafu { listener: name })?
