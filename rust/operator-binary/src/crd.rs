@@ -55,9 +55,8 @@ pub struct AutoTlsBackend {
     #[serde(default = "default_cert_lifetime", with = "humantime_serde")]
     #[schemars(with = "String")]
     /// Maximum lifetime the created certificates are allowed to have.
-    /// Clients can request shorter-lived certificates.
-    /// In case they request a longer lifetime than allowed by this setting, the lifetime will be the minimum of both,
-    /// so this setting takes precedence.
+    /// In case consumers request a longer lifetime than allowed by this setting,
+    /// the lifetime will be the minimum of both, so this setting takes precedence.
     pub max_certificate_lifetime: Duration,
 }
 
