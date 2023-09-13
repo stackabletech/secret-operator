@@ -10,20 +10,24 @@ use snafu::{ResultExt, Snafu};
 use crate::format::utils::split_pem_certificates;
 
 use super::{
-    well_known::{TlsPem, TlsPkcs12},
+    well_known::{CompatibilityOptions, TlsPem, TlsPkcs12},
     SecretFormat, WellKnownSecretData,
 };
 
 pub fn convert(
     from: WellKnownSecretData,
     to: SecretFormat,
+    compat: &CompatibilityOptions,
 ) -> Result<WellKnownSecretData, ConvertError> {
     match (from, to) {
         // Converting into the current format is always a no-op
         (from, to) if SecretFormat::from(&from) == to => Ok(from),
 
         (WellKnownSecretData::TlsPem(pem), SecretFormat::TlsPkcs12) => {
-            Ok(WellKnownSecretData::TlsPkcs12(convert_tls_to_pkcs12(pem)?))
+            Ok(WellKnownSecretData::TlsPkcs12(convert_tls_to_pkcs12(
+                pem,
+                compat.tls_pkcs12_password.as_deref().unwrap_or_default(),
+            )?))
         }
 
         (from, to) => NoValidConversionSnafu { from, to }.fail(),
@@ -44,7 +48,10 @@ pub enum ConvertError {
     TlsToPkcs12 { source: TlsToPkcs12Error },
 }
 
-pub fn convert_tls_to_pkcs12(pem: TlsPem) -> Result<TlsPkcs12, TlsToPkcs12Error> {
+pub fn convert_tls_to_pkcs12(
+    pem: TlsPem,
+    p12_password: &str,
+) -> Result<TlsPkcs12, TlsToPkcs12Error> {
     use tls_to_pkcs12_error::*;
     let cert = X509::from_pem(&pem.certificate_pem).context(LoadCertSnafu)?;
     let key = PKey::private_key_from_pem(&pem.key_pem).context(LoadKeySnafu)?;
@@ -62,7 +69,7 @@ pub fn convert_tls_to_pkcs12(pem: TlsPem) -> Result<TlsPkcs12, TlsToPkcs12Error>
             .ca(ca_stack)
             .cert(&cert)
             .pkey(&key)
-            .build2("")
+            .build2(p12_password)
             .and_then(|store| store.to_der())
             .context(BuildKeystoreSnafu)?,
     })

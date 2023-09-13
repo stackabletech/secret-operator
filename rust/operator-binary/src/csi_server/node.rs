@@ -2,7 +2,7 @@ use crate::{
     backend::{
         self, pod_info, pod_info::PodInfo, SecretBackendError, SecretContents, SecretVolumeSelector,
     },
-    format::{self, SecretFormat},
+    format::{self, well_known::CompatibilityOptions, SecretFormat},
     grpc::csi::v1::{
         node_server::Node, NodeExpandVolumeRequest, NodeExpandVolumeResponse,
         NodeGetCapabilitiesRequest, NodeGetCapabilitiesResponse, NodeGetInfoRequest,
@@ -188,6 +188,7 @@ impl SecretProvisionerNode {
         target_path: &Path,
         data: SecretContents,
         format: Option<SecretFormat>,
+        compat: &CompatibilityOptions,
     ) -> Result<(), PublishError> {
         let create_secret = {
             let mut opts = OpenOptions::new();
@@ -201,7 +202,7 @@ impl SecretProvisionerNode {
         };
         for (k, v) in data
             .data
-            .into_files(format)
+            .into_files(format, compat)
             .context(publish_error::FormatDataSnafu)?
         {
             let item_path = target_path.join(k);
@@ -354,8 +355,15 @@ impl Node for SecretProvisionerNode {
                 self.tag_pod(&self.client, &request.volume_id, &selector, &data)
                     .await?;
                 self.prepare_secret_dir(&target_path).await?;
-                self.save_secret_data(&target_path, data, selector.format)
-                    .await?;
+                self.save_secret_data(
+                    &target_path,
+                    data,
+                    selector.format,
+                    &CompatibilityOptions {
+                        tls_pkcs12_password: selector.compat_tls_pkcs12_password,
+                    },
+                )
+                .await?;
                 Ok(Response::new(NodePublishVolumeResponse {}))
             }
             .await,
