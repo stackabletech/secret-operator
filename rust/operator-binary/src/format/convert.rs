@@ -5,7 +5,7 @@ use openssl::{
     stack::Stack,
     x509::{X509Ref, X509},
 };
-use snafu::{ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu};
 
 use crate::format::utils::split_pem_certificates;
 
@@ -64,7 +64,7 @@ pub fn convert_tls_to_pkcs12(
     }
 
     Ok(TlsPkcs12 {
-        truststore: pkcs12_truststore(&ca_stack)?,
+        truststore: pkcs12_truststore(&ca_stack, p12_password)?,
         keystore: Pkcs12::builder()
             .ca(ca_stack)
             .cert(&cert)
@@ -75,8 +75,22 @@ pub fn convert_tls_to_pkcs12(
     })
 }
 
+fn bmp_string(s: &str) -> Vec<u8> {
+    let utf16: Vec<u16> = s.encode_utf16().collect();
+
+    let mut bytes = Vec::with_capacity(utf16.len() * 2 + 2);
+    for c in utf16 {
+        bytes.push((c / 256) as u8);
+        bytes.push((c % 256) as u8);
+    }
+    bytes.push(0x00);
+    bytes.push(0x00);
+    bytes
+}
+
 fn pkcs12_truststore<'a>(
     ca_list: impl IntoIterator<Item = &'a X509Ref>,
+    p12_password: &str,
 ) -> Result<Vec<u8>, TlsToPkcs12Error> {
     // We can't use OpenSSL's `Pkcs12`, since it doesn't let us add new attributes to the SafeBags being created,
     // and Java refuses to trust CA bags without the `java_trusted_ca_oid` attribute set.
@@ -102,21 +116,19 @@ fn pkcs12_truststore<'a>(
             })],
         });
     }
+    let password_as_bmp_string = bmp_string(p12_password);
+    let encrypted_data = p12::ContentInfo::EncryptedData(
+        p12::EncryptedData::from_safe_bags(&truststore_bags[..], &password_as_bmp_string)
+            .context(tls_to_pkcs12_error::EncryptDataForTruststoreSnafu)?,
+    );
     let truststore_data = yasna::construct_der(|w| {
         w.write_sequence_of(|w| {
-            p12::ContentInfo::Data(yasna::construct_der(|w| {
-                w.write_sequence_of(|w| {
-                    for bag in truststore_bags {
-                        bag.write(w.next())
-                    }
-                })
-            }))
-            .write(w.next());
-        })
+            encrypted_data.write(w.next());
+        });
     });
     Ok(p12::PFX {
         version: 3,
-        mac_data: Some(p12::MacData::new(&truststore_data, b"")),
+        mac_data: Some(p12::MacData::new(&truststore_data, &password_as_bmp_string)),
         auth_safe: p12::ContentInfo::Data(truststore_data),
     }
     .to_der())
@@ -135,4 +147,6 @@ pub enum TlsToPkcs12Error {
     BuildKeystore { source: OpensslError },
     #[snafu(display("failed to serialize CA certificate for truststore"))]
     SerializeCaForTruststore { source: OpensslError },
+    #[snafu(display("failed to encrypt data for truststore"))]
+    EncryptDataForTruststore,
 }
