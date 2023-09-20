@@ -75,6 +75,7 @@ pub fn convert_tls_to_pkcs12(
     })
 }
 
+// This function was copied from https://github.com/hjiayz/p12/blob/0b3b2e1a141c7c2384e85f3737dcc4d4ab4e8b9c/src/lib.rs#L723-L734
 fn bmp_string(s: &str) -> Vec<u8> {
     let utf16: Vec<u16> = s.encode_utf16().collect();
 
