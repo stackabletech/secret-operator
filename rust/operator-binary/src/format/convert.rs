@@ -75,18 +75,11 @@ pub fn convert_tls_to_pkcs12(
     })
 }
 
-// This function was copied from https://github.com/hjiayz/p12/blob/0b3b2e1a141c7c2384e85f3737dcc4d4ab4e8b9c/src/lib.rs#L723-L734
 fn bmp_string(s: &str) -> Vec<u8> {
-    let utf16: Vec<u16> = s.encode_utf16().collect();
-
-    let mut bytes = Vec::with_capacity(utf16.len() * 2 + 2);
-    for c in utf16 {
-        bytes.push((c / 256) as u8);
-        bytes.push((c % 256) as u8);
-    }
-    bytes.push(0x00);
-    bytes.push(0x00);
-    bytes
+    s.encode_utf16()
+        .chain([0]) // null-termination character
+        .flat_map(u16::to_be_bytes)
+        .collect()
 }
 
 fn pkcs12_truststore<'a>(
