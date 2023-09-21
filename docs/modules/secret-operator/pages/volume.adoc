@@ -61,7 +61,7 @@ The lifetime of the created certificate.
 Please note that you can not request a lifetime longer than allowed by `maxCertificateLifetime` on the SecretClass.
 If you do so, `maxCertificateLifetime` will be used as the certificate lifetime, to adhere to the requirements
 set by the admin that created the SecretClass.
-Format is `1d`, `7d`, `1m` or `1y`.
+Format is `24h`, `1d` or `7d`.
 
 === `secrets.stackable.tech/backend.autotls.cert.restart-buffer`
 
@@ -75,8 +75,7 @@ The amount of time the Pod using the cert gets restarted before the cert expires
 Keep in mind that there can be multiple Pods - such as 80 datanodes - trying to
 shut down at the same time. It can take some hours until all Pods are restarted
 in a rolling fashion.
-Format is `1d`, `7d`, `1m` or `1y`.
-
+Format is `24h`, `1d` or `7d`.
 === `secrets.stackable.tech/kerberos.service.names`
 
 *Required*: false

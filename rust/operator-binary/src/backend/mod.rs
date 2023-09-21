@@ -89,7 +89,7 @@ pub struct SecretVolumeSelector {
     )]
     pub compat_tls_pkcs12_password: Option<String>,
 
-    /// The TLS cert lifetime (`1d`, `7d`, `1m` or `1y`).
+    /// The TLS cert lifetime (`24h`, `1d` or `7d`).
     #[serde(
         rename = "secrets.stackable.tech/backend.autotls.cert.lifetime",
         default = "default_cert_lifetime"
@@ -100,7 +100,8 @@ pub struct SecretVolumeSelector {
     /// Keep in mind that there can be multiple Pods - such as 80 datanodes - trying to
     /// shut down at the same time. It can take some hours until all Pods are restarted
     /// in a rolling fashion.
-    /// Format is `1d`, `7d`, `1m` or `1y`.
+    ///     /// Format is `1d`, `7d`, `1m` or `1y`.
+
     #[serde(
         rename = "secrets.stackable.tech/backend.autotls.cert.restart-buffer",
         default = "default_cert_restart_buffer"
