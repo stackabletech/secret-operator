@@ -18,7 +18,6 @@ byteorder = "1.4"
 clap = "4.3"
 futures = { version = "0.3", features = ["compat"] }
 h2 = "=0.3.18" # We need to keep this in sync with our patched h2 build
-humantime-serde = "1.1"
 ldap3 = { version = "0.11", default-features = false, features = ["gssapi", "tls"] }
 libc = "0.2"
 native-tls = "0.2"
@@ -34,7 +33,7 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 snafu = "0.7"
 socket2 = { version = "0.5", features = ["all"] }
-stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.46.0" }
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.50.0" }
 strum = { version = "0.25", features = ["derive"] }
 sys-mount = { version = "2.1", default-features = false }
 tempfile = "3.3"
@@ -53,5 +52,5 @@ yasna = "0.5"
 # Workaround for https://github.com/hyperium/tonic/issues/243
 h2 = { git = "https://github.com/stackabletech/h2.git", branch = "feature/grpc-uds" }
 
-# [patch."https://github.com/stackabletech/operator-rs.git"]
-# stackable-operator = { git = "https://github.com/stackabletech//operator-rs.git", branch = "main" }
+[patch."https://github.com/stackabletech/operator-rs.git"]
+stackable-operator = { git = "https://github.com/stackabletech//operator-rs.git", branch = "feat/add-duration-from-consts" }

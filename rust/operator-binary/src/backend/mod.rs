@@ -9,8 +9,11 @@ pub mod tls;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Deserializer};
-use stackable_operator::k8s_openapi::chrono::{DateTime, FixedOffset};
-use std::{collections::HashSet, convert::Infallible, time::Duration};
+use stackable_operator::{
+    duration::Duration,
+    k8s_openapi::chrono::{DateTime, FixedOffset},
+};
+use std::{collections::HashSet, convert::Infallible};
 
 pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
@@ -89,7 +92,6 @@ pub struct SecretVolumeSelector {
     /// The TLS cert lifetime (`1d`, `7d`, `1m` or `1y`).
     #[serde(
         rename = "secrets.stackable.tech/backend.autotls.cert.lifetime",
-        with = "humantime_serde",
         default = "default_cert_lifetime"
     )]
     pub autotls_cert_lifetime: Duration,
@@ -101,7 +103,6 @@ pub struct SecretVolumeSelector {
     /// Format is `1d`, `7d`, `1m` or `1y`.
     #[serde(
         rename = "secrets.stackable.tech/backend.autotls.cert.restart-buffer",
-        with = "humantime_serde",
         default = "default_cert_restart_buffer"
     )]
     pub autotls_cert_restart_buffer: Duration,

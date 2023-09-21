@@ -22,6 +22,7 @@ use openssl::{
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::ObjectMetaBuilder,
+    duration::Duration,
     k8s_openapi::{
         api::core::v1::{Secret, SecretReference},
         chrono::{self, FixedOffset, TimeZone},
@@ -29,7 +30,7 @@ use stackable_operator::{
     },
     kube::runtime::reflector::ObjectRef,
 };
-use time::{error::ConversionRange, Duration, OffsetDateTime};
+use time::OffsetDateTime;
 
 use crate::format::{well_known, SecretData, WellKnownSecretData};
 
@@ -43,18 +44,16 @@ use super::{
 /// which matches the rolling re-deploy of k8s nodes of e.g.:
 /// * 1 week for IONOS
 /// * 2 weeks for some on-prem k8s clusters
-pub const DEFAULT_MAX_CERT_LIFETIME: std::time::Duration =
-    std::time::Duration::from_secs(15 * 24 * 60 * 60);
+pub const DEFAULT_MAX_CERT_LIFETIME: Duration = Duration::from_days(15);
 
 /// Default lifetime of certs when no annotations are set on the Volume.
-pub const DEFAULT_CERT_LIFETIME: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_hours(24);
 
 /// When a StatefulSet has many Pods (e.g. 80 HDFS datanodes or Trino workers) a rolling
 /// redeployment can take multiple hours. When the certificates of all datanodes expire approximately
 /// at the same time and PodDisruptionBudgets are in place, Pods can need to this time to properly shut down,
 /// so we need to evict them enough time in advance
-pub const DEFAULT_CERT_RESTART_BUFFER: std::time::Duration =
-    std::time::Duration::from_secs(6 * 60 * 60);
+pub const DEFAULT_CERT_RESTART_BUFFER: Duration = Duration::from_hours(6);
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -91,15 +90,6 @@ pub enum Error {
     },
     #[snafu(display("invalid certificate lifetime"))]
     InvalidCertLifetime { source: DateTimeOutOfBoundsError },
-    #[snafu(display("invalid certificate lifetime"))]
-    InvalidCertLifetime2 { source: ConversionRange },
-    #[snafu(display("invalid restart before expiration time"))]
-    InvalidRestartBeforeExpirationLifetime { source: ConversionRange },
-    #[snafu(display("failed to parse max certificate lifetime \"{lifetime:?}\""))]
-    InvalidMaxCertLifetime {
-        source: ConversionRange,
-        lifetime: std::time::Duration,
-    },
     #[snafu(display("invalid certificate lifetime, as - respecting the restart before expiration time - the Pod would have needed to be restarted in the past. The TLS cert lifetime needs to be at least the restart before expiration time!"))]
     TooSortCertLifetime {},
 }
@@ -123,9 +113,6 @@ impl SecretBackendError for Error {
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SaveCaCertificate { .. } => tonic::Code::Unavailable,
             Error::InvalidCertLifetime { .. } => tonic::Code::Internal,
-            Error::InvalidMaxCertLifetime { .. } => tonic::Code::InvalidArgument,
-            Error::InvalidCertLifetime2 { .. } => tonic::Code::InvalidArgument,
-            Error::InvalidRestartBeforeExpirationLifetime { .. } => tonic::Code::InvalidArgument,
             Error::TooSortCertLifetime {} => tonic::Code::InvalidArgument,
         }
     }
@@ -147,8 +134,8 @@ impl TlsGenerate {
             .context(BuildCertificateSnafu { tpe: CertType::Ca })?
             .build();
         let now = OffsetDateTime::now_utc();
-        let not_before = now - Duration::minutes(5);
-        let not_after = now + Duration::days(2 * 365);
+        let not_before = now - *Duration::from_minutes(5);
+        let not_after = now + *Duration::from_days(2 * 365);
         let conf = Conf::new(ConfMethod::default()).unwrap();
         let ca_key = Rsa::generate(2048)
             .and_then(PKey::try_from)
@@ -206,14 +193,8 @@ impl TlsGenerate {
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
         auto_generate_if_missing: bool,
-        max_cert_lifetime: std::time::Duration,
+        max_cert_lifetime: Duration,
     ) -> Result<Self> {
-        let max_cert_lifetime =
-            max_cert_lifetime
-                .try_into()
-                .context(InvalidMaxCertLifetimeSnafu {
-                    lifetime: max_cert_lifetime,
-                })?;
         let (k8s_secret_name, k8s_ns) = match secret_ref {
             SecretReference {
                 name: Some(name),
@@ -299,23 +280,17 @@ impl SecretBackend for TlsGenerate {
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
         let now = OffsetDateTime::now_utc();
-        let not_before = now - Duration::minutes(5);
+        let not_before = now - *Duration::from_minutes(5);
 
         // Extract and convert consumer input from the Volume annotations.
-        let cert_lifetime = selector
-            .autotls_cert_lifetime
-            .try_into()
-            .context(InvalidCertLifetime2Snafu)?;
-        let cert_restart_buffer: Duration = selector
-            .autotls_cert_restart_buffer
-            .try_into()
-            .context(InvalidRestartBeforeExpirationLifetimeSnafu)?;
+        let cert_lifetime = selector.autotls_cert_lifetime;
+        let cert_restart_buffer = selector.autotls_cert_restart_buffer;
 
         // We need to check that the cert lifetime it is not longer than allowed,
         // by capping it to the maximum configured at the SecretClass.
         let cert_lifetime = min(cert_lifetime, self.max_cert_lifetime);
-        let not_after = now + cert_lifetime;
-        let expire_pod_after = not_after - cert_restart_buffer;
+        let not_after = now + *cert_lifetime;
+        let expire_pod_after = not_after - *cert_restart_buffer;
         if expire_pod_after <= now {
             TooSortCertLifetimeSnafu.fail()?;
         }

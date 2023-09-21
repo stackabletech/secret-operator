@@ -16,7 +16,6 @@ async-trait.workspace = true
 clap.workspace = true
 futures.workspace = true
 h2.workspace = true
-humantime-serde.workspace = true
 libc.workspace = true
 openssl.workspace = true
 p12.workspace = true

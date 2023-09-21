@@ -1,8 +1,9 @@
-use std::{fmt::Display, ops::Deref, time::Duration};
+use std::{fmt::Display, ops::Deref};
 
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use stackable_operator::{
+    duration::Duration,
     k8s_openapi::api::core::v1::SecretReference,
     kube::CustomResource,
     schemars::{self, JsonSchema},
@@ -52,15 +53,14 @@ pub enum SearchNamespace {
 #[serde(rename_all = "camelCase")]
 pub struct AutoTlsBackend {
     pub ca: AutoTlsCa,
-    #[serde(default = "default_cert_lifetime", with = "humantime_serde")]
-    #[schemars(with = "String")]
+    #[serde(default = "default_max_certificate_lifetime")]
     /// Maximum lifetime the created certificates are allowed to have.
     /// In case consumers request a longer lifetime than allowed by this setting,
     /// the lifetime will be the minimum of both, so this setting takes precedence.
     pub max_certificate_lifetime: Duration,
 }
 
-fn default_cert_lifetime() -> Duration {
+fn default_max_certificate_lifetime() -> Duration {
     DEFAULT_MAX_CERT_LIFETIME
 }
 
@@ -188,9 +188,7 @@ impl Deref for KerberosPrincipal {
 
 #[cfg(test)]
 mod test {
-    use std::time::Duration;
-
-    use stackable_operator::k8s_openapi::api::core::v1::SecretReference;
+    use super::*;
 
     use crate::{
         backend::tls::DEFAULT_MAX_CERT_LIFETIME,
@@ -260,7 +258,7 @@ mod test {
                         },
                         auto_generate: true,
                     },
-                    max_certificate_lifetime: Duration::from_secs(31 * 24 * 60 * 60),
+                    max_certificate_lifetime: Duration::from_days(31),
                 })
             }
         );
