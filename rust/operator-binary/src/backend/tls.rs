@@ -90,8 +90,8 @@ pub enum Error {
     },
     #[snafu(display("invalid certificate lifetime"))]
     InvalidCertLifetime { source: DateTimeOutOfBoundsError },
-    #[snafu(display("invalid certificate lifetime, as - respecting the restart before expiration time - the Pod would have needed to be restarted in the past. The TLS cert lifetime needs to be at least the restart before expiration time!"))]
-    TooSortCertLifetime {},
+    #[snafu(display("certificate expiring at {expires_at} would schedule the pod to be restarted at {restart_at}, which is in the past (and we don't have a time machine (yet))"))]
+    TooShortCertLifetimeRequiresTimeTravel { expires_at: DateTime, restart_at: DateTime },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
