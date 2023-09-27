@@ -91,7 +91,10 @@ pub enum Error {
     #[snafu(display("invalid certificate lifetime"))]
     InvalidCertLifetime { source: DateTimeOutOfBoundsError },
     #[snafu(display("certificate expiring at {expires_at} would schedule the pod to be restarted at {restart_at}, which is in the past (and we don't have a time machine (yet))"))]
-    TooShortCertLifetimeRequiresTimeTravel { expires_at: DateTime, restart_at: DateTime },
+    TooShortCertLifetimeRequiresTimeTravel {
+        expires_at: OffsetDateTime,
+        restart_at: OffsetDateTime,
+    },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -113,7 +116,7 @@ impl SecretBackendError for Error {
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SaveCaCertificate { .. } => tonic::Code::Unavailable,
             Error::InvalidCertLifetime { .. } => tonic::Code::Internal,
-            Error::TooSortCertLifetime {} => tonic::Code::InvalidArgument,
+            Error::TooShortCertLifetimeRequiresTimeTravel { .. } => tonic::Code::InvalidArgument,
         }
     }
 }
@@ -292,7 +295,11 @@ impl SecretBackend for TlsGenerate {
         let not_after = now + *cert_lifetime;
         let expire_pod_after = not_after - *cert_restart_buffer;
         if expire_pod_after <= now {
-            TooSortCertLifetimeSnafu.fail()?;
+            TooShortCertLifetimeRequiresTimeTravelSnafu {
+                expires_at: not_after,
+                restart_at: expire_pod_after,
+            }
+            .fail()?;
         }
 
         let conf = Conf::new(ConfMethod::default()).unwrap();
