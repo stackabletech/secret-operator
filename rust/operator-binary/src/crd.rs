@@ -258,7 +258,7 @@ mod test {
                         },
                         auto_generate: true,
                     },
-                    max_certificate_lifetime: Duration::from_days(31),
+                    max_certificate_lifetime: Duration::from_days_unchecked(31),
                 })
             }
         );

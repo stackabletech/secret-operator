@@ -44,16 +44,16 @@ use super::{
 /// which matches the rolling re-deploy of k8s nodes of e.g.:
 /// * 1 week for IONOS
 /// * 2 weeks for some on-prem k8s clusters
-pub const DEFAULT_MAX_CERT_LIFETIME: Duration = Duration::from_days(15);
+pub const DEFAULT_MAX_CERT_LIFETIME: Duration = Duration::from_days_unchecked(15);
 
 /// Default lifetime of certs when no annotations are set on the Volume.
-pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_hours(24);
+pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_hours_unchecked(24);
 
 /// When a StatefulSet has many Pods (e.g. 80 HDFS datanodes or Trino workers) a rolling
 /// redeployment can take multiple hours. When the certificates of all datanodes expire approximately
 /// at the same time and PodDisruptionBudgets are in place, Pods can need to this time to properly shut down,
 /// so we need to evict them enough time in advance
-pub const DEFAULT_CERT_RESTART_BUFFER: Duration = Duration::from_hours(6);
+pub const DEFAULT_CERT_RESTART_BUFFER: Duration = Duration::from_hours_unchecked(6);
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -137,8 +137,8 @@ impl TlsGenerate {
             .context(BuildCertificateSnafu { tpe: CertType::Ca })?
             .build();
         let now = OffsetDateTime::now_utc();
-        let not_before = now - *Duration::from_minutes(5);
-        let not_after = now + *Duration::from_days(2 * 365);
+        let not_before = now - *Duration::from_minutes_unchecked(5);
+        let not_after = now + *Duration::from_days_unchecked(2 * 365);
         let conf = Conf::new(ConfMethod::default()).unwrap();
         let ca_key = Rsa::generate(2048)
             .and_then(PKey::try_from)
@@ -283,7 +283,7 @@ impl SecretBackend for TlsGenerate {
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
         let now = OffsetDateTime::now_utc();
-        let not_before = now - *Duration::from_minutes(5);
+        let not_before = now - *Duration::from_minutes_unchecked(5);
 
         // Extract and convert consumer input from the Volume annotations.
         let cert_lifetime = selector.autotls_cert_lifetime;
