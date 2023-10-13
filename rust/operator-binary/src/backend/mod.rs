@@ -10,8 +10,8 @@ pub mod tls;
 use async_trait::async_trait;
 use serde::{Deserialize, Deserializer};
 use stackable_operator::{
-    duration::Duration,
     k8s_openapi::chrono::{DateTime, FixedOffset},
+    time::Duration,
 };
 use std::{collections::HashSet, convert::Infallible};
 

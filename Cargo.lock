@@ -31,9 +31,9 @@ dependencies = [
 
 [[package]]
 name = "aho-corasick"
-version = "1.1.1"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea5d730647d4fadd988536d06fecce94b7b4f2a7efdae548f1cf4b63205518ab"
+checksum = "b2969dcb958b36655471fc61f7e416fa76033bdd4bfed0678d8fee1e2d07a1f0"
 dependencies = [
  "memchr",
 ]
@@ -1157,9 +1157,9 @@ dependencies = [
 
 [[package]]
 name = "jobserver"
-version = "0.1.26"
+version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "936cfd212a0155903bcbc060e316fb6cc7cbf2e1907329391ebadc1fe0ce77c2"
+checksum = "8c37f63953c4c63420ed5fd3d6d398c719489b9f872b9fa683262f8edd363c7d"
 dependencies = [
  "libc",
 ]
@@ -1175,9 +1175,9 @@ dependencies = [
 
 [[package]]
 name = "json-patch"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f7765dccf8c39c3a470fc694efe322969d791e713ca46bc7b5c506886157572"
+checksum = "55ff1e1486799e3f64129f8ccad108b38290df9cd7015cd31bed17239f0789d6"
 dependencies = [
  "serde",
  "serde_json",
@@ -1701,7 +1701,7 @@ dependencies = [
  "futures-util",
  "once_cell",
  "opentelemetry_api",
- "ordered-float 3.9.1",
+ "ordered-float 3.9.2",
  "percent-encoding",
  "rand",
  "regex",
@@ -1712,18 +1712,18 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "2.10.0"
+version = "2.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7940cf2ca942593318d07fcf2596cdca60a85c9e7fab408a5e21a4f9dcd40d87"
+checksum = "68f19d67e5a2795c94e73e0bb1cc1a7edeb2e28efd39e2e1c9b7a40c1108b11c"
 dependencies = [
  "num-traits",
 ]
 
 [[package]]
 name = "ordered-float"
-version = "3.9.1"
+version = "3.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a54938017eacd63036332b4ae5c8a49fc8c0c1d6d629893057e4f13609edd06"
+checksum = "f1e1c390732d15f1d48471625cd92d154e66db2c56645e29a9cd26f4699f72dc"
 dependencies = [
  "num-traits",
 ]
@@ -2008,14 +2008,14 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.9.6"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebee201405406dbf528b8b672104ae6d6d63e6d118cb10e4d51abbc7b58044ff"
+checksum = "d119d7c7ca818f8a53c300863d4f87566aac09943aef5b355bb83969dae75d87"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-automata 0.3.9",
- "regex-syntax 0.7.5",
+ "regex-automata 0.4.1",
+ "regex-syntax 0.8.1",
 ]
 
 [[package]]
@@ -2029,13 +2029,13 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.3.9"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59b23e92ee4318893fa3fe3e6fb365258efbfe6ac6ab30f090cdcbb7aa37efa9"
+checksum = "465c6fc0621e4abc4187a2bda0937bfd4f722c2730b29562e19689ea796c9a4b"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-syntax 0.7.5",
+ "regex-syntax 0.8.1",
 ]
 
 [[package]]
@@ -2046,9 +2046,9 @@ checksum = "f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1"
 
 [[package]]
 name = "regex-syntax"
-version = "0.7.5"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbb5fb1acd8a1a18b3dd5be62d25485eb770e05afb408a9627d14d451bae12da"
+checksum = "56d84fdd47036b038fc80dd333d10b6aab10d5d31f4a366e20014def75328d33"
 
 [[package]]
 name = "ring"
@@ -2079,9 +2079,9 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rustix"
-version = "0.38.17"
+version = "0.38.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f25469e9ae0f3d0047ca8b93fc56843f38e6774f0914a107ff8b41be8be8e0b7"
+checksum = "745ecfa778e66b2b63c88a61cb36e0eea109e803b0b86bf9879fbc77c70e86ed"
 dependencies = [
  "bitflags 2.4.0",
  "errno",
@@ -2229,18 +2229,18 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.19"
+version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad977052201c6de01a8ef2aa3378c4bd23217a056337d1d6da40468d267a4fb0"
+checksum = "836fa6a3e1e547f9a2c4040802ec865b5d85f4014efe00555d7090a3dcaa1090"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "serde"
-version = "1.0.188"
+version = "1.0.189"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf9e0fcba69a370eed61bcf2b728575f726b50b55cba78064753d708ddc7549e"
+checksum = "8e422a44e74ad4001bdc8eede9a4570ab52f71190e9c076d14369f38b9200537"
 dependencies = [
  "serde_derive",
 ]
@@ -2251,15 +2251,15 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
 dependencies = [
- "ordered-float 2.10.0",
+ "ordered-float 2.10.1",
  "serde",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.188"
+version = "1.0.189"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4eca7ac642d82aa35b60049a6eccb4be6be75e599bd2e9adb5f875a737654af2"
+checksum = "1e48d1f918009ce3145511378cf68d613e3b3d9137d67272562080d68a2b32d5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2441,8 +2441,8 @@ dependencies = [
 
 [[package]]
 name = "stackable-operator"
-version = "0.53.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=0.53.0#48cfb1cafbfc401e565bb2f4b7024038a5fac015"
+version = "0.54.0"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat/duration-improvs#b63124a9cad693a4d6e292135da6cfa9097b8574"
 dependencies = [
  "chrono",
  "clap",
@@ -2467,6 +2467,7 @@ dependencies = [
  "stackable-operator-derive",
  "strum",
  "thiserror",
+ "time",
  "tokio",
  "tracing",
  "tracing-opentelemetry",
@@ -2475,8 +2476,8 @@ dependencies = [
 
 [[package]]
 name = "stackable-operator-derive"
-version = "0.53.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=0.53.0#48cfb1cafbfc401e565bb2f4b7024038a5fac015"
+version = "0.54.0"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=feat/duration-improvs#b63124a9cad693a4d6e292135da6cfa9097b8574"
 dependencies = [
  "darling 0.20.3",
  "proc-macro2",
@@ -2657,7 +2658,7 @@ dependencies = [
  "byteorder",
  "integer-encoding",
  "log",
- "ordered-float 2.10.0",
+ "ordered-float 2.10.1",
  "threadpool",
 ]
 

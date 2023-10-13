@@ -3,10 +3,10 @@ use std::{fmt::Display, ops::Deref};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use stackable_operator::{
-    duration::Duration,
     k8s_openapi::api::core::v1::SecretReference,
     kube::CustomResource,
     schemars::{self, JsonSchema},
+    time::Duration,
 };
 
 use crate::backend::tls::DEFAULT_MAX_CERT_LIFETIME;

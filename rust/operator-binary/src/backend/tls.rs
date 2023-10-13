@@ -22,13 +22,13 @@ use openssl::{
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::ObjectMetaBuilder,
-    duration::Duration,
     k8s_openapi::{
         api::core::v1::{Secret, SecretReference},
         chrono::{self, FixedOffset, TimeZone},
         ByteString,
     },
     kube::runtime::reflector::ObjectRef,
+    time::Duration,
 };
 use time::OffsetDateTime;
 
@@ -137,8 +137,8 @@ impl TlsGenerate {
             .context(BuildCertificateSnafu { tpe: CertType::Ca })?
             .build();
         let now = OffsetDateTime::now_utc();
-        let not_before = now - *Duration::from_minutes_unchecked(5);
-        let not_after = now + *Duration::from_days_unchecked(2 * 365);
+        let not_before = now - Duration::from_minutes_unchecked(5);
+        let not_after = now + Duration::from_days_unchecked(2 * 365);
         let conf = Conf::new(ConfMethod::default()).unwrap();
         let ca_key = Rsa::generate(2048)
             .and_then(PKey::try_from)
@@ -283,7 +283,7 @@ impl SecretBackend for TlsGenerate {
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
         let now = OffsetDateTime::now_utc();
-        let not_before = now - *Duration::from_minutes_unchecked(5);
+        let not_before = now - Duration::from_minutes_unchecked(5);
 
         // Extract and convert consumer input from the Volume annotations.
         let cert_lifetime = selector.autotls_cert_lifetime;
@@ -292,8 +292,8 @@ impl SecretBackend for TlsGenerate {
         // We need to check that the cert lifetime it is not longer than allowed,
         // by capping it to the maximum configured at the SecretClass.
         let cert_lifetime = min(cert_lifetime, self.max_cert_lifetime);
-        let not_after = now + *cert_lifetime;
-        let expire_pod_after = not_after - *cert_restart_buffer;
+        let not_after = now + cert_lifetime;
+        let expire_pod_after = not_after - cert_restart_buffer;
         if expire_pod_after <= now {
             TooShortCertLifetimeRequiresTimeTravelSnafu {
                 expires_at: not_after,
