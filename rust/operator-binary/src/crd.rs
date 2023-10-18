@@ -53,6 +53,7 @@ pub enum SearchNamespace {
 #[serde(rename_all = "camelCase")]
 pub struct AutoTlsBackend {
     pub ca: AutoTlsCa,
+
     #[serde(default = "default_max_certificate_lifetime")]
     /// Maximum lifetime the created certificates are allowed to have.
     /// In case consumers request a longer lifetime than allowed by this setting,
