@@ -50,9 +50,11 @@ pub const DEFAULT_MAX_CERT_LIFETIME: Duration = Duration::from_days_unchecked(15
 pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_hours_unchecked(24);
 
 /// When a StatefulSet has many Pods (e.g. 80 HDFS datanodes or Trino workers) a rolling
-/// redeployment can take multiple hours. When the certificates of all datanodes expire approximately
-/// at the same time and PodDisruptionBudgets are in place, Pods can need to this time to properly shut down,
-/// so we need to evict them enough time in advance
+/// redeployment can take multiple hours. When the certificates of all datanodes
+/// expire approximately at the same time, only a certain number of Pods can be unavailable.
+/// So they need to be restarted sequentially - combined with a graceful shutdown this can
+/// take hours. To prevent expired certificates we need to evict them enough time in advance
+/// - which is the purpose of the buffer.
 pub const DEFAULT_CERT_RESTART_BUFFER: Duration = Duration::from_hours_unchecked(6);
 
 #[derive(Debug, Snafu)]
