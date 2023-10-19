@@ -11,7 +11,7 @@ It is not possible to mix the two because they are incompatible. This means that
 
 This operator can be installed from RedHat's Operator Hub.
 
-Unfortunately there are some things you need ot be aware of when upgrading or uninstalling the operator from the Operator Hub.
+Unfortunately there are some things you need to be aware of when upgrading or uninstalling the operator from the Operator Hub.
 
 Due to limitations of the Operator Lifecycle Manager (OLM) you cannot enable automatic updates of the Stackable Secret Operator. Upgrading to a new version requires you to uninstall the existing version of the operator and then manually removing the following resources:
 
