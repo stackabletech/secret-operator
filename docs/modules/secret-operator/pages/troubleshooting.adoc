@@ -15,3 +15,4 @@
 . Is the CSI driver registered on the relevant `CSINode` objects? (`kubectl get csinode/$NODE_NAME -o yaml` should contain the driver `secrets.stackable.tech`)
 . Does the secret-operator sidecar container named `node-driver-registrar` have any relevant log entries?
 . Does the kubelet have any relevant log entries?
+. When running on OpenShift also have a look at the xref:openshift.adoc[OpenShift documentation].
