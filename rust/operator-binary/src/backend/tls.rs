@@ -1,5 +1,7 @@
 //! Dynamically provisions TLS certificates
 
+use std::cmp::min;
+
 use async_trait::async_trait;
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},
@@ -26,8 +28,9 @@ use stackable_operator::{
         ByteString,
     },
     kube::runtime::reflector::ObjectRef,
+    time::Duration,
 };
-use time::{Duration, OffsetDateTime};
+use time::OffsetDateTime;
 
 use crate::format::{well_known, SecretData, WellKnownSecretData};
 
@@ -35,6 +38,24 @@ use super::{
     pod_info::{Address, PodInfo},
     SecretBackend, SecretBackendError, SecretContents,
 };
+
+/// As the Pods will be evicted [`DEFAULT_CERT_RESTART_BUFFER`] before
+/// the cert actually expires, this results in a restart in approx every 2 weeks,
+/// which matches the rolling re-deploy of k8s nodes of e.g.:
+/// * 1 week for IONOS
+/// * 2 weeks for some on-prem k8s clusters
+pub const DEFAULT_MAX_CERT_LIFETIME: Duration = Duration::from_days_unchecked(15);
+
+/// Default lifetime of certs when no annotations are set on the Volume.
+pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_hours_unchecked(24);
+
+/// When a StatefulSet has many Pods (e.g. 80 HDFS datanodes or Trino workers) a rolling
+/// redeployment can take multiple hours. When the certificates of all datanodes
+/// expire approximately at the same time, only a certain number of Pods can be unavailable.
+/// So they need to be restarted sequentially - combined with a graceful shutdown this can
+/// take hours. To prevent expired certificates we need to evict them enough time in advance
+/// - which is the purpose of the buffer.
+pub const DEFAULT_CERT_RESTART_BUFFER: Duration = Duration::from_hours_unchecked(6);
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -71,6 +92,11 @@ pub enum Error {
     },
     #[snafu(display("invalid certificate lifetime"))]
     InvalidCertLifetime { source: DateTimeOutOfBoundsError },
+    #[snafu(display("certificate expiring at {expires_at} would schedule the pod to be restarted at {restart_at}, which is in the past (and we don't have a time machine (yet))"))]
+    TooShortCertLifetimeRequiresTimeTravel {
+        expires_at: OffsetDateTime,
+        restart_at: OffsetDateTime,
+    },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -92,6 +118,7 @@ impl SecretBackendError for Error {
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SaveCaCertificate { .. } => tonic::Code::Unavailable,
             Error::InvalidCertLifetime { .. } => tonic::Code::Internal,
+            Error::TooShortCertLifetimeRequiresTimeTravel { .. } => tonic::Code::InvalidArgument,
         }
     }
 }
@@ -99,10 +126,11 @@ impl SecretBackendError for Error {
 pub struct TlsGenerate {
     ca_cert: X509,
     ca_key: PKey<Private>,
+    max_cert_lifetime: Duration,
 }
 
 impl TlsGenerate {
-    pub fn new_self_signed() -> Result<Self> {
+    pub fn new_self_signed(max_cert_lifetime: Duration) -> Result<Self> {
         let subject_name = X509NameBuilder::new()
             .and_then(|mut name| {
                 name.append_entry_by_nid(Nid::COMMONNAME, "secret-operator self-signed")?;
@@ -111,8 +139,8 @@ impl TlsGenerate {
             .context(BuildCertificateSnafu { tpe: CertType::Ca })?
             .build();
         let now = OffsetDateTime::now_utc();
-        let not_before = now - Duration::minutes(5);
-        let not_after = now + Duration::days(2 * 365);
+        let not_before = now - Duration::from_minutes_unchecked(5);
+        let not_after = now + Duration::from_days_unchecked(2 * 365);
         let conf = Conf::new(ConfMethod::default()).unwrap();
         let ca_key = Rsa::generate(2048)
             .and_then(PKey::try_from)
@@ -153,7 +181,11 @@ impl TlsGenerate {
             })
             .context(BuildCertificateSnafu { tpe: CertType::Ca })?
             .build();
-        Ok(Self { ca_key, ca_cert })
+        Ok(Self {
+            ca_key,
+            ca_cert,
+            max_cert_lifetime,
+        })
     }
 
     /// Check if a signing CA has already been instantiated in a specified Kubernetes secret - if
@@ -166,6 +198,7 @@ impl TlsGenerate {
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
         auto_generate_if_missing: bool,
+        max_cert_lifetime: Duration,
     ) -> Result<Self> {
         let (k8s_secret_name, k8s_ns) = match secret_ref {
             SecretReference {
@@ -193,11 +226,12 @@ impl TlsGenerate {
                         &ca_data.get("ca.crt").context(MissingCaCertificateSnafu)?.0,
                     )
                     .context(LoadCertificateSnafu { tpe: CertType::Ca })?,
+                    max_cert_lifetime,
                 }
             }
             Err(_) if auto_generate_if_missing => {
                 // Failed to get existing cert, try to create a new self-signed one
-                let ca = Self::new_self_signed()?;
+                let ca = Self::new_self_signed(max_cert_lifetime)?;
                 // Use create rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
                 client
                     .create(&Secret {
@@ -251,9 +285,25 @@ impl SecretBackend for TlsGenerate {
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
         let now = OffsetDateTime::now_utc();
-        let not_before = now - Duration::minutes(5);
-        let not_after = now + Duration::days(1);
-        let expire_pod_after = not_after - Duration::minutes(30);
+        let not_before = now - Duration::from_minutes_unchecked(5);
+
+        // Extract and convert consumer input from the Volume annotations.
+        let cert_lifetime = selector.autotls_cert_lifetime;
+        let cert_restart_buffer = selector.autotls_cert_restart_buffer;
+
+        // We need to check that the cert lifetime it is not longer than allowed,
+        // by capping it to the maximum configured at the SecretClass.
+        let cert_lifetime = min(cert_lifetime, self.max_cert_lifetime);
+        let not_after = now + cert_lifetime;
+        let expire_pod_after = not_after - cert_restart_buffer;
+        if expire_pod_after <= now {
+            TooShortCertLifetimeRequiresTimeTravelSnafu {
+                expires_at: not_after,
+                restart_at: expire_pod_after,
+            }
+            .fail()?;
+        }
+
         let conf = Conf::new(ConfMethod::default()).unwrap();
         let pod_key = Rsa::generate(2048)
             .and_then(PKey::try_from)

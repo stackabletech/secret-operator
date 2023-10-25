@@ -6,5 +6,7 @@ tests:
     # Requires manual connection to an AD cluster
     # - name: kerberos-ad
     #   dimensions: []
+  - name: tls
+    dimensions: []
 suites:
   - name: nightly

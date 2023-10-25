@@ -6,9 +6,12 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::SecretReference,
     kube::CustomResource,
     schemars::{self, JsonSchema},
+    time::Duration,
 };
 
-#[derive(CustomResource, Serialize, Deserialize, Clone, Debug, JsonSchema)]
+use crate::backend::tls::DEFAULT_MAX_CERT_LIFETIME;
+
+#[derive(CustomResource, Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[kube(
     group = "secrets.stackable.tech",
     version = "v1alpha1",
@@ -24,7 +27,7 @@ pub struct SecretClassSpec {
     pub backend: SecretClassBackend,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::large_enum_variant)]
 pub enum SecretClassBackend {
@@ -33,26 +36,36 @@ pub enum SecretClassBackend {
     KerberosKeytab(KerberosKeytabBackend),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct K8sSearchBackend {
     pub search_namespace: SearchNamespace,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum SearchNamespace {
     Pod {},
     Name(String),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AutoTlsBackend {
     pub ca: AutoTlsCa,
+
+    #[serde(default = "default_max_certificate_lifetime")]
+    /// Maximum lifetime the created certificates are allowed to have.
+    /// In case consumers request a longer lifetime than allowed by this setting,
+    /// the lifetime will be the minimum of both, so this setting takes precedence.
+    pub max_certificate_lifetime: Duration,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+fn default_max_certificate_lifetime() -> Duration {
+    DEFAULT_MAX_CERT_LIFETIME
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AutoTlsCa {
     pub secret: SecretReference,
@@ -61,7 +74,7 @@ pub struct AutoTlsCa {
     pub auto_generate: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct KerberosKeytabBackend {
     pub realm_name: Hostname,
@@ -71,7 +84,7 @@ pub struct KerberosKeytabBackend {
     pub admin_principal: KerberosPrincipal,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum KerberosKeytabBackendAdmin {
     #[serde(rename_all = "camelCase")]
@@ -86,7 +99,7 @@ pub enum KerberosKeytabBackendAdmin {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(try_from = "String", into = "String")]
 pub struct Hostname(String);
 #[derive(Debug, Snafu)]
@@ -128,7 +141,7 @@ impl Deref for Hostname {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(try_from = "String", into = "String")]
 pub struct KerberosPrincipal(String);
 #[derive(Debug, Snafu)]
@@ -171,5 +184,84 @@ impl Deref for KerberosPrincipal {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::{
+        backend::tls::DEFAULT_MAX_CERT_LIFETIME,
+        crd::{AutoTlsBackend, SecretClass, SecretClassSpec},
+    };
+
+    #[test]
+    fn test_deserialization() {
+        let input: &str = r#"
+        apiVersion: secrets.stackable.tech/v1alpha1
+        kind: SecretClass
+        metadata:
+          name: tls
+        spec:
+          backend:
+            autoTls:
+              ca:
+                secret:
+                  name: secret-provisioner-tls-ca
+                  namespace: default
+        "#;
+        let deserializer = serde_yaml::Deserializer::from_str(input);
+        let secret_class: SecretClass =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+        assert_eq!(
+            secret_class.spec,
+            SecretClassSpec {
+                backend: crate::crd::SecretClassBackend::AutoTls(AutoTlsBackend {
+                    ca: crate::crd::AutoTlsCa {
+                        secret: SecretReference {
+                            name: Some("secret-provisioner-tls-ca".to_string()),
+                            namespace: Some("default".to_string()),
+                        },
+                        auto_generate: false,
+                    },
+                    max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
+                })
+            }
+        );
+
+        let input: &str = r#"
+        apiVersion: secrets.stackable.tech/v1alpha1
+        kind: SecretClass
+        metadata:
+          name: tls
+        spec:
+          backend:
+            autoTls:
+              ca:
+                secret:
+                  name: secret-provisioner-tls-ca
+                  namespace: default
+                autoGenerate: true
+              maxCertificateLifetime: 31d
+        "#;
+        let deserializer = serde_yaml::Deserializer::from_str(input);
+        let secret_class: SecretClass =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+        assert_eq!(
+            secret_class.spec,
+            SecretClassSpec {
+                backend: crate::crd::SecretClassBackend::AutoTls(AutoTlsBackend {
+                    ca: crate::crd::AutoTlsCa {
+                        secret: SecretReference {
+                            name: Some("secret-provisioner-tls-ca".to_string()),
+                            namespace: Some("default".to_string()),
+                        },
+                        auto_generate: true,
+                    },
+                    max_certificate_lifetime: Duration::from_days_unchecked(31),
+                })
+            }
+        );
     }
 }
