@@ -30,7 +30,7 @@ The `service` scope allows `Pod` objects to specify custom scopes. This should t
 [#listener-volume]
 === `listener-volume`
 
-The `listener-volume` scope allows `Pod` objects to request secrets corresponding to a xref::listener:volume.adoc[listener volume] that is bound to the same `Pod`.
+The `listener-volume` scope allows `Pod` objects to request secrets corresponding to a xref:listener-operator:volume.adoc[listener volume] that is bound to the same `Pod`.
 
 The `listener-volume` scope takes the name of the listener volume as a paremeter.
 
