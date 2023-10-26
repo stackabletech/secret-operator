@@ -36,8 +36,6 @@ spec:
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
-            - name: LISTOP
-              value: /csi-listop/csi.sock
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
@@ -48,8 +46,6 @@ spec:
           volumeMounts:
             - name: csi
               mountPath: /csi
-            - name: csi-listop
-              mountPath: /csi-listop
             - name: mountpoint
               mountPath: {{ .Values.kubeletDir }}/pods
               {{- if .Values.securityContext.privileged }}
@@ -118,9 +114,6 @@ spec:
         - name: csi
           hostPath:
             path: {{ .Values.kubeletDir }}/plugins/secrets.stackable.tech/
-        - name: csi-listop
-          hostPath:
-            path: {{ .Values.kubeletDir }}/plugins/listeners.stackable.tech/
         - name: mountpoint
           hostPath:
             path: {{ .Values.kubeletDir }}/pods/
