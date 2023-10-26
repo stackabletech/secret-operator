@@ -44,7 +44,7 @@ pub enum FromPodError {
     },
     #[snafu(display("pod has no listener volume {listener_volume}"))]
     GetListenerVolume { listener_volume: String },
-    #[snafu(display("fialed to get listener PVC {listener_pvc} for volume {listener_volume}"))]
+    #[snafu(display("failed to get listener PVC {listener_pvc} for volume {listener_volume}"))]
     GetListenerPvc {
         source: stackable_operator::error::Error,
         listener_volume: String,
