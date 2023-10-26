@@ -103,9 +103,15 @@ pub async fn from_class(
                     secret,
                     auto_generate,
                 },
+            max_certificate_lifetime,
         }) => from(
-            super::TlsGenerate::get_or_create_k8s_certificate(client, &secret, auto_generate)
-                .await?,
+            super::TlsGenerate::get_or_create_k8s_certificate(
+                client,
+                &secret,
+                auto_generate,
+                max_certificate_lifetime,
+            )
+            .await?,
         ),
         crd::SecretClassBackend::KerberosKeytab(crd::KerberosKeytabBackend {
             realm_name,

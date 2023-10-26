@@ -10,7 +10,10 @@ pub mod tls;
 use async_trait::async_trait;
 use serde::{Deserialize, Deserializer};
 use snafu::{OptionExt, Snafu};
-use stackable_operator::k8s_openapi::chrono::{DateTime, FixedOffset};
+use stackable_operator::{
+    k8s_openapi::chrono::{DateTime, FixedOffset},
+    time::Duration,
+};
 use std::{collections::HashSet, convert::Infallible};
 
 pub use dynamic::Dynamic;
@@ -23,7 +26,10 @@ use scope::SecretScope;
 
 use crate::format::{SecretData, SecretFormat};
 
-use self::pod_info::SchedulingPodInfo;
+use self::{
+    pod_info::SchedulingPodInfo,
+    tls::{DEFAULT_CERT_LIFETIME, DEFAULT_CERT_RESTART_BUFFER},
+};
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
@@ -71,10 +77,48 @@ pub struct SecretVolumeSelector {
     /// The Kerberos service names (`SERVICE_NAME/hostname@realm`)
     #[serde(
         rename = "secrets.stackable.tech/kerberos.service.names",
-        default = "SecretVolumeSelector::default_kerberos_service_names",
-        deserialize_with = "SecretVolumeSelector::deserialize_str_vec"
+        deserialize_with = "SecretVolumeSelector::deserialize_str_vec",
+        default = "SecretVolumeSelector::default_kerberos_service_names"
     )]
     pub kerberos_service_names: Vec<String>,
+
+    /// The password used to encrypt the TLS PKCS#12 keystore
+    ///
+    /// Required for some applications that misbehave with blank keystore passwords (such as Hadoop).
+    /// Has no effect if `format` is not `tls-pkcs12`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.compatibility.tls-pkcs12.password",
+        deserialize_with = "SecretVolumeSelector::deserialize_some",
+        default
+    )]
+    pub compat_tls_pkcs12_password: Option<String>,
+
+    /// The TLS cert lifetime.
+    /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
+    #[serde(
+        rename = "secrets.stackable.tech/backend.autotls.cert.lifetime",
+        default = "default_cert_lifetime"
+    )]
+    pub autotls_cert_lifetime: Duration,
+
+    /// The amount of time the Pod using the cert gets restarted before the cert expires.
+    /// Keep in mind that there can be multiple Pods - such as 80 datanodes - trying to
+    /// shut down at the same time. It can take some hours until all Pods are restarted
+    /// in a rolling fashion.
+    /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
+    #[serde(
+        rename = "secrets.stackable.tech/backend.autotls.cert.restart-buffer",
+        default = "default_cert_restart_buffer"
+    )]
+    pub autotls_cert_restart_buffer: Duration,
+}
+
+fn default_cert_restart_buffer() -> Duration {
+    DEFAULT_CERT_RESTART_BUFFER
+}
+
+fn default_cert_lifetime() -> Duration {
+    DEFAULT_CERT_LIFETIME
 }
 
 #[derive(Snafu, Debug)]

@@ -49,6 +49,36 @@ The xref:secretclass.adoc#format[format] that the secret should be written as.
 
 This can be either the default output format of the xref:secretclass.adoc#backend[backend], or a format that it defines a conversion into.
 
+=== `secrets.stackable.tech/backend.autotls.cert.lifetime`
+
+*Required*: false
+
+*Default value*: `1d`
+
+*Backends*: xref:secretclass.adoc#backend-autotls[]
+
+The lifetime of the created certificate.
+Please note that you can not request a lifetime longer than allowed by `maxCertificateLifetime` on the SecretClass.
+If you do so, `maxCertificateLifetime` will be used as the certificate lifetime, to adhere to the requirements
+set by the administrator who created the SecretClass.
+
+The format is documented in xref:concepts:duration.adoc[].
+
+=== `secrets.stackable.tech/backend.autotls.cert.restart-buffer`
+
+*Required*: false
+
+*Default value*: `6h`
+
+*Backends*: xref:secretclass.adoc#backend-autotls[]
+
+The amount of time the Pod using the cert gets restarted before the cert expires.
+Keep in mind that there can be multiple Pods - such as 80 datanodes - trying to
+shut down at the same time. It can take some hours until all Pods are restarted
+in a rolling fashion.
+
+The format is documented in xref:concepts:duration.adoc[].
+
 === `secrets.stackable.tech/kerberos.service.names`
 
 *Required*: false

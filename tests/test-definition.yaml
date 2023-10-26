@@ -8,5 +8,7 @@ tests:
     #   dimensions: []
   - name: listener
     dimensions: []
+  - name: tls
+    dimensions: []
 suites:
   - name: nightly

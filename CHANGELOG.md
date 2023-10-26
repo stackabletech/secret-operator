@@ -6,13 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added support for encrypting PKCS#12 keystores ([#314]).
 - Added listener scope for provisioned secrets ([#310]).
 
-### Changed
-
-- `operator-rs` `0.44.0` -> `0.48.0` ([#310]).
-
 [#310]: https://github.com/stackabletech/secret-operator/pull/310
+[#314]: https://github.com/stackabletech/secret-operator/pull/314
 
 ## [23.7.0] - 2023-07-14
 
