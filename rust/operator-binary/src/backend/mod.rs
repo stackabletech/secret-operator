@@ -9,6 +9,7 @@ pub mod tls;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Deserializer};
+use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{DateTime, FixedOffset},
     time::Duration,
@@ -25,7 +26,10 @@ use scope::SecretScope;
 
 use crate::format::{SecretData, SecretFormat};
 
-use self::tls::{DEFAULT_CERT_LIFETIME, DEFAULT_CERT_RESTART_BUFFER};
+use self::{
+    pod_info::SchedulingPodInfo,
+    tls::{DEFAULT_CERT_LIFETIME, DEFAULT_CERT_RESTART_BUFFER},
+};
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
@@ -117,14 +121,22 @@ fn default_cert_lifetime() -> Duration {
     DEFAULT_CERT_LIFETIME
 }
 
+#[derive(Snafu, Debug)]
+#[snafu(module)]
+pub enum ScopeAddressesError {
+    #[snafu(display("no addresses found for listener {listener}"))]
+    NoListenerAddresses { listener: String },
+}
+
 impl SecretVolumeSelector {
     /// Returns all addresses associated with a certain [`SecretScope`]
     fn scope_addresses<'a>(
         &'a self,
         pod_info: &'a pod_info::PodInfo,
         scope: &scope::SecretScope,
-    ) -> Vec<Address> {
-        match scope {
+    ) -> Result<Vec<Address>, ScopeAddressesError> {
+        use scope_addresses_error::*;
+        Ok(match scope {
             scope::SecretScope::Node => {
                 let mut addrs = vec![Address::Dns(pod_info.node_name.clone())];
                 addrs.extend(pod_info.node_ips.iter().copied().map(Address::Ip));
@@ -149,7 +161,12 @@ impl SecretVolumeSelector {
                 "{}.{}.svc.cluster.local",
                 name, self.namespace
             ))],
-        }
+            scope::SecretScope::ListenerVolume { name } => pod_info
+                .listener_addresses
+                .get(name)
+                .context(NoListenerAddressesSnafu { listener: name })?
+                .to_vec(),
+        })
     }
 
     fn default_kerberos_service_names() -> Vec<String> {
@@ -210,9 +227,10 @@ pub trait SecretBackend: Send + Sync {
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,
+        pod_info: SchedulingPodInfo,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
-        // selector is unused in the stub implementation, but should still be used in all "real" impls
-        let _ = selector;
+        // selector and pod_info are unused in the stub implementation, but should still be used in "real" impls
+        let _ = (selector, pod_info);
         Ok(None)
     }
 }

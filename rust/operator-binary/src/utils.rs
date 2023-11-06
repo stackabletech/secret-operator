@@ -1,5 +1,6 @@
 use std::{fmt::LowerHex, os::unix::prelude::AsRawFd, path::Path};
 
+use futures::{pin_mut, Stream, StreamExt};
 use pin_project::pin_project;
 use socket2::Socket;
 use std::fmt::Write as _; // import without risk of name clashing
@@ -111,9 +112,23 @@ pub fn error_full_message(err: &dyn std::error::Error) -> String {
     full_msg
 }
 
+/// Propagates `Ok(true)` and `Err(_)` from `stream`, otherwise returns `Ok(false)`.
+pub async fn trystream_any<S: Stream<Item = Result<bool, E>>, E>(stream: S) -> Result<bool, E> {
+    pin_mut!(stream);
+    while let Some(value) = stream.next().await {
+        match value {
+            v @ (Ok(true) | Err(_)) => return v,
+            Ok(false) => {}
+        }
+    }
+    Ok(false)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::utils::{error_full_message, FmtByteSlice};
+    use futures::StreamExt;
+
+    use crate::utils::{error_full_message, trystream_any, FmtByteSlice};
 
     #[test]
     fn fmt_hex_byte_slice() {
@@ -134,6 +149,39 @@ mod tests {
                     .as_ref()
             ),
             "leaf: middleware: root error"
+        );
+    }
+
+    #[tokio::test]
+    async fn trystream_any_should_work() {
+        let bomb = |msg: &'static str| futures::stream::repeat_with(move || panic!("{msg}"));
+        assert_eq!(
+            trystream_any(futures::stream::iter([])).await,
+            Result::<_, ()>::Ok(false)
+        );
+        assert_eq!(
+            trystream_any(futures::stream::iter([Ok(false), Ok(false)])).await,
+            Result::<_, ()>::Ok(false)
+        );
+        assert_eq!(
+            trystream_any(futures::stream::iter([Ok(false), Ok(true)])).await,
+            Result::<_, ()>::Ok(true)
+        );
+        assert_eq!(
+            trystream_any(
+                futures::stream::iter([Ok(false), Ok(true)])
+                    .chain(bomb("should not continue reading stream after Ok(true)"))
+            )
+            .await,
+            Result::<_, ()>::Ok(true)
+        );
+        assert_eq!(
+            trystream_any(
+                futures::stream::iter([Ok(false), Err(())])
+                    .chain(bomb("should not continue reading stream after Err(_)"))
+            )
+            .await,
+            Result::<_, ()>::Err(())
         );
     }
 }

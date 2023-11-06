@@ -1,5 +1,7 @@
 //! See [`SecretScope`]
 
+use std::fmt::Display;
+
 use serde::{Deserialize, Deserializer};
 use snafu::{OptionExt, Snafu};
 
@@ -9,6 +11,12 @@ pub enum SecretScope {
     Node,
     Pod,
     Service { name: String },
+    ListenerVolume { name: String },
+}
+impl From<&SecretScope> for SecretScope {
+    fn from(value: &SecretScope) -> Self {
+        value.clone()
+    }
 }
 
 #[derive(Debug, Snafu)]
@@ -35,6 +43,12 @@ impl SecretScope {
                     .context(deserialize_error::ScopeRequiresParamSnafu { tpe })?
                     .to_string(),
             },
+            "listener-volume" => Self::ListenerVolume {
+                name: param
+                    .take()
+                    .context(deserialize_error::ScopeRequiresParamSnafu { tpe })?
+                    .to_string(),
+            },
             _ => return deserialize_error::UnknownScopeTypeSnafu { tpe }.fail(),
         };
         if let Some(param) = param {
@@ -49,5 +63,15 @@ impl SecretScope {
             .split(',')
             .map(|s| Self::deserialize(s).map_err(<D::Error as serde::de::Error>::custom))
             .collect::<Result<Vec<_>, _>>()
+    }
+}
+impl Display for SecretScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SecretScope::Node => write!(f, "node"),
+            SecretScope::Pod => write!(f, "pod"),
+            SecretScope::Service { name } => write!(f, "service={name}"),
+            SecretScope::ListenerVolume { name } => write!(f, "listener-volume={name}"),
+        }
     }
 }

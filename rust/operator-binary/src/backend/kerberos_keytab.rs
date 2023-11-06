@@ -13,12 +13,20 @@ use crate::{
     format::{well_known, SecretData, WellKnownSecretData},
 };
 
-use super::{pod_info::Address, SecretBackend, SecretBackendError, SecretContents};
+use super::{
+    pod_info::Address, scope::SecretScope, ScopeAddressesError, SecretBackend, SecretBackendError,
+    SecretContents,
+};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("invalid secret reference: {secret:?}"))]
     InvalidSecretRef { secret: SecretReference },
+    #[snafu(display("failed to get addresses for scope {scope}"))]
+    ScopeAddresses {
+        source: ScopeAddressesError,
+        scope: SecretScope,
+    },
     #[snafu(display("failed to load admin keytab {secret:?}"))]
     LoadAdminKeytab {
         source: stackable_operator::error::Error,
@@ -53,6 +61,7 @@ impl SecretBackendError for Error {
             Error::ProvisionKeytab { .. } => tonic::Code::Unavailable,
             Error::PodPrincipal { .. } => tonic::Code::FailedPrecondition,
             Error::ReadKeytab { .. } => tonic::Code::Unavailable,
+            Error::ScopeAddresses { .. } => tonic::Code::Unavailable,
         }
     }
 }
@@ -181,7 +190,13 @@ cluster.local = {realm_name}
         let mut pod_principals: Vec<KerberosPrincipal> = Vec::new();
         for service_name in &selector.kerberos_service_names {
             for scope in &selector.scope {
-                for addr in selector.scope_addresses(&pod_info, scope) {
+                for addr in
+                    selector
+                        .scope_addresses(&pod_info, scope)
+                        .context(ScopeAddressesSnafu {
+                            scope: scope.clone(),
+                        })?
+                {
                     if let Address::Dns(hostname) = addr {
                         pod_principals.push(
                             format!("{service_name}/{hostname}")

@@ -14,14 +14,16 @@ use stackable_operator::{
 use crate::{crd::SearchNamespace, format::SecretData};
 
 use super::{
-    pod_info::PodInfo, scope::SecretScope, SecretBackend, SecretBackendError, SecretContents,
-    SecretVolumeSelector,
+    pod_info::{PodInfo, SchedulingPodInfo},
+    scope::SecretScope,
+    SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
 };
 
 const LABEL_CLASS: &str = "secrets.stackable.tech/class";
 const LABEL_SCOPE_NODE: &str = "secrets.stackable.tech/node";
 const LABEL_SCOPE_POD: &str = "secrets.stackable.tech/pod";
 const LABEL_SCOPE_SERVICE: &str = "secrets.stackable.tech/service";
+const LABEL_SCOPE_LISTENER: &str = "secrets.stackable.tech/listener";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -35,6 +37,8 @@ pub enum Error {
     },
     #[snafu(display("no Secrets matched label selector {label_selector:?}"))]
     NoSecret { label_selector: String },
+    #[snafu(display("failed to find Listener name for volume {listener_volume}"))]
+    NoListener { listener_volume: String },
 }
 
 impl SecretBackendError for Error {
@@ -43,6 +47,7 @@ impl SecretBackendError for Error {
             Error::SecretSelector { .. } => tonic::Code::FailedPrecondition,
             Error::SecretQuery { .. } => tonic::Code::FailedPrecondition,
             Error::NoSecret { .. } => tonic::Code::FailedPrecondition,
+            Error::NoListener { .. } => tonic::Code::FailedPrecondition,
         }
     }
 }
@@ -70,7 +75,8 @@ impl SecretBackend for K8sSearch {
         selector: &SecretVolumeSelector,
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
-        let label_selector = build_label_selector_query(selector, Some(&pod_info))?;
+        let label_selector =
+            build_label_selector_query(selector, LabelSelectorPodInfo::Scheduled(&pod_info))?;
         let secret = self
             .client
             .list::<Secret>(
@@ -95,13 +101,15 @@ impl SecretBackend for K8sSearch {
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,
+        pod_info: SchedulingPodInfo,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
-        if selector.scope.contains(&SecretScope::Node) {
-            let label_selector = build_label_selector_query(selector, None)?;
+        if pod_info.has_node_scope {
+            let label_selector =
+                build_label_selector_query(selector, LabelSelectorPodInfo::Scheduling(&pod_info))?;
             Ok(Some(
                 self.client
                     .list::<Secret>(
-                        __self.search_ns_for_pod(selector),
+                        self.search_ns_for_pod(selector),
                         &ListParams::default().labels(&label_selector),
                     )
                     .await
@@ -116,24 +124,54 @@ impl SecretBackend for K8sSearch {
     }
 }
 
+enum LabelSelectorPodInfo<'a> {
+    Scheduling(&'a SchedulingPodInfo),
+    Scheduled(&'a PodInfo),
+}
+
 fn build_label_selector_query(
     vol_selector: &SecretVolumeSelector,
-    pod_info: Option<&PodInfo>,
+    pod_info: LabelSelectorPodInfo,
 ) -> Result<String, Error> {
     let mut label_selector =
         BTreeMap::from([(LABEL_CLASS.to_string(), vol_selector.class.to_string())]);
+    let mut listener_i = 0;
+    // Only include node selector once we are scheduled,
+    // until then we use the query to decide where scheduling should be possible!
+    if let LabelSelectorPodInfo::Scheduled(pod_info) = pod_info {
+        // k8sSearch doesn't take the scope's resolved addresses into account, so we need to check whether
+        // Listener scopes also imply Node
+        if pod_info.scheduling.has_node_scope {
+            label_selector.insert(LABEL_SCOPE_NODE.to_string(), pod_info.node_name.clone());
+        }
+    }
+    let scheduling_pod_info = match pod_info {
+        LabelSelectorPodInfo::Scheduling(spi) => spi,
+        LabelSelectorPodInfo::Scheduled(pi) => &pi.scheduling,
+    };
     for scope in &vol_selector.scope {
         match scope {
             SecretScope::Node => {
-                if let Some(pod_info) = pod_info {
-                    label_selector.insert(LABEL_SCOPE_NODE.to_string(), pod_info.node_name.clone());
-                }
+                // already checked `pod_info.has_node_scope`, which also takes node listeners into account
             }
             SecretScope::Pod => {
                 label_selector.insert(LABEL_SCOPE_POD.to_string(), vol_selector.pod.clone());
             }
             SecretScope::Service { name } => {
                 label_selector.insert(LABEL_SCOPE_SERVICE.to_string(), name.clone());
+            }
+            SecretScope::ListenerVolume { name } => {
+                label_selector.insert(
+                    format!("{LABEL_SCOPE_LISTENER}.{listener_i}"),
+                    scheduling_pod_info
+                        .volume_listener_names
+                        .get(name)
+                        .context(NoListenerSnafu {
+                            listener_volume: name,
+                        })?
+                        .clone(),
+                );
+                listener_i += 1;
             }
         }
     }

@@ -1,7 +1,11 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    backend::{self, SecretBackendError, SecretVolumeSelector},
+    backend::{
+        self,
+        pod_info::{self, SchedulingPodInfo},
+        SecretBackendError, SecretVolumeSelector,
+    },
     grpc::csi::{
         self,
         v1::{
@@ -15,7 +19,8 @@ use crate::{
 use serde::{de::IntoDeserializer, Deserialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    k8s_openapi::api::core::v1::PersistentVolumeClaim, kube::runtime::reflector::ObjectRef,
+    k8s_openapi::api::core::v1::{PersistentVolumeClaim, Pod},
+    kube::runtime::reflector::ObjectRef,
 };
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
@@ -36,6 +41,12 @@ enum CreateVolumeError {
     ResolveOwnerPod {
         pvc: ObjectRef<PersistentVolumeClaim>,
     },
+    #[snafu(display("failed to get pod for volume"))]
+    GetPod {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to parse pod details"))]
+    ParsePod { source: pod_info::FromPodError },
     #[snafu(display("failed to parse secret selector from annotations of {pvc}"))]
     InvalidSecretSelector {
         source: serde::de::value::Error,
@@ -59,6 +70,8 @@ impl From<CreateVolumeError> for Status {
             CreateVolumeError::InvalidParams { .. } => Status::invalid_argument(full_msg),
             CreateVolumeError::FindPvc { .. } => Status::unavailable(full_msg),
             CreateVolumeError::ResolveOwnerPod { .. } => Status::failed_precondition(full_msg),
+            CreateVolumeError::GetPod { .. } => Status::unavailable(full_msg),
+            CreateVolumeError::ParsePod { .. } => Status::failed_precondition(full_msg),
             CreateVolumeError::InvalidSecretSelector { .. } => {
                 Status::failed_precondition(full_msg)
             }
@@ -143,15 +156,26 @@ impl Controller for SecretProvisionerController {
         &self,
         request: Request<csi::v1::CreateVolumeRequest>,
     ) -> Result<Response<csi::v1::CreateVolumeResponse>, Status> {
+        use create_volume_error::*;
         let request = request.into_inner();
         let params = CreateVolumeParams::deserialize(request.parameters.into_deserializer())
-            .context(create_volume_error::InvalidParamsSnafu)?;
+            .context(InvalidParamsSnafu)?;
         let (pvc_selector, selector) = self.get_pvc_secret_selector(&params).await?;
+
+        let pod = self
+            .client
+            .get::<Pod>(&selector.pod, &selector.namespace)
+            .await
+            .context(GetPodSnafu)?;
+        let pod_info = SchedulingPodInfo::from_pod(&self.client, &pod, &selector.scope)
+            .await
+            .context(ParsePodSnafu)?;
+
         let backend = backend::dynamic::from_selector(&self.client, &selector)
             .await
             .context(create_volume_error::InitBackendSnafu)?;
         let accessible_topology = match backend
-            .get_qualified_node_names(&selector)
+            .get_qualified_node_names(&selector, pod_info)
             .await
             .context(create_volume_error::FindNodesSnafu)?
         {

@@ -1,0 +1,75 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: client-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: client-role
+rules:
+  - apiGroups:
+      - listeners.stackable.tech
+    resources:
+      - listeners
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: client-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: client-sa
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: client-role
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: client
+spec:
+  template:
+    spec:
+      containers:
+        - name: client
+          image: docker.stackable.tech/stackable/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - sh
+          args:
+            - -euc
+            - |
+              url=https://$(kubectl get listeners/listener-nginx-0 -o jsonpath='{.status.ingressAddresses[0].address}:{.status.ingressAddresses[0].ports.https}')
+              curl $url --cacert /stackable/tls/ca.crt
+          volumeMounts:
+            - mountPath: /stackable/tls
+              name: tls
+      volumes:
+        - name: tls
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+      securityContext:
+        fsGroup: 1000
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 0
+      serviceAccountName: client-sa

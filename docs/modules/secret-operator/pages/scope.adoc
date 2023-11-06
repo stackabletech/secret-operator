@@ -13,19 +13,30 @@ include this extra context. The exact effect of the scope depends on which xref:
 [#node]
 === `node`
 
-The `node` scope is resolved to the name of the Kubernetes `Node` object that the `Pod` is running on. This will typically
+The `node` scope is resolved to the name of the Kubernetes Node object that the Pod is running on. This will typically
 be the DNS name of the node.
 
 [#pod]
 === `pod`
 
-The `pod` scope is resolved to the name of the Kubernetes `Pod`. This allows the secret to differentiate between `StatefulSet` replicas.
+The `pod` scope is resolved to the name of the Kubernetes Pod. This allows the secret to differentiate between StatefulSet replicas.
 
 [#service]
 === `service`
 
-The `service` scope allows `Pod` objects to specify custom scopes. This should typically correspond to `Service` objects that the
-`Pod` participate in.
+The `service` scope allows Pod objects to specify custom scopes. This should typically correspond to Service objects that the
+Pod participate in.
+
+[#listener-volume]
+=== `listener-volume`
+
+The `listener-volume` scope allows Pod objects to request secrets corresponding to a xref:listener-operator:volume.adoc[listener volume] that is bound to the same Pod.
+
+The `listener-volume` scope takes the name of the listener volume as a paremeter.
+
+note:: The parameter is the name of the Pod's _volume_, not the name of the PersistentVolumeClaim, PersistentVolume, or xref:listener-operator:listener.adoc[Listener].
+
+note:: The `listener-volume` scope also implies the xref:#node[] scope for xref:listener-operator:listenerclass.adoc#servicetype-nodeport[NodePort] listeners.
 
 == Example
 

@@ -36,7 +36,8 @@ use crate::format::{well_known, SecretData, WellKnownSecretData};
 
 use super::{
     pod_info::{Address, PodInfo},
-    SecretBackend, SecretBackendError, SecretContents,
+    scope::SecretScope,
+    ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents,
 };
 
 /// As the Pods will be evicted [`DEFAULT_CERT_RESTART_BUFFER`] before
@@ -59,6 +60,11 @@ pub const DEFAULT_CERT_RESTART_BUFFER: Duration = Duration::from_hours_unchecked
 
 #[derive(Debug, Snafu)]
 pub enum Error {
+    #[snafu(display("failed to get addresses for scope {scope}"))]
+    ScopeAddresses {
+        source: ScopeAddressesError,
+        scope: SecretScope,
+    },
     #[snafu(display("failed to generate certificate key"))]
     GenerateKey { source: openssl::error::ErrorStack },
     #[snafu(display("could not find CA {secret}, and autoGenerate is false"))]
@@ -109,6 +115,7 @@ pub enum CertType {
 impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
         match self {
+            Error::ScopeAddresses { .. } => tonic::Code::Unavailable,
             Error::GenerateKey { .. } => tonic::Code::Internal,
             Error::FindCaAndGenDisabled { .. } => tonic::Code::FailedPrecondition,
             Error::MissingCaCertificate { .. } => tonic::Code::FailedPrecondition,
@@ -308,6 +315,14 @@ impl SecretBackend for TlsGenerate {
         let pod_key = Rsa::generate(2048)
             .and_then(PKey::try_from)
             .context(GenerateKeySnafu)?;
+        let mut addresses = Vec::new();
+        for scope in &selector.scope {
+            addresses.extend(
+                selector
+                    .scope_addresses(&pod_info, scope)
+                    .context(ScopeAddressesSnafu { scope })?,
+            );
+        }
         let pod_cert = X509Builder::new()
             .and_then(|mut x509| {
                 let subject_name = X509NameBuilder::new()
@@ -347,14 +362,12 @@ impl SecretBackend for TlsGenerate {
                 let mut san_ext = SubjectAlternativeName::new();
                 san_ext.critical();
                 let mut has_san = false;
-                for scope in &selector.scope {
-                    for addr in selector.scope_addresses(&pod_info, scope) {
-                        has_san = true;
-                        match addr {
-                            Address::Dns(dns) => san_ext.dns(&dns),
-                            Address::Ip(ip) => san_ext.ip(&ip.to_string()),
-                        };
-                    }
+                for addr in addresses {
+                    has_san = true;
+                    match addr {
+                        Address::Dns(dns) => san_ext.dns(&dns),
+                        Address::Ip(ip) => san_ext.ip(&ip.to_string()),
+                    };
                 }
                 if has_san {
                     exts.push(san_ext.build(&ctx)?);
