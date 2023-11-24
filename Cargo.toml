@@ -3,7 +3,7 @@ members = ["rust/operator-binary", "rust/krb5", "rust/krb5-provision-keytab", "r
 default-members = ["rust/operator-binary"]
 
 [workspace.package]
-version = "0.0.0-dev"
+version = "23.11.0"
 authors = ["Stackable GmbH <info@stackable.tech>"]
 license = "OSL-3.0"
 edition = "2021"
