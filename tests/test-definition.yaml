@@ -5,7 +5,8 @@ dimensions:
       - "false"
 tests:
   - name: kerberos
-    dimensions: []
+    dimensions:
+      - openshift
     # Requires manual connection to an AD cluster
     # - name: kerberos-ad
     #   dimensions: []

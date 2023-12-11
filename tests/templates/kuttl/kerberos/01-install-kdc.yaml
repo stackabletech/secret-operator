@@ -17,6 +17,9 @@ spec:
       labels:
         app: krb5-kdc
     spec:
+      serviceAccount: integration-tests-sa
+      securityContext:
+        runAsUser: 0
       initContainers:
         - name: init
           image: docker.stackable.tech/stackable/krb5:1.18.2-stackable23.4.0-rc1
