@@ -49,7 +49,7 @@ spec:
   - metadata:
       name: listener
       annotations:
-        listeners.stackable.tech/listener-class: nodeport
+        listeners.stackable.tech/listener-class: external-unstable
     spec:
       accessModes:
       - ReadWriteMany
