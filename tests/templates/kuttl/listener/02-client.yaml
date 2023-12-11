@@ -41,6 +41,7 @@ metadata:
 spec:
   template:
     spec:
+      serviceAccount: integration-tests-sa
       containers:
         - name: client
           image: docker.stackable.tech/stackable/testing-tools:0.2.0-stackable0.0.0-dev

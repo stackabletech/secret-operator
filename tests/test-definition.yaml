@@ -11,7 +11,8 @@ tests:
     # - name: kerberos-ad
     #   dimensions: []
   - name: listener
-    dimensions: []
+    dimensions:
+      - openshift
   - name: tls
     dimensions:
       - openshift
