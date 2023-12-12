@@ -53,6 +53,7 @@ struct SecretOperatorRun {
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
     pub const TARGET: Option<&str> = option_env!("TARGET");
+    pub const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 }
 
 #[tokio::main]
@@ -60,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         stackable_operator::cli::Command::Crd => {
-            crd::SecretClass::print_yaml_schema()?;
+            crd::SecretClass::print_yaml_schema(built_info::CARGO_PKG_VERSION)?;
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun {
             csi_endpoint,

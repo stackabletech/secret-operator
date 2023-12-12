@@ -22,8 +22,10 @@ spec:
           description: Auto-generated derived type for SecretClassSpec via `CustomResource`
           properties:
             spec:
+              description: A [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass) is a cluster-global Kubernetes resource that defines a category of secrets that the Secret Operator knows how to provision.
               properties:
                 backend:
+                  description: Each SecretClass is associated with a single [backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend), which dictates the mechanism for issuing that kind of Secret.
                   oneOf:
                     - required:
                         - k8sSearch
@@ -33,15 +35,20 @@ spec:
                         - kerberosKeytab
                   properties:
                     autoTls:
+                      description: |-
+                        The [`autoTls` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-autotls) issues a TLS certificate signed by the Secret Operator. The certificate authority can be provided by the administrator, or managed automatically by the Secret Operator.
+
+                        A new certificate and keypair will be generated and signed for each Pod, keys or certificates are never reused.
                       properties:
                         ca:
+                          description: Configures the certificate authority used to issue Pod certificates.
                           properties:
                             autoGenerate:
                               default: false
-                              description: Whether a new certificate authority should be generated if it does not already exist
+                              description: Whether a new certificate authority should be generated if it does not already exist.
                               type: boolean
                             secret:
-                              description: SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace
+                              description: Reference (name and namespace) to a Kubernetes Secret object where the CA certificate and key is stored in the keys `ca.crt` and `ca.key` respectively.
                               properties:
                                 name:
                                   description: name is unique within a namespace to reference a secret resource.
@@ -55,14 +62,16 @@ spec:
                           type: object
                         maxCertificateLifetime:
                           default: 15d
-                          description: Maximum lifetime the created certificates are allowed to have. In case consumers request a longer lifetime than allowed by this setting, the lifetime will be the minimum of both, so this setting takes precedence.
+                          description: Maximum lifetime the created certificates are allowed to have. In case consumers request a longer lifetime than allowed by this setting, the lifetime will be the minimum of both, so this setting takes precedence. The default value is 15 days.
                           type: string
                       required:
                         - ca
                       type: object
                     k8sSearch:
+                      description: The [`k8sSearch` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-k8ssearch) can be used to mount Secrets across namespaces into Pods.
                       properties:
                         searchNamespace:
+                          description: Configures the namespace searched for Secret objects.
                           oneOf:
                             - required:
                                 - pod
@@ -70,16 +79,20 @@ spec:
                                 - name
                           properties:
                             name:
+                              description: The Secret objects are located in a single global namespace. Should be used for secrets that are provisioned by the cluster administrator.
                               type: string
                             pod:
+                              description: The Secret objects are located in the same namespace as the Pod object. Should be used for Secrets that are provisioned by the application administrator.
                               type: object
                           type: object
                       required:
                         - searchNamespace
                       type: object
                     kerberosKeytab:
+                      description: The [`kerberosKeytab` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-kerberoskeytab) creates a Kerberos keytab file for a selected realm. The Kerberos KDC and administrator credentials must be provided by the administrator.
                       properties:
                         admin:
+                          description: Kerberos admin configuration settings.
                           oneOf:
                             - required:
                                 - mit
@@ -87,11 +100,13 @@ spec:
                                 - activeDirectory
                           properties:
                             activeDirectory:
+                              description: Credentials should be provisioned in a Microsoft Active Directory domain.
                               properties:
                                 ldapServer:
+                                  description: An AD LDAP server, such as the AD Domain Controller. This must match the server’s FQDN, or GSSAPI authentication will fail.
                                   type: string
                                 ldapTlsCaSecret:
-                                  description: SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace
+                                  description: Reference (name and namespace) to a Kubernetes Secret object containing the TLS CA (in `ca.crt`) that the LDAP server’s certificate should be authenticated against.
                                   properties:
                                     name:
                                       description: name is unique within a namespace to reference a secret resource.
@@ -101,7 +116,7 @@ spec:
                                       type: string
                                   type: object
                                 passwordCacheSecret:
-                                  description: SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace
+                                  description: Reference (name and namespace) to a Kubernetes Secret object where workload passwords will be stored. This must not be accessible to end users.
                                   properties:
                                     name:
                                       description: name is unique within a namespace to reference a secret resource.
@@ -111,8 +126,10 @@ spec:
                                       type: string
                                   type: object
                                 schemaDistinguishedName:
+                                  description: The root Distinguished Name (DN) for AD-managed schemas, typically `CN=Schema,CN=Configuration,{domain_dn}`.
                                   type: string
                                 userDistinguishedName:
+                                  description: The root Distinguished Name (DN) where service accounts should be provisioned, typically `CN=Users,{domain_dn}`.
                                   type: string
                               required:
                                 - ldapServer
@@ -122,15 +139,17 @@ spec:
                                 - userDistinguishedName
                               type: object
                             mit:
+                              description: Credentials should be provisioned in a MIT Kerberos Admin Server.
                               properties:
                                 kadminServer:
+                                  description: The hostname of the Kerberos Admin Server. This should be provided by the Kerberos administrator.
                                   type: string
                               required:
                                 - kadminServer
                               type: object
                           type: object
                         adminKeytabSecret:
-                          description: SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace
+                          description: Reference (`name` and `namespace`) to a K8s Secret object where a keytab with administrative privileges is stored in the key `keytab`.
                           properties:
                             name:
                               description: name is unique within a namespace to reference a secret resource.
@@ -140,10 +159,13 @@ spec:
                               type: string
                           type: object
                         adminPrincipal:
+                          description: The admin principal.
                           type: string
                         kdc:
+                          description: The hostname of the Kerberos Key Distribution Center (KDC). This should be provided by the Kerberos administrator.
                           type: string
                         realmName:
+                          description: The name of the Kerberos realm. This should be provided by the Kerberos administrator.
                           type: string
                       required:
                         - admin
