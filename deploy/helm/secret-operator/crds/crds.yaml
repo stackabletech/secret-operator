@@ -25,7 +25,7 @@ spec:
               description: A [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass) is a cluster-global Kubernetes resource that defines a category of secrets that the Secret Operator knows how to provision.
               properties:
                 backend:
-                  description: Each SecretClass is a associated with a single backend, which dictates the mechanism for issuing that kind of Secret.
+                  description: Each SecretClass is associated with a single backend, which dictates the mechanism for issuing that kind of Secret.
                   oneOf:
                     - required:
                         - k8sSearch
@@ -62,7 +62,7 @@ spec:
                           type: object
                         maxCertificateLifetime:
                           default: 15d
-                          description: Maximum lifetime the created certificates are allowed to have. In case consumers request a longer lifetime than allowed by this setting, the lifetime will be the minimum of both, so this setting takes precedence.
+                          description: Maximum lifetime the created certificates are allowed to have. In case consumers request a longer lifetime than allowed by this setting, the lifetime will be the minimum of both, so this setting takes precedence. The default value is 15 days.
                           type: string
                       required:
                         - ca
