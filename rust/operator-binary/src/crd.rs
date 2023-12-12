@@ -26,7 +26,9 @@ use crate::backend::tls::DEFAULT_MAX_CERT_LIFETIME;
 )]
 #[serde(rename_all = "camelCase")]
 pub struct SecretClassSpec {
-    /// Each SecretClass is associated with a single backend, which dictates the mechanism for issuing that kind of Secret.
+    /// Each SecretClass is associated with a single
+    /// [backend](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend),
+    /// which dictates the mechanism for issuing that kind of Secret.
     pub backend: SecretClassBackend,
 }
 
@@ -34,16 +36,19 @@ pub struct SecretClassSpec {
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::large_enum_variant)]
 pub enum SecretClassBackend {
-    /// This backend can be used to mount Secrets across namespaces into Pods.
+    /// The [`k8sSearch` backend](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-k8ssearch)
+    /// can be used to mount Secrets across namespaces into Pods.
     K8sSearch(K8sSearchBackend),
 
-    /// The `autoTls` backend issues a TLS certificate signed by the Secret Operator.
+    /// The [`autoTls` backend](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-autotls)
+    /// issues a TLS certificate signed by the Secret Operator.
     /// The certificate authority can be provided by the administrator, or managed automatically by the Secret Operator.
     ///
     /// A new certificate and keypair will be generated and signed for each Pod, keys or certificates are never reused.
     AutoTls(AutoTlsBackend),
 
-    /// Creates a Kerberos keytab file for a selected realm.
+    /// The [`kerberosKeytab` backend](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-kerberoskeytab)
+    /// reates a Kerberos keytab file for a selected realm.
     /// The Kerberos KDC and administrator credentials must be provided by the administrator.
     KerberosKeytab(KerberosKeytabBackend),
 }
