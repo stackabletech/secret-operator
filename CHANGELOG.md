@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Improved CRD documentation ([#333]).
+
+[#333]: https://github.com/stackabletech/secret-operator/pull/333
+
 ## [23.11.0] - 2023-11-24
 
 ### Added
