@@ -26,7 +26,7 @@ use crate::backend::tls::DEFAULT_MAX_CERT_LIFETIME;
 )]
 #[serde(rename_all = "camelCase")]
 pub struct SecretClassSpec {
-    /// Each SecretClass is a associated with a single backend, which dictates the mechanism for issuing that kind of Secret.
+    /// Each SecretClass is associated with a single backend, which dictates the mechanism for issuing that kind of Secret.
     pub backend: SecretClassBackend,
 }
 
@@ -76,6 +76,7 @@ pub struct AutoTlsBackend {
     /// Maximum lifetime the created certificates are allowed to have.
     /// In case consumers request a longer lifetime than allowed by this setting,
     /// the lifetime will be the minimum of both, so this setting takes precedence.
+    /// The default value is 15 days.
     #[serde(default = "default_max_certificate_lifetime")]
     pub max_certificate_lifetime: Duration,
 }
