@@ -89,7 +89,7 @@ spec:
                         - searchNamespace
                       type: object
                     kerberosKeytab:
-                      description: The [`kerberosKeytab` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-kerberoskeytab) reates a Kerberos keytab file for a selected realm. The Kerberos KDC and administrator credentials must be provided by the administrator.
+                      description: The [`kerberosKeytab` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-kerberoskeytab) creates a Kerberos keytab file for a selected realm. The Kerberos KDC and administrator credentials must be provided by the administrator.
                       properties:
                         admin:
                           description: Kerberos admin configuration settings.

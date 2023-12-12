@@ -48,7 +48,7 @@ pub enum SecretClassBackend {
     AutoTls(AutoTlsBackend),
 
     /// The [`kerberosKeytab` backend](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-kerberoskeytab)
-    /// reates a Kerberos keytab file for a selected realm.
+    /// creates a Kerberos keytab file for a selected realm.
     /// The Kerberos KDC and administrator credentials must be provided by the administrator.
     KerberosKeytab(KerberosKeytabBackend),
 }
