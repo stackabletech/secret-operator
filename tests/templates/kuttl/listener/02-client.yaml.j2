@@ -21,6 +21,12 @@ rules:
       - pods
     verbs:
       - get
+{% if test_scenario['values']['openshift'] == "true" %}
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
+    resourceNames: ["privileged"]
+    verbs: ["use"]
+{% endif %}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -41,6 +47,7 @@ metadata:
 spec:
   template:
     spec:
+      serviceAccount: client-sa
       containers:
         - name: client
           image: docker.stackable.tech/stackable/testing-tools:0.2.0-stackable0.0.0-dev

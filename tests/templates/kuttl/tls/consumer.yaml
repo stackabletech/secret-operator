@@ -80,3 +80,4 @@ spec:
         fsGroup: 1000
       restartPolicy: Never
       terminationGracePeriodSeconds: 0
+      serviceAccount: integration-tests-sa
