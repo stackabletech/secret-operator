@@ -2,7 +2,6 @@
 // be included from a different module
 * xref:secret-operator:building.adoc[]
 * xref:secret-operator:installation.adoc[]
-* xref:secret-operator:configuration.adoc[]
 * xref:secret-operator:usage.adoc[]
 * Concepts
 ** xref:secret-operator:secretclass.adoc[]
@@ -10,3 +9,7 @@
 ** xref:secret-operator:volume.adoc[]
 * xref:secret-operator:security.adoc[]
 * xref:secret-operator:troubleshooting.adoc[]
+* xref:secret-operator:reference/index.adoc[]
+** xref:secret-operator:reference/crds.adoc[]
+*** {crd-docs}/secrets.stackable.tech/secretclass/v1alpha1/[SecretClass {external-link-icon}^]
+** xref:secret-operator:reference/commandline-parameters.adoc[]
