@@ -1,1 +1,1 @@
-{"operator": {"name": "secret-operator", "include_productconfig": false, "pretty_string": "Stackable Secret Operator", "product_string": "secret-operator", "run_as": "custom", "url": "stackabletech/secret-operator.git"}}
+{"operator": {"name": "secret-operator", "include_productconfig": false, "has_product": false, "pretty_string": "Stackable Secret Operator", "product_string": "secret-operator", "run_as": "custom", "url": "stackabletech/secret-operator.git"}}
