@@ -65,39 +65,49 @@ pub enum Error {
         source: ScopeAddressesError,
         scope: SecretScope,
     },
+
     #[snafu(display("failed to generate certificate key"))]
     GenerateKey { source: openssl::error::ErrorStack },
+
     #[snafu(display("could not find CA {secret}, and autoGenerate is false"))]
     FindCaAndGenDisabled {
         source: stackable_operator::error::Error,
         secret: ObjectRef<Secret>,
     },
+
     #[snafu(display("CA secret is missing required certificate file"))]
     MissingCaCertificate,
+
     #[snafu(display("failed to load {tpe:?} certificate"))]
     LoadCertificate {
         source: openssl::error::ErrorStack,
         tpe: CertType,
     },
+
     #[snafu(display("invalid secret reference: {secret:?}"))]
     InvalidSecretRef { secret: SecretReference },
+
     #[snafu(display("failed to build {tpe:?} certificate"))]
     BuildCertificate {
         source: openssl::error::ErrorStack,
         tpe: CertType,
     },
+
     #[snafu(display("failed to serialize {tpe:?} certificate"))]
     SerializeCertificate {
         source: openssl::error::ErrorStack,
         tpe: CertType,
     },
+
     #[snafu(display("failed to save CA certificate to {secret}"))]
     SaveCaCertificate {
         source: stackable_operator::error::Error,
         secret: ObjectRef<Secret>,
     },
+
     #[snafu(display("invalid certificate lifetime"))]
     InvalidCertLifetime { source: DateTimeOutOfBoundsError },
+
     #[snafu(display("certificate expiring at {expires_at} would schedule the pod to be restarted at {restart_at}, which is in the past (and we don't have a time machine (yet))"))]
     TooShortCertLifetimeRequiresTimeTravel {
         expires_at: OffsetDateTime,
@@ -407,6 +417,7 @@ impl SecretBackend for TlsGenerate {
 pub enum DateTimeOutOfBoundsError {
     #[snafu(display("datetime is invalid"))]
     DateTime,
+
     #[snafu(display("time zone is out of bounds"))]
     TimeZone,
 }

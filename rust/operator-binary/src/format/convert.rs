@@ -41,6 +41,7 @@ pub enum ConvertError {
         from: SecretFormat,
         to: SecretFormat,
     },
+
     #[snafu(
         display("failed to convert from PEM certificate to PKCS#12"),
         context(false)
@@ -133,14 +134,19 @@ fn pkcs12_truststore<'a>(
 pub enum TlsToPkcs12Error {
     #[snafu(display("failed to load certificate"))]
     LoadCert { source: OpensslError },
+
     #[snafu(display("failed to load private key"))]
     LoadKey { source: OpensslError },
+
     #[snafu(display("failed to load CA certificate"))]
     LoadCa { source: OpensslError },
+
     #[snafu(display("failed to build keystore"))]
     BuildKeystore { source: OpensslError },
+
     #[snafu(display("failed to serialize CA certificate for truststore"))]
     SerializeCaForTruststore { source: OpensslError },
+
     #[snafu(display("failed to encrypt data for truststore"))]
     EncryptDataForTruststore,
 }
