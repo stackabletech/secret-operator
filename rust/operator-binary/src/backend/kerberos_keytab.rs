@@ -22,30 +22,39 @@ use super::{
 pub enum Error {
     #[snafu(display("invalid secret reference: {secret:?}"))]
     InvalidSecretRef { secret: SecretReference },
+
     #[snafu(display("failed to get addresses for scope {scope}"))]
     ScopeAddresses {
         source: ScopeAddressesError,
         scope: SecretScope,
     },
+
     #[snafu(display("failed to load admin keytab {secret:?}"))]
     LoadAdminKeytab {
         source: stackable_operator::error::Error,
         secret: SecretReference,
     },
+
     #[snafu(display(r#"admin keytab {secret:?} does not contain key "keytab""#))]
     NoAdminKeytabKeyInSecret { secret: SecretReference },
+
     #[snafu(display("failed to create temp dir"))]
     TempSetup { source: std::io::Error },
+
     #[snafu(display("failed to write Kerberos configuration"))]
     WriteConfig { source: std::io::Error },
+
     #[snafu(display("failed to write admin keytab"))]
     WriteAdminKeytab { source: std::io::Error },
+
     #[snafu(display("failed to provision keytab"))]
     ProvisionKeytab {
         source: stackable_krb5_provision_keytab::Error,
     },
+
     #[snafu(display("generated invalid Kerberos principal for pod"))]
     PodPrincipal { source: InvalidKerberosPrincipal },
+
     #[snafu(display("failed to read keytab"))]
     ReadKeytab { source: std::io::Error },
 }

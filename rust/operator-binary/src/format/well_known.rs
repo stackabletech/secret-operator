@@ -127,6 +127,7 @@ pub struct CompatibilityOptions {
 pub enum FromFilesError {
     #[snafu(display("could not identify a secret format containing the files {files:?}"))]
     UnknownFormat { files: Vec<String> },
+
     #[snafu(display("unable to parse as {format:?}: missing required file {file:?}"))]
     MissingRequiredFile { format: SecretFormat, file: String },
 }

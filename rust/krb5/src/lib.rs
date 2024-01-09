@@ -20,6 +20,7 @@ pub mod profile;
 pub enum Error {
     #[snafu(display("{reason}"))]
     Krb5 { reason: Krb5Error },
+
     #[snafu(display("{string_name} is too long"))]
     StringTooLong {
         source: std::num::TryFromIntError,

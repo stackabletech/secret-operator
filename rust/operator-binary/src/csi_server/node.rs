@@ -37,45 +37,56 @@ use super::controller::TOPOLOGY_NODE;
 enum PublishError {
     #[snafu(display("failed to parse selector from volume context"))]
     InvalidSelector { source: serde::de::value::Error },
+
     #[snafu(display("failed to get pod for volume"))]
     GetPod {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to parse pod details"))]
     ParsePod { source: pod_info::FromPodError },
+
     #[snafu(display("failed to initialize backend"))]
     InitBackend {
         source: backend::dynamic::FromSelectorError,
     },
+
     #[snafu(display("backend failed to get secret data"))]
     BackendGetSecretData { source: backend::dynamic::DynError },
+
     #[snafu(display("failed to create secret parent dir {}", path.display()))]
     CreateDir {
         source: std::io::Error,
         path: PathBuf,
     },
+
     #[snafu(display("failed to mount volume mount directory {}", path.display()))]
     Mount {
         source: std::io::Error,
         path: PathBuf,
     },
+
     #[snafu(display("failed to convert secret data into desired format"))]
     FormatData { source: format::IntoFilesError },
+
     #[snafu(display("failed to set volume permissions for {}", path.display()))]
     SetDirPermissions {
         source: std::io::Error,
         path: PathBuf,
     },
+
     #[snafu(display("failed to create secret file {}", path.display()))]
     CreateFile {
         source: std::io::Error,
         path: PathBuf,
     },
+
     #[snafu(display("failed to write secret file {}", path.display()))]
     WriteFile {
         source: std::io::Error,
         path: PathBuf,
     },
+    
     #[snafu(display("failed to tag pod with expiry metadata"))]
     TagPod {
         source: stackable_operator::error::Error,
@@ -114,6 +125,7 @@ enum UnpublishError {
         source: std::io::Error,
         path: PathBuf,
     },
+
     #[snafu(display("failed to delete volume mount directory {}", path.display()))]
     Delete {
         source: std::io::Error,

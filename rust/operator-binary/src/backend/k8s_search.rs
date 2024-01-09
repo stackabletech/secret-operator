@@ -32,12 +32,15 @@ pub enum Error {
     SecretSelector {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to query for secrets"))]
     SecretQuery {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("no Secrets matched label selector {label_selector:?}"))]
     NoSecret { label_selector: String },
+
     #[snafu(display("failed to find Listener name for volume {listener_volume}"))]
     NoListener { listener_volume: String },
 }

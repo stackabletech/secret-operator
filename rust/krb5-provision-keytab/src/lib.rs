@@ -41,14 +41,19 @@ pub struct Response {}
 pub enum Error {
     #[snafu(display("failed to serialize request"))]
     SerializeRequest { source: serde_json::Error },
+
     #[snafu(display("failed to deserialize response"))]
     DeserializeResponse { source: serde_json::Error },
+
     #[snafu(display("failed to start provisioner"))]
     SpawnProvisioner { source: std::io::Error },
+
     #[snafu(display("error waiting for provisioner to exit"))]
     WaitProvisioner { source: std::io::Error },
+
     #[snafu(display("failed to provision keytab: {msg}"))]
     RunProvisioner { msg: String },
+
     #[snafu(display("failed to write request"))]
     WriteRequest { source: std::io::Error },
 }

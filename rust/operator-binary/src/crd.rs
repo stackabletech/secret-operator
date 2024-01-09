@@ -167,6 +167,7 @@ pub struct Hostname(String);
 pub enum InvalidHostname {
     #[snafu(display("hostname contains illegal characters (allowed: alphanumeric, -, and .)"))]
     IllegalCharacter,
+
     #[snafu(display("hostname may not start with a dash"))]
     StartWithDash,
 }
@@ -211,6 +212,7 @@ pub enum InvalidKerberosPrincipal {
         "principal contains illegal characters (allowed: alphanumeric, /, @, -, and .)"
     ))]
     IllegalCharacter,
+
     #[snafu(display("principal may not start with a dash"))]
     StartWithDash,
 }

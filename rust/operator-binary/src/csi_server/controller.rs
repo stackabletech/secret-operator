@@ -32,32 +32,40 @@ pub const TOPOLOGY_NODE: &str = "secrets.stackable.tech/node";
 enum CreateVolumeError {
     #[snafu(display("failed to parse CreateVolume parameters"))]
     InvalidParams { source: serde::de::value::Error },
+
     #[snafu(display("failed to load {pvc}"))]
     FindPvc {
         source: stackable_operator::error::Error,
         pvc: ObjectRef<PersistentVolumeClaim>,
     },
+
     #[snafu(display("failed to resolve owning Pod of {pvc}"))]
     ResolveOwnerPod {
         pvc: ObjectRef<PersistentVolumeClaim>,
     },
+
     #[snafu(display("failed to get pod for volume"))]
     GetPod {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to parse pod details"))]
     ParsePod { source: pod_info::FromPodError },
+
     #[snafu(display("failed to parse secret selector from annotations of {pvc}"))]
     InvalidSecretSelector {
         source: serde::de::value::Error,
         pvc: ObjectRef<PersistentVolumeClaim>,
     },
+
     #[snafu(display("failed to initialize backend"))]
     InitBackend {
         source: backend::dynamic::FromSelectorError,
     },
+
     #[snafu(display("failed to find nodes matching scopes"))]
     FindNodes { source: backend::dynamic::DynError },
+
     #[snafu(display("no nodes match scopes"))]
     NoMatchingNode,
 }

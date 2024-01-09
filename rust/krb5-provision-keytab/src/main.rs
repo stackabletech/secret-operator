@@ -18,46 +18,61 @@ mod secret_ref;
 enum Error {
     #[snafu(display("failed to deserialize request"))]
     DeserializeRequest { source: serde_json::Error },
+
     #[snafu(display("failed to init krb5 context"))]
     KrbInit { source: krb5::Error },
+
     #[snafu(display("failed to init MIT admin client"))]
     MitAdminInit { source: mit::Error },
+
     #[snafu(display("failed to init Active Directory admin client"))]
     ActiveDirectoryInit { source: active_directory::Error },
+
     #[snafu(display("failed to init kadmin server handle"))]
     KadminInit { source: kadm5::Error },
+
     #[snafu(display("failed to decode admin principal name"))]
     DecodeAdminPrincipalName { source: NulError },
+
     #[snafu(display("failed to decode pod principal name"))]
     DecodePodPrincipalName { source: NulError },
+
     #[snafu(display("failed to decode admin keytab path"))]
     DecodeAdminKeytabPath { source: NulError },
+
     #[snafu(display("failed to decode pod keytab path"))]
     DecodePodKeytabPath { source: NulError },
+
     #[snafu(display("failed to resolve pod keytab"))]
     ResolvePodKeytab { source: krb5::Error },
+
     #[snafu(display("failed to parse principal {principal:?}"))]
     ParsePrincipal {
         source: krb5::Error,
         principal: String,
     },
+
     #[snafu(display("failed to prepare principal {principal} (backend: MIT)"))]
     PreparePrincipalMit {
         source: mit::Error,
         principal: String,
     },
+
     #[snafu(display("failed to prepare principal {principal} (backend: Active Directory)"))]
     PreparePrincipalActiveDirectory {
         source: active_directory::Error,
         principal: String,
     },
+
     #[snafu(display("failed to create principal {principal}"))]
     CreatePrincipal {
         source: kadm5::Error,
         principal: String,
     },
+
     #[snafu(display("failed to add dummy key to keytab"))]
     AddDummyToKeytab { source: krb5::Error },
+
     #[snafu(display("failed to remove dummy key from keytab"))]
     RemoveDummyFromKeytab { source: krb5::Error },
 }
