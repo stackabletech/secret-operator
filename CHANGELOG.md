@@ -8,7 +8,12 @@ All notable changes to this project will be documented in this file.
 
 - Improved CRD documentation ([#333]).
 
+## Changed
+
+- Use new annotation builder ([#341])
+
 [#333]: https://github.com/stackabletech/secret-operator/pull/333
+[#341]: https://github.com/stackabletech/secret-operator/pull/341
 
 ## [23.11.0] - 2023-11-24
 
