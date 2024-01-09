@@ -16,9 +16,12 @@ use crate::{
 use openssl::sha::Sha256;
 use serde::{de::IntoDeserializer, Deserialize};
 use snafu::{ResultExt, Snafu};
-use stackable_operator::{builder::ObjectMetaBuilder, k8s_openapi::api::core::v1::Pod};
+use stackable_operator::{
+    builder::ObjectMetaBuilder,
+    k8s_openapi::api::core::v1::Pod,
+    kvp::{Annotation, AnnotationError, Annotations},
+};
 use std::{
-    collections::BTreeMap,
     fs::Permissions,
     os::unix::prelude::PermissionsExt,
     path::{Path, PathBuf},
@@ -86,11 +89,14 @@ enum PublishError {
         source: std::io::Error,
         path: PathBuf,
     },
-    
+
     #[snafu(display("failed to tag pod with expiry metadata"))]
     TagPod {
         source: stackable_operator::error::Error,
     },
+
+    #[snafu(display("failed to build annotation"))]
+    BuildAnnotation { source: AnnotationError },
 }
 
 // Useful since all service calls return a [Result<tonic::Response<T>, tonic::Status>]
@@ -113,6 +119,7 @@ impl From<PublishError> for Status {
             PublishError::CreateFile { .. } => Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
+            PublishError::BuildAnnotation { .. } => Status::unavailable(full_msg),
         }
     }
 }
@@ -254,15 +261,18 @@ impl SecretProvisionerNode {
         // however, we mostly just care about preventing accidental hashes here, for which plain byte truncation should be "good enough".
         let volume_tag = &volume_tag[..16];
 
-        let mut annotations = BTreeMap::default();
+        let mut annotations = Annotations::new();
 
         if let Some(expires_after) = data.expires_after {
             annotations.insert(
-                format!(
-                    "restarter.stackable.tech/expires-at.{:x}",
-                    FmtByteSlice(volume_tag)
-                ),
-                expires_after.to_rfc3339(),
+                Annotation::try_from((
+                    format!(
+                        "restarter.stackable.tech/expires-at.{:x}",
+                        FmtByteSlice(volume_tag)
+                    ),
+                    expires_after.to_rfc3339(),
+                ))
+                .context(publish_error::BuildAnnotationSnafu)?,
             );
         }
 
