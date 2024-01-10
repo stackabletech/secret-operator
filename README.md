@@ -10,21 +10,19 @@
 
 [Documentation](https://docs.stackable.tech/home/stable/secret-operator) | [Stackable Data Platform](https://stackable.tech/) | [Platform Docs](https://docs.stackable.tech/) | [Discussions](https://github.com/orgs/stackabletech/discussions) | [Discord](https://discord.gg/7kZ3BNnCAF)
 
-
 This is a Kubernetes Operator to provision and inject secrets for Kubernetes pods. Compared to Kubernetes' native secret mounts, this permits secrets to be selected dynamically based on properties of the `Pod`.
 
 It is part of the Stackable Data Platform, a curated selection of the best open source data apps like Apache Kafka, Apache Druid, Trino or Apache Spark, [all](#other-operators) working together seamlessly. Based on Kubernetes, it runs everywhere – [on prem or in the cloud](#supported-platforms).
 
-
 ## Installation
 
-You can install the operator using [stackablectl or helm](https://docs.stackable.tech/secret-operator/stable/installation.html).
+You can install the operator using [stackablectl or helm](https://docs.stackable.tech/home/stable/secret/getting_started/installation).
 
 Read on to get started with it, or see it in action in one of our [demos](https://stackable.tech/en/demos/).
 
 ## Getting Started
 
-You can follow this [tutorial](https://docs.stackable.tech/secret/stable/getting_started/first_steps.html).
+You can follow this [tutorial](https://docs.stackable.tech/home/stable/secret/getting_started/first_steps) .
 
 ## Documentation
 
@@ -34,7 +32,6 @@ If you are interested in the most recent state of this repository, check out the
 The documentation for all Stackable products can be found at [docs.stackable.tech](https://docs.stackable.tech).
 
 If you have a question about the Stackable Data Platform contact us via our [homepage](https://stackable.tech/) or ask a public questions in our [Discussions forum](https://github.com/orgs/stackabletech/discussions).
-
 
 ## What does it do?
 
