@@ -4,7 +4,6 @@
 
 <h1 align="center">Stackable Secret Operator</h1>
 
-
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/stackabletech/secret-operator/graphs/commit-activity)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-green.svg)](https://docs.stackable.tech/home/stable/contributor/index.html)
 [![License OSL3.0](https://img.shields.io/badge/license-OSL3.0-green)](./LICENSE)
@@ -51,7 +50,6 @@ The Secret Operator is deployed as a DaemonSet and provides a CSI to mount files
 
 The Secret Operator by [Stackable](https://stackable.tech/).
 This is a Kubernetes Operator to provision and inject secrets for Kubernetes Pods. It is part of the [Stackable Data Platform](https://stackable.tech/), a curated selection of the best open source data apps like Kafka, Druid, Trino or Spark, all working together seamlessly. Based on Kubernetes, it runs everywhere – on prem or in the cloud.
-
 
 ## About The Stackable Data Platform
 
