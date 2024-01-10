@@ -4,11 +4,22 @@
 {%- set related_reading_links=[] -%}
 {%- set no_jenkins_job_badge=true -%}
 
-{% include "partials/borrowed/header.md.j2" %}
-{% include "partials/borrowed/links.md.j2" %}
+{% filter trim %}
+  {%- include "partials/borrowed/header.md.j2" -%}
+{% endfilter %}
 
-{% include "partials/main.md.j2" %}
+{% filter trim %}
+  {%- include "partials/borrowed/links.md.j2" -%}
+{% endfilter %}
 
-{% include "partials/borrowed/footer.md.j2" %}
+{% filter trim %}
+  {%- include "partials/main.md.j2" -%}
+{% endfilter %}
 
-{% include "partials/borrowed/related_reading.md.j2" %}
+{% filter trim %}
+  {%- include "partials/borrowed/footer.md.j2" -%}
+{% endfilter %}
+
+{% filter trim %}
+  {%- include "partials/borrowed/related_reading.md.j2" -%}
+{% endfilter %}
