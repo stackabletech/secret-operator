@@ -16,13 +16,13 @@ It is part of the Stackable Data Platform, a curated selection of the best open 
 
 ## Installation
 
-You can install the operator using [stackablectl or helm](https://docs.stackable.tech/home/stable/secret/getting_started/installation).
+You can install the operator using [stackablectl or helm](https://docs.stackable.tech/home/stable/secret-operator/getting_started/installation).
 
 Read on to get started with it, or see it in action in one of our [demos](https://stackable.tech/en/demos/).
 
 ## Getting Started
 
-You can follow this [tutorial](https://docs.stackable.tech/home/stable/secret/getting_started/first_steps) .
+You can follow this [tutorial](https://docs.stackable.tech/home/stable/secret-operator/getting_started/first_steps) .
 
 ## Documentation
 
