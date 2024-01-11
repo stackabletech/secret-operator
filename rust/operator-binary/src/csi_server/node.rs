@@ -1,3 +1,24 @@
+use std::{
+    fs::Permissions,
+    os::unix::prelude::PermissionsExt,
+    path::{Path, PathBuf},
+};
+
+use openssl::sha::Sha256;
+use serde::{de::IntoDeserializer, Deserialize};
+use snafu::{ResultExt, Snafu};
+use stackable_operator::{
+    builder::ObjectMetaBuilder,
+    k8s_openapi::api::core::v1::Pod,
+    kvp::{Annotation, AnnotationError, Annotations},
+};
+use sys_mount::{unmount, Mount, MountFlags, UnmountFlags};
+use tokio::{
+    fs::{create_dir_all, OpenOptions},
+    io::AsyncWriteExt,
+};
+use tonic::{Request, Response, Status};
+
 use crate::{
     backend::{
         self, pod_info, pod_info::PodInfo, SecretBackendError, SecretContents, SecretVolumeSelector,
@@ -13,25 +34,6 @@ use crate::{
     },
     utils::{error_full_message, FmtByteSlice},
 };
-use openssl::sha::Sha256;
-use serde::{de::IntoDeserializer, Deserialize};
-use snafu::{ResultExt, Snafu};
-use stackable_operator::{
-    builder::ObjectMetaBuilder,
-    k8s_openapi::api::core::v1::Pod,
-    kvp::{Annotation, AnnotationError, Annotations},
-};
-use std::{
-    fs::Permissions,
-    os::unix::prelude::PermissionsExt,
-    path::{Path, PathBuf},
-};
-use sys_mount::{unmount, Mount, MountFlags, UnmountFlags};
-use tokio::{
-    fs::{create_dir_all, OpenOptions},
-    io::AsyncWriteExt,
-};
-use tonic::{Request, Response, Status};
 
 use super::controller::TOPOLOGY_NODE;
 

@@ -1,16 +1,18 @@
 //! Support code for runtime-configurable dynamic [`SecretBackend`]s
 
+use std::{collections::HashSet, fmt::Display};
+
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::kube::runtime::reflector::ObjectRef;
-use std::{collections::HashSet, fmt::Display};
+
+use crate::crd::{self, SecretClass};
 
 use super::{
     kerberos_keytab::{self, KerberosProfile},
     pod_info::{PodInfo, SchedulingPodInfo},
     tls, SecretBackend, SecretBackendError, SecretVolumeSelector,
 };
-use crate::crd::{self, SecretClass};
 
 #[derive(Debug)]
 pub struct DynError(Box<dyn SecretBackendError>);

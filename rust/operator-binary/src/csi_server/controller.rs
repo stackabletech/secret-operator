@@ -1,5 +1,14 @@
 use std::collections::BTreeMap;
 
+use serde::{de::IntoDeserializer, Deserialize};
+use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::{
+    k8s_openapi::api::core::v1::{PersistentVolumeClaim, Pod},
+    kube::runtime::reflector::ObjectRef,
+};
+use tonic::{Request, Response, Status};
+use uuid::Uuid;
+
 use crate::{
     backend::{
         self,
@@ -16,14 +25,6 @@ use crate::{
     },
     utils::error_full_message,
 };
-use serde::{de::IntoDeserializer, Deserialize};
-use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::{
-    k8s_openapi::api::core::v1::{PersistentVolumeClaim, Pod},
-    kube::runtime::reflector::ObjectRef,
-};
-use tonic::{Request, Response, Status};
-use uuid::Uuid;
 
 pub const TOPOLOGY_NODE: &str = "secrets.stackable.tech/node";
 

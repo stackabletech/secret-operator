@@ -1,7 +1,8 @@
-use super::{convert, ConvertError, SecretFiles};
 use serde::Deserialize;
 use snafu::{OptionExt, Snafu};
 use strum::EnumDiscriminants;
+
+use super::{convert, ConvertError, SecretFiles};
 
 const FILE_PEM_CERT_CERT: &str = "tls.crt";
 const FILE_PEM_CERT_KEY: &str = "tls.key";
