@@ -24,6 +24,7 @@ rules:
       - list
       - watch
       - create
+      - patch
       - delete
   - apiGroups:
       - ""
@@ -50,6 +51,12 @@ rules:
     verbs:
       - get
       - patch
+  - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
   - apiGroups:
       - secrets.stackable.tech
     resources:
