@@ -10,7 +10,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::Pod,
-    kvp::{Annotation, AnnotationError, Annotations},
+    kvp::{AnnotationError, Annotations},
 };
 use sys_mount::{unmount, Mount, MountFlags, UnmountFlags};
 use tokio::{
@@ -266,16 +266,15 @@ impl SecretProvisionerNode {
         let mut annotations = Annotations::new();
 
         if let Some(expires_after) = data.expires_after {
-            annotations.insert(
-                Annotation::try_from((
+            annotations
+                .parse_insert((
                     format!(
                         "restarter.stackable.tech/expires-at.{:x}",
                         FmtByteSlice(volume_tag)
                     ),
                     expires_after.to_rfc3339(),
                 ))
-                .context(publish_error::BuildAnnotationSnafu)?,
-            );
+                .context(publish_error::BuildAnnotationSnafu)?;
         }
 
         if !annotations.is_empty() {

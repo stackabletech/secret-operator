@@ -9,7 +9,7 @@ use stackable_operator::{
         api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector, ByteString,
     },
     kube::api::ListParams,
-    kvp::{Label, LabelError, LabelSelectorExt, Labels},
+    kvp::{LabelError, LabelSelectorExt, Labels},
 };
 
 use crate::{crd::SearchNamespace, format::SecretData};
@@ -152,10 +152,9 @@ fn build_label_selector_query(
         // k8sSearch doesn't take the scope's resolved addresses into account, so we need to check whether
         // Listener scopes also imply Node
         if pod_info.scheduling.has_node_scope {
-            labels.insert(
-                Label::try_from((LABEL_SCOPE_NODE.to_string(), pod_info.node_name.clone()))
-                    .context(BuildLabelSnafu)?,
-            );
+            labels
+                .parse_insert((LABEL_SCOPE_NODE.to_string(), pod_info.node_name.clone()))
+                .context(BuildLabelSnafu)?;
         }
     }
     let scheduling_pod_info = match pod_info {
@@ -168,20 +167,18 @@ fn build_label_selector_query(
                 // already checked `pod_info.has_node_scope`, which also takes node listeners into account
             }
             SecretScope::Pod => {
-                labels.insert(
-                    Label::try_from((LABEL_SCOPE_POD.to_string(), vol_selector.pod.clone()))
-                        .context(BuildLabelSnafu)?,
-                );
+                labels
+                    .parse_insert((LABEL_SCOPE_POD.to_string(), vol_selector.pod.clone()))
+                    .context(BuildLabelSnafu)?;
             }
             SecretScope::Service { name } => {
-                labels.insert(
-                    Label::try_from((LABEL_SCOPE_SERVICE.to_string(), name.clone()))
-                        .context(BuildLabelSnafu)?,
-                );
+                labels
+                    .parse_insert((LABEL_SCOPE_SERVICE.to_string(), name.clone()))
+                    .context(BuildLabelSnafu)?;
             }
             SecretScope::ListenerVolume { name } => {
-                labels.insert(
-                    Label::try_from((
+                labels
+                    .parse_insert((
                         format!("{LABEL_SCOPE_LISTENER}.{listener_i}"),
                         scheduling_pod_info
                             .volume_listener_names
@@ -191,8 +188,7 @@ fn build_label_selector_query(
                             })?
                             .clone(),
                     ))
-                    .context(BuildLabelSnafu)?,
-                );
+                    .context(BuildLabelSnafu)?;
                 listener_i += 1;
             }
         }
