@@ -16,25 +16,34 @@ use crate::{
 pub enum Error {
     #[snafu(display("LDAP TLS CA reference is invalid"))]
     LdapTlsCaReferenceInvalid { source: IncompleteSecretRef },
+
     #[snafu(display("failed to retrieve LDAP TLS CA {ca_ref}"))]
     GetLdapTlsCa {
         source: stackable_operator::error::Error,
         ca_ref: FullSecretRef,
     },
+
     #[snafu(display("LDAP TLS CA secret is missing required key {key}"))]
     LdapTlsCaKeyMissing { key: String },
+
     #[snafu(display("failed to parse LDAP TLS CA"))]
     ParseLdapTlsCa { source: native_tls::Error },
+
     #[snafu(display("password cache reference is invalid"))]
     PasswordCacheReferenceInvalid { source: IncompleteSecretRef },
+
     #[snafu(display("password cache error"))]
     PasswordCache { source: credential_cache::Error },
+
     #[snafu(display("failed to configure LDAP TLS"))]
     ConfigureLdapTls { source: native_tls::Error },
+
     #[snafu(display("failed to connect to LDAP server"))]
     ConnectLdap { source: ldap3::LdapError },
+
     #[snafu(display("failed to authenticate to LDAP server"))]
     LdapAuthn { source: ldap3::LdapError },
+
     #[snafu(display("failed to init Kubernetes client"))]
     KubeInit {
         source: stackable_operator::error::Error,
@@ -42,18 +51,22 @@ pub enum Error {
 
     #[snafu(display("failed to unparse Kerberos principal"))]
     UnparsePrincipal { source: krb5::Error },
+
     #[snafu(display("failed to get password cache {password_cache_ref}"))]
     GetPasswordCache {
         source: stackable_operator::error::Error,
         password_cache_ref: FullSecretRef,
     },
+
     #[snafu(display("failed to update password cache {password_cache_ref}"))]
     UpdatePasswordCache {
         source: stackable_operator::error::Error,
         password_cache_ref: FullSecretRef,
     },
+
     #[snafu(display("failed to create LDAP user"))]
     CreateLdapUser { source: ldap3::LdapError },
+
     #[snafu(display(
         "LDAP user already exists, either delete it manually or add it to the password cache ({password_cache_ref})"
     ))]
@@ -61,8 +74,10 @@ pub enum Error {
         source: ldap3::LdapError,
         password_cache_ref: FullSecretRef,
     },
+
     #[snafu(display("failed to decode generated password"))]
     DecodePassword { source: NulError },
+
     #[snafu(display("failed to add key to keytab"))]
     AddToKeytab { source: krb5::Error },
 }

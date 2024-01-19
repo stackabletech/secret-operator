@@ -11,12 +11,14 @@ pub enum Error {
         source: stackable_operator::error::Error,
         cache_ref: FullSecretRef,
     },
+
     #[snafu(display("failed to save credential {key} to {cache_ref}"))]
     SaveToCache {
         source: stackable_operator::error::Error,
         key: String,
         cache_ref: FullSecretRef,
     },
+
     #[snafu(display("newly saved credential {key} was not found in {cache_ref}"))]
     SavedKeyNotFound {
         key: String,

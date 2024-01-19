@@ -29,44 +29,55 @@ pub enum FromPodError {
         source: std::net::AddrParseError,
         address: String,
     },
+
     #[snafu(display("pod has not yet been scheduled to a node"))]
     NoNode,
+
     #[snafu(display("pod has no namespace"))]
     NoNamespace,
+
     #[snafu(display("pod has no name"))]
     NoPodName,
+
     #[snafu(display("pod has no uid"))]
     NoPodUid,
+
     #[snafu(display("failed to get {node}"))]
     GetNode {
         source: stackable_operator::error::Error,
         node: ObjectRef<Node>,
     },
+
     #[snafu(display("pod has no listener volume {listener_volume}"))]
     GetListenerVolume { listener_volume: String },
+
     #[snafu(display("failed to get listener PVC {listener_pvc} for volume {listener_volume}"))]
     GetListenerPvc {
         source: stackable_operator::error::Error,
         listener_volume: String,
         listener_pvc: ObjectRef<PersistentVolumeClaim>,
     },
+
     #[snafu(display("failed to get {listener} for volume {listener_volume}"))]
     GetListener {
         source: stackable_operator::error::Error,
         listener_volume: String,
         listener: ObjectRef<Listener>,
     },
+
     #[snafu(display("failed to get {listener_class} for volume {listener_volume}"))]
     GetListenerClass {
         source: stackable_operator::error::Error,
         listener_volume: String,
         listener_class: ObjectRef<ListenerClass>,
     },
+
     #[snafu(display("{listener} has no class for volume {listener_volume}"))]
     ListenerHasNoClass {
         listener_volume: String,
         listener: ObjectRef<Listener>,
     },
+
     #[snafu(display(
         "{listener_pvc} has no listener or listener class for volume {listener_volume}"
     ))]
@@ -74,12 +85,14 @@ pub enum FromPodError {
         listener_volume: String,
         listener_pvc: ObjectRef<PersistentVolumeClaim>,
     },
+
     #[snafu(display("failed to get {pod_listeners} for {pod}"))]
     GetPodListeners {
         source: stackable_operator::error::Error,
         pod_listeners: ObjectRef<PodListeners>,
         pod: ObjectRef<Pod>,
     },
+
     #[snafu(display("{pod_listeners} has no addresses for listener {listener} yet"))]
     NoPodListenerAddresses {
         pod_listeners: ObjectRef<PodListeners>,

@@ -1,5 +1,14 @@
 use std::collections::BTreeMap;
 
+use serde::{de::IntoDeserializer, Deserialize};
+use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::{
+    k8s_openapi::api::core::v1::{PersistentVolumeClaim, Pod},
+    kube::runtime::reflector::ObjectRef,
+};
+use tonic::{Request, Response, Status};
+use uuid::Uuid;
+
 use crate::{
     backend::{
         self,
@@ -16,14 +25,6 @@ use crate::{
     },
     utils::error_full_message,
 };
-use serde::{de::IntoDeserializer, Deserialize};
-use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::{
-    k8s_openapi::api::core::v1::{PersistentVolumeClaim, Pod},
-    kube::runtime::reflector::ObjectRef,
-};
-use tonic::{Request, Response, Status};
-use uuid::Uuid;
 
 pub const TOPOLOGY_NODE: &str = "secrets.stackable.tech/node";
 
@@ -32,32 +33,40 @@ pub const TOPOLOGY_NODE: &str = "secrets.stackable.tech/node";
 enum CreateVolumeError {
     #[snafu(display("failed to parse CreateVolume parameters"))]
     InvalidParams { source: serde::de::value::Error },
+
     #[snafu(display("failed to load {pvc}"))]
     FindPvc {
         source: stackable_operator::error::Error,
         pvc: ObjectRef<PersistentVolumeClaim>,
     },
+
     #[snafu(display("failed to resolve owning Pod of {pvc}"))]
     ResolveOwnerPod {
         pvc: ObjectRef<PersistentVolumeClaim>,
     },
+
     #[snafu(display("failed to get pod for volume"))]
     GetPod {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to parse pod details"))]
     ParsePod { source: pod_info::FromPodError },
+
     #[snafu(display("failed to parse secret selector from annotations of {pvc}"))]
     InvalidSecretSelector {
         source: serde::de::value::Error,
         pvc: ObjectRef<PersistentVolumeClaim>,
     },
+
     #[snafu(display("failed to initialize backend"))]
     InitBackend {
         source: backend::dynamic::FromSelectorError,
     },
+
     #[snafu(display("failed to find nodes matching scopes"))]
     FindNodes { source: backend::dynamic::DynError },
+
     #[snafu(display("no nodes match scopes"))]
     NoMatchingNode,
 }

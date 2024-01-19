@@ -9,6 +9,7 @@ use stackable_operator::{
         api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector, ByteString,
     },
     kube::api::ListParams,
+    kvp::{LabelError, LabelSelectorExt, Labels},
 };
 
 use crate::{crd::SearchNamespace, format::SecretData};
@@ -31,14 +32,20 @@ pub enum Error {
     SecretSelector {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to query for secrets"))]
     SecretQuery {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("no Secrets matched label selector {label_selector:?}"))]
     NoSecret { label_selector: String },
+
     #[snafu(display("failed to find Listener name for volume {listener_volume}"))]
     NoListener { listener_volume: String },
+
+    #[snafu(display("failed to build label"))]
+    BuildLabel { source: LabelError },
 }
 
 impl SecretBackendError for Error {
@@ -48,6 +55,7 @@ impl SecretBackendError for Error {
             Error::SecretQuery { .. } => tonic::Code::FailedPrecondition,
             Error::NoSecret { .. } => tonic::Code::FailedPrecondition,
             Error::NoListener { .. } => tonic::Code::FailedPrecondition,
+            Error::BuildLabel { .. } => tonic::Code::FailedPrecondition,
         }
     }
 }
@@ -133,8 +141,10 @@ fn build_label_selector_query(
     vol_selector: &SecretVolumeSelector,
     pod_info: LabelSelectorPodInfo,
 ) -> Result<String, Error> {
-    let mut label_selector =
-        BTreeMap::from([(LABEL_CLASS.to_string(), vol_selector.class.to_string())]);
+    let mut labels: Labels =
+        BTreeMap::from([(LABEL_CLASS.to_string(), vol_selector.class.to_string())])
+            .try_into()
+            .context(BuildLabelSnafu)?;
     let mut listener_i = 0;
     // Only include node selector once we are scheduled,
     // until then we use the query to decide where scheduling should be possible!
@@ -142,7 +152,9 @@ fn build_label_selector_query(
         // k8sSearch doesn't take the scope's resolved addresses into account, so we need to check whether
         // Listener scopes also imply Node
         if pod_info.scheduling.has_node_scope {
-            label_selector.insert(LABEL_SCOPE_NODE.to_string(), pod_info.node_name.clone());
+            labels
+                .parse_insert((LABEL_SCOPE_NODE.to_string(), pod_info.node_name.clone()))
+                .context(BuildLabelSnafu)?;
         }
     }
     let scheduling_pod_info = match pod_info {
@@ -155,29 +167,38 @@ fn build_label_selector_query(
                 // already checked `pod_info.has_node_scope`, which also takes node listeners into account
             }
             SecretScope::Pod => {
-                label_selector.insert(LABEL_SCOPE_POD.to_string(), vol_selector.pod.clone());
+                labels
+                    .parse_insert((LABEL_SCOPE_POD.to_string(), vol_selector.pod.clone()))
+                    .context(BuildLabelSnafu)?;
             }
             SecretScope::Service { name } => {
-                label_selector.insert(LABEL_SCOPE_SERVICE.to_string(), name.clone());
+                labels
+                    .parse_insert((LABEL_SCOPE_SERVICE.to_string(), name.clone()))
+                    .context(BuildLabelSnafu)?;
             }
             SecretScope::ListenerVolume { name } => {
-                label_selector.insert(
-                    format!("{LABEL_SCOPE_LISTENER}.{listener_i}"),
-                    scheduling_pod_info
-                        .volume_listener_names
-                        .get(name)
-                        .context(NoListenerSnafu {
-                            listener_volume: name,
-                        })?
-                        .clone(),
-                );
+                labels
+                    .parse_insert((
+                        format!("{LABEL_SCOPE_LISTENER}.{listener_i}"),
+                        scheduling_pod_info
+                            .volume_listener_names
+                            .get(name)
+                            .context(NoListenerSnafu {
+                                listener_volume: name,
+                            })?
+                            .clone(),
+                    ))
+                    .context(BuildLabelSnafu)?;
                 listener_i += 1;
             }
         }
     }
-    stackable_operator::label_selector::convert_label_selector_to_query_string(&LabelSelector {
+    let label_selector = LabelSelector {
         match_expressions: None,
-        match_labels: Some(label_selector),
-    })
-    .context(SecretSelectorSnafu)
+        match_labels: Some(labels.into()),
+    };
+
+    label_selector
+        .to_query_string()
+        .context(SecretSelectorSnafu)
 }

@@ -47,6 +47,7 @@ impl SecretData {
 pub enum IntoFilesError {
     #[snafu(display("failed to parse secret data"), context(false))]
     Parse { source: ParseError },
+
     #[snafu(
         display("failed to convert secret data into desired format"),
         context(false)

@@ -1,3 +1,24 @@
+use std::{
+    fs::Permissions,
+    os::unix::prelude::PermissionsExt,
+    path::{Path, PathBuf},
+};
+
+use openssl::sha::Sha256;
+use serde::{de::IntoDeserializer, Deserialize};
+use snafu::{ResultExt, Snafu};
+use stackable_operator::{
+    builder::ObjectMetaBuilder,
+    k8s_openapi::api::core::v1::Pod,
+    kvp::{AnnotationError, Annotations},
+};
+use sys_mount::{unmount, Mount, MountFlags, UnmountFlags};
+use tokio::{
+    fs::{create_dir_all, OpenOptions},
+    io::AsyncWriteExt,
+};
+use tonic::{Request, Response, Status};
+
 use crate::{
     backend::{
         self, pod_info, pod_info::PodInfo, SecretBackendError, SecretContents, SecretVolumeSelector,
@@ -13,22 +34,6 @@ use crate::{
     },
     utils::{error_full_message, FmtByteSlice},
 };
-use openssl::sha::Sha256;
-use serde::{de::IntoDeserializer, Deserialize};
-use snafu::{ResultExt, Snafu};
-use stackable_operator::{builder::ObjectMetaBuilder, k8s_openapi::api::core::v1::Pod};
-use std::{
-    collections::BTreeMap,
-    fs::Permissions,
-    os::unix::prelude::PermissionsExt,
-    path::{Path, PathBuf},
-};
-use sys_mount::{unmount, Mount, MountFlags, UnmountFlags};
-use tokio::{
-    fs::{create_dir_all, OpenOptions},
-    io::AsyncWriteExt,
-};
-use tonic::{Request, Response, Status};
 
 use super::controller::TOPOLOGY_NODE;
 
@@ -37,49 +42,63 @@ use super::controller::TOPOLOGY_NODE;
 enum PublishError {
     #[snafu(display("failed to parse selector from volume context"))]
     InvalidSelector { source: serde::de::value::Error },
+
     #[snafu(display("failed to get pod for volume"))]
     GetPod {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to parse pod details"))]
     ParsePod { source: pod_info::FromPodError },
+
     #[snafu(display("failed to initialize backend"))]
     InitBackend {
         source: backend::dynamic::FromSelectorError,
     },
+
     #[snafu(display("backend failed to get secret data"))]
     BackendGetSecretData { source: backend::dynamic::DynError },
+
     #[snafu(display("failed to create secret parent dir {}", path.display()))]
     CreateDir {
         source: std::io::Error,
         path: PathBuf,
     },
+
     #[snafu(display("failed to mount volume mount directory {}", path.display()))]
     Mount {
         source: std::io::Error,
         path: PathBuf,
     },
+
     #[snafu(display("failed to convert secret data into desired format"))]
     FormatData { source: format::IntoFilesError },
+
     #[snafu(display("failed to set volume permissions for {}", path.display()))]
     SetDirPermissions {
         source: std::io::Error,
         path: PathBuf,
     },
+
     #[snafu(display("failed to create secret file {}", path.display()))]
     CreateFile {
         source: std::io::Error,
         path: PathBuf,
     },
+
     #[snafu(display("failed to write secret file {}", path.display()))]
     WriteFile {
         source: std::io::Error,
         path: PathBuf,
     },
+
     #[snafu(display("failed to tag pod with expiry metadata"))]
     TagPod {
         source: stackable_operator::error::Error,
     },
+
+    #[snafu(display("failed to build annotation"))]
+    BuildAnnotation { source: AnnotationError },
 }
 
 // Useful since all service calls return a [Result<tonic::Response<T>, tonic::Status>]
@@ -102,6 +121,7 @@ impl From<PublishError> for Status {
             PublishError::CreateFile { .. } => Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
+            PublishError::BuildAnnotation { .. } => Status::unavailable(full_msg),
         }
     }
 }
@@ -114,6 +134,7 @@ enum UnpublishError {
         source: std::io::Error,
         path: PathBuf,
     },
+
     #[snafu(display("failed to delete volume mount directory {}", path.display()))]
     Delete {
         source: std::io::Error,
@@ -242,16 +263,18 @@ impl SecretProvisionerNode {
         // however, we mostly just care about preventing accidental hashes here, for which plain byte truncation should be "good enough".
         let volume_tag = &volume_tag[..16];
 
-        let mut annotations = BTreeMap::default();
+        let mut annotations = Annotations::new();
 
         if let Some(expires_after) = data.expires_after {
-            annotations.insert(
-                format!(
-                    "restarter.stackable.tech/expires-at.{:x}",
-                    FmtByteSlice(volume_tag)
-                ),
-                expires_after.to_rfc3339(),
-            );
+            annotations
+                .parse_insert((
+                    format!(
+                        "restarter.stackable.tech/expires-at.{:x}",
+                        FmtByteSlice(volume_tag)
+                    ),
+                    expires_after.to_rfc3339(),
+                ))
+                .context(publish_error::BuildAnnotationSnafu)?;
         }
 
         if !annotations.is_empty() {
