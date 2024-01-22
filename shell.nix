@@ -1,11 +1,7 @@
-let 
-  pkgs = import <nixpkgs> {};
-  beku = pkgs.callPackage(pkgs.fetchFromGitHub {
-    owner = "stackabletech";
-    repo = "beku.py";
-    rev = "589e48ae45c5984d8f1528e1c0b802e9fa137715";
-    hash = "sha256-hLaIY4BE+VIMeKmS3JLOZy87OC2VuQtbX/NCIbQr2p4=";
-  } + "/beku.nix") {};
+let
+  sources = import ./nix/sources.nix;
+  pkgs = import sources.nixpkgs {};
+  beku = pkgs.callPackage (sources."beku.py" + "/beku.nix") {};
 in pkgs.mkShell rec {
   name = "secret-operator";
   buildInputs = with pkgs; [
@@ -43,4 +39,4 @@ in pkgs.mkShell rec {
   ];
 
   LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
- }
+}
