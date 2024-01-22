@@ -29,6 +29,7 @@ in pkgs.mkShell rec {
     kuttl
     beku
 
+    # specific to this operator
     pkg-config
     clang
     libclang
