@@ -29,7 +29,10 @@ use stackable_operator::{
 };
 use time::OffsetDateTime;
 
-use crate::format::{well_known, SecretData, WellKnownSecretData};
+use crate::{
+    format::{well_known, SecretData, WellKnownSecretData},
+    utils::iterator_try_concat_bytes,
+};
 
 use super::{
     pod_info::{Address, PodInfo},
@@ -71,6 +74,9 @@ pub enum Error {
     #[snafu(display("failed to load CA"))]
     LoadCa { source: ca::Error },
 
+    #[snafu(display("failed to pick a CA"))]
+    PickCa { source: ca::GetCaError },
+
     #[snafu(display("failed to build certificate"))]
     BuildCertificate { source: openssl::error::ErrorStack },
 
@@ -103,6 +109,7 @@ impl SecretBackendError for Error {
             Error::ScopeAddresses { .. } => tonic::Code::Unavailable,
             Error::GenerateKey { .. } => tonic::Code::Internal,
             Error::LoadCa { source } => source.grpc_code(),
+            Error::PickCa { source } => source.grpc_code(),
             Error::BuildCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::InvalidCertLifetime { .. } => tonic::Code::Internal,
@@ -130,9 +137,14 @@ impl TlsGenerate {
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
         Ok(Self {
-            ca_manager: ca::Manager::load_or_create(client, secret_ref, auto_generate_if_missing)
-                .await
-                .context(LoadCaSnafu)?,
+            ca_manager: ca::Manager::load_or_create(
+                client,
+                secret_ref,
+                auto_generate_if_missing,
+                Some(Duration::from_days_unchecked(400)),
+            )
+            .await
+            .context(LoadCaSnafu)?,
             max_cert_lifetime,
         })
     }
@@ -181,7 +193,7 @@ impl SecretBackend for TlsGenerate {
                     .context(ScopeAddressesSnafu { scope })?,
             );
         }
-        let ca = self.ca_manager.get_ca();
+        let ca = self.ca_manager.get_ca(not_after).context(PickCaSnafu)?;
         let pod_cert = X509Builder::new()
             .and_then(|mut x509| {
                 let subject_name = X509NameBuilder::new()
@@ -242,10 +254,13 @@ impl SecretBackend for TlsGenerate {
         Ok(
             SecretContents::new(SecretData::WellKnown(WellKnownSecretData::TlsPem(
                 well_known::TlsPem {
-                    ca_pem: ca
-                        .ca_cert
-                        .to_pem()
-                        .context(SerializeCertificateSnafu { tpe: CertType::Ca })?,
+                    ca_pem: iterator_try_concat_bytes(self.ca_manager.all_cas().into_iter().map(
+                        |ca| {
+                            ca.ca_cert
+                                .to_pem()
+                                .context(SerializeCertificateSnafu { tpe: CertType::Ca })
+                        },
+                    ))?,
                     certificate_pem: pod_cert
                         .to_pem()
                         .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,

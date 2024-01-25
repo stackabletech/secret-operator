@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use openssl::{
-    asn1::{Asn1Integer, Asn1Time},
+    asn1::{Asn1Integer, Asn1Time, Asn1TimeRef, TimeDiff},
     bn::{BigNum, MsbOption},
     conf::{Conf, ConfMethod},
     hash::MessageDigest,
@@ -30,11 +30,14 @@ use stackable_operator::{
     time::Duration,
 };
 use time::OffsetDateTime;
+use tracing::{info, warn};
 
 use crate::backend::SecretBackendError;
 
-const SECRET_KEY_CERT: &str = "ca.crt";
-const SECRET_KEY_KEY: &str = "ca.key";
+const SECRET_KEY_LEGACY_CERT: &str = "ca.crt";
+const SECRET_KEY_LEGACY_KEY: &str = "ca.key";
+const SECRET_KEY_CERT_SUFFIX: &str = ".ca.crt";
+const SECRET_KEY_KEY_SUFFIX: &str = ".ca.key";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -60,6 +63,13 @@ pub enum Error {
         secret: ObjectRef<Secret>,
     },
 
+    #[snafu(display("failed to parse CA lifetime from key {key:?} of {secret}"))]
+    ParseLifetime {
+        source: Asn1TimeParseError,
+        key: String,
+        secret: ObjectRef<Secret>,
+    },
+
     #[snafu(display("invalid secret reference: {secret:?}"))]
     InvalidSecretRef { secret: SecretReference },
 
@@ -74,6 +84,9 @@ pub enum Error {
         source: entry::CommitError,
         secret: ObjectRef<Secret>,
     },
+
+    #[snafu(display("CA save was requested but automatic management is disabled"))]
+    SaveRequestedButForbidden,
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -85,10 +98,27 @@ impl SecretBackendError for Error {
             Error::FindCa { .. } => tonic::Code::Unavailable,
             Error::CaNotFoundAndGenDisabled { .. } => tonic::Code::FailedPrecondition,
             Error::LoadCertificate { .. } => tonic::Code::FailedPrecondition,
+            Error::ParseLifetime { .. } => tonic::Code::FailedPrecondition,
             Error::InvalidSecretRef { .. } => tonic::Code::FailedPrecondition,
             Error::BuildCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SaveCaCertificate { .. } => tonic::Code::Unavailable,
+            Error::SaveRequestedButForbidden { .. } => tonic::Code::FailedPrecondition,
+        }
+    }
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(module)]
+pub enum GetCaError {
+    #[snafu(display("No CA will live until at least {cutoff}"))]
+    NoCaLivesLongEnough { cutoff: OffsetDateTime },
+}
+
+impl SecretBackendError for GetCaError {
+    fn grpc_code(&self) -> tonic::Code {
+        match self {
+            GetCaError::NoCaLivesLongEnough { .. } => tonic::Code::FailedPrecondition,
         }
     }
 }
@@ -96,6 +126,7 @@ impl SecretBackendError for Error {
 pub struct CertificateAuthority {
     pub ca_cert: X509,
     pub ca_key: PKey<Private>,
+    not_after: OffsetDateTime,
 }
 
 impl CertificateAuthority {
@@ -150,7 +181,11 @@ impl CertificateAuthority {
             })
             .context(BuildCertificateSnafu)?
             .build();
-        Ok(Self { ca_key, ca_cert })
+        Ok(Self {
+            ca_key,
+            ca_cert,
+            not_after,
+        })
     }
 
     fn from_secret(
@@ -159,33 +194,41 @@ impl CertificateAuthority {
         key_key: &str,
         cert_key: &str,
     ) -> Result<Self> {
+        let ca_cert = X509::from_pem(
+            &secret_data
+                .get(cert_key)
+                .context(MissingCaCertificateSnafu)?
+                .0,
+        )
+        .with_context(|_| LoadCertificateSnafu {
+            key: cert_key,
+            secret: secret_ref(),
+        })?;
+        let ca_key = PKey::private_key_from_pem(
+            &secret_data
+                .get(key_key)
+                .context(MissingCaCertificateSnafu)?
+                .0,
+        )
+        .with_context(|_| LoadCertificateSnafu {
+            key: key_key,
+            secret: secret_ref(),
+        })?;
         Ok(CertificateAuthority {
-            ca_key: PKey::private_key_from_pem(
-                &secret_data
-                    .get(key_key)
-                    .context(MissingCaCertificateSnafu)?
-                    .0,
-            )
-            .with_context(|_| LoadCertificateSnafu {
-                key: key_key,
-                secret: secret_ref(),
+            not_after: asn1time_to_offsetdatetime(ca_cert.not_after()).with_context(|_| {
+                ParseLifetimeSnafu {
+                    key: cert_key,
+                    secret: secret_ref(),
+                }
             })?,
-            ca_cert: X509::from_pem(
-                &secret_data
-                    .get(cert_key)
-                    .context(MissingCaCertificateSnafu)?
-                    .0,
-            )
-            .with_context(|_| LoadCertificateSnafu {
-                key: cert_key,
-                secret: secret_ref(),
-            })?,
+            ca_cert,
+            ca_key,
         })
     }
 }
 
 pub struct Manager {
-    ca: CertificateAuthority,
+    cas: Vec<CertificateAuthority>,
 }
 
 impl Manager {
@@ -193,6 +236,7 @@ impl Manager {
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
         auto_generate_if_missing: bool,
+        rotate_ca_if_expiring_before: Option<Duration>,
     ) -> Result<Self> {
         let (k8s_secret_name, k8s_ns) = match secret_ref {
             SecretReference {
@@ -209,49 +253,60 @@ impl Manager {
         let secret_ref = || ObjectRef::<Secret>::new(k8s_secret_name).within(k8s_ns);
         // Use entry API rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
         let secrets_api = &client.get_api::<Secret>(k8s_ns);
-        let existing_secret =
-            secrets_api
-                .entry(k8s_secret_name)
-                .await
-                .with_context(|_| FindCaSnafu {
-                    secret: secret_ref(),
-                })?;
-        let ca;
-        let mut ca_secret = match existing_secret {
+        let ca_secret = secrets_api
+            .entry(k8s_secret_name)
+            .await
+            .with_context(|_| FindCaSnafu {
+                secret: secret_ref(),
+            })?;
+        let mut update_ca_secret = false;
+        let mut cas = match &ca_secret {
             Entry::Occupied(ca_secret) => {
                 // Existing CA has been found, load and use this
                 let empty = BTreeMap::new();
                 let ca_data = ca_secret.get().data.as_ref().unwrap_or(&empty);
-                ca = CertificateAuthority::from_secret(
-                    ca_data,
-                    secret_ref,
-                    SECRET_KEY_KEY,
-                    SECRET_KEY_CERT,
-                )?;
-                ca_secret
+                if ca_data.contains_key(SECRET_KEY_LEGACY_CERT) {
+                    if auto_generate_if_missing {
+                        update_ca_secret = true;
+                        info!(
+                            secret = %secret_ref(),
+                            "Migrating CA secret from legacy naming scheme"
+                        );
+                    } else {
+                        warn!(
+                            secret = %secret_ref(),
+                            "CA secret uses legacy certificate naming ({SECRET_KEY_LEGACY_CERT}), please rename to 0{SECRET_KEY_CERT_SUFFIX}"
+                        );
+                    }
+                    vec![CertificateAuthority::from_secret(
+                        ca_data,
+                        secret_ref,
+                        SECRET_KEY_LEGACY_KEY,
+                        SECRET_KEY_LEGACY_CERT,
+                    )?]
+                } else {
+                    ca_data
+                        .keys()
+                        .filter_map(|cert_key| {
+                            Some(CertificateAuthority::from_secret(
+                                ca_data,
+                                secret_ref,
+                                &cert_key.contains(SECRET_KEY_CERT_SUFFIX).then(|| {
+                                    cert_key.replace(SECRET_KEY_CERT_SUFFIX, SECRET_KEY_KEY_SUFFIX)
+                                })?,
+                                cert_key,
+                            ))
+                        })
+                        .collect::<Result<_>>()?
+                }
             }
-            Entry::Vacant(ca_secret) if auto_generate_if_missing => {
-                ca = CertificateAuthority::new_self_signed()?;
-                ca_secret.insert(Secret {
-                    data: Some(
-                        [
-                            (
-                                SECRET_KEY_KEY.to_string(),
-                                ByteString(
-                                    ca.ca_key
-                                        .private_key_to_pem_pkcs8()
-                                        .context(SerializeCertificateSnafu)?,
-                                ),
-                            ),
-                            (
-                                SECRET_KEY_CERT.to_string(),
-                                ByteString(ca.ca_cert.to_pem().context(SerializeCertificateSnafu)?),
-                            ),
-                        ]
-                        .into(),
-                    ),
-                    ..Secret::default()
-                })
+            Entry::Vacant(_) if auto_generate_if_missing => {
+                update_ca_secret = true;
+                info!(
+                    secret = %secret_ref(),
+                    "Provisioning a new CA certificate, because it could not be found"
+                );
+                vec![CertificateAuthority::new_self_signed()?]
             }
             Entry::Vacant(_) => {
                 return CaNotFoundAndGenDisabledSnafu {
@@ -260,16 +315,113 @@ impl Manager {
                 .fail();
             }
         };
-        ca_secret
-            .commit(&PostParams::default())
-            .await
-            .context(SaveCaCertificateSnafu {
-                secret: ObjectRef::new(k8s_secret_name).within(k8s_ns),
-            })?;
-        Ok(Self { ca })
+        let newest_ca = cas.iter().map(|ca| ca.not_after).max();
+        if let (Some(cutoff_duration), Some(newest_ca)) = (rotate_ca_if_expiring_before, newest_ca)
+        {
+            let cutoff = OffsetDateTime::now_utc() + cutoff_duration;
+            if newest_ca < cutoff {
+                if auto_generate_if_missing {
+                    update_ca_secret = true;
+                    info!(
+                        secret = %secret_ref(),
+                        %cutoff,
+                        cutoff.duration = %cutoff_duration,
+                        ca_expires_at = %newest_ca,
+                        "Provisioning a new CA certificate, because the old one will soon expire"
+                    );
+                    cas.push(CertificateAuthority::new_self_signed()?);
+                } else {
+                    warn!(
+                        secret = %secret_ref(),
+                        %cutoff,
+                        cutoff.duration = %cutoff_duration,
+                        ca_expires_at = %newest_ca,
+                        "CA certificate will soon expire, please provision a new one to prepare for rotation"
+                    );
+                }
+            } else {
+                info!(
+                    secret = %secret_ref(),
+                    %cutoff,
+                    cutoff.duration = %cutoff_duration,
+                    ca_expires_at = %newest_ca,
+                    "CA is not close to expiring, will not initiate rotation"
+                );
+            }
+        }
+        if update_ca_secret {
+            if auto_generate_if_missing {
+                info!(secret = %secret_ref(), "CA has been modified, saving");
+                let mut ca_secret = ca_secret.or_insert(Secret::default);
+                ca_secret.get_mut().data = Some(
+                    cas.iter()
+                        .enumerate()
+                        .flat_map(|(i, ca)| {
+                            [
+                                ca.ca_key
+                                    .private_key_to_pem_pkcs8()
+                                    .context(SerializeCertificateSnafu)
+                                    .map(|key| {
+                                        (format!("{i}{SECRET_KEY_KEY_SUFFIX}"), ByteString(key))
+                                    }),
+                                ca.ca_cert.to_pem().context(SerializeCertificateSnafu).map(
+                                    |cert| {
+                                        (format!("{i}{SECRET_KEY_CERT_SUFFIX}"), ByteString(cert))
+                                    },
+                                ),
+                            ]
+                        })
+                        .collect::<Result<_>>()?,
+                );
+                ca_secret
+                    .commit(&PostParams::default())
+                    .await
+                    .context(SaveCaCertificateSnafu {
+                        secret: ObjectRef::new(k8s_secret_name).within(k8s_ns),
+                    })?;
+            } else {
+                return SaveRequestedButForbiddenSnafu.fail();
+            }
+        }
+        Ok(Self { cas })
     }
 
-    pub fn get_ca(&self) -> &CertificateAuthority {
-        &self.ca
+    pub fn get_ca(
+        &self,
+        valid_until_at_least: OffsetDateTime,
+    ) -> Result<&CertificateAuthority, GetCaError> {
+        use get_ca_error::*;
+        self.cas
+            .iter()
+            .filter(|ca| ca.not_after > valid_until_at_least)
+            // pick the oldest valid CA, since it will be trusted by the most peers
+            .min_by_key(|ca| ca.not_after)
+            .context(NoCaLivesLongEnoughSnafu {
+                cutoff: valid_until_at_least,
+            })
     }
+
+    pub fn all_cas(&self) -> impl IntoIterator<Item = &CertificateAuthority> + '_ {
+        &self.cas
+    }
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(module)]
+pub enum Asn1TimeParseError {
+    #[snafu(display("unix epoch is not a valid Asn1Time"))]
+    Epoch { source: openssl::error::ErrorStack },
+    #[snafu(display("unable to diff Asn1Time"))]
+    Diff { source: openssl::error::ErrorStack },
+    #[snafu(display("unable to parse as OffsetDateTime"))]
+    Parse { source: time::error::ComponentRange },
+}
+
+fn asn1time_to_offsetdatetime(asn: &Asn1TimeRef) -> Result<OffsetDateTime, Asn1TimeParseError> {
+    use asn1_time_parse_error::*;
+    const SECS_PER_DAY: i64 = 60 * 60 * 24;
+    let epoch = Asn1Time::from_unix(0).context(EpochSnafu)?;
+    let TimeDiff { days, secs } = epoch.diff(asn).context(DiffSnafu)?;
+    OffsetDateTime::from_unix_timestamp(i64::from(days) * SECS_PER_DAY + i64::from(secs))
+        .context(ParseSnafu)
 }

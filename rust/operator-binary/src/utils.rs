@@ -124,6 +124,21 @@ pub async fn trystream_any<S: Stream<Item = Result<bool, E>>, E>(stream: S) -> R
     Ok(false)
 }
 
+/// Concatenate chunks of bytes, short-circuiting on [`Err`].
+///
+/// This is a byte-oriented equivalent to [`Iterator::collect::<Result<String, _>>`](`Iterator::collect`).
+pub fn iterator_try_concat_bytes<I1, I2, E>(iter: I1) -> Result<Vec<u8>, E>
+where
+    I1: Iterator<Item = Result<I2, E>>,
+    I2: IntoIterator<Item = u8>,
+{
+    let mut buffer = Vec::new();
+    for chunk in iter {
+        buffer.extend(chunk?)
+    }
+    Ok(buffer)
+}
+
 #[cfg(test)]
 mod tests {
     use futures::StreamExt;
