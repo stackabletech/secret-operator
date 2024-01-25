@@ -209,8 +209,8 @@ impl TlsGenerate {
     /// one is found the key is loaded and used for signing certs.
     /// If no current authority can be found, a new keypair and self signed certificate is created
     /// and stored for future use.
-    /// This allows users to provide their own CA files, but also enables using this for dev and test
-    /// scenarios where self signed, ephemeral CAs are ok to use.
+    /// This allows users to provide their own CA files, but also enables secret-operator to generate
+    /// an independent self-signed CA.
     pub async fn get_or_create_k8s_certificate(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
