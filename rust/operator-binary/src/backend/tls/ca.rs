@@ -407,6 +407,8 @@ impl Manager {
         if update_ca_secret {
             if config.manage_ca {
                 info!(secret = %secret_ref(), "CA has been modified, saving");
+                // Sort CAs by age to avoid spurious writes
+                certificate_authorities.sort_by_key(|ca| ca.not_after);
                 let mut ca_secret = ca_secret.or_insert(Secret::default);
                 ca_secret.get_mut().data = Some(
                     certificate_authorities
