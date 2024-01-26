@@ -157,7 +157,7 @@ pub struct Config {
     /// pods' truststores.
     ///
     /// Hence, this value _should_ be larger than the PKI's maximum certificate lifetime,
-    /// and smaller than [`ca_lifetime`].
+    /// and smaller than [`Self::ca_lifetime`].
     pub rotate_if_ca_expires_before: Option<Duration>,
 }
 
