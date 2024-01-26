@@ -196,7 +196,10 @@ impl SecretBackend for TlsGenerate {
                     .context(ScopeAddressesSnafu { scope })?,
             );
         }
-        let ca = self.ca_manager.find_certificate_authority_for_signing(not_after).context(PickCaSnafu)?;
+        let ca = self
+            .ca_manager
+            .find_certificate_authority_for_signing(not_after)
+            .context(PickCaSnafu)?;
         let pod_cert = X509Builder::new()
             .and_then(|mut x509| {
                 let subject_name = X509NameBuilder::new()
