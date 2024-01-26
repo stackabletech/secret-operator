@@ -45,7 +45,7 @@ spec:
                           properties:
                             autoGenerate:
                               default: false
-                              description: Whether a new certificate authority should be generated if it does not already exist.
+                              description: Whether the certificate authority should be managed by Secret Operator, including being generated if it does not already exist.
                               type: boolean
                             secret:
                               description: Reference (name and namespace) to a Kubernetes Secret object where the CA certificate and key is stored in the keys `ca.crt` and `ca.key` respectively.
