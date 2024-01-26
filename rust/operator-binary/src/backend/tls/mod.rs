@@ -196,7 +196,7 @@ impl SecretBackend for TlsGenerate {
                     .context(ScopeAddressesSnafu { scope })?,
             );
         }
-        let ca = self.ca_manager.get_ca(not_after).context(PickCaSnafu)?;
+        let ca = self.ca_manager.find_certificate_authority_for_signing(not_after).context(PickCaSnafu)?;
         let pod_cert = X509Builder::new()
             .and_then(|mut x509| {
                 let subject_name = X509NameBuilder::new()
@@ -206,7 +206,7 @@ impl SecretBackend for TlsGenerate {
                     })?
                     .build();
                 x509.set_subject_name(&subject_name)?;
-                x509.set_issuer_name(ca.ca_cert.issuer_name())?;
+                x509.set_issuer_name(ca.certificate.issuer_name())?;
                 x509.set_not_before(Asn1Time::from_unix(not_before.unix_timestamp())?.as_ref())?;
                 x509.set_not_after(Asn1Time::from_unix(not_after.unix_timestamp())?.as_ref())?;
                 x509.set_pubkey(&pod_key)?;
@@ -216,7 +216,7 @@ impl SecretBackend for TlsGenerate {
                 let mut serial = BigNum::new()?;
                 serial.rand(64, MsbOption::MAYBE_ZERO, false)?;
                 x509.set_serial_number(Asn1Integer::from_bn(&serial)?.as_ref())?;
-                let ctx = x509.x509v3_context(Some(&ca.ca_cert), Some(&conf));
+                let ctx = x509.x509v3_context(Some(&ca.certificate), Some(&conf));
                 let mut exts = vec![
                     BasicConstraints::new().critical().build()?,
                     KeyUsage::new()
@@ -249,7 +249,7 @@ impl SecretBackend for TlsGenerate {
                 for ext in exts {
                     x509.append_extension(ext)?;
                 }
-                x509.sign(&ca.ca_key, MessageDigest::sha256())?;
+                x509.sign(&ca.private_key, MessageDigest::sha256())?;
                 Ok(x509)
             })
             .context(BuildCertificateSnafu)?

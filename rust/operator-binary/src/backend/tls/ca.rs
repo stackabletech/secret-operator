@@ -39,10 +39,17 @@ use crate::{
     utils::{asn1time_to_offsetdatetime, Asn1TimeParseError},
 };
 
-const SECRET_KEY_LEGACY_CERT: &str = "ca.crt";
-const SECRET_KEY_LEGACY_KEY: &str = "ca.key";
-const SECRET_KEY_CERT_SUFFIX: &str = ".ca.crt";
-const SECRET_KEY_KEY_SUFFIX: &str = ".ca.key";
+/// v1 format: support a single cert/pkey pair
+mod secret_v1_keys {
+    pub const CERTIFICATE: &str = "ca.crt";
+    pub const PRIVATE_KEY: &str = "ca.key";
+}
+
+/// v2 format: support multiple cert/pkey pairs, prefixed by `{i}.`
+mod secret_v2_key_suffixes {
+    pub const CERTIFICATE: &str = ".ca.crt";
+    pub const PRIVATE_KEY: &str = ".ca.key";
+}
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -156,8 +163,8 @@ pub struct Config {
 
 /// A single certificate authority certificate.
 pub struct CertificateAuthority {
-    pub ca_cert: X509,
-    pub ca_key: PKey<Private>,
+    pub certificate: X509,
+    pub private_key: PKey<Private>,
     not_after: OffsetDateTime,
 }
 
@@ -175,16 +182,16 @@ impl CertificateAuthority {
         let not_before = now - Duration::from_minutes_unchecked(5);
         let not_after = now + config.ca_lifetime;
         let conf = Conf::new(ConfMethod::default()).unwrap();
-        let ca_key = Rsa::generate(2048)
+        let private_key = Rsa::generate(2048)
             .and_then(PKey::try_from)
             .context(GenerateKeySnafu)?;
-        let ca_cert = X509Builder::new()
+        let certificate = X509Builder::new()
             .and_then(|mut x509| {
                 x509.set_subject_name(&subject_name)?;
                 x509.set_issuer_name(&subject_name)?;
                 x509.set_not_before(Asn1Time::from_unix(not_before.unix_timestamp())?.as_ref())?;
                 x509.set_not_after(Asn1Time::from_unix(not_after.unix_timestamp())?.as_ref())?;
-                x509.set_pubkey(&ca_key)?;
+                x509.set_pubkey(&private_key)?;
                 let mut serial = BigNum::new()?;
                 serial.rand(64, MsbOption::MAYBE_ZERO, false)?;
                 x509.set_serial_number(Asn1Integer::from_bn(&serial)?.as_ref())?;
@@ -209,14 +216,14 @@ impl CertificateAuthority {
                 for ext in exts {
                     x509.append_extension(ext)?;
                 }
-                x509.sign(&ca_key, MessageDigest::sha256())?;
+                x509.sign(&private_key, MessageDigest::sha256())?;
                 Ok(x509)
             })
             .context(BuildCertificateSnafu)?
             .build();
         Ok(Self {
-            ca_key,
-            ca_cert,
+            private_key,
+            certificate,
             not_after,
         })
     }
@@ -225,51 +232,51 @@ impl CertificateAuthority {
     fn from_secret_data(
         secret_data: &BTreeMap<String, ByteString>,
         secret_ref: impl Fn() -> ObjectRef<Secret>,
-        key_key: &str,
-        cert_key: &str,
+        key_certificate: &str,
+        key_private_key: &str,
     ) -> Result<Self> {
-        let ca_cert = X509::from_pem(
+        let certificate = X509::from_pem(
             &secret_data
-                .get(cert_key)
+                .get(key_certificate)
                 .context(MissingCertificateSnafu {
-                    key: cert_key,
+                    key: key_certificate,
                     secret: secret_ref(),
                 })?
                 .0,
         )
         .with_context(|_| LoadCertificateSnafu {
-            key: cert_key,
+            key: key_certificate,
             secret: secret_ref(),
         })?;
-        let ca_key = PKey::private_key_from_pem(
+        let private_key = PKey::private_key_from_pem(
             &secret_data
-                .get(key_key)
+                .get(key_private_key)
                 .context(MissingCertificateSnafu {
-                    key: key_key,
+                    key: key_private_key,
                     secret: secret_ref(),
                 })?
                 .0,
         )
         .with_context(|_| LoadCertificateSnafu {
-            key: key_key,
+            key: key_private_key,
             secret: secret_ref(),
         })?;
         Ok(CertificateAuthority {
-            not_after: asn1time_to_offsetdatetime(ca_cert.not_after()).with_context(|_| {
+            not_after: asn1time_to_offsetdatetime(certificate.not_after()).with_context(|_| {
                 ParseLifetimeSnafu {
-                    key: cert_key,
+                    key: key_certificate,
                     secret: secret_ref(),
                 }
             })?,
-            ca_cert,
-            ca_key,
+            certificate,
+            private_key,
         })
     }
 }
 
 /// Manages multiple [`CertificateAuthorities`](`CertificateAuthority`), rotating them as needed.
 pub struct Manager {
-    cas: Vec<CertificateAuthority>,
+    certificate_authorities: Vec<CertificateAuthority>,
 }
 
 impl Manager {
@@ -300,12 +307,12 @@ impl Manager {
                 secret: secret_ref(),
             })?;
         let mut update_ca_secret = false;
-        let mut cas = match &ca_secret {
+        let mut certificate_authorities = match &ca_secret {
             Entry::Occupied(ca_secret) => {
                 // Existing CA has been found, load and use this
                 let empty = BTreeMap::new();
                 let ca_data = ca_secret.get().data.as_ref().unwrap_or(&empty);
-                if ca_data.contains_key(SECRET_KEY_LEGACY_CERT) {
+                if ca_data.contains_key(secret_v1_keys::CERTIFICATE) {
                     if config.manage_ca {
                         update_ca_secret = true;
                         info!(
@@ -315,14 +322,16 @@ impl Manager {
                     } else {
                         warn!(
                             secret = %secret_ref(),
-                            "CA secret uses legacy certificate naming ({SECRET_KEY_LEGACY_CERT}), please rename to 0{SECRET_KEY_CERT_SUFFIX}"
+                            "CA secret uses legacy certificate naming ({v1}), please rename to 0{v2}",
+                            v1 = secret_v1_keys::CERTIFICATE,
+                            v2 = secret_v2_key_suffixes::CERTIFICATE,
                         );
                     }
                     vec![CertificateAuthority::from_secret_data(
                         ca_data,
                         secret_ref,
-                        SECRET_KEY_LEGACY_KEY,
-                        SECRET_KEY_LEGACY_CERT,
+                        secret_v1_keys::CERTIFICATE,
+                        secret_v1_keys::PRIVATE_KEY,
                     )?]
                 } else {
                     ca_data
@@ -331,10 +340,15 @@ impl Manager {
                             Some(CertificateAuthority::from_secret_data(
                                 ca_data,
                                 secret_ref,
-                                &cert_key.contains(SECRET_KEY_CERT_SUFFIX).then(|| {
-                                    cert_key.replace(SECRET_KEY_CERT_SUFFIX, SECRET_KEY_KEY_SUFFIX)
-                                })?,
                                 cert_key,
+                                &cert_key
+                                    .ends_with(secret_v2_key_suffixes::CERTIFICATE)
+                                    .then(|| {
+                                        cert_key.replace(
+                                            secret_v2_key_suffixes::CERTIFICATE,
+                                            secret_v2_key_suffixes::PRIVATE_KEY,
+                                        )
+                                    })?,
                             ))
                         })
                         .collect::<Result<_>>()?
@@ -355,7 +369,7 @@ impl Manager {
                 .fail();
             }
         };
-        let newest_ca = cas.iter().map(|ca| ca.not_after).max();
+        let newest_ca = certificate_authorities.iter().map(|ca| ca.not_after).max();
         if let (Some(cutoff_duration), Some(newest_ca)) =
             (config.rotate_if_ca_expires_before, newest_ca)
         {
@@ -370,7 +384,7 @@ impl Manager {
                         ca_expires_at = %newest_ca,
                         "Provisioning a new CA certificate, because the old one will soon expire"
                     );
-                    cas.push(CertificateAuthority::new_self_signed(config)?);
+                    certificate_authorities.push(CertificateAuthority::new_self_signed(config)?);
                 } else {
                     warn!(
                         secret = %secret_ref(),
@@ -395,21 +409,29 @@ impl Manager {
                 info!(secret = %secret_ref(), "CA has been modified, saving");
                 let mut ca_secret = ca_secret.or_insert(Secret::default);
                 ca_secret.get_mut().data = Some(
-                    cas.iter()
+                    certificate_authorities
+                        .iter()
                         .enumerate()
                         .flat_map(|(i, ca)| {
                             [
-                                ca.ca_key
+                                ca.certificate
+                                    .to_pem()
+                                    .context(SerializeCertificateSnafu)
+                                    .map(|cert| {
+                                        (
+                                            format!("{i}{}", secret_v2_key_suffixes::CERTIFICATE),
+                                            ByteString(cert),
+                                        )
+                                    }),
+                                ca.private_key
                                     .private_key_to_pem_pkcs8()
                                     .context(SerializeCertificateSnafu)
                                     .map(|key| {
-                                        (format!("{i}{SECRET_KEY_KEY_SUFFIX}"), ByteString(key))
+                                        (
+                                            format!("{i}{}", secret_v2_key_suffixes::PRIVATE_KEY),
+                                            ByteString(key),
+                                        )
                                     }),
-                                ca.ca_cert.to_pem().context(SerializeCertificateSnafu).map(
-                                    |cert| {
-                                        (format!("{i}{SECRET_KEY_CERT_SUFFIX}"), ByteString(cert))
-                                    },
-                                ),
                             ]
                         })
                         .collect::<Result<_>>()?,
@@ -424,16 +446,18 @@ impl Manager {
                 return SaveRequestedButForbiddenSnafu.fail();
             }
         }
-        Ok(Self { cas })
+        Ok(Self {
+            certificate_authorities,
+        })
     }
 
     /// Get an appropriate [`CertificateAuthority`] for signing a given certificate.
-    pub fn get_ca(
+    pub fn find_certificate_authority_for_signing(
         &self,
         valid_until_at_least: OffsetDateTime,
     ) -> Result<&CertificateAuthority, GetCaError> {
         use get_ca_error::*;
-        self.cas
+        self.certificate_authorities
             .iter()
             .filter(|ca| ca.not_after > valid_until_at_least)
             // pick the oldest valid CA, since it will be trusted by the most peers
@@ -445,6 +469,8 @@ impl Manager {
 
     /// Get all active trust root certificates.
     pub fn trust_roots(&self) -> impl IntoIterator<Item = &X509> + '_ {
-        self.cas.iter().map(|ca| &ca.ca_cert)
+        self.certificate_authorities
+            .iter()
+            .map(|ca| &ca.certificate)
     }
 }
