@@ -443,8 +443,8 @@ impl Manager {
             })
     }
 
-    /// Get all active trust roots.
-    pub fn all_cas(&self) -> impl IntoIterator<Item = &CertificateAuthority> + '_ {
-        &self.cas
+    /// Get all active trust root certificates.
+    pub fn trust_roots(&self) -> impl IntoIterator<Item = &X509> + '_ {
+        self.cas.iter().map(|ca| &ca.ca_cert)
     }
 }

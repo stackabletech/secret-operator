@@ -257,13 +257,12 @@ impl SecretBackend for TlsGenerate {
         Ok(
             SecretContents::new(SecretData::WellKnown(WellKnownSecretData::TlsPem(
                 well_known::TlsPem {
-                    ca_pem: iterator_try_concat_bytes(self.ca_manager.all_cas().into_iter().map(
-                        |ca| {
-                            ca.ca_cert
-                                .to_pem()
+                    ca_pem: iterator_try_concat_bytes(
+                        self.ca_manager.trust_roots().into_iter().map(|ca| {
+                            ca.to_pem()
                                 .context(SerializeCertificateSnafu { tpe: CertType::Ca })
-                        },
-                    ))?,
+                        }),
+                    )?,
                     certificate_pem: pod_cert
                         .to_pem()
                         .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
