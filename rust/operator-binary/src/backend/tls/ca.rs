@@ -1,6 +1,6 @@
 //! Dynamically provisions and picks Certificate Authorities.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Display};
 
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},
@@ -32,7 +32,7 @@ use stackable_operator::{
     time::Duration,
 };
 use time::OffsetDateTime;
-use tracing::{info, warn};
+use tracing::{info, info_span, warn};
 
 use crate::{
     backend::SecretBackendError,
@@ -166,6 +166,17 @@ pub struct CertificateAuthority {
     pub certificate: X509,
     pub private_key: PKey<Private>,
     not_after: OffsetDateTime,
+}
+
+impl Display for CertificateAuthority {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("CertificateAuthority(serial=")?;
+        match self.certificate.serial_number().to_bn() {
+            Ok(sn) => write!(f, "{}", sn)?,
+            Err(_) => f.write_str("<invalid>")?,
+        }
+        f.write_str(")")
+    }
 }
 
 impl CertificateAuthority {
@@ -356,11 +367,14 @@ impl Manager {
             }
             Entry::Vacant(_) if config.manage_ca => {
                 update_ca_secret = true;
+                let ca = CertificateAuthority::new_self_signed(config)?;
                 info!(
                     secret = %secret_ref(),
+                    %ca,
+                    %ca.not_after,
                     "Provisioning a new CA certificate, because it could not be found"
                 );
-                vec![CertificateAuthority::new_self_signed(config)?]
+                vec![ca]
             }
             Entry::Vacant(_) => {
                 return CaNotFoundAndGenDisabledSnafu {
@@ -369,39 +383,33 @@ impl Manager {
                 .fail();
             }
         };
-        let newest_ca = certificate_authorities.iter().map(|ca| ca.not_after).max();
+        // Check whether CA should be rotated
+        let newest_ca = certificate_authorities.iter().max_by_key(|ca| ca.not_after);
         if let (Some(cutoff_duration), Some(newest_ca)) =
             (config.rotate_if_ca_expires_before, newest_ca)
         {
             let cutoff = OffsetDateTime::now_utc() + cutoff_duration;
-            if newest_ca < cutoff {
+            let _span = info_span!(
+                "ca_rotation",
+                secret = %secret_ref(),
+                %cutoff,
+                cutoff.duration = %cutoff_duration,
+                %newest_ca,
+                %newest_ca.not_after,
+            )
+            .entered();
+            if newest_ca.not_after < cutoff {
                 if config.manage_ca {
                     update_ca_secret = true;
                     info!(
-                        secret = %secret_ref(),
-                        %cutoff,
-                        cutoff.duration = %cutoff_duration,
-                        ca_expires_at = %newest_ca,
                         "Provisioning a new CA certificate, because the old one will soon expire"
                     );
                     certificate_authorities.push(CertificateAuthority::new_self_signed(config)?);
                 } else {
-                    warn!(
-                        secret = %secret_ref(),
-                        %cutoff,
-                        cutoff.duration = %cutoff_duration,
-                        ca_expires_at = %newest_ca,
-                        "CA certificate will soon expire, please provision a new one to prepare for rotation"
-                    );
+                    warn!("CA certificate will soon expire, please provision a new one");
                 }
             } else {
-                info!(
-                    secret = %secret_ref(),
-                    %cutoff,
-                    cutoff.duration = %cutoff_duration,
-                    ca_expires_at = %newest_ca,
-                    "CA is not close to expiring, will not initiate rotation"
-                );
+                info!("CA is not close to expiring, will not initiate rotation");
             }
         }
         if update_ca_secret {
