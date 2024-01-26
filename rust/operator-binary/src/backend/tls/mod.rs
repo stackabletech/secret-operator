@@ -133,15 +133,18 @@ impl TlsGenerate {
     pub async fn get_or_create_k8s_certificate(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
-        auto_generate_if_missing: bool,
+        auto_generate: bool,
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
         Ok(Self {
             ca_manager: ca::Manager::load_or_create(
                 client,
                 secret_ref,
-                auto_generate_if_missing,
-                Some(Duration::from_days_unchecked(400)),
+                &ca::Config {
+                    manage_ca: auto_generate,
+                    ca_lifetime: Duration::from_days_unchecked(2 * 365),
+                    rotate_if_ca_expires_before: Some(Duration::from_days_unchecked(365)),
+                },
             )
             .await
             .context(LoadCaSnafu)?,

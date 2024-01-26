@@ -97,7 +97,9 @@ pub struct AutoTlsCa {
     /// and key is stored in the keys `ca.crt` and `ca.key` respectively.
     pub secret: SecretReference,
 
-    /// Whether a new certificate authority should be generated if it does not already exist.
+    /// Whether the certificate authority should be managed by Secret Operator, including being generated
+    /// if it does not already exist.
+    // TODO: Consider renaming to `manage` for v1alpha2
     #[serde(default)]
     pub auto_generate: bool,
 }

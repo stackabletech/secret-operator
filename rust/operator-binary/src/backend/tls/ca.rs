@@ -1,7 +1,9 @@
+//! Dynamically provisions and picks Certificate Authorities.
+
 use std::collections::BTreeMap;
 
 use openssl::{
-    asn1::{Asn1Integer, Asn1Time, Asn1TimeRef, TimeDiff},
+    asn1::{Asn1Integer, Asn1Time},
     bn::{BigNum, MsbOption},
     conf::{Conf, ConfMethod},
     hash::MessageDigest,
@@ -32,7 +34,10 @@ use stackable_operator::{
 use time::OffsetDateTime;
 use tracing::{info, warn};
 
-use crate::backend::SecretBackendError;
+use crate::{
+    backend::SecretBackendError,
+    utils::{asn1time_to_offsetdatetime, Asn1TimeParseError},
+};
 
 const SECRET_KEY_LEGACY_CERT: &str = "ca.crt";
 const SECRET_KEY_LEGACY_KEY: &str = "ca.key";
@@ -53,8 +58,11 @@ pub enum Error {
     #[snafu(display("CA {secret} does not exist, and autoGenerate is false"))]
     CaNotFoundAndGenDisabled { secret: ObjectRef<Secret> },
 
-    #[snafu(display("CA secret is missing required certificate file"))]
-    MissingCaCertificate,
+    #[snafu(display("CA {secret} is missing required key {key:?}"))]
+    MissingCertificate {
+        key: String,
+        secret: ObjectRef<Secret>,
+    },
 
     #[snafu(display("failed to load certificate from key {key:?} of {secret}"))]
     LoadCertificate {
@@ -94,7 +102,7 @@ impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
         match self {
             Error::GenerateKey { .. } => tonic::Code::Internal,
-            Error::MissingCaCertificate { .. } => tonic::Code::FailedPrecondition,
+            Error::MissingCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::FindCa { .. } => tonic::Code::Unavailable,
             Error::CaNotFoundAndGenDisabled { .. } => tonic::Code::FailedPrecondition,
             Error::LoadCertificate { .. } => tonic::Code::FailedPrecondition,
@@ -123,6 +131,30 @@ impl SecretBackendError for GetCaError {
     }
 }
 
+#[derive(Debug)]
+pub struct Config {
+    /// Whether [`Manager`] is allowed to automatically provision and manage this CA.
+    ///
+    /// If `false`, logs will be emitted where Secret Operator would have taken action.
+    pub manage_ca: bool,
+
+    /// The duration of any new CA certificates provisioned.
+    pub ca_lifetime: Duration,
+
+    /// If no existing CA certificate outlives `rotate_if_ca_expires_before`, a new
+    /// certificate will be generated.
+    ///
+    /// To ensure compatibility with pods that have already been started, the old CA
+    /// will still be used as long as the provisioned certificate's lifetime fits
+    /// inside the old CA's. This allows the new CA to be gradually introduced to all
+    /// pods' truststores.
+    ///
+    /// Hence, this value _should_ be larger than the PKI's maximum certificate lifetime,
+    /// and smaller than [`ca_lifetime`].
+    pub rotate_if_ca_expires_before: Option<Duration>,
+}
+
+/// A single certificate authority certificate.
 pub struct CertificateAuthority {
     pub ca_cert: X509,
     pub ca_key: PKey<Private>,
@@ -130,7 +162,8 @@ pub struct CertificateAuthority {
 }
 
 impl CertificateAuthority {
-    fn new_self_signed() -> Result<Self> {
+    /// Generate a new self-signed CA with a random key.
+    fn new_self_signed(config: &Config) -> Result<Self> {
         let subject_name = X509NameBuilder::new()
             .and_then(|mut name| {
                 name.append_entry_by_nid(Nid::COMMONNAME, "secret-operator self-signed")?;
@@ -140,7 +173,7 @@ impl CertificateAuthority {
             .build();
         let now = OffsetDateTime::now_utc();
         let not_before = now - Duration::from_minutes_unchecked(5);
-        let not_after = now + Duration::from_days_unchecked(2 * 365);
+        let not_after = now + config.ca_lifetime;
         let conf = Conf::new(ConfMethod::default()).unwrap();
         let ca_key = Rsa::generate(2048)
             .and_then(PKey::try_from)
@@ -188,7 +221,8 @@ impl CertificateAuthority {
         })
     }
 
-    fn from_secret(
+    /// Loads an existing CA from the data of a [`Secret`].
+    fn from_secret_data(
         secret_data: &BTreeMap<String, ByteString>,
         secret_ref: impl Fn() -> ObjectRef<Secret>,
         key_key: &str,
@@ -197,7 +231,10 @@ impl CertificateAuthority {
         let ca_cert = X509::from_pem(
             &secret_data
                 .get(cert_key)
-                .context(MissingCaCertificateSnafu)?
+                .context(MissingCertificateSnafu {
+                    key: cert_key,
+                    secret: secret_ref(),
+                })?
                 .0,
         )
         .with_context(|_| LoadCertificateSnafu {
@@ -207,7 +244,10 @@ impl CertificateAuthority {
         let ca_key = PKey::private_key_from_pem(
             &secret_data
                 .get(key_key)
-                .context(MissingCaCertificateSnafu)?
+                .context(MissingCertificateSnafu {
+                    key: key_key,
+                    secret: secret_ref(),
+                })?
                 .0,
         )
         .with_context(|_| LoadCertificateSnafu {
@@ -227,6 +267,7 @@ impl CertificateAuthority {
     }
 }
 
+/// Manages multiple [`CertificateAuthorities`](`CertificateAuthority`), rotating them as needed.
 pub struct Manager {
     cas: Vec<CertificateAuthority>,
 }
@@ -235,8 +276,7 @@ impl Manager {
     pub async fn load_or_create(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
-        auto_generate_if_missing: bool,
-        rotate_ca_if_expiring_before: Option<Duration>,
+        config: &Config,
     ) -> Result<Self> {
         let (k8s_secret_name, k8s_ns) = match secret_ref {
             SecretReference {
@@ -266,7 +306,7 @@ impl Manager {
                 let empty = BTreeMap::new();
                 let ca_data = ca_secret.get().data.as_ref().unwrap_or(&empty);
                 if ca_data.contains_key(SECRET_KEY_LEGACY_CERT) {
-                    if auto_generate_if_missing {
+                    if config.manage_ca {
                         update_ca_secret = true;
                         info!(
                             secret = %secret_ref(),
@@ -278,7 +318,7 @@ impl Manager {
                             "CA secret uses legacy certificate naming ({SECRET_KEY_LEGACY_CERT}), please rename to 0{SECRET_KEY_CERT_SUFFIX}"
                         );
                     }
-                    vec![CertificateAuthority::from_secret(
+                    vec![CertificateAuthority::from_secret_data(
                         ca_data,
                         secret_ref,
                         SECRET_KEY_LEGACY_KEY,
@@ -288,7 +328,7 @@ impl Manager {
                     ca_data
                         .keys()
                         .filter_map(|cert_key| {
-                            Some(CertificateAuthority::from_secret(
+                            Some(CertificateAuthority::from_secret_data(
                                 ca_data,
                                 secret_ref,
                                 &cert_key.contains(SECRET_KEY_CERT_SUFFIX).then(|| {
@@ -300,13 +340,13 @@ impl Manager {
                         .collect::<Result<_>>()?
                 }
             }
-            Entry::Vacant(_) if auto_generate_if_missing => {
+            Entry::Vacant(_) if config.manage_ca => {
                 update_ca_secret = true;
                 info!(
                     secret = %secret_ref(),
                     "Provisioning a new CA certificate, because it could not be found"
                 );
-                vec![CertificateAuthority::new_self_signed()?]
+                vec![CertificateAuthority::new_self_signed(config)?]
             }
             Entry::Vacant(_) => {
                 return CaNotFoundAndGenDisabledSnafu {
@@ -316,11 +356,12 @@ impl Manager {
             }
         };
         let newest_ca = cas.iter().map(|ca| ca.not_after).max();
-        if let (Some(cutoff_duration), Some(newest_ca)) = (rotate_ca_if_expiring_before, newest_ca)
+        if let (Some(cutoff_duration), Some(newest_ca)) =
+            (config.rotate_if_ca_expires_before, newest_ca)
         {
             let cutoff = OffsetDateTime::now_utc() + cutoff_duration;
             if newest_ca < cutoff {
-                if auto_generate_if_missing {
+                if config.manage_ca {
                     update_ca_secret = true;
                     info!(
                         secret = %secret_ref(),
@@ -329,7 +370,7 @@ impl Manager {
                         ca_expires_at = %newest_ca,
                         "Provisioning a new CA certificate, because the old one will soon expire"
                     );
-                    cas.push(CertificateAuthority::new_self_signed()?);
+                    cas.push(CertificateAuthority::new_self_signed(config)?);
                 } else {
                     warn!(
                         secret = %secret_ref(),
@@ -350,7 +391,7 @@ impl Manager {
             }
         }
         if update_ca_secret {
-            if auto_generate_if_missing {
+            if config.manage_ca {
                 info!(secret = %secret_ref(), "CA has been modified, saving");
                 let mut ca_secret = ca_secret.or_insert(Secret::default);
                 ca_secret.get_mut().data = Some(
@@ -386,6 +427,7 @@ impl Manager {
         Ok(Self { cas })
     }
 
+    /// Get an appropriate [`CertificateAuthority`] for signing a given certificate.
     pub fn get_ca(
         &self,
         valid_until_at_least: OffsetDateTime,
@@ -401,27 +443,8 @@ impl Manager {
             })
     }
 
+    /// Get all active trust roots.
     pub fn all_cas(&self) -> impl IntoIterator<Item = &CertificateAuthority> + '_ {
         &self.cas
     }
-}
-
-#[derive(Debug, Snafu)]
-#[snafu(module)]
-pub enum Asn1TimeParseError {
-    #[snafu(display("unix epoch is not a valid Asn1Time"))]
-    Epoch { source: openssl::error::ErrorStack },
-    #[snafu(display("unable to diff Asn1Time"))]
-    Diff { source: openssl::error::ErrorStack },
-    #[snafu(display("unable to parse as OffsetDateTime"))]
-    Parse { source: time::error::ComponentRange },
-}
-
-fn asn1time_to_offsetdatetime(asn: &Asn1TimeRef) -> Result<OffsetDateTime, Asn1TimeParseError> {
-    use asn1_time_parse_error::*;
-    const SECS_PER_DAY: i64 = 60 * 60 * 24;
-    let epoch = Asn1Time::from_unix(0).context(EpochSnafu)?;
-    let TimeDiff { days, secs } = epoch.diff(asn).context(DiffSnafu)?;
-    OffsetDateTime::from_unix_timestamp(i64::from(days) * SECS_PER_DAY + i64::from(secs))
-        .context(ParseSnafu)
 }
