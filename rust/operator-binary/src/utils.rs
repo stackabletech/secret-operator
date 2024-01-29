@@ -147,8 +147,10 @@ where
 pub enum Asn1TimeParseError {
     #[snafu(display("unix epoch is not a valid Asn1Time"))]
     Epoch { source: openssl::error::ErrorStack },
+
     #[snafu(display("unable to diff Asn1Time"))]
     Diff { source: openssl::error::ErrorStack },
+
     #[snafu(display("unable to parse as OffsetDateTime"))]
     Parse { source: time::error::ComponentRange },
 }
