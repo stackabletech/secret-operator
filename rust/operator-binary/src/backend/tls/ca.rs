@@ -17,10 +17,7 @@ use openssl::{
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    k8s_openapi::{
-        api::core::v1::{Secret, SecretReference},
-        ByteString,
-    },
+    k8s_openapi::{api::core::v1::Secret, ByteString},
     kube::{
         self,
         api::{
@@ -31,6 +28,7 @@ use stackable_operator::{
     },
     time::Duration,
 };
+use stackable_secret_operator_crd_utils::SecretReference;
 use time::OffsetDateTime;
 use tracing::{info, info_span, warn};
 
@@ -85,9 +83,6 @@ pub enum Error {
         secret: ObjectRef<Secret>,
     },
 
-    #[snafu(display("invalid secret reference: {secret:?}"))]
-    InvalidSecretRef { secret: SecretReference },
-
     #[snafu(display("failed to build certificate"))]
     BuildCertificate { source: openssl::error::ErrorStack },
 
@@ -114,7 +109,6 @@ impl SecretBackendError for Error {
             Error::CaNotFoundAndGenDisabled { .. } => tonic::Code::FailedPrecondition,
             Error::LoadCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::ParseLifetime { .. } => tonic::Code::FailedPrecondition,
-            Error::InvalidSecretRef { .. } => tonic::Code::FailedPrecondition,
             Error::BuildCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SaveCaCertificate { .. } => tonic::Code::Unavailable,
@@ -242,7 +236,7 @@ impl CertificateAuthority {
     /// Loads an existing CA from the data of a [`Secret`].
     fn from_secret_data(
         secret_data: &BTreeMap<String, ByteString>,
-        secret_ref: impl Fn() -> ObjectRef<Secret>,
+        secret_ref: &SecretReference,
         key_certificate: &str,
         key_private_key: &str,
     ) -> Result<Self> {
@@ -251,32 +245,32 @@ impl CertificateAuthority {
                 .get(key_certificate)
                 .context(MissingCertificateSnafu {
                     key: key_certificate,
-                    secret: secret_ref(),
+                    secret: secret_ref,
                 })?
                 .0,
         )
         .with_context(|_| LoadCertificateSnafu {
             key: key_certificate,
-            secret: secret_ref(),
+            secret: secret_ref,
         })?;
         let private_key = PKey::private_key_from_pem(
             &secret_data
                 .get(key_private_key)
                 .context(MissingCertificateSnafu {
                     key: key_private_key,
-                    secret: secret_ref(),
+                    secret: secret_ref,
                 })?
                 .0,
         )
         .with_context(|_| LoadCertificateSnafu {
             key: key_private_key,
-            secret: secret_ref(),
+            secret: secret_ref,
         })?;
         Ok(CertificateAuthority {
             not_after: asn1time_to_offsetdatetime(certificate.not_after()).with_context(|_| {
                 ParseLifetimeSnafu {
                     key: key_certificate,
-                    secret: secret_ref(),
+                    secret: secret_ref,
                 }
             })?,
             certificate,
@@ -296,27 +290,12 @@ impl Manager {
         secret_ref: &SecretReference,
         config: &Config,
     ) -> Result<Self> {
-        let (k8s_secret_name, k8s_ns) = match secret_ref {
-            SecretReference {
-                name: Some(name),
-                namespace: Some(ns),
-            } => (name, ns),
-            _ => {
-                return InvalidSecretRefSnafu {
-                    secret: secret_ref.clone(),
-                }
-                .fail()
-            }
-        };
-        let secret_ref = || ObjectRef::<Secret>::new(k8s_secret_name).within(k8s_ns);
         // Use entry API rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
-        let secrets_api = &client.get_api::<Secret>(k8s_ns);
+        let secrets_api = &client.get_api::<Secret>(&secret_ref.namespace);
         let ca_secret = secrets_api
-            .entry(k8s_secret_name)
+            .entry(&secret_ref.name)
             .await
-            .with_context(|_| FindCaSnafu {
-                secret: secret_ref(),
-            })?;
+            .with_context(|_| FindCaSnafu { secret: secret_ref })?;
         let mut update_ca_secret = false;
         let mut certificate_authorities = match &ca_secret {
             Entry::Occupied(ca_secret) => {
@@ -327,12 +306,12 @@ impl Manager {
                     if config.manage_ca {
                         update_ca_secret = true;
                         info!(
-                            secret = %secret_ref(),
+                            secret = %secret_ref,
                             "Migrating CA secret from legacy naming scheme"
                         );
                     } else {
                         warn!(
-                            secret = %secret_ref(),
+                            secret = %secret_ref,
                             "CA secret uses legacy certificate naming ({v1}), please rename to 0{v2}",
                             v1 = secret_v1_keys::CERTIFICATE,
                             v2 = secret_v2_key_suffixes::CERTIFICATE,
@@ -369,7 +348,7 @@ impl Manager {
                 update_ca_secret = true;
                 let ca = CertificateAuthority::new_self_signed(config)?;
                 info!(
-                    secret = %secret_ref(),
+                    secret = %secret_ref,
                     %ca,
                     %ca.not_after,
                     "Provisioning a new CA certificate, because it could not be found"
@@ -377,10 +356,7 @@ impl Manager {
                 vec![ca]
             }
             Entry::Vacant(_) => {
-                return CaNotFoundAndGenDisabledSnafu {
-                    secret: ObjectRef::new(k8s_secret_name).within(k8s_ns),
-                }
-                .fail();
+                return CaNotFoundAndGenDisabledSnafu { secret: secret_ref }.fail();
             }
         };
         // Check whether CA should be rotated
@@ -391,7 +367,7 @@ impl Manager {
             let cutoff = OffsetDateTime::now_utc() + cutoff_duration;
             let _span = info_span!(
                 "ca_rotation",
-                secret = %secret_ref(),
+                secret = %secret_ref,
                 %cutoff,
                 cutoff.duration = %cutoff_duration,
                 %newest_ca,
@@ -414,7 +390,7 @@ impl Manager {
         }
         if update_ca_secret {
             if config.manage_ca {
-                info!(secret = %secret_ref(), "CA has been modified, saving");
+                info!(secret = %secret_ref, "CA has been modified, saving");
                 // Sort CAs by age to avoid spurious writes
                 certificate_authorities.sort_by_key(|ca| ca.not_after);
                 let mut ca_secret = ca_secret.or_insert(Secret::default);
@@ -449,9 +425,7 @@ impl Manager {
                 ca_secret
                     .commit(&PostParams::default())
                     .await
-                    .context(SaveCaCertificateSnafu {
-                        secret: ObjectRef::new(k8s_secret_name).within(k8s_ns),
-                    })?;
+                    .context(SaveCaCertificateSnafu { secret: secret_ref })?;
             } else {
                 return SaveRequestedButForbiddenSnafu.fail();
             }

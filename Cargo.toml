@@ -1,5 +1,5 @@
 [workspace]
-members = ["rust/operator-binary", "rust/krb5", "rust/krb5-provision-keytab", "rust/krb5-sys"]
+members = ["rust/*"]
 default-members = ["rust/operator-binary"]
 resolver = "2"
 

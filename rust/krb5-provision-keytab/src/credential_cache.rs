@@ -1,28 +1,30 @@
 use futures::{TryFuture, TryFutureExt};
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::k8s_openapi::{api::core::v1::Secret, ByteString};
-
-use crate::secret_ref::FullSecretRef;
+use stackable_operator::{
+    k8s_openapi::{api::core::v1::Secret, ByteString},
+    kube::runtime::reflector::ObjectRef,
+};
+use stackable_secret_operator_crd_utils::SecretReference;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("failed to load initial cache from {cache_ref}"))]
     GetInitialCache {
         source: stackable_operator::error::Error,
-        cache_ref: FullSecretRef,
+        cache_ref: ObjectRef<Secret>,
     },
 
     #[snafu(display("failed to save credential {key} to {cache_ref}"))]
     SaveToCache {
         source: stackable_operator::error::Error,
         key: String,
-        cache_ref: FullSecretRef,
+        cache_ref: ObjectRef<Secret>,
     },
 
     #[snafu(display("newly saved credential {key} was not found in {cache_ref}"))]
     SavedKeyNotFound {
         key: String,
-        cache_ref: FullSecretRef,
+        cache_ref: ObjectRef<Secret>,
     },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -30,7 +32,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub struct CredentialCache {
     name: &'static str,
     kube: stackable_operator::client::Client,
-    cache_ref: FullSecretRef,
+    cache_ref: SecretReference,
     current_state: Secret,
 }
 impl CredentialCache {
@@ -38,7 +40,7 @@ impl CredentialCache {
     pub async fn new(
         name: &'static str,
         kube: stackable_operator::client::Client,
-        cache_ref: FullSecretRef,
+        cache_ref: SecretReference,
     ) -> Result<Self> {
         Ok(Self {
             name,
@@ -127,5 +129,5 @@ impl CredentialCache {
 
 /// Information that may be useful for generating error messages in get_or_insert handlers
 pub struct Ctx {
-    pub cache_ref: FullSecretRef,
+    pub cache_ref: SecretReference,
 }

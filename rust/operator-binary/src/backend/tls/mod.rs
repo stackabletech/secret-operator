@@ -21,12 +21,10 @@ use openssl::{
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    k8s_openapi::{
-        api::core::v1::SecretReference,
-        chrono::{self, FixedOffset, TimeZone},
-    },
+    k8s_openapi::chrono::{self, FixedOffset, TimeZone},
     time::Duration,
 };
+use stackable_secret_operator_crd_utils::SecretReference;
 use time::OffsetDateTime;
 
 use crate::{

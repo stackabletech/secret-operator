@@ -1,0 +1,13 @@
+[package]
+name = "stackable-secret-operator-crd-utils"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde.workspace = true
+stackable-operator.workspace = true
