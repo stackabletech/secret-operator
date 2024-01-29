@@ -4,6 +4,7 @@ image:
   repository: docker.stackable.tech/stackable/secret-operator
   pullPolicy: IfNotPresent
   pullSecrets: []
+
 csiProvisioner:
   image:
     repository: docker.stackable.tech/k8s/sig-storage/csi-provisioner
