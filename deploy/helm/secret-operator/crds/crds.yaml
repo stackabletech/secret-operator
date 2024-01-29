@@ -45,17 +45,20 @@ spec:
                           properties:
                             autoGenerate:
                               default: false
-                              description: Whether a new certificate authority should be generated if it does not already exist.
+                              description: Whether the certificate authority should be managed by Secret Operator, including being generated if it does not already exist.
                               type: boolean
                             secret:
                               description: Reference (name and namespace) to a Kubernetes Secret object where the CA certificate and key is stored in the keys `ca.crt` and `ca.key` respectively.
                               properties:
                                 name:
-                                  description: name is unique within a namespace to reference a secret resource.
+                                  description: Name of the Secret being referred to.
                                   type: string
                                 namespace:
-                                  description: namespace defines the space within which the secret name must be unique.
+                                  description: Namespace of the Secret being referred to.
                                   type: string
+                              required:
+                                - name
+                                - namespace
                               type: object
                           required:
                             - secret
@@ -109,21 +112,27 @@ spec:
                                   description: Reference (name and namespace) to a Kubernetes Secret object containing the TLS CA (in `ca.crt`) that the LDAP server’s certificate should be authenticated against.
                                   properties:
                                     name:
-                                      description: name is unique within a namespace to reference a secret resource.
+                                      description: Name of the Secret being referred to.
                                       type: string
                                     namespace:
-                                      description: namespace defines the space within which the secret name must be unique.
+                                      description: Namespace of the Secret being referred to.
                                       type: string
+                                  required:
+                                    - name
+                                    - namespace
                                   type: object
                                 passwordCacheSecret:
                                   description: Reference (name and namespace) to a Kubernetes Secret object where workload passwords will be stored. This must not be accessible to end users.
                                   properties:
                                     name:
-                                      description: name is unique within a namespace to reference a secret resource.
+                                      description: Name of the Secret being referred to.
                                       type: string
                                     namespace:
-                                      description: namespace defines the space within which the secret name must be unique.
+                                      description: Namespace of the Secret being referred to.
                                       type: string
+                                  required:
+                                    - name
+                                    - namespace
                                   type: object
                                 schemaDistinguishedName:
                                   description: The root Distinguished Name (DN) for AD-managed schemas, typically `CN=Schema,CN=Configuration,{domain_dn}`.
@@ -152,11 +161,14 @@ spec:
                           description: Reference (`name` and `namespace`) to a K8s Secret object where a keytab with administrative privileges is stored in the key `keytab`.
                           properties:
                             name:
-                              description: name is unique within a namespace to reference a secret resource.
+                              description: Name of the Secret being referred to.
                               type: string
                             namespace:
-                              description: namespace defines the space within which the secret name must be unique.
+                              description: Namespace of the Secret being referred to.
                               type: string
+                          required:
+                            - name
+                            - namespace
                           type: object
                         adminPrincipal:
                           description: The admin principal.

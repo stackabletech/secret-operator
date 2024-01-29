@@ -1,4 +1,4 @@
-//! API wrapper for accessing
+//! API wrapper for accessing krb5-provision-keytab binary
 
 use std::{
     path::{Path, PathBuf},
@@ -7,7 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use stackable_operator::k8s_openapi::api::core::v1::SecretReference;
+use stackable_secret_operator_crd_utils::SecretReference;
 use tokio::{io::AsyncWriteExt, process::Command};
 
 #[derive(Serialize, Deserialize)]

@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 stackable-krb5-provision-keytab = { path = "../krb5-provision-keytab" }
+stackable-secret-operator-crd-utils = { path = "../crd-utils" }
 
 anyhow.workspace = true
 async-trait.workspace = true

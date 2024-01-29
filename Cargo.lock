@@ -2495,6 +2495,7 @@ dependencies = [
  "serde_json",
  "snafu 0.7.5",
  "stackable-operator",
+ "stackable-secret-operator-crd-utils",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -2574,6 +2575,7 @@ dependencies = [
  "socket2 0.5.4",
  "stackable-krb5-provision-keytab",
  "stackable-operator",
+ "stackable-secret-operator-crd-utils",
  "strum",
  "sys-mount",
  "tempfile",
@@ -2586,6 +2588,14 @@ dependencies = [
  "tracing",
  "uuid",
  "yasna",
+]
+
+[[package]]
+name = "stackable-secret-operator-crd-utils"
+version = "0.0.0-dev"
+dependencies = [
+ "serde",
+ "stackable-operator",
 ]
 
 [[package]]

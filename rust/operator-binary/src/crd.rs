@@ -3,11 +3,11 @@ use std::{fmt::Display, ops::Deref};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use stackable_operator::{
-    k8s_openapi::api::core::v1::SecretReference,
     kube::CustomResource,
     schemars::{self, JsonSchema},
     time::Duration,
 };
+use stackable_secret_operator_crd_utils::SecretReference;
 
 use crate::backend::tls::DEFAULT_MAX_CERT_LIFETIME;
 
@@ -97,7 +97,9 @@ pub struct AutoTlsCa {
     /// and key is stored in the keys `ca.crt` and `ca.key` respectively.
     pub secret: SecretReference,
 
-    /// Whether a new certificate authority should be generated if it does not already exist.
+    /// Whether the certificate authority should be managed by Secret Operator, including being generated
+    /// if it does not already exist.
+    // TODO: Consider renaming to `manage` for v1alpha2
     #[serde(default)]
     pub auto_generate: bool,
 }
@@ -282,8 +284,8 @@ mod test {
                 backend: crate::crd::SecretClassBackend::AutoTls(AutoTlsBackend {
                     ca: crate::crd::AutoTlsCa {
                         secret: SecretReference {
-                            name: Some("secret-provisioner-tls-ca".to_string()),
-                            namespace: Some("default".to_string()),
+                            name: "secret-provisioner-tls-ca".to_string(),
+                            namespace: "default".to_string(),
                         },
                         auto_generate: false,
                     },
@@ -316,8 +318,8 @@ mod test {
                 backend: crate::crd::SecretClassBackend::AutoTls(AutoTlsBackend {
                     ca: crate::crd::AutoTlsCa {
                         secret: SecretReference {
-                            name: Some("secret-provisioner-tls-ca".to_string()),
-                            namespace: Some("default".to_string()),
+                            name: "secret-provisioner-tls-ca".to_string(),
+                            namespace: "default".to_string(),
                         },
                         auto_generate: true,
                     },
