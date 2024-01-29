@@ -3,7 +3,7 @@ use std::{fmt::LowerHex, os::unix::prelude::AsRawFd, path::Path};
 use futures::{pin_mut, Stream, StreamExt};
 use openssl::asn1::{Asn1Time, Asn1TimeRef, TimeDiff};
 use pin_project::pin_project;
-use snafu::{ResultExt as _, Snafu};
+use snafu::{OptionExt as _, ResultExt as _, Snafu};
 use socket2::Socket;
 use std::fmt::Write as _; // import without risk of name clashing
 use time::OffsetDateTime;
@@ -153,6 +153,9 @@ pub enum Asn1TimeParseError {
 
     #[snafu(display("unable to parse as OffsetDateTime"))]
     Parse { source: time::error::ComponentRange },
+
+    #[snafu(display("time overflowed"))]
+    Overflow,
 }
 
 /// Converts an OpenSSL [`Asn1TimeRef`] into a Rustier [`OffsetDateTime`].
@@ -161,8 +164,13 @@ pub fn asn1time_to_offsetdatetime(asn: &Asn1TimeRef) -> Result<OffsetDateTime, A
     const SECS_PER_DAY: i64 = 60 * 60 * 24;
     let epoch = Asn1Time::from_unix(0).context(EpochSnafu)?;
     let TimeDiff { days, secs } = epoch.diff(asn).context(DiffSnafu)?;
-    OffsetDateTime::from_unix_timestamp(i64::from(days) * SECS_PER_DAY + i64::from(secs))
-        .context(ParseSnafu)
+    OffsetDateTime::from_unix_timestamp(
+        i64::from(days)
+            .checked_mul(SECS_PER_DAY)
+            .and_then(|day_secs| day_secs.checked_add(i64::from(secs)))
+            .context(OverflowSnafu)?,
+    )
+    .context(ParseSnafu)
 }
 
 #[cfg(test)]
