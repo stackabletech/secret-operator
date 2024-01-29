@@ -1,9 +1,12 @@
 use std::{fmt::LowerHex, os::unix::prelude::AsRawFd, path::Path};
 
 use futures::{pin_mut, Stream, StreamExt};
+use openssl::asn1::{Asn1Time, Asn1TimeRef, TimeDiff};
 use pin_project::pin_project;
+use snafu::{OptionExt as _, ResultExt as _, Snafu};
 use socket2::Socket;
 use std::fmt::Write as _; // import without risk of name clashing
+use time::OffsetDateTime;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::{UnixListener, UnixStream},
@@ -124,11 +127,61 @@ pub async fn trystream_any<S: Stream<Item = Result<bool, E>>, E>(stream: S) -> R
     Ok(false)
 }
 
+/// Concatenate chunks of bytes, short-circuiting on [`Err`].
+///
+/// This is a byte-oriented equivalent to [`Iterator::collect::<Result<String, _>>`](`Iterator::collect`).
+pub fn iterator_try_concat_bytes<I1, I2, E>(iter: I1) -> Result<Vec<u8>, E>
+where
+    I1: IntoIterator<Item = Result<I2, E>>,
+    I2: IntoIterator<Item = u8>,
+{
+    let mut buffer = Vec::new();
+    for chunk in iter {
+        buffer.extend(chunk?)
+    }
+    Ok(buffer)
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(module)]
+pub enum Asn1TimeParseError {
+    #[snafu(display("unix epoch is not a valid Asn1Time"))]
+    Epoch { source: openssl::error::ErrorStack },
+
+    #[snafu(display("unable to diff Asn1Time"))]
+    Diff { source: openssl::error::ErrorStack },
+
+    #[snafu(display("unable to parse as OffsetDateTime"))]
+    Parse { source: time::error::ComponentRange },
+
+    #[snafu(display("time overflowed"))]
+    Overflow,
+}
+
+/// Converts an OpenSSL [`Asn1TimeRef`] into a Rustier [`OffsetDateTime`].
+pub fn asn1time_to_offsetdatetime(asn: &Asn1TimeRef) -> Result<OffsetDateTime, Asn1TimeParseError> {
+    use asn1_time_parse_error::*;
+    const SECS_PER_DAY: i64 = 60 * 60 * 24;
+    let epoch = Asn1Time::from_unix(0).context(EpochSnafu)?;
+    let TimeDiff { days, secs } = epoch.diff(asn).context(DiffSnafu)?;
+    OffsetDateTime::from_unix_timestamp(
+        i64::from(days)
+            .checked_mul(SECS_PER_DAY)
+            .and_then(|day_secs| day_secs.checked_add(i64::from(secs)))
+            .context(OverflowSnafu)?,
+    )
+    .context(ParseSnafu)
+}
+
 #[cfg(test)]
 mod tests {
     use futures::StreamExt;
+    use openssl::asn1::Asn1Time;
+    use time::OffsetDateTime;
 
     use crate::utils::{error_full_message, trystream_any, FmtByteSlice};
+
+    use super::{asn1time_to_offsetdatetime, iterator_try_concat_bytes};
 
     #[test]
     fn fmt_hex_byte_slice() {
@@ -182,6 +235,37 @@ mod tests {
             )
             .await,
             Result::<_, ()>::Err(())
+        );
+    }
+
+    #[test]
+    fn iterator_try_concat_bytes_should_work() {
+        assert_eq!(
+            iterator_try_concat_bytes([Result::<_, ()>::Ok(vec![0, 1]), Ok(vec![2])]),
+            Ok(vec![0, 1, 2])
+        );
+        assert_eq!(
+            iterator_try_concat_bytes([Ok(vec![0, 1]), Err(())]),
+            Err(())
+        );
+        assert_eq!(iterator_try_concat_bytes([Err(()), Ok(vec![2])]), Err(()));
+        assert_eq!(iterator_try_concat_bytes::<_, Vec<_>, ()>([]), Ok(vec![]));
+    }
+
+    #[test]
+    fn asn1time_to_offsetdatetime_should_work() {
+        assert_eq!(
+            asn1time_to_offsetdatetime(
+                // Asn1Time uses a custom time format (https://www.openssl.org/docs/man3.2/man3/ASN1_TIME_set.html)
+                // that is _roughly_ "ISO8601-1 without separator characters"
+                &Asn1Time::from_str("20240102020304Z").unwrap()
+            )
+            .unwrap(),
+            OffsetDateTime::parse(
+                "2024-01-02T02:03:04Z",
+                &time::format_description::well_known::Iso8601::DEFAULT
+            )
+            .unwrap()
         );
     }
 }

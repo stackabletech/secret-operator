@@ -5,22 +5,17 @@ use krb5::{Keyblock, Keytab, KrbContext, Principal, PrincipalUnparseOptions};
 use ldap3::{Ldap, LdapConnAsync, LdapConnSettings};
 use rand::{seq::SliceRandom, thread_rng, CryptoRng};
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::k8s_openapi::api::core::v1::{Secret, SecretReference};
+use stackable_operator::{k8s_openapi::api::core::v1::Secret, kube::runtime::reflector::ObjectRef};
+use stackable_secret_operator_crd_utils::SecretReference;
 
-use crate::{
-    credential_cache::{self, CredentialCache},
-    secret_ref::{FullSecretRef, IncompleteSecretRef},
-};
+use crate::credential_cache::{self, CredentialCache};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("LDAP TLS CA reference is invalid"))]
-    LdapTlsCaReferenceInvalid { source: IncompleteSecretRef },
-
     #[snafu(display("failed to retrieve LDAP TLS CA {ca_ref}"))]
     GetLdapTlsCa {
         source: stackable_operator::error::Error,
-        ca_ref: FullSecretRef,
+        ca_ref: ObjectRef<Secret>,
     },
 
     #[snafu(display("LDAP TLS CA secret is missing required key {key}"))]
@@ -28,9 +23,6 @@ pub enum Error {
 
     #[snafu(display("failed to parse LDAP TLS CA"))]
     ParseLdapTlsCa { source: native_tls::Error },
-
-    #[snafu(display("password cache reference is invalid"))]
-    PasswordCacheReferenceInvalid { source: IncompleteSecretRef },
 
     #[snafu(display("password cache error"))]
     PasswordCache { source: credential_cache::Error },
@@ -55,13 +47,13 @@ pub enum Error {
     #[snafu(display("failed to get password cache {password_cache_ref}"))]
     GetPasswordCache {
         source: stackable_operator::error::Error,
-        password_cache_ref: FullSecretRef,
+        password_cache_ref: ObjectRef<Secret>,
     },
 
     #[snafu(display("failed to update password cache {password_cache_ref}"))]
     UpdatePasswordCache {
         source: stackable_operator::error::Error,
-        password_cache_ref: FullSecretRef,
+        password_cache_ref: ObjectRef<Secret>,
     },
 
     #[snafu(display("failed to create LDAP user"))]
@@ -72,7 +64,7 @@ pub enum Error {
     ))]
     CreateLdapUserConflict {
         source: ldap3::LdapError,
-        password_cache_ref: FullSecretRef,
+        password_cache_ref: ObjectRef<Secret>,
     },
 
     #[snafu(display("failed to decode generated password"))]
@@ -121,15 +113,9 @@ impl<'a> AdAdmin<'a> {
         ldap.sasl_gssapi_bind(ldap_server)
             .await
             .context(LdapAuthnSnafu)?;
-        let password_cache = CredentialCache::new(
-            "AD passwords",
-            kube,
-            password_cache_secret
-                .try_into()
-                .context(PasswordCacheReferenceInvalidSnafu)?,
-        )
-        .await
-        .context(PasswordCacheSnafu)?;
+        let password_cache = CredentialCache::new("AD passwords", kube, password_cache_secret)
+            .await
+            .context(PasswordCacheSnafu)?;
         Ok(Self {
             ldap,
             krb,
@@ -190,9 +176,6 @@ async fn get_ldap_ca_certificate(
     kube: &stackable_operator::client::Client,
     ca_secret_ref: SecretReference,
 ) -> Result<native_tls::Certificate> {
-    let ca_secret_ref: FullSecretRef = ca_secret_ref
-        .try_into()
-        .context(LdapTlsCaReferenceInvalidSnafu)?;
     let ca_secret = kube
         .get::<Secret>(&ca_secret_ref.name, &ca_secret_ref.namespace)
         .await
@@ -241,7 +224,7 @@ async fn create_ad_user(
     password: &str,
     user_dn_base: &str,
     schema_dn_base: &str,
-    password_cache_ref: FullSecretRef,
+    password_cache_ref: SecretReference,
 ) -> Result<()> {
     // Flags are a subset of https://learn.microsoft.com/en-us/troubleshoot/windows-server/identity/useraccountcontrol-manipulate-account-properties
     const AD_UAC_NORMAL_ACCOUNT: u32 = 0x0200;

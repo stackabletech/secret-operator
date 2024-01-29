@@ -9,36 +9,36 @@ use openssl::{
     conf::{Conf, ConfMethod},
     hash::MessageDigest,
     nid::Nid,
-    pkey::{PKey, Private},
+    pkey::PKey,
     rsa::Rsa,
     x509::{
         extension::{
             AuthorityKeyIdentifier, BasicConstraints, ExtendedKeyUsage, KeyUsage,
             SubjectAlternativeName, SubjectKeyIdentifier,
         },
-        X509Builder, X509NameBuilder, X509,
+        X509Builder, X509NameBuilder,
     },
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    builder::ObjectMetaBuilder,
-    k8s_openapi::{
-        api::core::v1::{Secret, SecretReference},
-        chrono::{self, FixedOffset, TimeZone},
-        ByteString,
-    },
-    kube::runtime::reflector::ObjectRef,
+    k8s_openapi::chrono::{self, FixedOffset, TimeZone},
     time::Duration,
 };
+use stackable_secret_operator_crd_utils::SecretReference;
 use time::OffsetDateTime;
 
-use crate::format::{well_known, SecretData, WellKnownSecretData};
+use crate::{
+    format::{well_known, SecretData, WellKnownSecretData},
+    utils::iterator_try_concat_bytes,
+};
 
 use super::{
     pod_info::{Address, PodInfo},
     scope::SecretScope,
     ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents,
 };
+
+mod ca;
 
 /// As the Pods will be evicted [`DEFAULT_CERT_RESTART_BUFFER`] before
 /// the cert actually expires, this results in a restart in approx every 2 weeks,
@@ -69,40 +69,19 @@ pub enum Error {
     #[snafu(display("failed to generate certificate key"))]
     GenerateKey { source: openssl::error::ErrorStack },
 
-    #[snafu(display("could not find CA {secret}, and autoGenerate is false"))]
-    FindCaAndGenDisabled {
-        source: stackable_operator::error::Error,
-        secret: ObjectRef<Secret>,
-    },
+    #[snafu(display("failed to load CA"))]
+    LoadCa { source: ca::Error },
 
-    #[snafu(display("CA secret is missing required certificate file"))]
-    MissingCaCertificate,
+    #[snafu(display("failed to pick a CA"))]
+    PickCa { source: ca::GetCaError },
 
-    #[snafu(display("failed to load {tpe:?} certificate"))]
-    LoadCertificate {
-        source: openssl::error::ErrorStack,
-        tpe: CertType,
-    },
-
-    #[snafu(display("invalid secret reference: {secret:?}"))]
-    InvalidSecretRef { secret: SecretReference },
-
-    #[snafu(display("failed to build {tpe:?} certificate"))]
-    BuildCertificate {
-        source: openssl::error::ErrorStack,
-        tpe: CertType,
-    },
+    #[snafu(display("failed to build certificate"))]
+    BuildCertificate { source: openssl::error::ErrorStack },
 
     #[snafu(display("failed to serialize {tpe:?} certificate"))]
     SerializeCertificate {
         source: openssl::error::ErrorStack,
         tpe: CertType,
-    },
-
-    #[snafu(display("failed to save CA certificate to {secret}"))]
-    SaveCaCertificate {
-        source: stackable_operator::error::Error,
-        secret: ObjectRef<Secret>,
     },
 
     #[snafu(display("invalid certificate lifetime"))]
@@ -127,13 +106,10 @@ impl SecretBackendError for Error {
         match self {
             Error::ScopeAddresses { .. } => tonic::Code::Unavailable,
             Error::GenerateKey { .. } => tonic::Code::Internal,
-            Error::FindCaAndGenDisabled { .. } => tonic::Code::FailedPrecondition,
-            Error::MissingCaCertificate { .. } => tonic::Code::FailedPrecondition,
-            Error::LoadCertificate { .. } => tonic::Code::FailedPrecondition,
-            Error::InvalidSecretRef { .. } => tonic::Code::FailedPrecondition,
+            Error::LoadCa { source } => source.grpc_code(),
+            Error::PickCa { source } => source.grpc_code(),
             Error::BuildCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
-            Error::SaveCaCertificate { .. } => tonic::Code::Unavailable,
             Error::InvalidCertLifetime { .. } => tonic::Code::Internal,
             Error::TooShortCertLifetimeRequiresTimeTravel { .. } => tonic::Code::InvalidArgument,
         }
@@ -141,151 +117,36 @@ impl SecretBackendError for Error {
 }
 
 pub struct TlsGenerate {
-    ca_cert: X509,
-    ca_key: PKey<Private>,
+    ca_manager: ca::Manager,
     max_cert_lifetime: Duration,
 }
 
 impl TlsGenerate {
-    pub fn new_self_signed(max_cert_lifetime: Duration) -> Result<Self> {
-        let subject_name = X509NameBuilder::new()
-            .and_then(|mut name| {
-                name.append_entry_by_nid(Nid::COMMONNAME, "secret-operator self-signed")?;
-                Ok(name)
-            })
-            .context(BuildCertificateSnafu { tpe: CertType::Ca })?
-            .build();
-        let now = OffsetDateTime::now_utc();
-        let not_before = now - Duration::from_minutes_unchecked(5);
-        let not_after = now + Duration::from_days_unchecked(2 * 365);
-        let conf = Conf::new(ConfMethod::default()).unwrap();
-        let ca_key = Rsa::generate(2048)
-            .and_then(PKey::try_from)
-            .context(GenerateKeySnafu)?;
-        let ca_cert = X509Builder::new()
-            .and_then(|mut x509| {
-                x509.set_subject_name(&subject_name)?;
-                x509.set_issuer_name(&subject_name)?;
-                x509.set_not_before(Asn1Time::from_unix(not_before.unix_timestamp())?.as_ref())?;
-                x509.set_not_after(Asn1Time::from_unix(not_after.unix_timestamp())?.as_ref())?;
-                x509.set_pubkey(&ca_key)?;
-                let mut serial = BigNum::new()?;
-                serial.rand(64, MsbOption::MAYBE_ZERO, false)?;
-                x509.set_serial_number(Asn1Integer::from_bn(&serial)?.as_ref())?;
-                x509.set_version(
-                    3 - 1, // zero-indexed
-                )?;
-                let ctx = x509.x509v3_context(None, Some(&conf));
-                let exts = [
-                    BasicConstraints::new().critical().ca().build()?,
-                    SubjectKeyIdentifier::new().build(&ctx)?,
-                    AuthorityKeyIdentifier::new()
-                        .issuer(false)
-                        .keyid(false)
-                        .build(&ctx)?,
-                    KeyUsage::new()
-                        .critical()
-                        .digital_signature()
-                        .key_cert_sign()
-                        .crl_sign()
-                        .build()?,
-                ];
-                for ext in exts {
-                    x509.append_extension(ext)?;
-                }
-                x509.sign(&ca_key, MessageDigest::sha256())?;
-                Ok(x509)
-            })
-            .context(BuildCertificateSnafu { tpe: CertType::Ca })?
-            .build();
-        Ok(Self {
-            ca_key,
-            ca_cert,
-            max_cert_lifetime,
-        })
-    }
-
     /// Check if a signing CA has already been instantiated in a specified Kubernetes secret - if
     /// one is found the key is loaded and used for signing certs.
     /// If no current authority can be found, a new keypair and self signed certificate is created
     /// and stored for future use.
-    /// This allows users to provide their own CA files, but also enables using this for dev and test
-    /// scenarios where self signed, ephemeral CAs are ok to use.
+    /// This allows users to provide their own CA files, but also enables secret-operator to generate
+    /// an independent self-signed CA.
     pub async fn get_or_create_k8s_certificate(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
-        auto_generate_if_missing: bool,
+        auto_generate: bool,
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
-        let (k8s_secret_name, k8s_ns) = match secret_ref {
-            SecretReference {
-                name: Some(name),
-                namespace: Some(ns),
-            } => (name, ns),
-            _ => {
-                return InvalidSecretRefSnafu {
-                    secret: secret_ref.clone(),
-                }
-                .fail()
-            }
-        };
-        let existing_secret = client.get::<Secret>(k8s_secret_name, k8s_ns).await;
-        Ok(match existing_secret {
-            Ok(ca_secret) => {
-                // Existing CA has been found, load and use this
-                let ca_data = ca_secret.data.unwrap_or_default();
-                Self {
-                    ca_key: PKey::private_key_from_pem(
-                        &ca_data.get("ca.key").context(MissingCaCertificateSnafu)?.0,
-                    )
-                    .context(LoadCertificateSnafu { tpe: CertType::Ca })?,
-                    ca_cert: X509::from_pem(
-                        &ca_data.get("ca.crt").context(MissingCaCertificateSnafu)?.0,
-                    )
-                    .context(LoadCertificateSnafu { tpe: CertType::Ca })?,
-                    max_cert_lifetime,
-                }
-            }
-            Err(_) if auto_generate_if_missing => {
-                // Failed to get existing cert, try to create a new self-signed one
-                let ca = Self::new_self_signed(max_cert_lifetime)?;
-                // Use create rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
-                client
-                    .create(&Secret {
-                        metadata: ObjectMetaBuilder::new()
-                            .namespace(k8s_ns)
-                            .name(k8s_secret_name)
-                            .build(),
-                        data: Some(
-                            [
-                                (
-                                    "ca.key".to_string(),
-                                    ByteString(ca.ca_key.private_key_to_pem_pkcs8().context(
-                                        SerializeCertificateSnafu { tpe: CertType::Ca },
-                                    )?),
-                                ),
-                                (
-                                    "ca.crt".to_string(),
-                                    ByteString(ca.ca_cert.to_pem().context(
-                                        SerializeCertificateSnafu { tpe: CertType::Ca },
-                                    )?),
-                                ),
-                            ]
-                            .into(),
-                        ),
-                        ..Secret::default()
-                    })
-                    .await
-                    .context(SaveCaCertificateSnafu {
-                        secret: ObjectRef::new(k8s_secret_name).within(k8s_ns),
-                    })?;
-                ca
-            }
-            Err(err) => {
-                return Err(err).context(FindCaAndGenDisabledSnafu {
-                    secret: ObjectRef::new(k8s_secret_name).within(k8s_ns),
-                });
-            }
+        Ok(Self {
+            ca_manager: ca::Manager::load_or_create(
+                client,
+                secret_ref,
+                &ca::Config {
+                    manage_ca: auto_generate,
+                    ca_lifetime: Duration::from_days_unchecked(2 * 365),
+                    rotate_if_ca_expires_before: Some(Duration::from_days_unchecked(365)),
+                },
+            )
+            .await
+            .context(LoadCaSnafu)?,
+            max_cert_lifetime,
         })
     }
 }
@@ -333,6 +194,10 @@ impl SecretBackend for TlsGenerate {
                     .context(ScopeAddressesSnafu { scope })?,
             );
         }
+        let ca = self
+            .ca_manager
+            .find_certificate_authority_for_signing(not_after)
+            .context(PickCaSnafu)?;
         let pod_cert = X509Builder::new()
             .and_then(|mut x509| {
                 let subject_name = X509NameBuilder::new()
@@ -342,7 +207,7 @@ impl SecretBackend for TlsGenerate {
                     })?
                     .build();
                 x509.set_subject_name(&subject_name)?;
-                x509.set_issuer_name(self.ca_cert.issuer_name())?;
+                x509.set_issuer_name(ca.certificate.issuer_name())?;
                 x509.set_not_before(Asn1Time::from_unix(not_before.unix_timestamp())?.as_ref())?;
                 x509.set_not_after(Asn1Time::from_unix(not_after.unix_timestamp())?.as_ref())?;
                 x509.set_pubkey(&pod_key)?;
@@ -352,7 +217,7 @@ impl SecretBackend for TlsGenerate {
                 let mut serial = BigNum::new()?;
                 serial.rand(64, MsbOption::MAYBE_ZERO, false)?;
                 x509.set_serial_number(Asn1Integer::from_bn(&serial)?.as_ref())?;
-                let ctx = x509.x509v3_context(Some(&self.ca_cert), Some(&conf));
+                let ctx = x509.x509v3_context(Some(&ca.certificate), Some(&conf));
                 let mut exts = vec![
                     BasicConstraints::new().critical().build()?,
                     KeyUsage::new()
@@ -385,18 +250,20 @@ impl SecretBackend for TlsGenerate {
                 for ext in exts {
                     x509.append_extension(ext)?;
                 }
-                x509.sign(&self.ca_key, MessageDigest::sha256())?;
+                x509.sign(&ca.private_key, MessageDigest::sha256())?;
                 Ok(x509)
             })
-            .context(BuildCertificateSnafu { tpe: CertType::Pod })?
+            .context(BuildCertificateSnafu)?
             .build();
         Ok(
             SecretContents::new(SecretData::WellKnown(WellKnownSecretData::TlsPem(
                 well_known::TlsPem {
-                    ca_pem: self
-                        .ca_cert
-                        .to_pem()
-                        .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
+                    ca_pem: iterator_try_concat_bytes(
+                        self.ca_manager.trust_roots().into_iter().map(|ca| {
+                            ca.to_pem()
+                                .context(SerializeCertificateSnafu { tpe: CertType::Ca })
+                        }),
+                    )?,
                     certificate_pem: pod_cert
                         .to_pem()
                         .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,

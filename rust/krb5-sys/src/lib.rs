@@ -1,4 +1,4 @@
-#![allow(non_upper_case_globals, non_camel_case_types)]
+#![allow(non_upper_case_globals, non_camel_case_types, non_snake_case)]
 // krb5 docs are not written following the Rust conventions,
 // so some annotations are misinterpreted by rustdoc as links.
 #![allow(rustdoc::broken_intra_doc_links)]
