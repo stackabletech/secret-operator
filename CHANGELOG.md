@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Improved CRD documentation ([#333]).
+- Helm: support labels in values.yaml ([#352]).
 
 ## Changed
 
@@ -17,6 +18,8 @@ All notable changes to this project will be documented in this file.
 [#333]: https://github.com/stackabletech/secret-operator/pull/333
 [#341]: https://github.com/stackabletech/secret-operator/pull/341
 [#350]: https://github.com/stackabletech/secret-operator/pull/350
+[#352]: https://github.com/stackabletech/secret-operator/pull/352
+
 
 ## [23.11.0] - 2023-11-24
 
