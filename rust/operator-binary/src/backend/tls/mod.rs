@@ -24,10 +24,10 @@ use stackable_operator::{
     k8s_openapi::chrono::{self, FixedOffset, TimeZone},
     time::Duration,
 };
-use stackable_secret_operator_crd_utils::SecretReference;
 use time::OffsetDateTime;
 
 use crate::{
+    crd,
     format::{well_known, SecretData, WellKnownSecretData},
     utils::iterator_try_concat_bytes,
 };
@@ -130,18 +130,21 @@ impl TlsGenerate {
     /// an independent self-signed CA.
     pub async fn get_or_create_k8s_certificate(
         client: &stackable_operator::client::Client,
-        secret_ref: &SecretReference,
-        auto_generate: bool,
+        crd::AutoTlsCa {
+            secret: ca_secret,
+            auto_generate: auto_generate_ca,
+            ca_lifetime,
+        }: &crd::AutoTlsCa,
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
         Ok(Self {
             ca_manager: ca::Manager::load_or_create(
                 client,
-                secret_ref,
+                ca_secret,
                 &ca::Config {
-                    manage_ca: auto_generate,
-                    ca_lifetime: Duration::from_days_unchecked(2 * 365),
-                    rotate_if_ca_expires_before: Some(Duration::from_days_unchecked(365)),
+                    manage_ca: *auto_generate_ca,
+                    ca_lifetime: *ca_lifetime,
+                    rotate_if_ca_expires_before: Some(*ca_lifetime / 2),
                 },
             )
             .await

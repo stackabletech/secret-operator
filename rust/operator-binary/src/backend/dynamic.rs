@@ -101,17 +101,12 @@ pub async fn from_class(
             })
         }
         crd::SecretClassBackend::AutoTls(crd::AutoTlsBackend {
-            ca:
-                crd::AutoTlsCa {
-                    secret,
-                    auto_generate,
-                },
+            ca,
             max_certificate_lifetime,
         }) => from(
             super::TlsGenerate::get_or_create_k8s_certificate(
                 client,
-                &secret,
-                auto_generate,
+                &ca,
                 max_certificate_lifetime,
             )
             .await?,

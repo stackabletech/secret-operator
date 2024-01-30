@@ -82,12 +82,14 @@ pub struct AutoTlsBackend {
     /// In case consumers request a longer lifetime than allowed by this setting,
     /// the lifetime will be the minimum of both, so this setting takes precedence.
     /// The default value is 15 days.
-    #[serde(default = "default_max_certificate_lifetime")]
+    #[serde(default = "AutoTlsBackend::default_max_certificate_lifetime")]
     pub max_certificate_lifetime: Duration,
 }
 
-fn default_max_certificate_lifetime() -> Duration {
-    DEFAULT_MAX_CERT_LIFETIME
+impl AutoTlsBackend {
+    fn default_max_certificate_lifetime() -> Duration {
+        DEFAULT_MAX_CERT_LIFETIME
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -102,6 +104,18 @@ pub struct AutoTlsCa {
     // TODO: Consider renaming to `manage` for v1alpha2
     #[serde(default)]
     pub auto_generate: bool,
+
+    /// The lifetime of each generated certificate authority.
+    ///
+    /// Ignored if `autoGenerate: false`. Should always be more than double `maxCertificateLifetime`.
+    #[serde(default = "AutoTlsCa::default_ca_lifetime")]
+    pub ca_lifetime: Duration,
+}
+
+impl AutoTlsCa {
+    fn default_ca_lifetime() -> Duration {
+        Duration::from_days_unchecked(365 * 2)
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
