@@ -9,7 +9,7 @@ use stackable_operator::{
 };
 use stackable_secret_operator_crd_utils::SecretReference;
 
-use crate::backend::tls::DEFAULT_MAX_CERT_LIFETIME;
+use crate::backend;
 
 /// A [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass) is a cluster-global Kubernetes resource
 /// that defines a category of secrets that the Secret Operator knows how to provision.
@@ -88,7 +88,7 @@ pub struct AutoTlsBackend {
 
 impl AutoTlsBackend {
     fn default_max_certificate_lifetime() -> Duration {
-        DEFAULT_MAX_CERT_LIFETIME
+        backend::tls::DEFAULT_MAX_CERT_LIFETIME
     }
 }
 
@@ -117,7 +117,7 @@ pub struct AutoTlsCa {
 
 impl AutoTlsCa {
     fn default_ca_certificate_lifetime() -> Duration {
-        Duration::from_days_unchecked(365 * 2)
+        backend::tls::DEFAULT_CA_CERT_LIFETIME
     }
 }
 
@@ -273,7 +273,7 @@ mod test {
     use super::*;
 
     use crate::{
-        backend::tls::DEFAULT_MAX_CERT_LIFETIME,
+        backend::tls::{DEFAULT_CA_CERT_LIFETIME, DEFAULT_MAX_CERT_LIFETIME},
         crd::{AutoTlsBackend, SecretClass, SecretClassSpec},
     };
 
@@ -305,6 +305,7 @@ mod test {
                             namespace: "default".to_string(),
                         },
                         auto_generate: false,
+                        ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
                     },
                     max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
                 })
@@ -324,6 +325,7 @@ mod test {
                   name: secret-provisioner-tls-ca
                   namespace: default
                 autoGenerate: true
+                caCertificateLifetime: 100d
               maxCertificateLifetime: 31d
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(input);
@@ -339,6 +341,7 @@ mod test {
                             namespace: "default".to_string(),
                         },
                         auto_generate: true,
+                        ca_certificate_lifetime: Duration::from_days_unchecked(100)
                     },
                     max_certificate_lifetime: Duration::from_days_unchecked(31),
                 })
