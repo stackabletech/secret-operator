@@ -107,13 +107,16 @@ pub struct AutoTlsCa {
 
     /// The lifetime of each generated certificate authority.
     ///
-    /// Ignored if `autoGenerate: false`. Should always be more than double `maxCertificateLifetime`.
-    #[serde(default = "AutoTlsCa::default_ca_lifetime")]
-    pub ca_lifetime: Duration,
+    /// Should always be more than double `maxCertificateLifetime`.
+    ///
+    /// If `autoGenerate: true` then the Secret Operator will prepare a new CA certificate the old CA approaches expiration.
+    /// If `autoGenerate: false` then the Secret Operator will log a warning instead.
+    #[serde(default = "AutoTlsCa::default_ca_certificate_lifetime")]
+    pub ca_certificate_lifetime: Duration,
 }
 
 impl AutoTlsCa {
-    fn default_ca_lifetime() -> Duration {
+    fn default_ca_certificate_lifetime() -> Duration {
         Duration::from_days_unchecked(365 * 2)
     }
 }
