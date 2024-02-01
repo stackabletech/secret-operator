@@ -140,7 +140,7 @@ pub struct Config {
     pub manage_ca: bool,
 
     /// The duration of any new CA certificates provisioned.
-    pub ca_lifetime: Duration,
+    pub ca_certificate_lifetime: Duration,
 
     /// If no existing CA certificate outlives `rotate_if_ca_expires_before`, a new
     /// certificate will be generated.
@@ -151,7 +151,7 @@ pub struct Config {
     /// pods' truststores.
     ///
     /// Hence, this value _should_ be larger than the PKI's maximum certificate lifetime,
-    /// and smaller than [`Self::ca_lifetime`].
+    /// and smaller than [`Self::ca_certificate_lifetime`].
     pub rotate_if_ca_expires_before: Option<Duration>,
 }
 
@@ -185,7 +185,7 @@ impl CertificateAuthority {
             .build();
         let now = OffsetDateTime::now_utc();
         let not_before = now - Duration::from_minutes_unchecked(5);
-        let not_after = now + config.ca_lifetime;
+        let not_after = now + config.ca_certificate_lifetime;
         let conf = Conf::new(ConfMethod::default()).unwrap();
         let private_key = Rsa::generate(2048)
             .and_then(PKey::try_from)
