@@ -173,12 +173,20 @@ impl SecretBackend for TlsGenerate {
         let not_before = now - Duration::from_minutes_unchecked(5);
 
         // Extract and convert consumer input from the Volume annotations.
-        let cert_lifetime = selector.autotls_cert_lifetime;
+        let mut cert_lifetime = selector.autotls_cert_lifetime;
         let cert_restart_buffer = selector.autotls_cert_restart_buffer;
 
         // We need to check that the cert lifetime it is not longer than allowed,
         // by capping it to the maximum configured at the SecretClass.
-        let cert_lifetime = min(cert_lifetime, self.max_cert_lifetime);
+        if cert_lifetime > self.max_cert_lifetime {
+            tracing::info!(
+                certificate.lifetime.requested = %cert_lifetime,
+                certificate.lifetime.maximum = %self.max_cert_lifetime,
+                "Pod requested a certificate to have a longer lifetime than the configured maximum, reducing",
+            );
+            cert_lifetime = self.max_cert_lifetime;
+        }
+
         let not_after = now + cert_lifetime;
         let expire_pod_after = not_after - cert_restart_buffer;
         if expire_pod_after <= now {
