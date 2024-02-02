@@ -19,6 +19,7 @@ use openssl::{
         X509Builder, X509NameBuilder,
     },
 };
+use rand::Rng;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{self, FixedOffset, TimeZone},
@@ -61,6 +62,9 @@ pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_hours_unchecked(24);
 /// take hours. To prevent expired certificates we need to evict them enough time in advance
 /// - which is the purpose of the buffer.
 pub const DEFAULT_CERT_RESTART_BUFFER: Duration = Duration::from_hours_unchecked(6);
+
+/// We randomize the certificate lifetimes slightly, in order to avoid all pods of a set restarting/failing at the same time.
+pub const CERT_JITTER_FACTOR: f64 = 0.2;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -173,19 +177,34 @@ impl SecretBackend for TlsGenerate {
         let not_before = now - Duration::from_minutes_unchecked(5);
 
         // Extract and convert consumer input from the Volume annotations.
-        let mut cert_lifetime = selector.autotls_cert_lifetime;
+        let cert_lifetime = selector.autotls_cert_lifetime;
         let cert_restart_buffer = selector.autotls_cert_restart_buffer;
 
         // We need to check that the cert lifetime it is not longer than allowed,
         // by capping it to the maximum configured at the SecretClass.
-        if cert_lifetime > self.max_cert_lifetime {
+        let cert_lifetime = if cert_lifetime > self.max_cert_lifetime {
             tracing::info!(
                 certificate.lifetime.requested = %cert_lifetime,
                 certificate.lifetime.maximum = %self.max_cert_lifetime,
+                certificate.lifetime = %self.max_cert_lifetime,
                 "Pod requested a certificate to have a longer lifetime than the configured maximum, reducing",
             );
-            cert_lifetime = self.max_cert_lifetime;
-        }
+            self.max_cert_lifetime
+        } else {
+            cert_lifetime
+        };
+
+        // Jitter the certificate lifetimes
+        let jitter_factor = rand::thread_rng().gen_range(0.0..CERT_JITTER_FACTOR);
+        let jitter_amount = Duration::from(cert_lifetime.mul_f64(jitter_factor));
+        let unjittered_cert_lifetime = cert_lifetime;
+        let cert_lifetime = cert_lifetime - jitter_amount;
+        tracing::info!(
+            certificate.lifetime.requested = %unjittered_cert_lifetime,
+            certificate.lifetime.jitter = %jitter_amount,
+            certificate.lifetime = %cert_lifetime,
+            "Applying jitter to certificate lifetime",
+        );
 
         let not_after = now + cert_lifetime;
         let expire_pod_after = not_after - cert_restart_buffer;
