@@ -1,6 +1,6 @@
 //! Dynamically provisions TLS certificates
 
-use std::{cmp::min, ops::Range};
+use std::ops::Range;
 
 use async_trait::async_trait;
 use openssl::{
