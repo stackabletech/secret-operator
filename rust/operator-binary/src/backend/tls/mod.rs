@@ -1,6 +1,6 @@
 //! Dynamically provisions TLS certificates
 
-use std::cmp::min;
+use std::{cmp::min, ops::Range};
 
 use async_trait::async_trait;
 use openssl::{
@@ -64,7 +64,7 @@ pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_hours_unchecked(24);
 pub const DEFAULT_CERT_RESTART_BUFFER: Duration = Duration::from_hours_unchecked(6);
 
 /// We randomize the certificate lifetimes slightly, in order to avoid all pods of a set restarting/failing at the same time.
-pub const CERT_JITTER_FACTOR: f64 = 0.2;
+pub const DEFAULT_CERT_JITTER_FACTOR: f64 = 0.2;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -100,6 +100,9 @@ pub enum Error {
         expires_at: OffsetDateTime,
         restart_at: OffsetDateTime,
     },
+
+    #[snafu(display("invalid jitter factor {requested} requested, must be within {range:?}"))]
+    JitterOutOfRange { requested: f64, range: Range<f64> },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -120,6 +123,7 @@ impl SecretBackendError for Error {
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::InvalidCertLifetime { .. } => tonic::Code::Internal,
             Error::TooShortCertLifetimeRequiresTimeTravel { .. } => tonic::Code::InvalidArgument,
+            Error::JitterOutOfRange { .. } => tonic::Code::InvalidArgument,
         }
     }
 }
@@ -195,13 +199,24 @@ impl SecretBackend for TlsGenerate {
         };
 
         // Jitter the certificate lifetimes
-        let jitter_factor = rand::thread_rng().gen_range(0.0..CERT_JITTER_FACTOR);
+        let jitter_factor_cap = selector.autotls_cert_jitter_factor;
+        let jitter_factor_allowed_range = 0.0..1.0;
+        if !jitter_factor_allowed_range.contains(&jitter_factor_cap) {
+            return JitterOutOfRangeSnafu {
+                requested: jitter_factor_cap,
+                range: jitter_factor_allowed_range,
+            }
+            .fail();
+        }
+        let jitter_factor = rand::thread_rng().gen_range(0.0..jitter_factor_cap);
         let jitter_amount = Duration::from(cert_lifetime.mul_f64(jitter_factor));
         let unjittered_cert_lifetime = cert_lifetime;
         let cert_lifetime = cert_lifetime - jitter_amount;
         tracing::info!(
             certificate.lifetime.requested = %unjittered_cert_lifetime,
             certificate.lifetime.jitter = %jitter_amount,
+            certificate.lifetime.jitter.factor = jitter_factor,
+            certificate.lifetime.jitter.factor.cap = jitter_factor_cap,
             certificate.lifetime = %cert_lifetime,
             "Applying jitter to certificate lifetime",
         );

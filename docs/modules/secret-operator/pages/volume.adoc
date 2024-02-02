@@ -79,6 +79,18 @@ in a rolling fashion.
 
 The format is documented in xref:concepts:duration.adoc[].
 
+=== `secrets.stackable.tech/backend.autotls.cert.jitter-factor`
+
+*Required*: false
+
+*Default value*: `0.2`
+
+*Backends*: xref:secretclass.adoc#backend-autotls[]
+
+Up to this part of the Certificate's lifetime may be removed for jittering.
+
+Must be within 0.0 and 1.0.
+
 === `secrets.stackable.tech/kerberos.service.names`
 
 *Required*: false
