@@ -3,6 +3,8 @@
 image:
   repository: docker.stackable.tech/stackable/secret-operator
   pullPolicy: IfNotPresent
+  pullSecrets: []
+
 csiProvisioner:
   image:
     repository: docker.stackable.tech/k8s/sig-storage/csi-provisioner
@@ -39,7 +41,6 @@ node:
         cpu: 100m
         memory: 128Mi
 
-imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
@@ -53,6 +54,10 @@ serviceAccount:
   name: ""
 
 podAnnotations: {}
+
+# Provide additional labels which get attached to all deployed resources
+labels:
+  stackable.tech/vendor: Stackable
 
 podSecurityContext: {}
   # fsGroup: 2000

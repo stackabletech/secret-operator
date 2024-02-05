@@ -7,10 +7,13 @@ use snafu::{ResultExt, Snafu};
 pub enum Error {
     #[snafu(display("failed to initialize kadm5 server handle"))]
     KadminInit { source: kadm5::Error },
+
     #[snafu(display("failed to create principal"))]
     CreatePrincipal { source: kadm5::Error },
+
     #[snafu(display("failed to principal's keys"))]
     GetPrincipalKeys { source: kadm5::Error },
+
     #[snafu(display("failed to add key to keytab"))]
     AddToKeytab { source: krb5::Error },
 }

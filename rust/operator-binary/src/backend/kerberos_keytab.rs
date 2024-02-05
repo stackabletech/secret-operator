@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_krb5_provision_keytab::provision_keytab;
-use stackable_operator::k8s_openapi::api::core::v1::{Secret, SecretReference};
+use stackable_operator::{k8s_openapi::api::core::v1::Secret, kube::runtime::reflector::ObjectRef};
+use stackable_secret_operator_crd_utils::SecretReference;
 use tempfile::tempdir;
 use tokio::{
     fs::File,
@@ -20,39 +21,44 @@ use super::{
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("invalid secret reference: {secret:?}"))]
-    InvalidSecretRef { secret: SecretReference },
     #[snafu(display("failed to get addresses for scope {scope}"))]
     ScopeAddresses {
         source: ScopeAddressesError,
         scope: SecretScope,
     },
-    #[snafu(display("failed to load admin keytab {secret:?}"))]
+
+    #[snafu(display("failed to load admin keytab from {secret}"))]
     LoadAdminKeytab {
         source: stackable_operator::error::Error,
-        secret: SecretReference,
+        secret: ObjectRef<Secret>,
     },
-    #[snafu(display(r#"admin keytab {secret:?} does not contain key "keytab""#))]
-    NoAdminKeytabKeyInSecret { secret: SecretReference },
+
+    #[snafu(display(r#"admin keytab {secret} does not contain key "keytab""#))]
+    NoAdminKeytabKeyInSecret { secret: ObjectRef<Secret> },
+
     #[snafu(display("failed to create temp dir"))]
     TempSetup { source: std::io::Error },
+
     #[snafu(display("failed to write Kerberos configuration"))]
     WriteConfig { source: std::io::Error },
+
     #[snafu(display("failed to write admin keytab"))]
     WriteAdminKeytab { source: std::io::Error },
+
     #[snafu(display("failed to provision keytab"))]
     ProvisionKeytab {
         source: stackable_krb5_provision_keytab::Error,
     },
+
     #[snafu(display("generated invalid Kerberos principal for pod"))]
     PodPrincipal { source: InvalidKerberosPrincipal },
+
     #[snafu(display("failed to read keytab"))]
     ReadKeytab { source: std::io::Error },
 }
 impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
         match self {
-            Error::InvalidSecretRef { .. } => tonic::Code::FailedPrecondition,
             Error::LoadAdminKeytab { .. } => tonic::Code::FailedPrecondition,
             Error::NoAdminKeytabKeyInSecret { .. } => tonic::Code::FailedPrecondition,
             Error::TempSetup { .. } => tonic::Code::Unavailable,
@@ -85,20 +91,11 @@ impl KerberosKeytab {
         admin_keytab_secret_ref: &SecretReference,
         admin_principal: KerberosPrincipal,
     ) -> Result<Self, Error> {
-        let (keytab_secret_name, keytab_secret_ns) = match admin_keytab_secret_ref {
-            SecretReference {
-                name: Some(name),
-                namespace: Some(ns),
-            } => (name, ns),
-            _ => {
-                return InvalidSecretRefSnafu {
-                    secret: admin_keytab_secret_ref.clone(),
-                }
-                .fail()
-            }
-        };
         let admin_keytab_secret = client
-            .get::<Secret>(keytab_secret_name, keytab_secret_ns)
+            .get::<Secret>(
+                &admin_keytab_secret_ref.name,
+                &admin_keytab_secret_ref.namespace,
+            )
             .await
             .context(LoadAdminKeytabSnafu {
                 secret: admin_keytab_secret_ref.clone(),

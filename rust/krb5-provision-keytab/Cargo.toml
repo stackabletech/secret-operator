@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 krb5 = { path = "../krb5" }
+stackable-secret-operator-crd-utils = { path = "../crd-utils" }
 
 byteorder.workspace = true
 futures.workspace = true

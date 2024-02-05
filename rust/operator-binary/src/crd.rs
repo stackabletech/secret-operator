@@ -3,13 +3,13 @@ use std::{fmt::Display, ops::Deref};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use stackable_operator::{
-    k8s_openapi::api::core::v1::SecretReference,
     kube::CustomResource,
     schemars::{self, JsonSchema},
     time::Duration,
 };
+use stackable_secret_operator_crd_utils::SecretReference;
 
-use crate::backend::tls::DEFAULT_MAX_CERT_LIFETIME;
+use crate::backend;
 
 /// A [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass) is a cluster-global Kubernetes resource
 /// that defines a category of secrets that the Secret Operator knows how to provision.
@@ -82,12 +82,14 @@ pub struct AutoTlsBackend {
     /// In case consumers request a longer lifetime than allowed by this setting,
     /// the lifetime will be the minimum of both, so this setting takes precedence.
     /// The default value is 15 days.
-    #[serde(default = "default_max_certificate_lifetime")]
+    #[serde(default = "AutoTlsBackend::default_max_certificate_lifetime")]
     pub max_certificate_lifetime: Duration,
 }
 
-fn default_max_certificate_lifetime() -> Duration {
-    DEFAULT_MAX_CERT_LIFETIME
+impl AutoTlsBackend {
+    fn default_max_certificate_lifetime() -> Duration {
+        backend::tls::DEFAULT_MAX_CERT_LIFETIME
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -97,9 +99,26 @@ pub struct AutoTlsCa {
     /// and key is stored in the keys `ca.crt` and `ca.key` respectively.
     pub secret: SecretReference,
 
-    /// Whether a new certificate authority should be generated if it does not already exist.
+    /// Whether the certificate authority should be managed by Secret Operator, including being generated
+    /// if it does not already exist.
+    // TODO: Consider renaming to `manage` for v1alpha2
     #[serde(default)]
     pub auto_generate: bool,
+
+    /// The lifetime of each generated certificate authority.
+    ///
+    /// Should always be more than double `maxCertificateLifetime`.
+    ///
+    /// If `autoGenerate: true` then the Secret Operator will prepare a new CA certificate the old CA approaches expiration.
+    /// If `autoGenerate: false` then the Secret Operator will log a warning instead.
+    #[serde(default = "AutoTlsCa::default_ca_certificate_lifetime")]
+    pub ca_certificate_lifetime: Duration,
+}
+
+impl AutoTlsCa {
+    fn default_ca_certificate_lifetime() -> Duration {
+        backend::tls::DEFAULT_CA_CERT_LIFETIME
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -167,6 +186,7 @@ pub struct Hostname(String);
 pub enum InvalidHostname {
     #[snafu(display("hostname contains illegal characters (allowed: alphanumeric, -, and .)"))]
     IllegalCharacter,
+
     #[snafu(display("hostname may not start with a dash"))]
     StartWithDash,
 }
@@ -211,6 +231,7 @@ pub enum InvalidKerberosPrincipal {
         "principal contains illegal characters (allowed: alphanumeric, /, @, -, and .)"
     ))]
     IllegalCharacter,
+
     #[snafu(display("principal may not start with a dash"))]
     StartWithDash,
 }
@@ -252,7 +273,7 @@ mod test {
     use super::*;
 
     use crate::{
-        backend::tls::DEFAULT_MAX_CERT_LIFETIME,
+        backend::tls::{DEFAULT_CA_CERT_LIFETIME, DEFAULT_MAX_CERT_LIFETIME},
         crd::{AutoTlsBackend, SecretClass, SecretClassSpec},
     };
 
@@ -280,10 +301,11 @@ mod test {
                 backend: crate::crd::SecretClassBackend::AutoTls(AutoTlsBackend {
                     ca: crate::crd::AutoTlsCa {
                         secret: SecretReference {
-                            name: Some("secret-provisioner-tls-ca".to_string()),
-                            namespace: Some("default".to_string()),
+                            name: "secret-provisioner-tls-ca".to_string(),
+                            namespace: "default".to_string(),
                         },
                         auto_generate: false,
+                        ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
                     },
                     max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
                 })
@@ -303,6 +325,7 @@ mod test {
                   name: secret-provisioner-tls-ca
                   namespace: default
                 autoGenerate: true
+                caCertificateLifetime: 100d
               maxCertificateLifetime: 31d
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(input);
@@ -314,10 +337,11 @@ mod test {
                 backend: crate::crd::SecretClassBackend::AutoTls(AutoTlsBackend {
                     ca: crate::crd::AutoTlsCa {
                         secret: SecretReference {
-                            name: Some("secret-provisioner-tls-ca".to_string()),
-                            namespace: Some("default".to_string()),
+                            name: "secret-provisioner-tls-ca".to_string(),
+                            namespace: "default".to_string(),
                         },
                         auto_generate: true,
+                        ca_certificate_lifetime: Duration::from_days_unchecked(100)
                     },
                     max_certificate_lifetime: Duration::from_days_unchecked(31),
                 })

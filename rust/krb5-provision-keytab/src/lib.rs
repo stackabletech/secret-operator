@@ -1,4 +1,4 @@
-//! API wrapper for accessing
+//! API wrapper for accessing krb5-provision-keytab binary
 
 use std::{
     path::{Path, PathBuf},
@@ -7,7 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use stackable_operator::k8s_openapi::api::core::v1::SecretReference;
+use stackable_secret_operator_crd_utils::SecretReference;
 use tokio::{io::AsyncWriteExt, process::Command};
 
 #[derive(Serialize, Deserialize)]
@@ -41,14 +41,19 @@ pub struct Response {}
 pub enum Error {
     #[snafu(display("failed to serialize request"))]
     SerializeRequest { source: serde_json::Error },
+
     #[snafu(display("failed to deserialize response"))]
     DeserializeResponse { source: serde_json::Error },
+
     #[snafu(display("failed to start provisioner"))]
     SpawnProvisioner { source: std::io::Error },
+
     #[snafu(display("error waiting for provisioner to exit"))]
     WaitProvisioner { source: std::io::Error },
+
     #[snafu(display("failed to provision keytab: {msg}"))]
     RunProvisioner { msg: String },
+
     #[snafu(display("failed to write request"))]
     WriteRequest { source: std::io::Error },
 }
