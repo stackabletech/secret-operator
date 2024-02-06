@@ -16,7 +16,6 @@ use stackable_operator::{
 };
 use std::{collections::HashSet, convert::Infallible};
 
-pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
 pub use kerberos_keytab::KerberosKeytab;
 pub use tls::TlsGenerate;
