@@ -113,6 +113,14 @@ pub struct AutoTlsCa {
     /// If `autoGenerate: false` then the Secret Operator will log a warning instead.
     #[serde(default = "AutoTlsCa::default_ca_certificate_lifetime")]
     pub ca_certificate_lifetime: Duration,
+
+    /// Whether the CA certificate should be rotated once the old certificate approaches expiration.
+    ///
+    /// This only takes effect when `autoGenerate: true`.
+    ///
+    /// This is an experimental option, that may be removed or changed in the future.
+    #[serde(default)]
+    pub experimental_rotate_ca_certificate: bool,
 }
 
 impl AutoTlsCa {
