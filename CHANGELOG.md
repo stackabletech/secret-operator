@@ -15,12 +15,14 @@ All notable changes to this project will be documented in this file.
 - `autoTLS` certificate authorities will now be rotated regularly ([#350]).
   - [BREAKING] This changes the format of the CA secrets. Old secrets will be migrated automatically, but manual intervention will be required to downgrade back to 23.11.x.
 - `autoTLS` certificate authority lifetimes are now configurable ([#357]).
+- Certificate lifetimes are now jittered ([#361]).
 
 [#333]: https://github.com/stackabletech/secret-operator/pull/333
 [#341]: https://github.com/stackabletech/secret-operator/pull/341
 [#350]: https://github.com/stackabletech/secret-operator/pull/350
 [#352]: https://github.com/stackabletech/secret-operator/pull/352
 [#357]: https://github.com/stackabletech/secret-operator/pull/357
+[#361]: https://github.com/stackabletech/secret-operator/pull/361
 
 
 ## [23.11.0] - 2023-11-24
