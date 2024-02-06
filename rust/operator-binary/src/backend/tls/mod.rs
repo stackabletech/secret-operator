@@ -146,6 +146,7 @@ impl TlsGenerate {
             secret: ca_secret,
             auto_generate: auto_generate_ca,
             ca_certificate_lifetime,
+            experimental_rotate_ca_certificate,
         }: &crd::AutoTlsCa,
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
@@ -156,7 +157,8 @@ impl TlsGenerate {
                 &ca::Config {
                     manage_ca: *auto_generate_ca,
                     ca_certificate_lifetime: *ca_certificate_lifetime,
-                    rotate_if_ca_expires_before: Some(*ca_certificate_lifetime / 2),
+                    rotate_if_ca_expires_before: experimental_rotate_ca_certificate
+                        .then(|| *ca_certificate_lifetime / 2),
                 },
             )
             .await
