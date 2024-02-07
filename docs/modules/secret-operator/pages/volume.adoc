@@ -91,6 +91,12 @@ Up to this part of the Certificate's lifetime may be removed for jittering.
 
 Must be within 0.0 and 1.0.
 
+For example, given a requested lifetime of 1 day and a jitter factor of 0.2, the certificate's lifetime would be
+shortened by a random amount between 0 and 4.8 hours, leaving a certificate that will be valid for between
+19.2 and 24 hours.
+
+Jittering may be disabled by setting the jitter factor to 0.
+
 === `secrets.stackable.tech/kerberos.service.names`
 
 *Required*: false
