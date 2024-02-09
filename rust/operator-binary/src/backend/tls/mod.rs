@@ -1,6 +1,6 @@
 //! Dynamically provisions TLS certificates
 
-use std::cmp::min;
+use std::ops::Range;
 
 use async_trait::async_trait;
 use openssl::{
@@ -19,6 +19,7 @@ use openssl::{
         X509Builder, X509NameBuilder,
     },
 };
+use rand::Rng;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{self, FixedOffset, TimeZone},
@@ -62,6 +63,9 @@ pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_hours_unchecked(24);
 /// - which is the purpose of the buffer.
 pub const DEFAULT_CERT_RESTART_BUFFER: Duration = Duration::from_hours_unchecked(6);
 
+/// We randomize the certificate lifetimes slightly, in order to avoid all pods of a set restarting/failing at the same time.
+pub const DEFAULT_CERT_JITTER_FACTOR: f64 = 0.2;
+
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("failed to get addresses for scope {scope}"))]
@@ -96,6 +100,9 @@ pub enum Error {
         expires_at: OffsetDateTime,
         restart_at: OffsetDateTime,
     },
+
+    #[snafu(display("invalid jitter factor {requested} requested, must be within {range:?}"))]
+    JitterOutOfRange { requested: f64, range: Range<f64> },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -116,6 +123,7 @@ impl SecretBackendError for Error {
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::InvalidCertLifetime { .. } => tonic::Code::Internal,
             Error::TooShortCertLifetimeRequiresTimeTravel { .. } => tonic::Code::InvalidArgument,
+            Error::JitterOutOfRange { .. } => tonic::Code::InvalidArgument,
         }
     }
 }
@@ -138,6 +146,7 @@ impl TlsGenerate {
             secret: ca_secret,
             auto_generate: auto_generate_ca,
             ca_certificate_lifetime,
+            experimental_rotate_ca_certificate,
         }: &crd::AutoTlsCa,
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
@@ -148,7 +157,8 @@ impl TlsGenerate {
                 &ca::Config {
                     manage_ca: *auto_generate_ca,
                     ca_certificate_lifetime: *ca_certificate_lifetime,
-                    rotate_if_ca_expires_before: Some(*ca_certificate_lifetime / 2),
+                    rotate_if_ca_expires_before: experimental_rotate_ca_certificate
+                        .then(|| *ca_certificate_lifetime / 2),
                 },
             )
             .await
@@ -178,7 +188,41 @@ impl SecretBackend for TlsGenerate {
 
         // We need to check that the cert lifetime it is not longer than allowed,
         // by capping it to the maximum configured at the SecretClass.
-        let cert_lifetime = min(cert_lifetime, self.max_cert_lifetime);
+        let cert_lifetime = if cert_lifetime > self.max_cert_lifetime {
+            tracing::info!(
+                certificate.lifetime.requested = %cert_lifetime,
+                certificate.lifetime.maximum = %self.max_cert_lifetime,
+                certificate.lifetime = %self.max_cert_lifetime,
+                "Pod requested a certificate to have a longer lifetime than the configured maximum, reducing",
+            );
+            self.max_cert_lifetime
+        } else {
+            cert_lifetime
+        };
+
+        // Jitter the certificate lifetimes
+        let jitter_factor_cap = selector.autotls_cert_jitter_factor;
+        let jitter_factor_allowed_range = 0.0..1.0;
+        if !jitter_factor_allowed_range.contains(&jitter_factor_cap) {
+            return JitterOutOfRangeSnafu {
+                requested: jitter_factor_cap,
+                range: jitter_factor_allowed_range,
+            }
+            .fail();
+        }
+        let jitter_factor = rand::thread_rng().gen_range(0.0..jitter_factor_cap);
+        let jitter_amount = Duration::from(cert_lifetime.mul_f64(jitter_factor));
+        let unjittered_cert_lifetime = cert_lifetime;
+        let cert_lifetime = cert_lifetime - jitter_amount;
+        tracing::info!(
+            certificate.lifetime.requested = %unjittered_cert_lifetime,
+            certificate.lifetime.jitter = %jitter_amount,
+            certificate.lifetime.jitter.factor = jitter_factor,
+            certificate.lifetime.jitter.factor.cap = jitter_factor_cap,
+            certificate.lifetime = %cert_lifetime,
+            "Applying jitter to certificate lifetime",
+        );
+
         let not_after = now + cert_lifetime;
         let expire_pod_after = not_after - cert_restart_buffer;
         if expire_pod_after <= now {

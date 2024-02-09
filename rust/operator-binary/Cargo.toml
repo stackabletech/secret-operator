@@ -39,6 +39,7 @@ tonic.workspace = true
 tracing.workspace = true
 uuid.workspace = true
 yasna.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
 serde_yaml.workspace = true

@@ -8,7 +8,7 @@ pub mod scope;
 pub mod tls;
 
 use async_trait::async_trait;
-use serde::{Deserialize, Deserializer};
+use serde::{de::Unexpected, Deserialize, Deserializer};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{DateTime, FixedOffset},
@@ -16,7 +16,6 @@ use stackable_operator::{
 };
 use std::{collections::HashSet, convert::Infallible};
 
-pub use dynamic::Dynamic;
 pub use k8s_search::K8sSearch;
 pub use kerberos_keytab::KerberosKeytab;
 pub use tls::TlsGenerate;
@@ -26,10 +25,7 @@ use scope::SecretScope;
 
 use crate::format::{SecretData, SecretFormat};
 
-use self::{
-    pod_info::SchedulingPodInfo,
-    tls::{DEFAULT_CERT_LIFETIME, DEFAULT_CERT_RESTART_BUFFER},
-};
+use self::pod_info::SchedulingPodInfo;
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
@@ -111,14 +107,27 @@ pub struct SecretVolumeSelector {
         default = "default_cert_restart_buffer"
     )]
     pub autotls_cert_restart_buffer: Duration,
+
+    /// The part of the certificate's lifetime that may be removed for jittering.
+    /// Must be within 0.0 and 1.0.
+    #[serde(
+        rename = "secrets.stackable.tech/backend.autotls.cert.jitter-factor",
+        deserialize_with = "SecretVolumeSelector::deserialize_str_as_f64",
+        default = "default_cert_jitter_factor"
+    )]
+    pub autotls_cert_jitter_factor: f64,
 }
 
 fn default_cert_restart_buffer() -> Duration {
-    DEFAULT_CERT_RESTART_BUFFER
+    tls::DEFAULT_CERT_RESTART_BUFFER
 }
 
 fn default_cert_lifetime() -> Duration {
-    DEFAULT_CERT_LIFETIME
+    tls::DEFAULT_CERT_LIFETIME
+}
+
+fn default_cert_jitter_factor() -> f64 {
+    tls::DEFAULT_CERT_JITTER_FACTOR
 }
 
 #[derive(Snafu, Debug)]
@@ -182,6 +191,16 @@ impl SecretVolumeSelector {
     fn deserialize_str_vec<'de, D: Deserializer<'de>>(de: D) -> Result<Vec<String>, D::Error> {
         let full_str = String::deserialize(de)?;
         Ok(full_str.split(',').map(str::to_string).collect())
+    }
+
+    fn deserialize_str_as_f64<'de, D: Deserializer<'de>>(de: D) -> Result<f64, D::Error> {
+        let str = String::deserialize(de)?;
+        str.parse().map_err(|_| {
+            <D::Error as serde::de::Error>::invalid_value(
+                Unexpected::Str(&str),
+                &"a string containing a f64",
+            )
+        })
     }
 }
 
