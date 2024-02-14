@@ -15,3 +15,5 @@ result
 image.tar
 
 tilt_options.json
+
+.envrc
