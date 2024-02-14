@@ -113,14 +113,6 @@ pub struct AutoTlsCa {
     /// If `autoGenerate: false` then the Secret Operator will log a warning instead.
     #[serde(default = "AutoTlsCa::default_ca_certificate_lifetime")]
     pub ca_certificate_lifetime: Duration,
-
-    /// Whether the CA certificate should be rotated once the old certificate approaches expiration.
-    ///
-    /// This only takes effect when `autoGenerate: true`.
-    ///
-    /// This is an experimental option, that may be removed or changed in the future.
-    #[serde(default)]
-    pub experimental_rotate_ca_certificate: bool,
 }
 
 impl AutoTlsCa {
@@ -314,7 +306,6 @@ mod test {
                         },
                         auto_generate: false,
                         ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
-                        experimental_rotate_ca_certificate: false,
                     },
                     max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
                 })
@@ -335,7 +326,6 @@ mod test {
                   namespace: default
                 autoGenerate: true
                 caCertificateLifetime: 100d
-                experimentalRotateCaCertificate: true
               maxCertificateLifetime: 31d
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(input);
@@ -351,8 +341,7 @@ mod test {
                             namespace: "default".to_string(),
                         },
                         auto_generate: true,
-                        ca_certificate_lifetime: Duration::from_days_unchecked(100),
-                        experimental_rotate_ca_certificate: true,
+                        ca_certificate_lifetime: Duration::from_days_unchecked(100)
                     },
                     max_certificate_lifetime: Duration::from_days_unchecked(31),
                 })
