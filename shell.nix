@@ -15,25 +15,18 @@ let
 in pkgs.mkShell rec {
   name = "secret-operator";
 
-  # want to test:
-  # cargo clippy --all-targets
-  # cargo test
-  # cargo doc --document-private-items
-  # make regenerate-charts
-  # make run-dev
-  # ./scripts/run_tests.sh
-
   packages = with pkgs; [
     ## cargo et-al
     rustup # this breaks pkg-config if it is in the nativeBuildInputs
 
-    # Extra dependencies for use in a pure env (nix-shell --pure)
+    ## Extra dependencies for use in a pure env (nix-shell --pure)
     # cacert
     # vim nvim nano
   ];
 
   # derivation runtime dependencies
   buildInputs = pkgs.lib.concatMap (crate: crate.buildInputs) cargoDependencySet ++ [ pkgs.libz ];
+  
   # build time dependencies
   nativeBuildInputs = pkgs.lib.concatMap (crate: crate.nativeBuildInputs) cargoDependencySet ++ (with pkgs; [
     pkg-config
