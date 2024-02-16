@@ -1,15 +1,8 @@
 let
-  # sources = import ./nix/sources.nix;
-  # pkgs = import sources.nixpkgs {};
-
   self = import ./. {};
   inherit (self) sources pkgs;
 
-
   beku = pkgs.callPackage (sources."beku.py" + "/beku.nix") {};
-
-
-
   cargoDependencySetOfCrate = crate: [ crate ] ++ pkgs.lib.concatMap cargoDependencySetOfCrate (crate.dependencies ++ crate.buildDependencies);
   cargoDependencySet = pkgs.lib.unique (pkgs.lib.flatten (pkgs.lib.mapAttrsToList (crateName: crate: cargoDependencySetOfCrate crate.build) self.cargo.workspaceMembers));
 in pkgs.mkShell rec {
