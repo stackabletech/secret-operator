@@ -77,7 +77,7 @@ jobs:
           locale: "US"
           # Ignore spellchecking generated files
           exclude: |
-            Cargo.nix
+            ./Cargo.nix
 
   languagetool:
     runs-on: ubuntu-latest
