@@ -18,16 +18,10 @@ in pkgs.mkShell rec {
   ];
 
   # derivation runtime dependencies
-  buildInputs = pkgs.lib.concatMap (crate: crate.buildInputs) cargoDependencySet ++ [ pkgs.libz ];
-  
+  buildInputs = pkgs.lib.concatMap (crate: crate.buildInputs) cargoDependencySet;
+
   # build time dependencies
   nativeBuildInputs = pkgs.lib.concatMap (crate: crate.nativeBuildInputs) cargoDependencySet ++ (with pkgs; [
-    pkg-config
-    clang 
-    openssl
-    protobuf
-    krb5 
-
     git
     yq-go
     jq
@@ -45,4 +39,5 @@ in pkgs.mkShell rec {
   ]);
 
   LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
+  BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.glibc.dev}/include -I${pkgs.clang}/resource-root/include";
 }
