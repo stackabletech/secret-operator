@@ -7723,13 +7723,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.61.0";
+        version = "0.64.0";
         edition = "2021";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "ddc57addbc741e3977b1589e553164505a59f639";
-          sha256 = "1scwkw9gjd1gaijz8nxdpps88r85mxkxn5l2805m9g6cm6zbgvc0";
+          rev = "d988822e7af3d363d52fb35643f0c6ed933f340a";
+          sha256 = "05a4aqb2lv3rkc049zsq5vxxbx4km8l1j6mbn984wjag5fsmrpfp";
         };
         authors = [
           "Stackable GmbH <info@stackable.de>"
@@ -7888,13 +7888,13 @@ rec {
       };
       "stackable-operator-derive" = rec {
         crateName = "stackable-operator-derive";
-        version = "0.61.0";
+        version = "0.64.0";
         edition = "2021";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "ddc57addbc741e3977b1589e553164505a59f639";
-          sha256 = "1scwkw9gjd1gaijz8nxdpps88r85mxkxn5l2805m9g6cm6zbgvc0";
+          rev = "d988822e7af3d363d52fb35643f0c6ed933f340a";
+          sha256 = "05a4aqb2lv3rkc049zsq5vxxbx4km8l1j6mbn984wjag5fsmrpfp";
         };
         procMacro = true;
         authors = [
