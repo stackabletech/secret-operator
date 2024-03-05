@@ -291,6 +291,13 @@ impl Controller for SecretProvisionerController {
     ) -> Result<Response<csi::v1::ControllerGetVolumeResponse>, Status> {
         Err(Status::unimplemented("endpoint not implemented"))
     }
+
+    async fn controller_modify_volume(
+        &self,
+        _request: Request<csi::v1::ControllerModifyVolumeRequest>,
+    ) -> Result<Response<csi::v1::ControllerModifyVolumeResponse>, Status> {
+        Err(Status::unimplemented("endpoint not implemented"))
+    }
 }
 
 #[derive(Deserialize)]
