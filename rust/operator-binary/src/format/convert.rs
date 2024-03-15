@@ -10,7 +10,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use crate::format::utils::split_pem_certificates;
 
 use super::{
-    well_known::{CompatibilityOptions, TlsPem, TlsPkcs12},
+    well_known::{CompatibilityOptions, TlsCaPem, TlsPem, TlsPkcs12, TlsPkcs12Truststore},
     SecretFormat, WellKnownSecretData,
 };
 
@@ -28,6 +28,35 @@ pub fn convert(
                 pem,
                 compat.tls_pkcs12_password.as_deref().unwrap_or_default(),
             )?))
+        }
+        (WellKnownSecretData::TlsPem(pem), SecretFormat::TlsCaPem) => {
+            Ok(WellKnownSecretData::TlsCaPem(TlsCaPem {
+                ca_pem: pem.ca_pem,
+            }))
+        }
+        (WellKnownSecretData::TlsPem(pem), SecretFormat::TlsPkcs12Truststore) => {
+            let ca_stack = ca_pem_to_ca_stack(&pem.ca_pem)?;
+
+            Ok(WellKnownSecretData::TlsPkcs12Truststore(
+                TlsPkcs12Truststore {
+                    truststore: pkcs12_truststore(
+                        &ca_stack,
+                        compat.tls_pkcs12_password.as_deref().unwrap_or_default(),
+                    )?,
+                },
+            ))
+        }
+        (WellKnownSecretData::TlsCaPem(pem), SecretFormat::TlsPkcs12Truststore) => {
+            let ca_stack = ca_pem_to_ca_stack(&pem.ca_pem)?;
+
+            Ok(WellKnownSecretData::TlsPkcs12Truststore(
+                TlsPkcs12Truststore {
+                    truststore: pkcs12_truststore(
+                        &ca_stack,
+                        compat.tls_pkcs12_password.as_deref().unwrap_or_default(),
+                    )?,
+                },
+            ))
         }
 
         (from, to) => NoValidConversionSnafu { from, to }.fail(),
@@ -49,20 +78,11 @@ pub enum ConvertError {
     TlsToPkcs12 { source: TlsToPkcs12Error },
 }
 
-pub fn convert_tls_to_pkcs12(
-    pem: TlsPem,
-    p12_password: &str,
-) -> Result<TlsPkcs12, TlsToPkcs12Error> {
+fn convert_tls_to_pkcs12(pem: TlsPem, p12_password: &str) -> Result<TlsPkcs12, TlsToPkcs12Error> {
     use tls_to_pkcs12_error::*;
     let cert = X509::from_pem(&pem.certificate_pem).context(LoadCertSnafu)?;
     let key = PKey::private_key_from_pem(&pem.key_pem).context(LoadKeySnafu)?;
-
-    let mut ca_stack = Stack::<X509>::new().context(LoadCaSnafu)?;
-    for ca in split_pem_certificates(&pem.ca_pem) {
-        X509::from_pem(ca)
-            .and_then(|ca| ca_stack.push(ca))
-            .context(LoadCertSnafu)?;
-    }
+    let ca_stack = ca_pem_to_ca_stack(&pem.ca_pem)?;
 
     Ok(TlsPkcs12 {
         truststore: pkcs12_truststore(&ca_stack, p12_password)?,
@@ -74,6 +94,17 @@ pub fn convert_tls_to_pkcs12(
             .and_then(|store| store.to_der())
             .context(BuildKeystoreSnafu)?,
     })
+}
+
+fn ca_pem_to_ca_stack(ca_pem: &[u8]) -> Result<Stack<X509>, TlsToPkcs12Error> {
+    use tls_to_pkcs12_error::*;
+    let mut ca_stack = Stack::<X509>::new().context(LoadCaSnafu)?;
+    for ca in split_pem_certificates(ca_pem) {
+        X509::from_pem(ca)
+            .and_then(|ca| ca_stack.push(ca))
+            .context(LoadCertSnafu)?;
+    }
+    Ok(ca_stack)
 }
 
 fn bmp_string(s: &str) -> Vec<u8> {
