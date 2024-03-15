@@ -13,7 +13,10 @@ tests:
   - name: listener
     dimensions:
       - openshift
-  - name: tls
+  - name: auto-tls
+    dimensions:
+      - openshift
+  - name: user-provided-tls
     dimensions:
       - openshift
 suites:

@@ -1,0 +1,48 @@
+# $NAMESPACE will be replaced with the namespace of the test case.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tls-consumer-pkcs12-truststore
+spec:
+  template:
+    spec:
+      containers:
+        - name: consumer
+          image: docker.stackable.tech/stackable/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - bash
+          args:
+            - -c
+            - |
+              set -euo pipefail
+              ls -la /stackable/tls
+
+              if ! test -f /stackable/tls/truststore.p12; then echo "Truststore missing!" && exit 1; fi
+              if test -f /stackable/tls/keystore.p12; then echo "Keystore is present, but should be absent!" && exit 1; fi
+          volumeMounts:
+            - mountPath: /stackable/tls
+              name: tls
+      volumes:
+        - name: tls
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls-$NAMESPACE
+                  secrets.stackable.tech/scope: pod
+                  secrets.stackable.tech/format: tls-pkcs12-truststore
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 0
+      serviceAccount: integration-tests-sa

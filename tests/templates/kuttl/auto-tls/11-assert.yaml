@@ -6,6 +6,6 @@ timeout: 300
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: tls-consumer
+  name: tls-consumer-pkcs12
 status:
   succeeded: 1
