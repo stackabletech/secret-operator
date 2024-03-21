@@ -22,8 +22,18 @@ pub struct TlsPem {
 }
 
 #[derive(Debug)]
+pub struct TlsCaPem {
+    pub ca_pem: Vec<u8>,
+}
+
+#[derive(Debug)]
 pub struct TlsPkcs12 {
     pub keystore: Vec<u8>,
+    pub truststore: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub struct TlsPkcs12Truststore {
     pub truststore: Vec<u8>,
 }
 
@@ -41,7 +51,9 @@ pub struct Kerberos {
 )]
 pub enum WellKnownSecretData {
     TlsPem(TlsPem),
+    TlsCaPem(TlsCaPem),
     TlsPkcs12(TlsPkcs12),
+    TlsPkcs12Truststore(TlsPkcs12Truststore),
     Kerberos(Kerberos),
 }
 
@@ -58,6 +70,9 @@ impl WellKnownSecretData {
                 (FILE_PEM_CERT_CA.to_string(), ca_pem),
             ]
             .into(),
+            WellKnownSecretData::TlsCaPem(TlsCaPem { ca_pem }) => {
+                [(FILE_PEM_CERT_CA.to_string(), ca_pem)].into()
+            }
             WellKnownSecretData::TlsPkcs12(TlsPkcs12 {
                 keystore,
                 truststore,
@@ -66,6 +81,9 @@ impl WellKnownSecretData {
                 (FILE_PKCS12_CERT_TRUSTSTORE.to_string(), truststore),
             ]
             .into(),
+            WellKnownSecretData::TlsPkcs12Truststore(TlsPkcs12Truststore { truststore }) => {
+                [(FILE_PKCS12_CERT_TRUSTSTORE.to_string(), truststore)].into()
+            }
             WellKnownSecretData::Kerberos(Kerberos { keytab, krb5_conf }) => [
                 (FILE_KERBEROS_KEYTAB_KEYTAB.to_string(), keytab),
                 (FILE_KERBEROS_KEYTAB_KRB5_CONF.to_string(), krb5_conf),
@@ -88,6 +106,8 @@ impl WellKnownSecretData {
                 key_pem: take_file(FILE_PEM_CERT_KEY)?,
                 ca_pem: take_file(FILE_PEM_CERT_CA)?,
             }))
+        } else if let Ok(ca_pem) = take_file(SecretFormat::TlsCaPem, FILE_PEM_CERT_CA) {
+            Ok(WellKnownSecretData::TlsCaPem(TlsCaPem { ca_pem }))
         } else if let Ok(keystore) = take_file(SecretFormat::TlsPkcs12, FILE_PKCS12_CERT_KEYSTORE) {
             Ok(WellKnownSecretData::TlsPkcs12(TlsPkcs12 {
                 keystore,
