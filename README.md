@@ -20,6 +20,10 @@ You can install the operator using [stackablectl or helm](https://docs.stackable
 
 Read on to get started with it, or see it in action in one of our [demos](https://stackable.tech/en/demos/).
 
+## Building
+
+As a user you do not need to build the operator yourself, but for development purposes you can read the [build instructions](./BUILDING.md) to learn how to build the operator.
+
 ## Getting Started
 
 You can follow this [tutorial](https://docs.stackable.tech/home/stable/secret-operator/getting_started/first_steps) .

@@ -56,7 +56,3 @@ In some cases IBM cloud has the kubelet directory located at `/var/data/kubelet/
 `failed to publish volume error=status: Unavailable, message: "failed to create secret parent dir /var/data/kubelet/pods/<POD_ID>/volumes/kubernetes.io~csi/pvc-<PVC_ID>/mount: No such file or directory (os error 2)"`
 
 In case you are encountering the mentioned error (or secret-operator does not work on your IBM cloud at all), you need to add the argument `--set kubeletDir=/var/data/kubelet` to the `helm install` command.
-
-== Building the operator from source
-
-See xref:building.adoc[] for more information.
