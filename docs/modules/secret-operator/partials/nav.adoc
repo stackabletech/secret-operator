@@ -1,6 +1,5 @@
 // the nav list should contain the module, because it will/might
 // be included from a different module
-* xref:secret-operator:building.adoc[]
 * xref:secret-operator:installation.adoc[]
 * xref:secret-operator:usage.adoc[]
 * Concepts
