@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- [BREAKING] The TLS CA Secret is now installed into the Namespace of the operator (typically `stackable-operators`), rather than `default`.
+  - Existing users can either migrate (recommended) by copying the CA into the correct Namespace
+    (`kubectl -n default get secret/secret-provisioner-tls-ca -o json | jq '.metadata.namespace = "stackable-operators"' | kubectl create -f-`),
+    or by setting the `secretClasses.tls.caSecretNamespace` Helm flag (`--set secretClasses.tls.caSecretNamespace=default`).
+
 ## [24.3.0] - 2024-03-20
 
 ### Added
