@@ -11,7 +11,7 @@ spec:
           metadata:
             annotations:
               secrets.stackable.tech/class: secret # <1>
-              secrets.stackable.tech/scope: node # <2>
+              secrets.stackable.tech/scope: node,pod,service=secret-consumer # <2>
           spec:
             storageClassName: secrets.stackable.tech # <3>
             accessModes: # <4>
