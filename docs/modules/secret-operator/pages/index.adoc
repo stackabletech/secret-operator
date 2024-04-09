@@ -1,12 +1,16 @@
 = Stackable Secret Operator
+:github: https://github.com/stackabletech/secret-operator/
+:crd: {crd-docs-base-url}/secret-operator/{crd-docs-version}/
+
+[.link-bar]
+* {github}[GitHub {external-link-icon}^]
+* {crd}[CRD documentation {external-link-icon}^]
 
 This is an operator for Kubernetes that provisions and injects secrets into Kubernetes Pods.
 
-Kubernetes Secret objects contain sensitive payloads such as passwords, tokens or keys. These objects
-are usually self-contained and static in the sense that their contents remain unchanged as long as their owners
-do not update them.
+Kubernetes Secret objects contain sensitive payloads such as passwords, tokens or keys.
+These objects are usually self-contained and static in the sense that their contents remain unchanged as long as their owners do not update them.
 
-The Stackable Secret Operator enhances the functionality of Kubernetes Secrets by introducing the concept of a
-SecretClass. A SecretClass represents a reference to a source of sensitive data. In addition to Kubernetes
-Secret objects, the operator can provision Pods with TLS Certificates, Kerberos keytabs or authentication
-tokens from external services.
+The Stackable Secret Operator enhances the functionality of Kubernetes Secrets by introducing the concept of a SecretClass.
+A SecretClass represents a reference to a source of sensitive data.
+In addition to Kubernetes Secret objects, the operator can provision Pods with TLS Certificates, Kerberos keytabs or authentication tokens from external services.
