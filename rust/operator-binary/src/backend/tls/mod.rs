@@ -43,7 +43,7 @@ mod ca;
 
 /// How long CA certificates should last for. Also used for calculating when they should be rotated.
 /// Must be less than half of [`DEFAULT_MAX_CERT_LIFETIME`].
-pub const DEFAULT_CA_CERT_LIFETIME: Duration = Duration::from_days_unchecked(365 * 2);
+pub const DEFAULT_CA_CERT_LIFETIME: Duration = Duration::from_days_unchecked(365);
 
 /// As the Pods will be evicted [`DEFAULT_CERT_RESTART_BUFFER`] before
 /// the cert actually expires, this results in a restart in approx every 2 weeks,
