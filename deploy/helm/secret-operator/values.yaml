@@ -84,3 +84,9 @@ affinity: {}
 
 # Kubelet dir may vary in environments such as microk8s, see https://github.com/stackabletech/secret-operator/issues/229
 kubeletDir: /var/lib/kubelet
+
+secretClasses:
+  tls:
+    # The namespace that the TLS Certificate Authority is installed into.
+    # Defaults to the namespace where secret-op is installed.
+    caSecretNamespace: null
