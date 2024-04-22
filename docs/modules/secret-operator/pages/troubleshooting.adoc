@@ -1,6 +1,10 @@
 = Troubleshooting
 
-== My secret-consuming Pods get stuck `Pending`!
+[#general]
+== General
+
+[#pod-stuck-pending]
+=== My secret-consuming Pods get stuck `Pending`!
 
 . Does the Pod have any events relating to scheduling? (`kubectl describe pod/$POD_NAME`)
 . Is the PersistentVolumeClaim being created? It should have the name `$POD_NAME-$VOLUME_NAME`.
@@ -16,3 +20,23 @@
 . Does the secret-operator sidecar container named `node-driver-registrar` have any relevant log entries?
 . Does the kubelet have any relevant log entries?
 . When running on OpenShift also have a look at the xref:openshift.adoc[OpenShift documentation].
+
+[#active-directory]
+== Active Directory
+
+[#active-directory-ldap-user-conflict]
+=== LDAP user already exists
+
+The Stackable Secret Operator maintains a cache of Active Directory user credentials. This error occurs when a required user is missing from the cache but exists in AD.
+
+This can be caused by a few different root issues:
+
+1. A race condition where multiple Pods require the same identity at the same time, leading to a stale cache.
+   This is transient, and should resolve itself within a few seconds as the cache is updated and any failed attempts are retried.
+2. Trying to reuse a single AD domain across multiple Kubernetes clusters.
+   This takes care to do safely, please see xref:secretclass.adoc#ad-principal-conflicts[] for more information.
+3. Deleting a user from the cache but not from AD (including deleting the whole cache).
+   When deleting users from the cache, make sure to also delete the corresponding AD users. Secret Operator should then automatically recreate them.
+4. The to-be-created principal conlicts with an existing unrelated principal.
+   This has to be resolved manually by an administrator.
+
