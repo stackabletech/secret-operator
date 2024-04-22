@@ -77,7 +77,13 @@ pub enum Error {
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 // Result codes are defined by https://www.rfc-editor.org/rfc/rfc4511#appendix-A.1
+const LDAP_RESULT_CODE_CONSTRAINT_VIOLATION: u32 = 19;
 const LDAP_RESULT_CODE_ENTRY_ALREADY_EXISTS: u32 = 68;
+
+// Error codes from https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/manage/component-updates/spn-and-upn-uniqueness#symptoms.
+// Rendered in LDAP error messages as 8 zero-padded hex digits.
+// BEST-EFFORT ONLY. THE SPECIFIC FORMAT IS NOT DOCUMENTED.
+const AD_CONSTRAINT_PREFIX_UPN_VALUE_NOT_UNIQUE: &str = "000021C8:";
 
 pub struct AdAdmin<'a> {
     ldap: Ldap,
@@ -294,6 +300,15 @@ async fn create_ad_user(
         LDAP_RESULT_CODE_ENTRY_ALREADY_EXISTS => create_user_result
             .success()
             .context(CreateLdapUserConflictSnafu { password_cache_ref })?,
+        LDAP_RESULT_CODE_CONSTRAINT_VIOLATION
+            if create_user_result
+                .text
+                .starts_with(AD_CONSTRAINT_PREFIX_UPN_VALUE_NOT_UNIQUE) =>
+        {
+            create_user_result
+                .success()
+                .context(CreateLdapUserConflictSnafu { password_cache_ref })?
+        }
         _ => create_user_result.success().context(CreateLdapUserSnafu)?,
     };
     Ok(())
