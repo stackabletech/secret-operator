@@ -60,7 +60,8 @@ pub enum Error {
     CreateLdapUser { source: ldap3::LdapError },
 
     #[snafu(display(
-        "LDAP user already exists, either delete it manually or add it to the password cache ({password_cache_ref})"
+        "LDAP user already exists but is missing from the password cache ({password_cache_ref}) (hint: see {link})",
+        link = "https://docs.stackable.tech/home/nightly/secret-operator/troubleshooting.html#active-directory-ldap-user-conflict"
     ))]
     CreateLdapUserConflict {
         source: ldap3::LdapError,
