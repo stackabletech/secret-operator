@@ -34,7 +34,7 @@ This can be caused by a few different root issues:
 1. A race condition where multiple Pods require the same identity at the same time, leading to a stale cache.
    This is transient, and should resolve itself within a few seconds as the cache is updated and any failed attempts are retried.
 2. Trying to reuse a single AD domain across multiple Kubernetes clusters.
-   This takes care to do safely, please see xref:secretclass.adoc#ad-principal-conflicts[] for more information.
+   This takes care to do safely, please see xref:secretclass.adoc#ad-principal-conflicts[Principal Conflicts] for more information.
 3. Deleting a user from the cache but not from AD (including deleting the whole cache).
    When deleting users from the cache, make sure to also delete the corresponding AD users. Secret Operator should then automatically recreate them.
 4. The to-be-created principal conlicts with an existing unrelated principal.
