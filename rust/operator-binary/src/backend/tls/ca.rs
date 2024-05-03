@@ -34,7 +34,7 @@ use tracing::{info, info_span, warn};
 
 use crate::{
     backend::SecretBackendError,
-    utils::{asn1time_to_offsetdatetime, Asn1TimeParseError},
+    utils::{asn1time_to_offsetdatetime, Asn1TimeParseError, Unloggable},
 };
 
 /// v1 format: support a single cert/pkey pair
@@ -156,9 +156,10 @@ pub struct Config {
 }
 
 /// A single certificate authority certificate.
+#[derive(Debug)]
 pub struct CertificateAuthority {
     pub certificate: X509,
-    pub private_key: PKey<Private>,
+    pub private_key: Unloggable<PKey<Private>>,
     not_after: OffsetDateTime,
 }
 
@@ -227,7 +228,7 @@ impl CertificateAuthority {
             .context(BuildCertificateSnafu)?
             .build();
         Ok(Self {
-            private_key,
+            private_key: Unloggable(private_key),
             certificate,
             not_after,
         })
@@ -274,12 +275,13 @@ impl CertificateAuthority {
                 }
             })?,
             certificate,
-            private_key,
+            private_key: Unloggable(private_key),
         })
     }
 }
 
 /// Manages multiple [`CertificateAuthorities`](`CertificateAuthority`), rotating them as needed.
+#[derive(Debug)]
 pub struct Manager {
     certificate_authorities: Vec<CertificateAuthority>,
 }

@@ -10,6 +10,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::Pod,
+    kube::runtime::reflector::ObjectRef,
     kvp::{AnnotationError, Annotations},
 };
 use sys_mount::{unmount, Mount, MountFlags, UnmountFlags};
@@ -371,6 +372,8 @@ impl Node for SecretProvisionerNode {
                 let backend = backend::dynamic::from_selector(&self.client, &selector)
                     .await
                     .context(publish_error::InitBackendSnafu)?;
+                let pod_ref = ObjectRef::<Pod>::new(&selector.pod).within(&selector.namespace);
+                tracing::info!(pod = %pod_ref, ?selector, ?pod_info, ?backend, "issuing secret for Pod");
                 let data = backend
                     .get_secret_data(&selector, pod_info)
                     .await

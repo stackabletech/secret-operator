@@ -12,7 +12,7 @@ use stackable_operator::{
     kvp::{LabelError, LabelSelectorExt, Labels},
 };
 
-use crate::{crd::SearchNamespace, format::SecretData};
+use crate::{crd::SearchNamespace, format::SecretData, utils::Unloggable};
 
 use super::{
     pod_info::{PodInfo, SchedulingPodInfo},
@@ -60,8 +60,10 @@ impl SecretBackendError for Error {
     }
 }
 
+#[derive(Debug)]
 pub struct K8sSearch {
-    pub client: stackable_operator::client::Client,
+    // Not secret per se, but isn't Debug: https://github.com/stackabletech/secret-operator/issues/411
+    pub client: Unloggable<stackable_operator::client::Client>,
     pub search_namespace: SearchNamespace,
 }
 
