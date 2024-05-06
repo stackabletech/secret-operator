@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- The associated configuration is now logged for each issued secret ([#413]).
+
 ### Changed
 
 - [BREAKING] The TLS CA Secret is now installed into the Namespace of the operator (typically `stackable-operators`), rather than `default` ([#397]).
@@ -13,6 +17,7 @@ All notable changes to this project will be documented in this file.
       - Setting the `secretClasses.tls.caSecretNamespace` Helm flag (`--set secretClasses.tls.caSecretNamespace=default`)
 
 [#397]: https://github.com/stackabletech/secret-operator/pull/397
+[#413]: https://github.com/stackabletech/secret-operator/pull/413
 
 ## [24.3.0] - 2024-03-20
 
