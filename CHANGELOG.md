@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Reduce CA default lifetime to one year ([#403])
+
+[#403]: https://github.com/stackabletech/secret-operator/pull/403
+
 ## [24.3.0] - 2024-03-20
 
 ### Added
