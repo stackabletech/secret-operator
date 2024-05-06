@@ -11,8 +11,10 @@ All notable changes to this project will be documented in this file.
       - (Recommended) Copying the CA into the new location
         (`kubectl -n default get secret/secret-provisioner-tls-ca -o json | jq '.metadata.namespace = "stackable-operators"' | kubectl create -f-`)
       - Setting the `secretClasses.tls.caSecretNamespace` Helm flag (`--set secretClasses.tls.caSecretNamespace=default`)
+- Reduce CA default lifetime to one year ([#403])
 
 [#397]: https://github.com/stackabletech/secret-operator/pull/397
+[#403]: https://github.com/stackabletech/secret-operator/pull/403
 
 ## [24.3.0] - 2024-03-20
 

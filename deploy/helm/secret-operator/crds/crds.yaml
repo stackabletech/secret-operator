@@ -48,7 +48,7 @@ spec:
                               description: Whether the certificate authority should be managed by Secret Operator, including being generated if it does not already exist.
                               type: boolean
                             caCertificateLifetime:
-                              default: 730d
+                              default: 365d
                               description: |-
                                 The lifetime of each generated certificate authority.
 
