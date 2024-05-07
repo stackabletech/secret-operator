@@ -18,7 +18,7 @@ built = { version = "0.6", features = ["chrono", "git2"] }
 byteorder = "1.4"
 clap = "4.3"
 futures = { version = "0.3", features = ["compat"] }
-h2 = "=0.3.18" # We need to keep this in sync with our patched h2 build
+h2 = "=0.3.26" # We need to keep this in sync with our patched h2 build
 ldap3 = { version = "0.11", default-features = false, features = [
   "gssapi",
   "tls",
