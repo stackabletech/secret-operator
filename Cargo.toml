@@ -40,7 +40,7 @@ socket2 = { version = "0.5", features = ["all"] }
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.64.0", features = [
   "time",
 ] }
-strum = { version = "0.25", features = ["derive"] }
+strum = { version = "0.26", features = ["derive"] }
 sys-mount = { version = "2.1", default-features = false }
 tempfile = "3.3"
 time = { version = "0.3", features = ["parsing"] }
