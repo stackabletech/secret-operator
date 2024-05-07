@@ -13,7 +13,7 @@ repository = "https://github.com/stackabletech/secret-operator"
 [workspace.dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
-bindgen = "0.66"
+bindgen = "0.69"
 built = { version = "0.6", features = ["chrono", "git2"] }
 byteorder = "1.4"
 clap = "4.3"
