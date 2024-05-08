@@ -39,4 +39,3 @@ This can be caused by a few different root issues:
    When deleting users from the cache, make sure to also delete the corresponding AD users. The Secret Operator should then automatically recreate them.
 4. The to-be-created principal conlicts with an existing unrelated principal.
    This has to be resolved manually by an administrator.
-
