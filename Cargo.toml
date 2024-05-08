@@ -46,7 +46,7 @@ tempfile = "3.3"
 time = { version = "0.3", features = ["parsing"] }
 tokio = { version = "1.29", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["net"] }
-tonic = "0.9"
+tonic = "0.11"
 tonic-build = "0.9"
 tonic-reflection = "0.9"
 tracing = "0.1"
