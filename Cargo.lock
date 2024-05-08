@@ -1944,7 +1944,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b82eaa1d779e9a4bc1c3217db8ffbeabaae1dca241bf70183242128d48681cd"
 dependencies = [
  "bytes",
- "prost-derive",
+ "prost-derive 0.11.9",
+]
+
+[[package]]
+name = "prost"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0f5d036824e4761737860779c906171497f6d55681139d8312388f8fe398922"
+dependencies = [
+ "bytes",
+ "prost-derive 0.12.4",
 ]
 
 [[package]]
@@ -1961,8 +1971,8 @@ dependencies = [
  "multimap",
  "petgraph",
  "prettyplease 0.1.25",
- "prost",
- "prost-types",
+ "prost 0.11.9",
+ "prost-types 0.11.9",
  "regex",
  "syn 1.0.109",
  "tempfile",
@@ -1983,12 +1993,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-derive"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19de2de2a00075bf566bee3bd4db014b11587e84184d3f7a791bc17f1a8e9e48"
+dependencies = [
+ "anyhow",
+ "itertools",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.38",
+]
+
+[[package]]
 name = "prost-types"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "213622a1460818959ac1181aaeb2dc9c7f63df720db7d788b3e24eacd1983e13"
 dependencies = [
- "prost",
+ "prost 0.11.9",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3235c33eb02c1f1e212abdbe34c78b264b038fb58ca612664343271e36e55ffe"
+dependencies = [
+ "prost 0.12.4",
 ]
 
 [[package]]
@@ -2579,8 +2611,8 @@ dependencies = [
  "openssl",
  "p12",
  "pin-project",
- "prost",
- "prost-types",
+ "prost 0.11.9",
+ "prost-types 0.11.9",
  "rand",
  "serde",
  "serde_json",
@@ -2596,7 +2628,7 @@ dependencies = [
  "time",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.9.2",
  "tonic-build",
  "tonic-reflection",
  "tracing",
@@ -2939,10 +2971,31 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost",
+ "prost 0.11.9",
  "tokio",
  "tokio-stream",
  "tower",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
+name = "tonic"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76c4eb7a4e9ef9d4763600161f12f5070b92a578e1b634db88a6887844c91a13"
+dependencies = [
+ "async-trait",
+ "base64",
+ "bytes",
+ "http",
+ "http-body",
+ "percent-encoding",
+ "pin-project",
+ "prost 0.12.4",
+ "tokio",
+ "tokio-stream",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -2963,15 +3016,15 @@ dependencies = [
 
 [[package]]
 name = "tonic-reflection"
-version = "0.9.2"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0543d7092032041fbeac1f2c84304537553421a11a623c2301b12ef0264862c7"
+checksum = "548c227bd5c0fae5925812c4ec6c66ffcfced23ea370cb823f4d18f0fc1cb6a7"
 dependencies = [
- "prost",
- "prost-types",
+ "prost 0.12.4",
+ "prost-types 0.12.4",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.11.0",
 ]
 
 [[package]]
