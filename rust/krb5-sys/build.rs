@@ -25,7 +25,7 @@ fn main() {
         .must_use_type("krb5_error_code")
         .must_use_type("kadm5_ret_t")
         // .default_macro_constant_type(bindgen::MacroTypeVariation::Signed)
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()
         .expect("Unable to generate bindings");
     let out_path = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR not set"));
