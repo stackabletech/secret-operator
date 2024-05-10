@@ -8,7 +8,7 @@ use openssl::sha::Sha256;
 use serde::{de::IntoDeserializer, Deserialize};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::ObjectMetaBuilder,
+    builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::Pod,
     kvp::{AnnotationError, Annotations},
 };
@@ -45,7 +45,7 @@ enum PublishError {
 
     #[snafu(display("failed to get pod for volume"))]
     GetPod {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
 
     #[snafu(display("failed to parse pod details"))]
@@ -94,7 +94,7 @@ enum PublishError {
 
     #[snafu(display("failed to tag pod with expiry metadata"))]
     TagPod {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
 
     #[snafu(display("failed to build annotation"))]

@@ -30,12 +30,12 @@ const LABEL_SCOPE_LISTENER: &str = "secrets.stackable.tech/listener";
 pub enum Error {
     #[snafu(display("failed to build Secret selector"))]
     SecretSelector {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::kvp::SelectorError,
     },
 
     #[snafu(display("failed to query for secrets"))]
     SecretQuery {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
 
     #[snafu(display("no Secrets matched label selector {label_selector:?}"))]

@@ -10,13 +10,13 @@ use stackable_secret_operator_crd_utils::SecretReference;
 pub enum Error {
     #[snafu(display("failed to load initial cache from {cache_ref}"))]
     GetInitialCache {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         cache_ref: ObjectRef<Secret>,
     },
 
     #[snafu(display("failed to save credential {key} to {cache_ref}"))]
     SaveToCache {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         key: String,
         cache_ref: ObjectRef<Secret>,
     },

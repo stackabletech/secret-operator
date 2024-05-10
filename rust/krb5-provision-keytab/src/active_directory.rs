@@ -14,7 +14,7 @@ use crate::credential_cache::{self, CredentialCache};
 pub enum Error {
     #[snafu(display("failed to retrieve LDAP TLS CA {ca_ref}"))]
     GetLdapTlsCa {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         ca_ref: ObjectRef<Secret>,
     },
 
@@ -38,7 +38,7 @@ pub enum Error {
 
     #[snafu(display("failed to init Kubernetes client"))]
     KubeInit {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
 
     #[snafu(display("failed to unparse Kerberos principal"))]
@@ -46,13 +46,13 @@ pub enum Error {
 
     #[snafu(display("failed to get password cache {password_cache_ref}"))]
     GetPasswordCache {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         password_cache_ref: ObjectRef<Secret>,
     },
 
     #[snafu(display("failed to update password cache {password_cache_ref}"))]
     UpdatePasswordCache {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         password_cache_ref: ObjectRef<Secret>,
     },
 
