@@ -922,7 +922,7 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 [[package]]
 name = "h2"
 version = "0.3.26"
-source = "git+https://github.com/stackabletech/h2.git?branch=feature/grpc-uds-/v0.3.26#19ec427ad2f32593443462b5b65dac9d85482864"
+source = "git+https://github.com/stackabletech/h2.git?branch=feature/grpc-uds#5438b66af85c7d871b32db8962bcd5bff849c824"
 dependencies = [
  "bytes",
  "fnv",
