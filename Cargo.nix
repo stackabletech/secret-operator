@@ -2734,8 +2734,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/h2.git";
-          rev = "19ec427ad2f32593443462b5b65dac9d85482864";
-          sha256 = "1bg3ad0106i1mp9nxl2wv1kw5wmmfx2hra3dv63kd86rfv6cmbnm";
+          rev = "5438b66af85c7d871b32db8962bcd5bff849c824";
+          sha256 = "0w5pfq633861pbkmrdll9i8vmiwkic1m43ccbvynif7cgx0ppvdz";
         };
         authors = [
           "Carl Lerche <me@carllerche.com>"
