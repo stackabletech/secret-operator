@@ -15,9 +15,16 @@ All notable changes to this project will be documented in this file.
       - (Recommended) Copying the CA into the new location
         (`kubectl -n default get secret/secret-provisioner-tls-ca -o json | jq '.metadata.namespace = "stackable-operators"' | kubectl create -f-`)
       - Setting the `secretClasses.tls.caSecretNamespace` Helm flag (`--set secretClasses.tls.caSecretNamespace=default`)
+- Reduce CA default lifetime to one year ([#403])
+- Update the image docker.stackable.tech/k8s/sig-storage/csi-provisioner
+  in the Helm values to v4.0.1 ([#440]).
+- Update the image docker.stackable.tech/k8s/sig-storage/csi-node-driver-registrar
+  in the Helm values to v2.10.1 ([#440]).
 
 [#397]: https://github.com/stackabletech/secret-operator/pull/397
+[#403]: https://github.com/stackabletech/secret-operator/pull/403
 [#413]: https://github.com/stackabletech/secret-operator/pull/413
+[#440]: https://github.com/stackabletech/secret-operator/pull/440
 
 ## [24.3.0] - 2024-03-20
 

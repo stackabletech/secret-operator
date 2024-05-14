@@ -20,12 +20,22 @@ fn main() {
         .allowlist_var("KRB5_.*")
         .allowlist_var("KADM5_.*")
         .allowlist_var("ENCTYPE_.*")
+        // Variadic functions generate bindings that rustc on ARM64 considers FFI-unsafe.
+        // We don't actually use them, so we can just blocklist the types, and any function
+        // variants that use them.
+        .blocklist_type("va_list")
+        .blocklist_type("__builtin_va_list")
+        .blocklist_type("__va_list_tag")
+        .blocklist_function(".*_vset_.*")
+        .blocklist_function(".*_vwrap_.*")
+        .blocklist_function(".*_vprepend_.*")
+        .blocklist_function(".*_va")
         .new_type_alias("krb5_error_code")
         .new_type_alias("kadm5_ret_t")
         .must_use_type("krb5_error_code")
         .must_use_type("kadm5_ret_t")
         // .default_macro_constant_type(bindgen::MacroTypeVariation::Signed)
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()
         .expect("Unable to generate bindings");
     let out_path = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR not set"));

@@ -36,7 +36,7 @@ enum CreateVolumeError {
 
     #[snafu(display("failed to load {pvc}"))]
     FindPvc {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         pvc: ObjectRef<PersistentVolumeClaim>,
     },
 
@@ -47,7 +47,7 @@ enum CreateVolumeError {
 
     #[snafu(display("failed to get pod for volume"))]
     GetPod {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
 
     #[snafu(display("failed to parse pod details"))]

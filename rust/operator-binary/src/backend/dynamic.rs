@@ -155,7 +155,7 @@ pub async fn from_class(
 pub enum FromSelectorError {
     #[snafu(display("failed to get {class}"))]
     GetSecretClass {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         class: ObjectRef<SecretClass>,
     },
 

@@ -30,7 +30,7 @@ pub enum Error {
 
     #[snafu(display("failed to load admin keytab from {secret}"))]
     LoadAdminKeytab {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         secret: ObjectRef<Secret>,
     },
 

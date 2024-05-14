@@ -44,7 +44,7 @@ pub enum FromPodError {
 
     #[snafu(display("failed to get {node}"))]
     GetNode {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         node: ObjectRef<Node>,
     },
 
@@ -53,21 +53,21 @@ pub enum FromPodError {
 
     #[snafu(display("failed to get listener PVC {listener_pvc} for volume {listener_volume}"))]
     GetListenerPvc {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         listener_volume: String,
         listener_pvc: ObjectRef<PersistentVolumeClaim>,
     },
 
     #[snafu(display("failed to get {listener} for volume {listener_volume}"))]
     GetListener {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         listener_volume: String,
         listener: ObjectRef<Listener>,
     },
 
     #[snafu(display("failed to get {listener_class} for volume {listener_volume}"))]
     GetListenerClass {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         listener_volume: String,
         listener_class: ObjectRef<ListenerClass>,
     },
@@ -88,7 +88,7 @@ pub enum FromPodError {
 
     #[snafu(display("failed to get {pod_listeners} for {pod}"))]
     GetPodListeners {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         pod_listeners: ObjectRef<PodListeners>,
         pod: ObjectRef<Pod>,
     },
