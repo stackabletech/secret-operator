@@ -1,4 +1,9 @@
-use std::{fmt::LowerHex, os::unix::prelude::AsRawFd, path::Path};
+use std::{
+    fmt::{Debug, LowerHex},
+    ops::{Deref, DerefMut},
+    os::unix::prelude::AsRawFd,
+    path::Path,
+};
 
 use futures::{pin_mut, Stream, StreamExt};
 use openssl::asn1::{Asn1Time, Asn1TimeRef, TimeDiff};
@@ -171,6 +176,30 @@ pub fn asn1time_to_offsetdatetime(asn: &Asn1TimeRef) -> Result<OffsetDateTime, A
             .context(OverflowSnafu)?,
     )
     .context(ParseSnafu)
+}
+
+/// Wrapper for (mostly) secret values that should not be logged.
+// When/if migrating to Valuable, provide a dummy implementation of Value too
+pub struct Unloggable<T>(pub T);
+
+impl<T> Debug for Unloggable<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("<redacted>")
+    }
+}
+
+impl<T> Deref for Unloggable<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for Unloggable<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 #[cfg(test)]

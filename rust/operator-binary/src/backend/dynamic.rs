@@ -1,12 +1,18 @@
 //! Support code for runtime-configurable dynamic [`SecretBackend`]s
 
-use std::{collections::HashSet, fmt::Display};
+use std::{
+    collections::HashSet,
+    fmt::{Debug, Display},
+};
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::kube::runtime::reflector::ObjectRef;
 
-use crate::crd::{self, SecretClass};
+use crate::{
+    crd::{self, SecretClass},
+    utils::Unloggable,
+};
 
 use super::{
     kerberos_keytab::{self, KerberosProfile},
@@ -14,12 +20,17 @@ use super::{
     tls, SecretBackend, SecretBackendError, SecretVolumeSelector,
 };
 
-#[derive(Debug)]
 pub struct DynError(Box<dyn SecretBackendError>);
+
+impl Debug for DynError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.0, f)
+    }
+}
 
 impl Display for DynError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+        Display::fmt(&self.0, f)
     }
 }
 impl std::error::Error for DynError {
@@ -34,6 +45,12 @@ impl SecretBackendError for DynError {
 }
 
 pub struct DynamicAdapter<B>(B);
+
+impl<B: Debug> Debug for DynamicAdapter<B> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 #[async_trait]
 impl<B: SecretBackend + Send + Sync> SecretBackend for DynamicAdapter<B> {
@@ -96,7 +113,7 @@ pub async fn from_class(
     Ok(match class.spec.backend {
         crd::SecretClassBackend::K8sSearch(crd::K8sSearchBackend { search_namespace }) => {
             from(super::K8sSearch {
-                client: client.clone(),
+                client: Unloggable(client.clone()),
                 search_namespace,
             })
         }

@@ -14,7 +14,7 @@ use stackable_operator::{
     k8s_openapi::chrono::{DateTime, FixedOffset},
     time::Duration,
 };
-use std::{collections::HashSet, convert::Infallible};
+use std::{collections::HashSet, convert::Infallible, fmt::Debug};
 
 pub use k8s_search::K8sSearch;
 pub use kerberos_keytab::KerberosKeytab;
@@ -228,7 +228,7 @@ impl SecretContents {
 /// It gets the pod information as well as volume definition and has to
 /// return any number of files.
 #[async_trait]
-pub trait SecretBackend: Send + Sync {
+pub trait SecretBackend: Debug + Send + Sync {
     type Error: SecretBackendError;
 
     /// Provision or load secret data from the source.

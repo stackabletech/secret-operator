@@ -128,6 +128,7 @@ impl SecretBackendError for Error {
     }
 }
 
+#[derive(Debug)]
 pub struct TlsGenerate {
     ca_manager: ca::Manager,
     max_cert_lifetime: Duration,

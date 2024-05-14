@@ -101,6 +101,7 @@ pub enum FromPodError {
 }
 
 /// Validated metadata about a scheduled [`Pod`]
+#[derive(Debug)]
 pub struct PodInfo {
     pub pod_ips: Vec<IpAddr>,
     pub service_name: Option<String>,
@@ -187,6 +188,7 @@ impl TryFrom<(AddressType, &str)> for Address {
 }
 
 /// Validated metadata about a pod that may or may not be scheduled yet.
+#[derive(Debug)]
 pub struct SchedulingPodInfo {
     pub namespace: String,
     pub pod_name: String,

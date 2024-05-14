@@ -12,6 +12,7 @@ use tokio::{
 use crate::{
     crd::{Hostname, InvalidKerberosPrincipal, KerberosKeytabBackendAdmin, KerberosPrincipal},
     format::{well_known, SecretData, WellKnownSecretData},
+    utils::Unloggable,
 };
 
 use super::{
@@ -72,15 +73,17 @@ impl SecretBackendError for Error {
     }
 }
 
+#[derive(Debug)]
 pub struct KerberosProfile {
     pub realm_name: Hostname,
     pub kdc: Hostname,
     pub admin: KerberosKeytabBackendAdmin,
 }
 
+#[derive(Debug)]
 pub struct KerberosKeytab {
     profile: KerberosProfile,
-    admin_keytab: Vec<u8>,
+    admin_keytab: Unloggable<Vec<u8>>,
     admin_principal: KerberosPrincipal,
 }
 
@@ -110,7 +113,7 @@ impl KerberosKeytab {
             .0;
         Ok(Self {
             profile,
-            admin_keytab,
+            admin_keytab: Unloggable(admin_keytab),
             admin_principal,
         })
     }
