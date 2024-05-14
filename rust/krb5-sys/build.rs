@@ -20,6 +20,16 @@ fn main() {
         .allowlist_var("KRB5_.*")
         .allowlist_var("KADM5_.*")
         .allowlist_var("ENCTYPE_.*")
+        // Variadic functions generate bindings that rustc on ARM64 considers FFI-unsafe.
+        // We don't actually use them, so we can just blocklist the types, and any function
+        // variants that use them.
+        .blocklist_type("va_list")
+        .blocklist_type("__builtin_va_list")
+        .blocklist_type("__va_list_tag")
+        .blocklist_function(".*_vset_.*")
+        .blocklist_function(".*_vwrap_.*")
+        .blocklist_function(".*_vprepend_.*")
+        .blocklist_function(".*_va")
         .new_type_alias("krb5_error_code")
         .new_type_alias("kadm5_ret_t")
         .must_use_type("krb5_error_code")
