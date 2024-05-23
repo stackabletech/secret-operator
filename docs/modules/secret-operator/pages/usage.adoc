@@ -17,4 +17,4 @@ issues TLS certificates, storing its CA certificate in the Kubernetes Secret obj
 include::example$usage-secretclass-tls.yaml[]
 ----
 
-NOTE: The default CA lifetime is https://github.com/stackabletech/secret-operator/blob/77e51cde89987239ab5cb303b0ffab051060e58c/rust/operator-binary/src/backend/tls/mod.rs#L44-L46[360 days]. This will be reduced over time.
+NOTE: The default CA lifetime is https://github.com/stackabletech/secret-operator/blob/77e51cde89987239ab5cb303b0ffab051060e58c/rust/operator-binary/src/backend/tls/mod.rs#L44-L46[365 days]. This will be reduced over time.
