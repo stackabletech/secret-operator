@@ -22,7 +22,7 @@ spec:
         runAsUser: 0
       initContainers:
         - name: init
-          image: docker.stackable.tech/stackable/krb5:1.18.2-stackable23.4.0-rc1
+          image: docker.stackable.tech/stackable/krb5:{{ test_scenario['values']['krb5'] }}-stackable0.0.0-dev
           args:
             - sh
             - -euo
@@ -43,7 +43,7 @@ spec:
               name: data
       containers:
         - name: kdc
-          image: docker.stackable.tech/stackable/krb5:1.18.2-stackable23.4.0-rc1
+          image: docker.stackable.tech/stackable/krb5:{{ test_scenario['values']['krb5'] }}-stackable0.0.0-dev
           args:
             - krb5kdc
             - -n
@@ -56,7 +56,7 @@ spec:
             - mountPath: /var/kerberos/krb5kdc
               name: data
         - name: kadmind
-          image: docker.stackable.tech/stackable/krb5:1.18.2-stackable23.4.0-rc1
+          image: docker.stackable.tech/stackable/krb5:{{ test_scenario['values']['krb5'] }}-stackable0.0.0-dev
           args:
             - kadmind
             - -nofork
@@ -69,7 +69,7 @@ spec:
             - mountPath: /var/kerberos/krb5kdc
               name: data
         - name: client
-          image: docker.stackable.tech/stackable/krb5:1.18.2-stackable23.4.0-rc1
+          image: docker.stackable.tech/stackable/krb5:{{ test_scenario['values']['krb5'] }}-stackable0.0.0-dev
           tty: true
           stdin: true
           env:
