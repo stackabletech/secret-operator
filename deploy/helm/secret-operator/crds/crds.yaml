@@ -114,6 +114,24 @@ spec:
                             activeDirectory:
                               description: Credentials should be provisioned in a Microsoft Active Directory domain.
                               properties:
+                                generateSamAccountName:
+                                  description: Allows samAccountName generation for new accounts to be customized. Note that setting this field (even if empty) makes the Secret Operator take over the generation duty from the domain controller.
+                                  nullable: true
+                                  properties:
+                                    prefix:
+                                      default: ''
+                                      description: A prefix to be prepended to generated samAccountNames.
+                                      type: string
+                                    totalLength:
+                                      default: 20
+                                      description: |-
+                                        The total length of generated samAccountNames, _including_ `prefix`. Must be larger than the length of `prefix`, but at most `20`.
+
+                                        Note that this should be as large as possible, to minimize the risk of collisions.
+                                      format: uint8
+                                      minimum: 0.0
+                                      type: integer
+                                  type: object
                                 ldapServer:
                                   description: An AD LDAP server, such as the AD Domain Controller. This must match the server’s FQDN, or GSSAPI authentication will fail.
                                   type: string

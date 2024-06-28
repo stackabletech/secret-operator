@@ -31,7 +31,13 @@ pub enum AdminBackend {
         password_cache_secret: SecretReference,
         user_distinguished_name: String,
         schema_distinguished_name: String,
+        generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
     },
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ActiveDirectorySamAccountNameRules {
+    pub prefix: String,
+    pub total_length: u8,
 }
 
 #[derive(Serialize, Deserialize)]

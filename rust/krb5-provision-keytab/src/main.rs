@@ -103,6 +103,7 @@ async fn run() -> Result<Response, Error> {
             password_cache_secret,
             user_distinguished_name,
             schema_distinguished_name,
+            generate_sam_account_name,
         } => AdminConnection::ActiveDirectory(
             active_directory::AdAdmin::connect(
                 &ldap_server,
@@ -111,6 +112,7 @@ async fn run() -> Result<Response, Error> {
                 password_cache_secret,
                 user_distinguished_name,
                 schema_distinguished_name,
+                generate_sam_account_name,
             )
             .await
             .context(ActiveDirectoryInitSnafu)?,

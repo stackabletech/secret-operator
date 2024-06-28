@@ -1,6 +1,10 @@
 use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_krb5_provision_keytab::provision_keytab;
+use stackable_krb5_provision_keytab::{
+    // Some qualified paths get long enough to break rustfmt, alias the crate name to work around that
+    self as provision,
+    provision_keytab,
+};
 use stackable_operator::{k8s_openapi::api::core::v1::Secret, kube::runtime::reflector::ObjectRef};
 use stackable_secret_operator_crd_utils::SecretReference;
 use tempfile::tempdir;
@@ -10,7 +14,10 @@ use tokio::{
 };
 
 use crate::{
-    crd::{Hostname, InvalidKerberosPrincipal, KerberosKeytabBackendAdmin, KerberosPrincipal},
+    crd::{
+        ActiveDirectorySamAccountNameRules, Hostname, InvalidKerberosPrincipal,
+        KerberosKeytabBackendAdmin, KerberosPrincipal,
+    },
     format::{well_known, SecretData, WellKnownSecretData},
     utils::Unloggable,
 };
@@ -229,12 +236,24 @@ cluster.local = {realm_name}
                         password_cache_secret,
                         user_distinguished_name,
                         schema_distinguished_name,
+                        generate_sam_account_name,
                     } => stackable_krb5_provision_keytab::AdminBackend::ActiveDirectory {
                         ldap_server: ldap_server.to_string(),
                         ldap_tls_ca_secret: ldap_tls_ca_secret.clone(),
                         password_cache_secret: password_cache_secret.clone(),
                         user_distinguished_name: user_distinguished_name.clone(),
                         schema_distinguished_name: schema_distinguished_name.clone(),
+                        generate_sam_account_name: generate_sam_account_name.clone().map(
+                            |ActiveDirectorySamAccountNameRules {
+                                 prefix,
+                                 total_length,
+                             }| {
+                                provision::ActiveDirectorySamAccountNameRules {
+                                    prefix,
+                                    total_length,
+                                }
+                            },
+                        ),
                     },
                 },
             },
