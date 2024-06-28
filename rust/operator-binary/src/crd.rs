@@ -176,6 +176,9 @@ pub enum KerberosKeytabBackendAdmin {
         /// typically `CN=Schema,CN=Configuration,{domain_dn}`.
         schema_distinguished_name: String,
 
+        /// Allows samAccountName generation for new accounts to be customized.
+        /// Note that setting this field (even if empty) makes the Secret Operator take
+        /// over the generation duty from the domain controller.
         generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
     },
 }
@@ -183,8 +186,13 @@ pub enum KerberosKeytabBackendAdmin {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ActiveDirectorySamAccountNameRules {
+    /// A prefix to be prepended to generated samAccountNames.
     #[serde(default)]
     pub prefix: String,
+    /// The total length of generated samAccountNames, _including_ `prefix`.
+    /// Must be larger than the length of `prefix`, but at most `20`.
+    ///
+    /// Note that this should be as large as possible, to minimize the risk of collisions.
     #[serde(default = "ActiveDirectorySamAccountNameRules::default_total_length")]
     pub total_length: u8,
 }
