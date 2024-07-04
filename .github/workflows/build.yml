@@ -108,6 +108,8 @@ jobs:
   run_cargodeny:
     name: Run Cargo Deny
     runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.relevant_step.outcome }}
     strategy:
       matrix:
         checks:
@@ -122,12 +124,15 @@ jobs:
         with:
           submodules: recursive
       - uses: EmbarkStudios/cargo-deny-action@3f4a782664881cf5725d0ffd23969fcce89fd868 # v1.6.3
+        id: relevant_step
         with:
           command: check ${{ matrix.checks }}
 
   run_rustfmt:
     name: Run Rustfmt
     runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.relevant_step.outcome }}
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
@@ -137,9 +142,12 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
           components: rustfmt
       - run: cargo fmt --all -- --check
+        id: relevant_step
 
   run_clippy:
     name: Run Clippy
+    outputs:
+      result: ${{ steps.relevant_step.outcome }}
     runs-on: ubuntu-latest
     steps:
       - name: Install host dependencies
@@ -176,6 +184,8 @@ jobs:
   run_rustdoc:
     name: Run RustDoc
     runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.relevant_step.outcome }}
     steps:
       - name: Install host dependencies
         uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
@@ -194,10 +204,13 @@ jobs:
           key: doc
           cache-all-crates: "true"
       - run: cargo doc --document-private-items
+        id: relevant_step
 
   run_tests:
     name: Run Cargo Tests
     runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.relevant_step.outcome }}
     steps:
       - name: Install host dependencies
         uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
@@ -215,6 +228,7 @@ jobs:
           key: test
           cache-all-crates: "true"
       - run: cargo test
+        id: relevant_step
 
 
   # Similar to check_charts, this tries to render the README, and see if there are unintended changes.
@@ -259,6 +273,8 @@ jobs:
   check_charts:
     name: Check if committed Helm charts are up to date
     runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.relevant_step.outcome }}
     steps:
       - name: Install host dependencies
         uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
@@ -283,6 +299,7 @@ jobs:
       - name: Regenerate charts
         run: make regenerate-charts
       - name: Check if committed charts were up to date
+        id: relevant_step
         run: git diff --exit-code
       - name: Git Diff showed uncommitted changes
         if: ${{ failure() }}
@@ -305,6 +322,33 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     steps:
+      - env:
+          UDEPS_RESULT: ${{needs.run_udeps.outputs.result}}
+          CARGODENY_RESULT: ${{needs.run_cargodeny.outputs.result}}
+          CLIPPY_RESULT: ${{needs.run_clippy.outputs.result}}
+          RUSTFMT_RESULT: ${{needs.run_rustfmt.outputs.result}}
+          RUSTDOC_RESULT: ${{needs.run_rustdoc.outputs.result}}
+          TESTS_RESULT: ${{needs.run_tests.outputs.result}}
+          CHARTS_RESULT: ${{needs.check_charts.outputs.result}}
+          README_RESULT: ${{needs.check_readme.outputs.result}}
+        run: |
+          if [ "$UDEPS_RESULT" != "success"     || \
+               "$CARGODENY_RESULT" != "success" || \
+               "$CLIPPY_RESULT" != "success"    || \
+               "$RUSTFMT_RESULT" != "success"   || \
+               "$RUSTDOC_RESULT" != "success"   || \
+               "$TESTS_RESULT" != "success"     || \
+               "$CHARTS_RESULT" != "success"    || \
+               "$README_RESULT" != "success" ]; then
+            echo "A required pre-check failed!"
+            exit 123
+          fi
+      - env:
+          UDEPS_RESULT: ${{needs.check_readme.outputs.result}}
+        run: |
+          if [ "$UDEPS_RESULT" != "success" ]; then
+            exit 123
+          fi
       - env:
           UDEPS_RESULT: ${{needs.check_readme.outputs.result}}
         run: |
