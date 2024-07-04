@@ -176,6 +176,7 @@ jobs:
           reporter: 'github-pr-review'
           github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run clippy manually without annotations
+        id: relevant_step
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: env.GITHUB_TOKEN == null
@@ -332,14 +333,14 @@ jobs:
           CHARTS_RESULT: ${{needs.check_charts.outputs.result}}
           README_RESULT: ${{needs.check_readme.outputs.result}}
         run: |
-          if [ "$UDEPS_RESULT" != "success"     || \
-               "$CARGODENY_RESULT" != "success" || \
-               "$CLIPPY_RESULT" != "success"    || \
-               "$RUSTFMT_RESULT" != "success"   || \
-               "$RUSTDOC_RESULT" != "success"   || \
-               "$TESTS_RESULT" != "success"     || \
-               "$CHARTS_RESULT" != "success"    || \
-               "$README_RESULT" != "success" ]; then
+          if [ "$UDEPS_RESULT" != "success" ]     || \
+             [ "$CARGODENY_RESULT" != "success" ] || \
+             [ "$CLIPPY_RESULT" != "success" ]    || \
+             [ "$RUSTFMT_RESULT" != "success" ]   || \
+             [ "$RUSTDOC_RESULT" != "success" ]   || \
+             [ "$TESTS_RESULT" != "success" ]     || \
+             [ "$CHARTS_RESULT" != "success" ]    || \
+             [ "$README_RESULT" != "success" ]; then
             echo "A required pre-check failed!"
             exit 123
           fi
@@ -377,6 +378,7 @@ jobs:
     if: needs.select_helm_repo.outputs.helm_repository != 'skip'
     outputs:
       IMAGE_TAG: ${{ steps.printtag.outputs.IMAGE_TAG }}
+      result: ${{ step.printtag.outcome }}
     steps:
       - name: Install host dependencies
         uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
