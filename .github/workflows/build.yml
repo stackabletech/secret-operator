@@ -368,12 +368,10 @@ jobs:
 
           make -e build
       - name: Publish Docker image and Helm chart
-        if: ${{ !github.event.pull_request.head.repo.fork }}
         run: make -e publish
         # Output the name of the published image to the Job output for later use
       - id: printtag
         name: Output image name and tag
-        if: ${{ !github.event.pull_request.head.repo.fork }}
         run: echo "IMAGE_TAG=$(make -e print-docker-tag)" >> $GITHUB_OUTPUT
 
   create_manifest_list:
@@ -415,7 +413,6 @@ jobs:
 
   openshift_preflight:
     name: Run the OpenShift Preflight check on the published images
-    if: ${{ !github.event.pull_request.head.repo.fork }}
     needs:
       - create_manifest_list
       - package_and_publish
