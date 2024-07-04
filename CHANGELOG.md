@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - The associated configuration is now logged for each issued secret ([#413]).
+- Fix csi-node-driver and csi-provisioner path in Helmchart ([#455])
 
 ### Changed
 
@@ -25,6 +26,7 @@ All notable changes to this project will be documented in this file.
 [#403]: https://github.com/stackabletech/secret-operator/pull/403
 [#413]: https://github.com/stackabletech/secret-operator/pull/413
 [#440]: https://github.com/stackabletech/secret-operator/pull/440
+[#455]: https://github.com/stackabletech/secret-operator/pull/455
 
 ## [24.3.0] - 2024-03-20
 
