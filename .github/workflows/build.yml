@@ -306,7 +306,7 @@ jobs:
           UDEPS_RESULT: ${{needs.run_udeps.outputs.result}}
         run: |
           if [ "$UDEPS_RESULT" != "success" ]; then
-            exit -2
+            exit 123
           fi
 
   package_and_publish:
