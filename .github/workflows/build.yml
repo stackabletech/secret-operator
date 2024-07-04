@@ -40,6 +40,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUSTC_BOOTSTRAP: 1
+    outputs:
+      result: ${{ steps.relevant_step.outcome }}
     steps:
       - name: Install host dependencies
         uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
@@ -58,6 +60,7 @@ jobs:
           cache-all-crates: "true"
       - uses: stackabletech/cargo-install-action@cargo-udeps
       - run: cargo udeps --workspace
+        id: relevant_step
 
   # This job evaluates the github environment to determine why this action is running and selects the appropriate
   # target repository for published Helm charts based on this.
@@ -297,9 +300,13 @@ jobs:
       - check_charts
       - check_readme
     runs-on: ubuntu-latest
+    if: always()
     steps:
-      - name: log
-        run: echo All tests have passed!
+      - env:
+          UDEPS_RESULT: ${{needs.run_udeps.outputs.result}}
+        run: |
+          if [ $UDEPS_RESULT -ne "success" ]; then
+            exit -2
 
   package_and_publish:
     name: Package Charts, Build Docker Image and publish them - ${{ matrix.runner }}
