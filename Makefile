@@ -7,6 +7,8 @@
 # It is available from Nixpkgs as `yq-go` (`nix shell nixpkgs#yq-go`)
 # This script also requires `jq` https://stedolan.github.io/jq/
 
+xxxx
+
 .PHONY: build publish
 
 TAG    := $(shell git rev-parse --short HEAD)
