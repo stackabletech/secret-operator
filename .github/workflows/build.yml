@@ -305,8 +305,9 @@ jobs:
       - env:
           UDEPS_RESULT: ${{needs.run_udeps.outputs.result}}
         run: |
-          if [ $UDEPS_RESULT -ne "success" ]; then
+          if [ "$UDEPS_RESULT" != "success" ]; then
             exit -2
+          fi
 
   package_and_publish:
     name: Package Charts, Build Docker Image and publish them - ${{ matrix.runner }}
