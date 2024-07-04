@@ -7,7 +7,7 @@
 # It is available from Nixpkgs as `yq-go` (`nix shell nixpkgs#yq-go`)
 # This script also requires `jq` https://stedolan.github.io/jq/
 
-.PHONY: build publish
+.PHONY: build, publish
 
 TAG    := $(shell git rev-parse --short HEAD)
 OPERATOR_NAME := secret-operator
