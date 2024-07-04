@@ -223,6 +223,8 @@ jobs:
   check_readme:
     name: Check if committed README is the one we would render from the available parts
     runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.relevant_step.outcome }}
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
@@ -235,6 +237,7 @@ jobs:
       - name: Regenerate charts
         run: make render-readme
       - name: Check if committed README were up to date
+        id: relevant_step
         run: git diff --exit-code
       - name: Git Diff showed uncommitted changes
         if: ${{ failure() }}
@@ -303,7 +306,7 @@ jobs:
     if: always()
     steps:
       - env:
-          UDEPS_RESULT: ${{needs.run_udeps.outputs.result}}
+          UDEPS_RESULT: ${{needs.check_readme.outputs.result}}
         run: |
           if [ "$UDEPS_RESULT" != "success" ]; then
             exit 123
