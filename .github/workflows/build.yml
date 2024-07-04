@@ -378,7 +378,7 @@ jobs:
     if: needs.select_helm_repo.outputs.helm_repository != 'skip'
     outputs:
       IMAGE_TAG: ${{ steps.printtag.outputs.IMAGE_TAG }}
-      result: ${{ step.printtag.outcome }}
+      result: ${{ steps.printtag.outcome }}
     steps:
       - name: Install host dependencies
         uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
