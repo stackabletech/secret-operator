@@ -364,6 +364,7 @@ jobs:
             sudo apt-get -y update
             sudo apt-get -y install helm
             sudo apt-get -y install libkrb5-dev
+            sudo apt-get -y install protobuf-compiler
             sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_arm64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
           fi
 
