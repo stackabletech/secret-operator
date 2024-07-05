@@ -147,7 +147,7 @@ jobs:
   run_clippy:
     name: Run Clippy
     outputs:
-      result: ${{ steps.relevant_step_fork.outcome == 'success' || steps.relevant_step_nofork.outcome == 'success' }}
+      result: ${{ steps.relevant_step_fork.outcome == 'success' || steps.relevant_step_nofork.outcome == 'success' && 'success' || 'failed' }}
     runs-on: ubuntu-latest
     steps:
       - name: Install host dependencies
