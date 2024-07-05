@@ -430,6 +430,7 @@ jobs:
 
   create_manifest_list:
     name: Build and publish manifest list
+    if: always()
     needs:
       - package_and_publish
       - select_helm_repo
@@ -479,6 +480,7 @@ jobs:
 
   openshift_preflight:
     name: Run the OpenShift Preflight check on the published images
+    if: always()
     needs:
       - create_manifest_list
       - package_and_publish
