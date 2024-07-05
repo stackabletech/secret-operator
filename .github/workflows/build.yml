@@ -334,6 +334,14 @@ jobs:
           CHARTS_RESULT: ${{needs.check_charts.outputs.result}}
           README_RESULT: ${{needs.check_readme.outputs.result}}
         run: |
+          echo "Udeps: $UDEPS_RESULT"
+          echo "CARGODENY_RESULT: $CARGODENY_RESULT"          
+          echo "CLIPPY_RESULT: $CLIPPY_RESULT"
+          echo "RUSTFMT_RESULT: $RUSTFMT_RESULT"
+          echo "RUSTDOC_RESULT: $RUSTDOC_RESULT"
+          echo "TESTS_RESULT: $TESTS_RESULT"
+          echo "CHARTS_RESULT: $CHARTS_RESULT"
+          echo "README_RESULT: $README_RESULT"
           if [ "$UDEPS_RESULT" != "success" ]     || \
              [ "$CARGODENY_RESULT" != "success" ] || \
              [ "$CLIPPY_RESULT" != "success" ]    || \
