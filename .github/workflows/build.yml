@@ -147,7 +147,7 @@ jobs:
   run_clippy:
     name: Run Clippy
     outputs:
-      result: ${{ steps.relevant_step.outcome }}
+      result: ${{ steps.relevant_step_fork.outcome == "success" || steps.relevant_step_nofork == "success" }}
     runs-on: ubuntu-latest
     steps:
       - name: Install host dependencies
@@ -168,6 +168,7 @@ jobs:
           cache-all-crates: "true"
       - name: Run clippy action to produce annotations
         uses: giraffate/clippy-action@13b9d32482f25d29ead141b79e7e04e7900281e0 # v1.0.1
+        id: relevant_step_nofork
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: env.GITHUB_TOKEN != null
@@ -176,7 +177,7 @@ jobs:
           reporter: 'github-pr-review'
           github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run clippy manually without annotations
-        id: relevant_step
+        id: relevant_step_fork
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: env.GITHUB_TOKEN == null
@@ -344,18 +345,6 @@ jobs:
             echo "A required pre-check failed!"
             exit 123
           fi
-      - env:
-          UDEPS_RESULT: ${{needs.check_readme.outputs.result}}
-        run: |
-          if [ "$UDEPS_RESULT" != "success" ]; then
-            exit 123
-          fi
-      - env:
-          UDEPS_RESULT: ${{needs.check_readme.outputs.result}}
-        run: |
-          if [ "$UDEPS_RESULT" != "success" ]; then
-            exit 123
-          fi
 
   package_and_publish:
     name: Package Charts, Build Docker Image and publish them - ${{ matrix.runner }}
@@ -375,7 +364,6 @@ jobs:
       OCI_REGISTRY_SDP_USERNAME: "robot$sdp+github-action-build"
       OCI_REGISTRY_SDP_CHARTS_PASSWORD: ${{ secrets.HARBOR_ROBOT_SDP_CHARTS_GITHUB_ACTION_BUILD_SECRET }}
       OCI_REGISTRY_SDP_CHARTS_USERNAME: "robot$sdp-charts+github-action-build"
-    if: needs.select_helm_repo.outputs.helm_repository != 'skip'
     outputs:
       IMAGE_TAG: ${{ steps.printtag.outputs.IMAGE_TAG }}
       result: ${{ steps.printtag.outcome }}
@@ -425,6 +413,7 @@ jobs:
 
           make -e build
       - name: Publish Docker image and Helm chart
+        if: needs.select_helm_repo.outputs.helm_repository != 'skip'
         run: make -e publish
         # Output the name of the published image to the Job output for later use
       - id: printtag
@@ -435,7 +424,10 @@ jobs:
     name: Build and publish manifest list
     needs:
       - package_and_publish
+      - select_helm_repo
     runs-on: ubuntu-latest
+    outputs:
+      PACKAGE_RESULT: ${{ needs.package_and_publish.outputs.result }}
     permissions:
       id-token: write
     env:
@@ -444,7 +436,16 @@ jobs:
       OCI_REGISTRY_SDP_USERNAME: "robot$sdp+github-action-build"
       OCI_REGISTRY_SDP_CHARTS_PASSWORD: ${{ secrets.HARBOR_ROBOT_SDP_CHARTS_GITHUB_ACTION_BUILD_SECRET }}
       OCI_REGISTRY_SDP_CHARTS_USERNAME: "robot$sdp-charts+github-action-build"
+      PACKAGE_RESULT: ${{ needs.package_and_publish.outputs.result }}
     steps:
+      -  run: |
+              if [ "$PACKAGE_RESULT" != "success" ]; then
+                echo "A required pre-check failed!"
+                exit 123
+              fi
+      - name: Skip if fork
+        if: needs.select_helm_repo.outputs.helm_repository != 'skip'
+        run: exit 0
       - name: Install cosign
         uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 # v3.5.0
       - name: Checkout
@@ -476,7 +477,16 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IMAGE_TAG: ${{ needs.package_and_publish.outputs.IMAGE_TAG }}
+      PACKAGE_RESULT: ${{ needs.package_and_publish.outputs.result }}
     steps:
+      - run: |
+          if [ "$PACKAGE_RESULT" != "success" ]; then
+            echo "A required pre-check failed!"
+            exit 123
+          fi
+      - name: Skip if fork
+        if: needs.select_helm_repo.outputs.helm_repository != 'skip'
+        run: exit 0
       - name: Install preflight
         run: |
           wget https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/1.9.4/preflight-linux-amd64
