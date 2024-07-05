@@ -430,7 +430,7 @@ jobs:
 
   create_manifest_list:
     name: Build and publish manifest list
-    if: always()
+    if: needs.select_helm_repo.outputs.helm_repository != 'skip'
     needs:
       - package_and_publish
       - select_helm_repo
@@ -452,9 +452,6 @@ jobs:
                 echo "A required pre-check failed!"
                 exit 123
               fi
-      - name: Skip if fork
-        if: needs.select_helm_repo.outputs.helm_repository != 'skip'
-        run: exit 0
       - name: Install cosign
         uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 # v3.5.0
       - name: Checkout
@@ -480,7 +477,7 @@ jobs:
 
   openshift_preflight:
     name: Run the OpenShift Preflight check on the published images
-    if: always()
+    if: needs.select_helm_repo.outputs.helm_repository != 'skip'
     needs:
       - create_manifest_list
       - package_and_publish
@@ -495,9 +492,6 @@ jobs:
             echo "A required pre-check failed!"
             exit 123
           fi
-      - name: Skip if fork
-        if: needs.select_helm_repo.outputs.helm_repository != 'skip'
-        run: exit 0
       - name: Install preflight
         run: |
           wget https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/1.9.4/preflight-linux-amd64
