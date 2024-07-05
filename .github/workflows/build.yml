@@ -147,7 +147,7 @@ jobs:
   run_clippy:
     name: Run Clippy
     outputs:
-      result: ${{ steps.relevant_step_fork.outcome == 'success' || steps.relevant_step_nofork == 'success' }}
+      result: ${{ steps.relevant_step_fork.outcome = 'success' || steps.relevant_step_nofork = 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Install host dependencies
@@ -438,7 +438,7 @@ jobs:
       OCI_REGISTRY_SDP_CHARTS_USERNAME: "robot$sdp-charts+github-action-build"
       PACKAGE_RESULT: ${{ needs.package_and_publish.outputs.result }}
     steps:
-      -  run: |
+      - run: |
               if [ "$PACKAGE_RESULT" != "success" ]; then
                 echo "A required pre-check failed!"
                 exit 123
