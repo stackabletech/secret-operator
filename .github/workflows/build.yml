@@ -147,7 +147,7 @@ jobs:
   run_clippy:
     name: Run Clippy
     outputs:
-      result: ${{ steps.relevant_step_fork.outcome == "success" || steps.relevant_step_nofork == "success" }}
+      result: ${{ steps.relevant_step_fork.outcome == 'success' || steps.relevant_step_nofork == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Install host dependencies
@@ -474,6 +474,7 @@ jobs:
     needs:
       - create_manifest_list
       - package_and_publish
+      - select_helm_repo
     runs-on: ubuntu-latest
     env:
       IMAGE_TAG: ${{ needs.package_and_publish.outputs.IMAGE_TAG }}
