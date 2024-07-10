@@ -191,7 +191,6 @@ impl TryFrom<(AddressType, &str)> for Address {
 #[derive(Debug)]
 pub struct SchedulingPodInfo {
     pub namespace: String,
-    pub pod_name: String,
     /// Map from volume names to Listener names.
     pub volume_listener_names: HashMap<String, String>,
     /// Whether the secret has a node or _node-equivalent_ scope.
@@ -278,7 +277,6 @@ impl SchedulingPodInfo {
         Ok(SchedulingPodInfo {
             volume_listener_names,
             has_node_scope,
-            pod_name,
             namespace,
         })
     }
