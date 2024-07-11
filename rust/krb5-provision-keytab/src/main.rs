@@ -4,7 +4,7 @@ use std::{
     io::{stdin, BufReader},
 };
 
-use krb5::{kadm5, Keyblock, Keytab};
+use krb5::{Keyblock, Keytab};
 use snafu::{ResultExt, Snafu};
 use stackable_krb5_provision_keytab::{AdminBackend, Request, Response};
 use tracing::info;
@@ -26,9 +26,6 @@ enum Error {
 
     #[snafu(display("failed to init Active Directory admin client"))]
     ActiveDirectoryInit { source: active_directory::Error },
-
-    #[snafu(display("failed to init kadmin server handle"))]
-    KadminInit { source: kadm5::Error },
 
     #[snafu(display("failed to decode admin principal name"))]
     DecodeAdminPrincipalName { source: NulError },
@@ -60,12 +57,6 @@ enum Error {
     #[snafu(display("failed to prepare principal {principal} (backend: Active Directory)"))]
     PreparePrincipalActiveDirectory {
         source: active_directory::Error,
-        principal: String,
-    },
-
-    #[snafu(display("failed to create principal {principal}"))]
-    CreatePrincipal {
-        source: kadm5::Error,
         principal: String,
     },
 
