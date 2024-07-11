@@ -20,7 +20,7 @@ All notable changes to this project will be documented in this file.
   in the Helm values to v4.0.1 ([#440]).
 - Update the image docker.stackable.tech/k8s/sig-storage/csi-node-driver-registrar
   in the Helm values to v2.10.1 ([#440]).
-- Bumped `stackable-operator` from `0.69.3` to `0.70.0` ([#467]).
+- Bumped `stackable-operator` from `0.69.3` to `0.70.0` and other dependencies([#467]).
 
 ### Removed
 
