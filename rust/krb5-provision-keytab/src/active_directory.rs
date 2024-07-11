@@ -44,18 +44,6 @@ pub enum Error {
     #[snafu(display("failed to unparse Kerberos principal"))]
     UnparsePrincipal { source: krb5::Error },
 
-    #[snafu(display("failed to get password cache {password_cache_ref}"))]
-    GetPasswordCache {
-        source: stackable_operator::client::Error,
-        password_cache_ref: ObjectRef<Secret>,
-    },
-
-    #[snafu(display("failed to update password cache {password_cache_ref}"))]
-    UpdatePasswordCache {
-        source: stackable_operator::client::Error,
-        password_cache_ref: ObjectRef<Secret>,
-    },
-
     #[snafu(display("failed to create LDAP user"))]
     CreateLdapUser { source: ldap3::LdapError },
 
