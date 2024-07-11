@@ -21,10 +21,15 @@ All notable changes to this project will be documented in this file.
 - Update the image docker.stackable.tech/k8s/sig-storage/csi-node-driver-registrar
   in the Helm values to v2.10.1 ([#440]).
 
+### Removed
+
+- Dead code ([#468]).
+
 [#397]: https://github.com/stackabletech/secret-operator/pull/397
 [#403]: https://github.com/stackabletech/secret-operator/pull/403
 [#413]: https://github.com/stackabletech/secret-operator/pull/413
 [#440]: https://github.com/stackabletech/secret-operator/pull/440
+[#468]: https://github.com/stackabletech/secret-operator/pull/468
 
 ## [24.3.0] - 2024-03-20
 
