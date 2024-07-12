@@ -558,7 +558,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "http-body";
@@ -677,7 +677,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "http-body";
@@ -2785,89 +2785,16 @@ rec {
         ];
 
       };
-      "h2 0.3.26" = rec {
-        crateName = "h2";
-        version = "0.3.26";
-        edition = "2018";
-        workspace_member = null;
-        src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/h2.git";
-          rev = "5438b66af85c7d871b32db8962bcd5bff849c824";
-          sha256 = "0w5pfq633861pbkmrdll9i8vmiwkic1m43ccbvynif7cgx0ppvdz";
-        };
-        authors = [
-          "Carl Lerche <me@carllerche.com>"
-          "Sean McArthur <sean@seanmonstar.com>"
-        ];
-        dependencies = [
-          {
-            name = "bytes";
-            packageId = "bytes";
-          }
-          {
-            name = "fnv";
-            packageId = "fnv";
-          }
-          {
-            name = "futures-core";
-            packageId = "futures-core";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "futures-sink";
-            packageId = "futures-sink";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "futures-util";
-            packageId = "futures-util";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "http";
-            packageId = "http 0.2.12";
-          }
-          {
-            name = "indexmap";
-            packageId = "indexmap 2.2.6";
-            features = [ "std" ];
-          }
-          {
-            name = "slab";
-            packageId = "slab";
-          }
-          {
-            name = "tokio";
-            packageId = "tokio";
-            features = [ "io-util" ];
-          }
-          {
-            name = "tokio-util";
-            packageId = "tokio-util";
-            features = [ "codec" "io" ];
-          }
-          {
-            name = "tracing";
-            packageId = "tracing";
-            usesDefaultFeatures = false;
-            features = [ "std" ];
-          }
-        ];
-        devDependencies = [
-          {
-            name = "tokio";
-            packageId = "tokio";
-            features = [ "rt-multi-thread" "macros" "sync" "net" ];
-          }
-        ];
-        features = {
-        };
-      };
-      "h2 0.4.5" = rec {
+      "h2" = rec {
         crateName = "h2";
         version = "0.4.5";
         edition = "2021";
-        sha256 = "1aw62k5xnghpryjnlsbxxhjiwpxir6yi15l3y02w933s225f50ps";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/h2.git";
+          rev = "0c2d171c2a36f49f515f199a82ed454236d8f099";
+          sha256 = "0v0865w398zw0q6mhkwifbbfwffilhhlr4ympjz6fg0ac1q95s1x";
+        };
         authors = [
           "Carl Lerche <me@carllerche.com>"
           "Sean McArthur <sean@seanmonstar.com>"
@@ -2897,7 +2824,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "indexmap";
@@ -3019,7 +2946,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "httpdate";
@@ -3049,7 +2976,7 @@ rec {
         dependencies = [
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
         ];
 
@@ -3122,33 +3049,7 @@ rec {
         ];
 
       };
-      "http 0.2.12" = rec {
-        crateName = "http";
-        version = "0.2.12";
-        edition = "2018";
-        sha256 = "1w81s4bcbmcj9bjp7mllm8jlz6b31wzvirz8bgpzbqkpwmbvn730";
-        authors = [
-          "Alex Crichton <alex@alexcrichton.com>"
-          "Carl Lerche <me@carllerche.com>"
-          "Sean McArthur <sean@seanmonstar.com>"
-        ];
-        dependencies = [
-          {
-            name = "bytes";
-            packageId = "bytes";
-          }
-          {
-            name = "fnv";
-            packageId = "fnv";
-          }
-          {
-            name = "itoa";
-            packageId = "itoa";
-          }
-        ];
-
-      };
-      "http 1.1.0" = rec {
+      "http" = rec {
         crateName = "http";
         version = "1.1.0";
         edition = "2018";
@@ -3195,7 +3096,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
         ];
 
@@ -3223,7 +3124,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "http-body";
@@ -3285,12 +3186,12 @@ rec {
           }
           {
             name = "h2";
-            packageId = "h2 0.4.5";
+            packageId = "h2";
             optional = true;
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "http-body";
@@ -3387,7 +3288,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "hyper";
@@ -3474,7 +3375,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "hyper";
@@ -3630,7 +3531,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "http-body";
@@ -4387,7 +4288,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "http-body";
@@ -4605,7 +4506,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "json-patch";
@@ -8646,7 +8547,7 @@ rec {
           }
           {
             name = "h2";
-            packageId = "h2 0.3.26";
+            packageId = "h2";
           }
           {
             name = "libc";
@@ -9673,12 +9574,12 @@ rec {
           }
           {
             name = "h2";
-            packageId = "h2 0.4.5";
+            packageId = "h2";
             optional = true;
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "http-body";
@@ -10024,7 +9925,7 @@ rec {
           }
           {
             name = "http";
-            packageId = "http 1.1.0";
+            packageId = "http";
           }
           {
             name = "http-body";
