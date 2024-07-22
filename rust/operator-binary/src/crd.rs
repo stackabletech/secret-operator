@@ -179,7 +179,7 @@ pub enum KerberosKeytabBackendAdmin {
         /// Allows samAccountName generation for new accounts to be customized.
         /// Note that setting this field (even if empty) makes the Secret Operator take
         /// over the generation duty from the domain controller.
-        generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
+        experimental_generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
     },
 }
 
