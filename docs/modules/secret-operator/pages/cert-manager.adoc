@@ -23,9 +23,9 @@ Where possible, we recommend using the xref:secretclass.adoc#backend-autotls[`au
 
 NOTE: We recommend using the xref:secretclass.adoc#backend-autotls[`autoTls` backend] instead for self-signed PKIs. We use Cert-Manager's CA issuer here to show the broader concepts.
 
-To do this, we'll first need to teach Cert-Manager how we want it to create our certificates.
+To do this, you will first need to teach Cert-Manager how to create your certificates.
 
-In a production setup this will likely use an external CA such as ACME or OpenBao/Vault. However, to make this guide self-contained we will let Cert-Manager create
+In a production setup this will likely use an external CA such as ACME or OpenBao/Vault. However, to make this guide self-contained, Cert-Manager will create
 a self-signed CA certificate instead.
 
 [source,yaml]
