@@ -197,7 +197,7 @@ async fn get_ldap_ca_certificate(
     native_tls::Certificate::from_pem(&ca_cert_pem).context(ParseLdapTlsCaSnafu)
 }
 
-fn generate_random_string(len: usize, dict: &Vec<char>) -> String {
+fn generate_random_string(len: usize, dict: &[char]) -> String {
     let mut rng = thread_rng();
     // Assert that `rng` is crypto-safe
     let _: &dyn CryptoRng = &rng;
@@ -278,45 +278,6 @@ async fn create_ad_user(
         }
         None => None,
     };
-    // let mut ldap_user_attributes = vec![
-    //     ("cn".as_bytes(), [principal_cn.as_bytes()].into()),
-    //     ("objectClass".as_bytes(), ["user".as_bytes()].into()),
-    //     ("instanceType".as_bytes(), ["4".as_bytes()].into()),
-    //     (
-    //         "objectCategory".as_bytes(),
-    //         [format!("CN=Container,{schema_dn_base}").as_bytes()].into(),
-    //     ),
-    //     (
-    //         "unicodePwd".as_bytes(),
-    //         [&*encode_password_for_ad_update(password)].into(),
-    //     ),
-    //     (
-    //         "userAccountControl".as_bytes(),
-    //         [(AD_UAC_NORMAL_ACCOUNT | AD_UAC_DONT_EXPIRE_PASSWORD)
-    //             .to_string()
-    //             .as_bytes()]
-    //         .into(),
-    //     ),
-    //     (
-    //         "userPrincipalName".as_bytes(),
-    //         [princ_name.as_bytes()].into(),
-    //     ),
-    //     (
-    //         "servicePrincipalName".as_bytes(),
-    //         [princ_name_realmless.as_bytes()].into(),
-    //     ),
-    //     (
-    //         // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-kile/6cfc7b50-11ed-4b4d-846d-6f08f0812919
-    //         "msDS-SupportedEncryptionTypes".as_bytes(),
-    //         [(AD_ENCTYPE_AES128_HMAC_SHA1 | AD_ENCTYPE_AES256_HMAC_SHA1)
-    //             .to_string()
-    //             .as_bytes()]
-    //         .into(),
-    //     ),
-    // ];
-    // if let Some(san) = sam_account_name {
-    //     ldap_user_attributes.push((b"samAccountName", [san.as_bytes()].into()));
-    // }
     let create_user_result = ldap
         .add(
             &format!("CN={principal_cn},{user_dn_base}"),
