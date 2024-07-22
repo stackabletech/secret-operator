@@ -51,9 +51,9 @@ include::example$cert-manager/secretclass.yaml[]
 [#certificate]
 == Requesting a certificate
 
-We can now use Cert-Manager to provision our first certificate. We use labels to inform the Stackable Secret Operator
-about which xref:scope.adoc[scopes] the certificate fulfils. Which scopes must be provisioned is going to depend
-on the applicable workload. This guide assumes the xref:scope.adoc#service[service] and xref:scope.adoc#node[node] scopes.
+You can now use Cert-Manager to provision your first certificate. Use labels to inform the Stackable Secret Operator
+about which xref:scope.adoc[scopes] the certificate fulfills. Which scopes must be provisioned is going to depend
+on the design of the workload. This guide assumes the xref:scope.adoc#service[service] and xref:scope.adoc#node[node] scopes.
 
 [source,yaml]
 ----
