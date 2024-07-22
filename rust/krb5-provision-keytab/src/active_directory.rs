@@ -267,17 +267,16 @@ async fn create_ad_user(
     let principal_cn = ldap3::dn_escape(&princ_name);
     // FIXME: AD restricts RDNs to 64 characters
     let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
-    let sam_account_name = match generate_sam_account_name {
-        Some(sam_rules) => {
+    let sam_account_name = generate_sam_account_name
+        .map(|sam_rules| {
             let mut name = sam_rules.prefix.clone();
             let random_part_len = usize::from(sam_rules.total_length)
                 .checked_sub(name.len())
                 .context(SamAccountNamePrefixLongerThanRequestedLengthSnafu)?;
             name += &generate_username(random_part_len);
-            Some(name)
-        }
-        None => None,
-    };
+            Ok(name)
+        })
+        .transpose()?;
     let create_user_result = ldap
         .add(
             &format!("CN={principal_cn},{user_dn_base}"),
