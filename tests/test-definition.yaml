@@ -6,6 +6,10 @@ dimensions:
   - name: openshift
     values:
       - "false"
+  - name: ad-custom-samaccountname
+    values:
+      - "false"
+      - "true"
 tests:
   - name: kerberos
     dimensions:
@@ -15,6 +19,7 @@ tests:
     # - name: kerberos-ad
     #   dimensions:
     #     - krb5
+    #     - ad-custom-samaccountname
   - name: listener
     dimensions:
       - openshift
