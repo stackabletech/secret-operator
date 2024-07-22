@@ -53,7 +53,7 @@ include::example$cert-manager/secretclass.yaml[]
 
 You can now use Cert-Manager to provision your first certificate. Use labels to inform the Stackable Secret Operator
 about which xref:scope.adoc[scopes] the certificate fulfills. Which scopes must be provisioned is going to depend
-on the design of the workload. This guide assumes the xref:scope.adoc#service[service] and xref:scope.adoc#node[node] scopes.
+on the design of the workload. This guide assumes the xref:scope.adoc#service[service] scope.
 
 [source,yaml]
 ----
