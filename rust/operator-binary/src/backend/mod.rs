@@ -8,7 +8,7 @@ pub mod scope;
 pub mod tls;
 
 use async_trait::async_trait;
-use serde::{de::Unexpected, Deserialize, Deserializer};
+use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{DateTime, FixedOffset},
@@ -32,6 +32,8 @@ use self::pod_info::SchedulingPodInfo;
 /// Fields beginning with `csi.storage.k8s.io/` are provided by the Kubelet
 #[derive(Deserialize, Debug)]
 pub struct SecretVolumeSelector {
+    #[serde(flatten)]
+    pub internal: InternalSecretVolumeSelectorParams,
     /// What kind of secret should be used
     #[serde(rename = "secrets.stackable.tech/class")]
     pub class: String,
@@ -116,6 +118,14 @@ pub struct SecretVolumeSelector {
         default = "default_cert_jitter_factor"
     )]
     pub autotls_cert_jitter_factor: f64,
+}
+
+/// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself
+#[derive(Deserialize, Serialize, Debug)]
+pub struct InternalSecretVolumeSelectorParams {
+    /// The name of the PersistentVolumeClaim that owns this volume
+    #[serde(rename = "secrets.stackable.tech/internal.pvc.name")]
+    pub pvc_name: String,
 }
 
 fn default_cert_restart_buffer() -> Duration {

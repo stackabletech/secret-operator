@@ -106,7 +106,7 @@ impl SecretBackend for K8sSearch {
     ) -> Result<SecretContents, Self::Error> {
         let labels = build_selector_labels(selector, LabelSelectorPodInfo::Scheduled(&pod_info))?;
         if let Some(cert_manager_issuer) = &self.cert_manager_issuer {
-            let cert_name = &selector.pod;
+            let cert_name = &selector.internal.pvc_name;
             let mut dns_names = Vec::new();
             let mut ip_addresses = Vec::new();
             for scope in &selector.scope {

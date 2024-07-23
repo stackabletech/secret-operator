@@ -13,7 +13,7 @@ use crate::{
     backend::{
         self,
         pod_info::{self, SchedulingPodInfo},
-        SecretBackendError, SecretVolumeSelector,
+        InternalSecretVolumeSelectorParams, SecretBackendError, SecretVolumeSelector,
     },
     grpc::csi::{
         self,
@@ -109,6 +109,26 @@ impl SecretProvisionerController {
             .with_context(|_| create_volume_error::FindPvcSnafu {
                 pvc: ObjectRef::new(&params.pvc_name).within(&params.pvc_namespace),
             })?;
+        let mut pvc_selector = pvc.metadata.annotations.unwrap_or_default();
+
+        // Inject internal selector params
+        let internal_selector_params = InternalSecretVolumeSelectorParams {
+            pvc_name: params.pvc_name.clone(),
+        };
+        pvc_selector.extend(
+            // Convert to BTreeMap while letting serde ensure that all
+            // field names and serializations are correct
+            serde_json::to_value(internal_selector_params)
+                .and_then(serde_json::from_value::<BTreeMap<String, String>>)
+                .expect("internal selector params failed to reserialize"),
+        );
+
+        // Kubernetes doesn't inform CSI controllers about the Pod
+        // associated with each volume (since, /normally/, volume creation
+        // is supposed to be independent from any Pod mounting it).
+        // Thus, we try to discover it ourselves instead, and add that.
+        // We specifically avoid adding it to the volume context, since it /will/
+        // be provided by the Kubelet during publish/mount.
         let pod_name = pvc
             .metadata
             .owner_references
@@ -124,7 +144,6 @@ impl SecretProvisionerController {
                 pvc: ObjectRef::new(&params.pvc_name).within(&params.pvc_namespace),
             })?
             .name;
-        let pvc_selector = pvc.metadata.annotations.unwrap_or_default();
         let mut raw_selector = pvc_selector.clone();
         raw_selector.extend([
             ("csi.storage.k8s.io/pod.name".to_string(), pod_name),
