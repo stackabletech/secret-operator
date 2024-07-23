@@ -32,6 +32,8 @@ spec:
                     - required:
                         - autoTls
                     - required:
+                        - experimentalCertManager
+                    - required:
                         - kerberosKeytab
                   properties:
                     autoTls:
@@ -78,6 +80,24 @@ spec:
                           type: string
                       required:
                         - ca
+                      type: object
+                    experimentalCertManager:
+                      properties:
+                        issuer:
+                          properties:
+                            kind:
+                              enum:
+                                - Issuer
+                                - ClusterIssuer
+                              type: string
+                            name:
+                              type: string
+                          required:
+                            - kind
+                            - name
+                          type: object
+                      required:
+                        - issuer
                       type: object
                     k8sSearch:
                       description: The [`k8sSearch` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-k8ssearch) can be used to mount Secrets across namespaces into Pods.

@@ -23,17 +23,9 @@ use crate::crd::CertManagerIssuerKind;
 #[serde(rename_all = "camelCase")]
 pub struct CertificateSpec {
     pub secret_name: String,
-    pub secret_template: SecretTemplate,
     pub dns_names: Vec<String>,
     pub ip_addresses: Vec<String>,
     pub issuer_ref: IssuerRef,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct SecretTemplate {
-    pub annotations: BTreeMap<String, String>,
-    pub labels: BTreeMap<String, String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

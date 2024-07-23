@@ -1,5 +1,6 @@
 //! Collects or generates secret data based on the request in the Kubernetes `Volume` definition
 
+pub mod cert_manager;
 pub mod dynamic;
 pub mod k8s_search;
 pub mod kerberos_keytab;
@@ -16,6 +17,7 @@ use stackable_operator::{
 };
 use std::{collections::HashSet, convert::Infallible, fmt::Debug};
 
+pub use cert_manager::CertManager;
 pub use k8s_search::K8sSearch;
 pub use kerberos_keytab::KerberosKeytab;
 pub use tls::TlsGenerate;

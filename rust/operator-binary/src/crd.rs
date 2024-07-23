@@ -47,6 +47,8 @@ pub enum SecretClassBackend {
     /// A new certificate and keypair will be generated and signed for each Pod, keys or certificates are never reused.
     AutoTls(AutoTlsBackend),
 
+    ExperimentalCertManager(CertManagerBackend),
+
     /// The [`kerberosKeytab` backend](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-kerberoskeytab)
     /// creates a Kerberos keytab file for a selected realm.
     /// The Kerberos KDC and administrator credentials must be provided by the administrator.
@@ -58,8 +60,6 @@ pub enum SecretClassBackend {
 pub struct K8sSearchBackend {
     /// Configures the namespace searched for Secret objects.
     pub search_namespace: SearchNamespace,
-
-    pub cert_manager_issuer: Option<CertManagerIssuer>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -72,19 +72,6 @@ pub enum SearchNamespace {
     /// The Secret objects are located in a single global namespace.
     /// Should be used for secrets that are provisioned by the cluster administrator.
     Name(String),
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct CertManagerIssuer {
-    pub kind: CertManagerIssuerKind,
-    pub name: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, JsonSchema)]
-pub enum CertManagerIssuerKind {
-    Issuer,
-    ClusterIssuer,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -134,6 +121,25 @@ impl AutoTlsCa {
     fn default_ca_certificate_lifetime() -> Duration {
         backend::tls::DEFAULT_CA_CERT_LIFETIME
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CertManagerBackend {
+    pub issuer: CertManagerIssuer,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CertManagerIssuer {
+    pub kind: CertManagerIssuerKind,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, JsonSchema)]
+pub enum CertManagerIssuerKind {
+    Issuer,
+    ClusterIssuer,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
