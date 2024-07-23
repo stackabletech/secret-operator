@@ -5,6 +5,18 @@ image:
   pullPolicy: IfNotPresent
   pullSecrets: []
 
+secretMigrationJob:
+  image:
+    repository: docker.stackable.tech/stackable/tools
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
 csiProvisioner:
   image:
     repository: docker.stackable.tech/k8s/csi-provisioner
