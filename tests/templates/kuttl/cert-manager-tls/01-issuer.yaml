@@ -1,0 +1,27 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: secret-operator-demonstration
+spec:
+  ca:
+    secretName: secret-operator-demonstration-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: secret-operator-demonstration-ca
+spec:
+  secretName: secret-operator-demonstration-ca
+  isCA: true
+  commonName: Stackable Secret Operator/Cert-Manager Demonstration CA
+  issuerRef:
+    kind: Issuer
+    name: secret-operator-demonstration-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: secret-operator-demonstration-ca
+spec:
+  selfSigned: {}

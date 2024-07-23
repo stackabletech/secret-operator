@@ -58,6 +58,8 @@ pub enum SecretClassBackend {
 pub struct K8sSearchBackend {
     /// Configures the namespace searched for Secret objects.
     pub search_namespace: SearchNamespace,
+
+    pub cert_manager_issuer: Option<CertManagerIssuer>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -70,6 +72,19 @@ pub enum SearchNamespace {
     /// The Secret objects are located in a single global namespace.
     /// Should be used for secrets that are provisioned by the cluster administrator.
     Name(String),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CertManagerIssuer {
+    pub kind: CertManagerIssuerKind,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, JsonSchema)]
+pub enum CertManagerIssuerKind {
+    Issuer,
+    ClusterIssuer,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

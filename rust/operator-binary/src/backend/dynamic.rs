@@ -111,12 +111,14 @@ pub async fn from_class(
     class: SecretClass,
 ) -> Result<Box<Dynamic>, FromClassError> {
     Ok(match class.spec.backend {
-        crd::SecretClassBackend::K8sSearch(crd::K8sSearchBackend { search_namespace }) => {
-            from(super::K8sSearch {
-                client: Unloggable(client.clone()),
-                search_namespace,
-            })
-        }
+        crd::SecretClassBackend::K8sSearch(crd::K8sSearchBackend {
+            search_namespace,
+            cert_manager_issuer,
+        }) => from(super::K8sSearch {
+            client: Unloggable(client.clone()),
+            search_namespace,
+            cert_manager_issuer,
+        }),
         crd::SecretClassBackend::AutoTls(crd::AutoTlsBackend {
             ca,
             max_certificate_lifetime,

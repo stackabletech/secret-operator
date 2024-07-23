@@ -8,16 +8,21 @@ use stackable_operator::{
     k8s_openapi::{
         api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector, ByteString,
     },
-    kube::api::ListParams,
+    kube::api::{ListParams, ObjectMeta},
     kvp::{LabelError, LabelSelectorExt, Labels},
 };
 
-use crate::{crd::SearchNamespace, format::SecretData, utils::Unloggable};
+use crate::{
+    cert_manager,
+    crd::{CertManagerIssuer, SearchNamespace},
+    format::SecretData,
+    utils::Unloggable,
+};
 
 use super::{
-    pod_info::{PodInfo, SchedulingPodInfo},
+    pod_info::{Address, PodInfo, SchedulingPodInfo},
     scope::SecretScope,
-    SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
+    ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
 };
 
 const LABEL_CLASS: &str = "secrets.stackable.tech/class";
@@ -28,6 +33,17 @@ const LABEL_SCOPE_LISTENER: &str = "secrets.stackable.tech/listener";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
+    #[snafu(display("failed to get addresses for scope {scope}"))]
+    ScopeAddresses {
+        source: ScopeAddressesError,
+        scope: SecretScope,
+    },
+
+    #[snafu(display("failed to apply cert-manager Certificate for volume"))]
+    ApplyCertManagerCertificate {
+        source: stackable_operator::client::Error,
+    },
+
     #[snafu(display("failed to build Secret selector"))]
     SecretSelector {
         source: stackable_operator::kvp::SelectorError,
@@ -51,8 +67,10 @@ pub enum Error {
 impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
         match self {
+            Error::ScopeAddresses { .. } => tonic::Code::Unavailable,
             Error::SecretSelector { .. } => tonic::Code::FailedPrecondition,
             Error::SecretQuery { .. } => tonic::Code::FailedPrecondition,
+            Error::ApplyCertManagerCertificate { .. } => tonic::Code::Unavailable,
             Error::NoSecret { .. } => tonic::Code::FailedPrecondition,
             Error::NoListener { .. } => tonic::Code::FailedPrecondition,
             Error::BuildLabel { .. } => tonic::Code::FailedPrecondition,
@@ -65,6 +83,7 @@ pub struct K8sSearch {
     // Not secret per se, but isn't Debug: https://github.com/stackabletech/secret-operator/issues/411
     pub client: Unloggable<stackable_operator::client::Client>,
     pub search_namespace: SearchNamespace,
+    pub cert_manager_issuer: Option<CertManagerIssuer>,
 }
 
 impl K8sSearch {
@@ -85,8 +104,53 @@ impl SecretBackend for K8sSearch {
         selector: &SecretVolumeSelector,
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
-        let label_selector =
-            build_label_selector_query(selector, LabelSelectorPodInfo::Scheduled(&pod_info))?;
+        let labels = build_selector_labels(selector, LabelSelectorPodInfo::Scheduled(&pod_info))?;
+        if let Some(cert_manager_issuer) = &self.cert_manager_issuer {
+            let cert_name = &selector.pod;
+            let mut dns_names = Vec::new();
+            let mut ip_addresses = Vec::new();
+            for scope in &selector.scope {
+                for address in selector
+                    .scope_addresses(&pod_info, scope)
+                    .context(ScopeAddressesSnafu { scope })?
+                {
+                    match address {
+                        Address::Dns(name) => dns_names.push(name),
+                        Address::Ip(addr) => ip_addresses.push(addr.to_string()),
+                    }
+                }
+            }
+            let cert = cert_manager::Certificate {
+                metadata: ObjectMeta {
+                    name: Some(cert_name.clone()),
+                    namespace: Some(self.search_ns_for_pod(selector).to_string()),
+                    ..Default::default()
+                },
+                spec: cert_manager::CertificateSpec {
+                    secret_name: cert_name.clone(),
+                    secret_template: cert_manager::SecretTemplate {
+                        annotations: BTreeMap::new(),
+                        labels: labels.clone().into(),
+                    },
+                    dns_names,
+                    ip_addresses,
+                    issuer_ref: cert_manager::IssuerRef {
+                        name: cert_manager_issuer.name.clone(),
+                        kind: cert_manager_issuer.kind,
+                    },
+                },
+            };
+            self.client
+                .apply_patch("k8s-search-cert-manager", &cert, &cert)
+                .await
+                .context(ApplyCertManagerCertificateSnafu)?;
+        }
+        let label_selector = LabelSelector {
+            match_expressions: None,
+            match_labels: Some(labels.into()),
+        }
+        .to_query_string()
+        .context(SecretSelectorSnafu)?;
         let secret = self
             .client
             .list::<Secret>(
@@ -113,9 +177,18 @@ impl SecretBackend for K8sSearch {
         selector: &SecretVolumeSelector,
         pod_info: SchedulingPodInfo,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
-        if pod_info.has_node_scope {
-            let label_selector =
-                build_label_selector_query(selector, LabelSelectorPodInfo::Scheduling(&pod_info))?;
+        if pod_info.has_node_scope
+        // FIXME: how should node selection interact with cert manager?
+            && self.cert_manager_issuer.is_none()
+        {
+            let labels =
+                build_selector_labels(selector, LabelSelectorPodInfo::Scheduling(&pod_info))?;
+            let label_selector = LabelSelector {
+                match_expressions: None,
+                match_labels: Some(labels.into()),
+            }
+            .to_query_string()
+            .context(SecretSelectorSnafu)?;
             Ok(Some(
                 self.client
                     .list::<Secret>(
@@ -139,10 +212,10 @@ enum LabelSelectorPodInfo<'a> {
     Scheduled(&'a PodInfo),
 }
 
-fn build_label_selector_query(
+fn build_selector_labels(
     vol_selector: &SecretVolumeSelector,
     pod_info: LabelSelectorPodInfo,
-) -> Result<String, Error> {
+) -> Result<Labels, Error> {
     let mut labels: Labels =
         BTreeMap::from([(LABEL_CLASS.to_string(), vol_selector.class.to_string())])
             .try_into()
@@ -195,12 +268,5 @@ fn build_label_selector_query(
             }
         }
     }
-    let label_selector = LabelSelector {
-        match_expressions: None,
-        match_labels: Some(labels.into()),
-    };
-
-    label_selector
-        .to_query_string()
-        .context(SecretSelectorSnafu)
+    Ok(labels)
 }

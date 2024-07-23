@@ -67,6 +67,13 @@ rules:
     verbs:
       - get
   - apiGroups:
+    - cert-manager.io
+    resources:
+    - certificates
+    verbs:
+    - patch
+    - create
+  - apiGroups:
     - security.openshift.io
     resourceNames:
     - privileged
