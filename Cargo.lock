@@ -1352,7 +1352,7 @@ dependencies = [
 
 [[package]]
 name = "krb5"
-version = "0.0.0-dev"
+version = "24.7.0"
 dependencies = [
  "krb5-sys",
  "snafu 0.8.4",
@@ -1360,7 +1360,7 @@ dependencies = [
 
 [[package]]
 name = "krb5-sys"
-version = "0.0.0-dev"
+version = "24.7.0"
 dependencies = [
  "bindgen",
  "pkg-config",
@@ -2608,7 +2608,7 @@ checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 
 [[package]]
 name = "stackable-krb5-provision-keytab"
-version = "0.0.0-dev"
+version = "24.7.0"
 dependencies = [
  "byteorder",
  "futures 0.3.30",
@@ -2676,7 +2676,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-secret-operator"
-version = "0.0.0-dev"
+version = "24.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2715,7 +2715,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-secret-operator-crd-utils"
-version = "0.0.0-dev"
+version = "24.7.0"
 dependencies = [
  "serde",
  "stackable-operator",

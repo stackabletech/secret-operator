@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [24.7.0] - 2024-07-24
+
 ### Added
 
 - The associated configuration is now logged for each issued secret ([#413]).
