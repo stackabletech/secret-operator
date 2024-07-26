@@ -1,6 +1,7 @@
 use std::{
     collections::HashSet,
     ffi::{CString, NulError},
+    sync::OnceLock,
 };
 
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -211,20 +212,26 @@ fn generate_random_string(len: usize, dict: &[char]) -> String {
 fn generate_ad_password(len: usize) -> String {
     // Allow all ASCII alphanumeric characters as well as punctuation
     // Exclude double quotes (") since they are used by the AD password update protocol...
-    let dict: Vec<char> = (1..=127)
-        .filter_map(char::from_u32)
-        .filter(|c| *c != '"' && (c.is_ascii_alphanumeric() || c.is_ascii_punctuation()))
-        .collect();
-    generate_random_string(len, &dict)
+    static DICT: OnceLock<Vec<char>> = OnceLock::new();
+    let dict = DICT.get_or_init(|| {
+        (1..=127)
+            .filter_map(char::from_u32)
+            .filter(|c| *c != '"' && (c.is_ascii_alphanumeric() || c.is_ascii_punctuation()))
+            .collect()
+    });
+    generate_random_string(len, dict)
 }
 
 fn generate_username(len: usize) -> String {
     // Allow ASCII alphanumerics
-    let dict: Vec<char> = (1..=127)
-        .filter_map(char::from_u32)
-        .filter(|c| c.is_ascii_alphanumeric())
-        .collect();
-    generate_random_string(len, &dict)
+    static DICT: OnceLock<Vec<char>> = OnceLock::new();
+    let dict = DICT.get_or_init(|| {
+        (1..=127)
+            .filter_map(char::from_u32)
+            .filter(|c| c.is_ascii_alphanumeric())
+            .collect()
+    });
+    generate_random_string(len, dict)
 }
 
 fn encode_password_for_ad_update(password: &str) -> Vec<u8> {
