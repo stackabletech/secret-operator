@@ -1,0 +1,16 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: my-app-tls # <1>
+spec:
+  secretName: my-app-tls # <2>
+  secretTemplate:
+    labels:
+      secrets.stackable.tech/class: tls-cert-manager # <3>
+      secrets.stackable.tech/service: my-app # <4>
+  dnsNames:
+    - my-app # <5>
+  issuerRef:
+    kind: Issuer
+    name: secret-operator-demonstration # <6>
