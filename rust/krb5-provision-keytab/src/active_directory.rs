@@ -1,10 +1,15 @@
-use std::ffi::{CString, NulError};
+use std::{
+    collections::HashSet,
+    ffi::{CString, NulError},
+    sync::OnceLock,
+};
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use krb5::{Keyblock, Keytab, KrbContext, Principal, PrincipalUnparseOptions};
 use ldap3::{Ldap, LdapConnAsync, LdapConnSettings};
 use rand::{seq::SliceRandom, thread_rng, CryptoRng};
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_krb5_provision_keytab::ActiveDirectorySamAccountNameRules;
 use stackable_operator::{k8s_openapi::api::core::v1::Secret, kube::runtime::reflector::ObjectRef};
 use stackable_secret_operator_crd_utils::SecretReference;
 
@@ -61,6 +66,9 @@ pub enum Error {
 
     #[snafu(display("failed to add key to keytab"))]
     AddToKeytab { source: krb5::Error },
+
+    #[snafu(display("configured samAccountName prefix is longer than the requested length"))]
+    SamAccountNamePrefixLongerThanRequestedLength,
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -79,6 +87,7 @@ pub struct AdAdmin<'a> {
     password_cache: CredentialCache,
     user_distinguished_name: String,
     schema_distinguished_name: String,
+    generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
 }
 
 impl<'a> AdAdmin<'a> {
@@ -89,6 +98,7 @@ impl<'a> AdAdmin<'a> {
         password_cache_secret: SecretReference,
         user_distinguished_name: String,
         schema_distinguished_name: String,
+        generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
     ) -> Result<AdAdmin<'a>> {
         let kube = stackable_operator::client::create_client(None)
             .await
@@ -117,6 +127,7 @@ impl<'a> AdAdmin<'a> {
             password_cache,
             user_distinguished_name,
             schema_distinguished_name,
+            generate_sam_account_name,
         })
     }
 
@@ -143,6 +154,7 @@ impl<'a> AdAdmin<'a> {
                     &self.user_distinguished_name,
                     &self.schema_distinguished_name,
                     ctx.cache_ref,
+                    self.generate_sam_account_name.as_ref(),
                 )
                 .await?;
                 Ok(password.into_bytes())
@@ -186,21 +198,40 @@ async fn get_ldap_ca_certificate(
     native_tls::Certificate::from_pem(&ca_cert_pem).context(ParseLdapTlsCaSnafu)
 }
 
-fn generate_ad_password(len: usize) -> String {
+fn generate_random_string(len: usize, dict: &[char]) -> String {
     let mut rng = thread_rng();
     // Assert that `rng` is crypto-safe
     let _: &dyn CryptoRng = &rng;
-    // Allow all ASCII alphanumeric characters as well as punctuation
-    // Exclude double quotes (") since they are used by the AD password update protocol...
-    let dict: Vec<char> = (1..=127)
-        .filter_map(char::from_u32)
-        .filter(|c| *c != '"' && (c.is_ascii_alphanumeric() || c.is_ascii_punctuation()))
-        .collect();
-    let pw = (0..len)
+    let str = (0..len)
         .map(|_| *dict.choose(&mut rng).expect("dictionary must be non-empty"))
         .collect::<String>();
-    assert_eq!(pw.len(), len);
-    pw
+    assert_eq!(str.len(), len);
+    str
+}
+
+fn generate_ad_password(len: usize) -> String {
+    // Allow all ASCII alphanumeric characters as well as punctuation
+    // Exclude double quotes (") since they are used by the AD password update protocol...
+    static DICT: OnceLock<Vec<char>> = OnceLock::new();
+    let dict = DICT.get_or_init(|| {
+        (1..=127)
+            .filter_map(char::from_u32)
+            .filter(|c| *c != '"' && (c.is_ascii_alphanumeric() || c.is_ascii_punctuation()))
+            .collect()
+    });
+    generate_random_string(len, dict)
+}
+
+fn generate_username(len: usize) -> String {
+    // Allow ASCII alphanumerics
+    static DICT: OnceLock<Vec<char>> = OnceLock::new();
+    let dict = DICT.get_or_init(|| {
+        (1..=127)
+            .filter_map(char::from_u32)
+            .filter(|c| c.is_ascii_alphanumeric())
+            .collect()
+    });
+    generate_random_string(len, dict)
 }
 
 fn encode_password_for_ad_update(password: &str) -> Vec<u8> {
@@ -220,6 +251,7 @@ async fn create_ad_user(
     user_dn_base: &str,
     schema_dn_base: &str,
     password_cache_ref: SecretReference,
+    generate_sam_account_name: Option<&ActiveDirectorySamAccountNameRules>,
 ) -> Result<()> {
     // Flags are a subset of https://learn.microsoft.com/en-us/troubleshoot/windows-server/identity/useraccountcontrol-manipulate-account-properties
     const AD_UAC_NORMAL_ACCOUNT: u32 = 0x0200;
@@ -242,10 +274,20 @@ async fn create_ad_user(
     let principal_cn = ldap3::dn_escape(&princ_name);
     // FIXME: AD restricts RDNs to 64 characters
     let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
+    let sam_account_name = generate_sam_account_name
+        .map(|sam_rules| {
+            let mut name = sam_rules.prefix.clone();
+            let random_part_len = usize::from(sam_rules.total_length)
+                .checked_sub(name.len())
+                .context(SamAccountNamePrefixLongerThanRequestedLengthSnafu)?;
+            name += &generate_username(random_part_len);
+            Ok(name)
+        })
+        .transpose()?;
     let create_user_result = ldap
         .add(
             &format!("CN={principal_cn},{user_dn_base}"),
-            vec![
+            [
                 ("cn".as_bytes(), [principal_cn.as_bytes()].into()),
                 ("objectClass".as_bytes(), ["user".as_bytes()].into()),
                 ("instanceType".as_bytes(), ["4".as_bytes()].into()),
@@ -280,7 +322,14 @@ async fn create_ad_user(
                         .as_bytes()]
                     .into(),
                 ),
-            ],
+            ]
+            .into_iter()
+            .chain(
+                sam_account_name
+                    .as_ref()
+                    .map(|san| ("samAccountName".as_bytes(), HashSet::from([san.as_bytes()]))),
+            )
+            .collect(),
         )
         .await
         .context(CreateLdapUserSnafu)?;
