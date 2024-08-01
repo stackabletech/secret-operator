@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Active Directory's `samAccountName` generation can now be customized ([#454]).
+
+[#454]: https://github.com/stackabletech/secret-operator/pull/454
+
+## [24.7.0] - 2024-07-24
+
+### Added
+
 - The associated configuration is now logged for each issued secret ([#413]).
 
 ### Changed
