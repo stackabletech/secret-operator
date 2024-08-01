@@ -93,7 +93,7 @@ pub struct SecretVolumeSelector {
     )]
     pub compat_tls_pkcs12_password: Option<String>,
 
-    /// The TLS cert lifetime.
+    /// The TLS cert lifetime (when using the [`tls`] backend).
     /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
     #[serde(
         rename = "secrets.stackable.tech/backend.autotls.cert.lifetime",
@@ -120,6 +120,15 @@ pub struct SecretVolumeSelector {
         default = "default_cert_jitter_factor"
     )]
     pub autotls_cert_jitter_factor: f64,
+
+    /// The TLS cert lifetime (when using the [`cert_manager`] backend).
+    /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
+    #[serde(
+        rename = "secrets.stackable.tech/backend.cert-manager.cert.lifetime",
+        deserialize_with = "SecretVolumeSelector::deserialize_some",
+        default
+    )]
+    pub cert_manager_cert_lifetime: Option<Duration>,
 }
 
 /// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself

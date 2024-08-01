@@ -9,6 +9,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{api::core::v1::Secret, ByteString},
     kube::api::ObjectMeta,
+    time::Duration,
 };
 
 use crate::{crd::CertManagerIssuer, external_crd, format::SecretData, utils::Unloggable};
@@ -19,6 +20,9 @@ use super::{
     scope::SecretScope,
     ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
 };
+
+/// Default lifetime of certs when no annotations are set on the Volume.
+pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_hours_unchecked(24);
 
 const FIELD_MANAGER_SCOPE: &str = "backend.cert-manager";
 
@@ -62,6 +66,7 @@ pub struct CertManager {
     // Not secret per se, but isn't Debug: https://github.com/stackabletech/secret-operator/issues/411
     pub client: Unloggable<stackable_operator::client::Client>,
     pub issuer: CertManagerIssuer,
+    pub default_certificate_lifetime: Duration,
 }
 
 #[async_trait]
@@ -104,6 +109,13 @@ impl SecretBackend for CertManager {
             },
             spec: external_crd::cert_manager::CertificateSpec {
                 secret_name: cert_name.clone(),
+                duration: Some(format!(
+                    "{}s",
+                    selector
+                        .cert_manager_cert_lifetime
+                        .unwrap_or(self.default_certificate_lifetime)
+                        .as_secs()
+                )),
                 dns_names,
                 ip_addresses,
                 issuer_ref: external_crd::cert_manager::IssuerRef {

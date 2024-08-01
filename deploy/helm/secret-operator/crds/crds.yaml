@@ -87,6 +87,13 @@ spec:
 
                         A new certificate will be requested the first time it is used by a Pod, it will be reused after that (subject to cert-manager renewal rules).
                       properties:
+                        defaultCertificateLifetime:
+                          default: 1d
+                          description: |-
+                            The default lifetime of certificates.
+
+                            Defaults to 1 day. This may need to be increased for external issuers that impose rate limits (such as Let's Encrypt).
+                          type: string
                         issuer:
                           description: A reference to the cert-manager issuer that the certificates should be requested from.
                           properties:

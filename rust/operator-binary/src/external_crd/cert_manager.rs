@@ -21,6 +21,7 @@ use stackable_operator::{
 #[serde(rename_all = "camelCase")]
 pub struct CertificateSpec {
     pub secret_name: String,
+    pub duration: Option<String>,
     pub dns_names: Vec<String>,
     pub ip_addresses: Vec<String>,
     pub issuer_ref: IssuerRef,

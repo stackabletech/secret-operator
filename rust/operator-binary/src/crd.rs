@@ -134,6 +134,18 @@ impl AutoTlsCa {
 pub struct CertManagerBackend {
     /// A reference to the cert-manager issuer that the certificates should be requested from.
     pub issuer: CertManagerIssuer,
+
+    /// The default lifetime of certificates.
+    ///
+    /// Defaults to 1 day. This may need to be increased for external issuers that impose rate limits (such as Let's Encrypt).
+    #[serde(default = "CertManagerBackend::default_certificate_lifetime")]
+    pub default_certificate_lifetime: Duration,
+}
+
+impl CertManagerBackend {
+    fn default_certificate_lifetime() -> Duration {
+        backend::cert_manager::DEFAULT_CERT_LIFETIME
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
