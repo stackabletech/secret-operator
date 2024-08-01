@@ -6,8 +6,17 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- The associated configuration is now logged for each issued secret ([#413]).
+- Active Directory's `samAccountName` generation can now be customized ([#454]).
 - Added experimental cert-manager backend ([#482]).
+
+[#454]: https://github.com/stackabletech/secret-operator/pull/454
+[#482]: https://github.com/stackabletech/secret-operator/pull/482
+
+## [24.7.0] - 2024-07-24
+
+### Added
+
+- The associated configuration is now logged for each issued secret ([#413]).
 
 ### Changed
 
@@ -34,7 +43,6 @@ All notable changes to this project will be documented in this file.
 [#467]: https://github.com/stackabletech/secret-operator/pull/467
 [#468]: https://github.com/stackabletech/secret-operator/pull/468
 [#470]: https://github.com/stackabletech/secret-operator/pull/470
-[#482]: https://github.com/stackabletech/secret-operator/pull/482
 
 ## [24.3.0] - 2024-03-20
 
