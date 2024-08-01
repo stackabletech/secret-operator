@@ -16,9 +16,9 @@ use tonic::transport::Server;
 use utils::{uds_bind_private, TonicUnixStream};
 
 mod backend;
-mod cert_manager;
 mod crd;
 mod csi_server;
+mod external_crd;
 mod format;
 mod grpc;
 mod utils;

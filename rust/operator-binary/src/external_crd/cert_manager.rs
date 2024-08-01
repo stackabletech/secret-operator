@@ -1,12 +1,8 @@
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
     kube::CustomResource,
     schemars::{self, JsonSchema},
 };
-
-use crate::crd::CertManagerIssuerKind;
 
 #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[kube(
@@ -32,5 +28,11 @@ pub struct CertificateSpec {
 #[serde(rename_all = "camelCase")]
 pub struct IssuerRef {
     pub name: String,
-    pub kind: CertManagerIssuerKind,
+    pub kind: IssuerKind,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, JsonSchema)]
+pub enum IssuerKind {
+    Issuer,
+    ClusterIssuer,
 }

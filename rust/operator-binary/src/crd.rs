@@ -9,7 +9,7 @@ use stackable_operator::{
 };
 use stackable_secret_operator_crd_utils::SecretReference;
 
-use crate::backend;
+use crate::{backend, external_crd};
 
 /// A [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass) is a cluster-global Kubernetes resource
 /// that defines a category of secrets that the Secret Operator knows how to provision.
@@ -132,14 +132,8 @@ pub struct CertManagerBackend {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CertManagerIssuer {
-    pub kind: CertManagerIssuerKind,
+    pub kind: external_crd::cert_manager::IssuerKind,
     pub name: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, JsonSchema)]
-pub enum CertManagerIssuerKind {
-    Issuer,
-    ClusterIssuer,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

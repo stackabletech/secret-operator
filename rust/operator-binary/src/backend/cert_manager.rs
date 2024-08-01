@@ -7,7 +7,7 @@ use stackable_operator::{
     kube::api::ObjectMeta,
 };
 
-use crate::{cert_manager, crd::CertManagerIssuer, format::SecretData, utils::Unloggable};
+use crate::{crd::CertManagerIssuer, external_crd, format::SecretData, utils::Unloggable};
 
 use super::{
     k8s_search::LABEL_SCOPE_NODE,
@@ -81,18 +81,18 @@ impl SecretBackend for CertManager {
                 }
             }
         }
-        let cert = cert_manager::Certificate {
+        let cert = external_crd::cert_manager::Certificate {
             metadata: ObjectMeta {
                 name: Some(cert_name.clone()),
                 namespace: Some(selector.namespace.clone()),
                 labels: Some([(LABEL_SCOPE_NODE.to_string(), pod_info.node_name)].into()),
                 ..Default::default()
             },
-            spec: cert_manager::CertificateSpec {
+            spec: external_crd::cert_manager::CertificateSpec {
                 secret_name: cert_name.clone(),
                 dns_names,
                 ip_addresses,
-                issuer_ref: cert_manager::IssuerRef {
+                issuer_ref: external_crd::cert_manager::IssuerRef {
                     name: self.issuer.name.clone(),
                     kind: self.issuer.kind,
                 },
@@ -128,7 +128,7 @@ impl SecretBackend for CertManager {
             Ok(self
                 .client
                 // If certificate does not already exist, allow scheduling to any node
-                .get_opt::<cert_manager::Certificate>(cert_name, &selector.namespace)
+                .get_opt::<external_crd::cert_manager::Certificate>(cert_name, &selector.namespace)
                 .await
                 .context(GetCertManagerCertificateSnafu)?
                 .and_then(|cert| cert.metadata.labels?.remove(LABEL_SCOPE_NODE))
