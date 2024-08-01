@@ -82,15 +82,25 @@ spec:
                         - ca
                       type: object
                     experimentalCertManager:
+                      description: |-
+                        The [`experimentalCertManager` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-certmanager) injects a TLS certificate issued by [cert-manager](https://cert-manager.io/).
+
+                        A new certificate will be requested the first time it is used by a Pod, it will be reused after that (subject to cert-manager renewal rules).
                       properties:
                         issuer:
+                          description: A reference to the cert-manager issuer that the certificates should be requested from.
                           properties:
                             kind:
+                              description: |-
+                                The kind of the issuer, Issuer or ClusterIssuer.
+
+                                If Issuer then it must be in the same namespace as the Pods using it.
                               enum:
                                 - Issuer
                                 - ClusterIssuer
                               type: string
                             name:
+                              description: The name of the issuer.
                               type: string
                           required:
                             - kind
