@@ -128,7 +128,7 @@ pub async fn from_class(
             )
             .await?,
         ),
-        crd::SecretClassBackend::ExperimentalCertManager(crd::CertManagerBackend { issuer }) => {
+        crd::SecretClassBackend::CertManager(crd::CertManagerBackend { issuer }) => {
             from(super::CertManager {
                 client: Unloggable(client.clone()),
                 issuer,

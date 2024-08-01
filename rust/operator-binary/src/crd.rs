@@ -47,7 +47,13 @@ pub enum SecretClassBackend {
     /// A new certificate and keypair will be generated and signed for each Pod, keys or certificates are never reused.
     AutoTls(AutoTlsBackend),
 
-    ExperimentalCertManager(CertManagerBackend),
+    /// The [`experimentalCertManager` backend](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-certmanager)
+    /// injects a TLS certificate issued by [cert-manager](https://cert-manager.io/).
+    ///
+    /// A new certificate will be requested the first time it is used by a Pod, it will be reused after that (subject to
+    /// cert-manager renewal rules).
+    #[serde(rename = "experimentalCertManager")]
+    CertManager(CertManagerBackend),
 
     /// The [`kerberosKeytab` backend](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-kerberoskeytab)
     /// creates a Kerberos keytab file for a selected realm.
@@ -126,13 +132,19 @@ impl AutoTlsCa {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CertManagerBackend {
+    /// A reference to the cert-manager issuer that the certificates should be requested from.
     pub issuer: CertManagerIssuer,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CertManagerIssuer {
+    /// The kind of the issuer, Issuer or ClusterIssuer.
+    ///
+    /// If Issuer then it must be in the same namespace as the Pods using it.
     pub kind: external_crd::cert_manager::IssuerKind,
+
+    /// The name of the issuer.
     pub name: String,
 }
 

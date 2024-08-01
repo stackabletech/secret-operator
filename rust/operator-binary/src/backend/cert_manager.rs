@@ -1,3 +1,7 @@
+//! Uses TLS certificates provisioned by [cert-manager](https://cert-manager.io/)
+//!
+//! Requires the Kubernetes cluster to already have cert-manager installed and configured.
+
 use std::collections::HashSet;
 
 use async_trait::async_trait;
@@ -15,6 +19,8 @@ use super::{
     scope::SecretScope,
     ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
 };
+
+const FIELD_MANAGER_SCOPE: &str = "backend.cert-manager";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -107,7 +113,7 @@ impl SecretBackend for CertManager {
             },
         };
         self.client
-            .apply_patch("cert-manager", &cert, &cert)
+            .apply_patch(FIELD_MANAGER_SCOPE, &cert, &cert)
             .await
             .context(ApplyCertManagerCertificateSnafu)?;
 
