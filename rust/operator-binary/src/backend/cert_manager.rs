@@ -85,7 +85,15 @@ impl SecretBackend for CertManager {
             metadata: ObjectMeta {
                 name: Some(cert_name.clone()),
                 namespace: Some(selector.namespace.clone()),
-                labels: Some([(LABEL_SCOPE_NODE.to_string(), pod_info.node_name)].into()),
+                labels: Some(
+                    [pod_info
+                        .scheduling
+                        .has_node_scope
+                        .then(|| (LABEL_SCOPE_NODE.to_string(), pod_info.node_name))]
+                    .into_iter()
+                    .flatten()
+                    .collect(),
+                ),
                 ..Default::default()
             },
             spec: external_crd::cert_manager::CertificateSpec {
