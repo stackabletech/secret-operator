@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - The associated configuration is now logged for each issued secret ([#413]).
+- Added experimental cert-manager backend ([#482]).
 
 ### Changed
 
@@ -33,6 +34,7 @@ All notable changes to this project will be documented in this file.
 [#467]: https://github.com/stackabletech/secret-operator/pull/467
 [#468]: https://github.com/stackabletech/secret-operator/pull/468
 [#470]: https://github.com/stackabletech/secret-operator/pull/470
+[#482]: https://github.com/stackabletech/secret-operator/pull/482
 
 ## [24.3.0] - 2024-03-20
 
