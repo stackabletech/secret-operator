@@ -1,4 +1,4 @@
-//! CRDs owned by [cert-manager](https://cert-manager.io/), see https://cert-manager.io/docs/reference/api-docs/
+//! CRDs owned by [cert-manager](https://cert-manager.io/), see [their API docs](https://cert-manager.io/docs/reference/api-docs/)
 
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
