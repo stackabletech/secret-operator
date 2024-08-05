@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - The associated configuration is now logged for each issued secret ([#413]).
+- Chore: Upgrade csi-provisioner to 5.0.1 and csi-node-driver-registrar to 2.11.1 ([#455])
 
 ### Changed
 
@@ -38,6 +39,7 @@ All notable changes to this project will be documented in this file.
 [#403]: https://github.com/stackabletech/secret-operator/pull/403
 [#413]: https://github.com/stackabletech/secret-operator/pull/413
 [#440]: https://github.com/stackabletech/secret-operator/pull/440
+[#455]: https://github.com/stackabletech/secret-operator/pull/455
 [#467]: https://github.com/stackabletech/secret-operator/pull/467
 [#468]: https://github.com/stackabletech/secret-operator/pull/468
 [#470]: https://github.com/stackabletech/secret-operator/pull/470

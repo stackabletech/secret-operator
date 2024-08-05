@@ -20,7 +20,7 @@ secretMigrationJob:
 csiProvisioner:
   image:
     repository: docker.stackable.tech/k8s/sig-storage/csi-provisioner
-    tag: v4.0.1
+    tag: v5.0.1
     pullPolicy: IfNotPresent
   resources:
     requests:
@@ -32,7 +32,7 @@ csiProvisioner:
 csiNodeDriverRegistrar:
   image:
     repository: docker.stackable.tech/k8s/sig-storage/csi-node-driver-registrar
-    tag: v2.10.1
+    tag: v2.11.1
     pullPolicy: IfNotPresent
   resources:
     requests:
