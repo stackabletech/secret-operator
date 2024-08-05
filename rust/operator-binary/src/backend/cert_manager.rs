@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use async_trait::async_trait;
-use snafu::{ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{api::core::v1::Secret, ByteString},
     kube::api::ObjectMeta,
@@ -28,6 +28,9 @@ const FIELD_MANAGER_SCOPE: &str = "backend.cert-manager";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
+    #[snafu(display("unable to find PersistentVolumeClaim for volume (try deleting and recreating the Pod, ensure you are using the `ephemeral:` volume type, rather than `csi:`)"))]
+    NoPvcName,
+
     #[snafu(display("failed to get addresses for scope {scope}"))]
     ScopeAddresses {
         source: ScopeAddressesError,
@@ -53,6 +56,7 @@ pub enum Error {
 impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
         match self {
+            Error::NoPvcName { .. } => tonic::Code::FailedPrecondition,
             Error::ScopeAddresses { .. } => tonic::Code::Unavailable,
             Error::GetSecret { .. } => tonic::Code::Unavailable,
             Error::GetCertManagerCertificate { .. } => tonic::Code::Unavailable,
@@ -78,7 +82,11 @@ impl SecretBackend for CertManager {
         selector: &SecretVolumeSelector,
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
-        let cert_name = &selector.internal.pvc_name;
+        let cert_name = selector
+            .internal
+            .pvc_name
+            .as_ref()
+            .context(NoPvcNameSnafu)?;
         let mut dns_names = Vec::new();
         let mut ip_addresses = Vec::new();
         for scope in &selector.scope {
@@ -150,7 +158,11 @@ impl SecretBackend for CertManager {
         pod_info: SchedulingPodInfo,
     ) -> Result<Option<HashSet<String>>, Self::Error> {
         if pod_info.has_node_scope {
-            let cert_name = &selector.internal.pvc_name;
+            let cert_name = selector
+                .internal
+                .pvc_name
+                .as_deref()
+                .context(NoPvcNameSnafu)?;
             Ok(self
                 .client
                 // If certificate does not already exist, allow scheduling to any node

@@ -113,7 +113,7 @@ impl SecretProvisionerController {
 
         // Inject internal selector params
         let internal_selector_params = InternalSecretVolumeSelectorParams {
-            pvc_name: params.pvc_name.clone(),
+            pvc_name: Some(params.pvc_name.clone()),
         };
         pvc_selector.extend(
             // Convert to BTreeMap while letting serde ensure that all

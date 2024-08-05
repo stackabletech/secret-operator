@@ -132,11 +132,20 @@ pub struct SecretVolumeSelector {
 }
 
 /// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself
+// These are optional even if they are set unconditionally, because otherwise we will
+// fail to restore volumes (after Node reboots etc) from before they were added during upgrades.
+//
+// They are also not set when using CSI Ephemeral volumes (see https://github.com/stackabletech/secret-operator/issues/481),
+// because this bypasses the CSI Controller entirely.
 #[derive(Deserialize, Serialize, Debug)]
 pub struct InternalSecretVolumeSelectorParams {
     /// The name of the PersistentVolumeClaim that owns this volume
-    #[serde(rename = "secrets.stackable.tech/internal.pvc.name")]
-    pub pvc_name: String,
+    #[serde(
+        rename = "secrets.stackable.tech/internal.pvc.name",
+        deserialize_with = "SecretVolumeSelector::deserialize_some",
+        default
+    )]
+    pub pvc_name: Option<String>,
 }
 
 fn default_cert_restart_buffer() -> Duration {
