@@ -106,7 +106,7 @@ rules:
       - get
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
   - apiGroups:
-    - security.openshift.io
+      - security.openshift.io
     resourceNames:
       - stackable-secret-operator-scc
     resources:
