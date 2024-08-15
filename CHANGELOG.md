@@ -8,7 +8,12 @@ All notable changes to this project will be documented in this file.
 
 - Active Directory's `samAccountName` generation can now be customized ([#454]).
 
+### Fixed
+
+- Fixed Kerberos keytab provisioning reusing its credential cache ([#490]).
+
 [#454]: https://github.com/stackabletech/secret-operator/pull/454
+[#490]: https://github.com/stackabletech/secret-operator/pull/490
 
 ## [24.7.0] - 2024-07-24
 
