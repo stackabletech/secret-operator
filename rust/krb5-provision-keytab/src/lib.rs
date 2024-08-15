@@ -75,7 +75,7 @@ pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<
         // ldap3 uses the default client keytab to authenticate to the LDAP server
         .env("KRB5_CLIENT_KTNAME", &req.admin_keytab_path)
         // avoid leaking credentials between secret volumes/secretclasses
-        .env("KRB5CCNAME", "MEMORY")
+        .env("KRB5CCNAME", "MEMORY:")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
