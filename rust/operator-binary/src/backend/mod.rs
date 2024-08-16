@@ -132,7 +132,7 @@ pub struct SecretVolumeSelector {
     pub cert_manager_cert_lifetime: Option<Duration>,
 }
 
-/// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself
+/// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself.
 // These are optional even if they are set unconditionally, because otherwise we will
 // fail to restore volumes (after Node reboots etc) from before they were added during upgrades.
 //
