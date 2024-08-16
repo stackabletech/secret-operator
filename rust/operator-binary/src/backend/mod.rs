@@ -122,6 +122,7 @@ pub struct SecretVolumeSelector {
     pub autotls_cert_jitter_factor: f64,
 
     /// The TLS cert lifetime (when using the [`cert_manager`] backend).
+    ///
     /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
     #[serde(
         rename = "secrets.stackable.tech/backend.cert-manager.cert.lifetime",
