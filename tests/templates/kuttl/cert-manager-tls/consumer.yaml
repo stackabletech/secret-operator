@@ -17,9 +17,7 @@ spec:
             - |
               set -euo pipefail
               ls -la /stackable/tls
-
               cat /stackable/tls/tls.crt | openssl x509 -noout -text
-
               cat /stackable/tls/tls.crt | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
           volumeMounts:
             - mountPath: /stackable/tls
