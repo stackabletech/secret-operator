@@ -67,7 +67,7 @@ impl SecretBackendError for Error {
 
 #[derive(Debug)]
 pub struct CertManager {
-    // Not secret per se, but isn't Debug: https://github.com/stackabletech/secret-operator/issues/411
+    // Not secret per se, but Client isn't Debug: https://github.com/stackabletech/secret-operator/issues/411
     pub client: Unloggable<stackable_operator::client::Client>,
     pub issuer: CertManagerIssuer,
     pub default_certificate_lifetime: Duration,
