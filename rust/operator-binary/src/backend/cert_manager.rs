@@ -31,7 +31,7 @@ pub enum Error {
     #[snafu(display("unable to find PersistentVolumeClaim for volume (try deleting and recreating the Pod, ensure you are using the `ephemeral:` volume type, rather than `csi:`)"))]
     NoPvcName,
 
-    #[snafu(display("failed to get addresses for scope {scope}"))]
+    #[snafu(display("failed to get addresses for scope {:?}", format!("{scope}")))]
     ScopeAddresses {
         source: ScopeAddressesError,
         scope: SecretScope,

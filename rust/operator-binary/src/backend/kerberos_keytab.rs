@@ -29,7 +29,7 @@ use super::{
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("failed to get addresses for scope {scope}"))]
+    #[snafu(display("failed to get addresses for scope {:?}", format!("{scope}")))]
     ScopeAddresses {
         source: ScopeAddressesError,
         scope: SecretScope,
