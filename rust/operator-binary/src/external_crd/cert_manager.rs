@@ -1,4 +1,4 @@
-//! CRDs owned by [cert-manager](https://cert-manager.io/), see [their API docs](https://cert-manager.io/docs/reference/api-docs/)
+//! CRDs owned by [cert-manager](https://cert-manager.io/), see [their API docs](https://cert-manager.io/docs/reference/api-docs/).
 
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
@@ -6,6 +6,7 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
 };
 
+/// See <https://cert-manager.io/docs/reference/api-docs/#cert-manager.io/v1.Certificate>.
 #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[kube(
     group = "cert-manager.io",
@@ -22,20 +23,17 @@ use stackable_operator::{
 pub struct CertificateSpec {
     pub secret_name: String,
     pub duration: Option<String>,
+    #[serde(default)]
     pub dns_names: Vec<String>,
+    #[serde(default)]
     pub ip_addresses: Vec<String>,
-    pub issuer_ref: IssuerRef,
+    pub issuer_ref: ObjectReference,
 }
 
+/// See <https://cert-manager.io/docs/reference/api-docs/#meta.cert-manager.io/v1.ObjectReference>.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct IssuerRef {
+pub struct ObjectReference {
     pub name: String,
-    pub kind: IssuerKind,
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, JsonSchema)]
-pub enum IssuerKind {
-    Issuer,
-    ClusterIssuer,
+    pub kind: Option<String>,
 }

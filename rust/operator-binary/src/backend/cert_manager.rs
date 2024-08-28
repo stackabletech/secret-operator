@@ -126,9 +126,9 @@ impl SecretBackend for CertManager {
                 )),
                 dns_names,
                 ip_addresses,
-                issuer_ref: external_crd::cert_manager::IssuerRef {
+                issuer_ref: external_crd::cert_manager::ObjectReference {
                     name: self.issuer.name.clone(),
-                    kind: self.issuer.kind,
+                    kind: Some(self.issuer.kind.to_string()),
                 },
             },
         };
