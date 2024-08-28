@@ -124,9 +124,8 @@ pub fn error_full_message(err: &dyn std::error::Error) -> String {
 pub async fn trystream_any<S: Stream<Item = Result<bool, E>>, E>(stream: S) -> Result<bool, E> {
     pin_mut!(stream);
     while let Some(value) = stream.next().await {
-        match value {
-            v @ (Ok(true) | Err(_)) => return v,
-            Ok(false) => {}
+        if let Ok(true) | Err(_) = value {
+            return value;
         }
     }
     Ok(false)
