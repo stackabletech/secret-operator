@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{api::core::v1::Secret, ByteString},
-    kube::api::ObjectMeta,
+    kube::{api::ObjectMeta, runtime::reflector::ObjectRef},
     time::Duration,
 };
 
@@ -37,19 +37,23 @@ pub enum Error {
         scope: SecretScope,
     },
 
-    #[snafu(display("failed to get secret"))]
+    #[snafu(display("failed to get {secret} (for {certificate})"))]
     GetSecret {
         source: stackable_operator::client::Error,
+        secret: ObjectRef<Secret>,
+        certificate: ObjectRef<external_crd::cert_manager::Certificate>,
     },
 
-    #[snafu(display("failed to apply cert-manager Certificate"))]
+    #[snafu(display("failed to apply {certificate}"))]
     ApplyCertManagerCertificate {
         source: stackable_operator::client::Error,
+        certificate: ObjectRef<external_crd::cert_manager::Certificate>,
     },
 
-    #[snafu(display("failed to get cert-manager Certificate"))]
+    #[snafu(display("failed to get {certificate}"))]
     GetCertManagerCertificate {
         source: stackable_operator::client::Error,
+        certificate: ObjectRef<external_crd::cert_manager::Certificate>,
     },
 }
 
@@ -132,16 +136,23 @@ impl SecretBackend for CertManager {
                 },
             },
         };
-        self.client
+        let cert = self
+            .client
             .apply_patch(FIELD_MANAGER_SCOPE, &cert, &cert)
             .await
-            .context(ApplyCertManagerCertificateSnafu)?;
+            .with_context(|_| ApplyCertManagerCertificateSnafu {
+                certificate: ObjectRef::from_obj(&cert),
+            })?;
 
         let secret = self
             .client
-            .get::<Secret>(cert_name, &selector.namespace)
+            .get::<Secret>(&cert.spec.secret_name, &selector.namespace)
             .await
-            .context(GetSecretSnafu)?;
+            .with_context(|_| GetSecretSnafu {
+                certificate: ObjectRef::from_obj(&cert),
+                secret: ObjectRef::<Secret>::new(&cert.spec.secret_name)
+                    .within(&selector.namespace),
+            })?;
         Ok(SecretContents::new(SecretData::Unknown(
             secret
                 .data
@@ -168,7 +179,12 @@ impl SecretBackend for CertManager {
                 // If certificate does not already exist, allow scheduling to any node
                 .get_opt::<external_crd::cert_manager::Certificate>(cert_name, &selector.namespace)
                 .await
-                .context(GetCertManagerCertificateSnafu)?
+                .with_context(|_|GetCertManagerCertificateSnafu {
+                    certificate: ObjectRef::<external_crd::cert_manager::Certificate>::new(
+                        cert_name,
+                    )
+                    .within(&selector.namespace),
+                })?
                 .and_then(|cert| cert.metadata.labels?.remove(LABEL_SCOPE_NODE))
                 .map(|node| [node].into()))
         } else {
