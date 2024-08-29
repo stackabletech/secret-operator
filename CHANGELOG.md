@@ -8,12 +8,19 @@ All notable changes to this project will be documented in this file.
 
 - Active Directory's `samAccountName` generation can now be customized ([#454]).
 
+### Changed
+
+- Refactored hostname validation ([#494]).
+  - BREAKING: Hostname validation is now somewhat stricter.
+  - BREAKING: Hostname validation is now enforced in CRD.
+
 ### Fixed
 
 - Fixed Kerberos keytab provisioning reusing its credential cache ([#490]).
 
 [#454]: https://github.com/stackabletech/secret-operator/pull/454
 [#490]: https://github.com/stackabletech/secret-operator/pull/490
+[#494]: https://github.com/stackabletech/secret-operator/pull/494
 
 ## [24.7.0] - 2024-07-24
 
