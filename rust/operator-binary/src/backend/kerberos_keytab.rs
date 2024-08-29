@@ -5,7 +5,11 @@ use stackable_krb5_provision_keytab::{
     self as provision,
     provision_keytab,
 };
-use stackable_operator::{commons::networking::{Hostname, KerberosRealmName}, k8s_openapi::api::core::v1::Secret, kube::runtime::reflector::ObjectRef};
+use stackable_operator::{
+    commons::networking::{Hostname, KerberosRealmName},
+    k8s_openapi::api::core::v1::Secret,
+    kube::runtime::reflector::ObjectRef,
+};
 use stackable_secret_operator_crd_utils::SecretReference;
 use tempfile::tempdir;
 use tokio::{
