@@ -208,7 +208,7 @@ spec:
                           type: string
                         realmName:
                           description: The name of the Kerberos realm. This should be provided by the Kerberos administrator.
-                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                          pattern: ^[-.a-zA-Z0-9]+$
                           type: string
                       required:
                         - admin
