@@ -3,6 +3,7 @@ use std::{fmt::Display, ops::Deref};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use stackable_operator::{
+    commons::networking::{Hostname, KerberosRealmName},
     kube::CustomResource,
     schemars::{self, JsonSchema},
     time::Duration,
@@ -125,7 +126,7 @@ impl AutoTlsCa {
 #[serde(rename_all = "camelCase")]
 pub struct KerberosKeytabBackend {
     /// The name of the Kerberos realm. This should be provided by the Kerberos administrator.
-    pub realm_name: Hostname,
+    pub realm_name: KerberosRealmName,
 
     /// The hostname of the Kerberos Key Distribution Center (KDC).
     /// This should be provided by the Kerberos administrator.
@@ -202,49 +203,6 @@ impl ActiveDirectorySamAccountNameRules {
     fn default_total_length() -> u8 {
         // Default AD samAccountName length limit
         20
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(try_from = "String", into = "String")]
-pub struct Hostname(String);
-#[derive(Debug, Snafu)]
-#[snafu(module)]
-pub enum InvalidHostname {
-    #[snafu(display("hostname contains illegal characters (allowed: alphanumeric, -, and .)"))]
-    IllegalCharacter,
-
-    #[snafu(display("hostname may not start with a dash"))]
-    StartWithDash,
-}
-impl TryFrom<String> for Hostname {
-    type Error = InvalidHostname;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        if value.starts_with('-') {
-            invalid_hostname::StartWithDashSnafu.fail()
-        } else if value.contains(|chr: char| !chr.is_alphanumeric() && chr != '.' && chr != '-') {
-            invalid_hostname::IllegalCharacterSnafu.fail()
-        } else {
-            Ok(Hostname(value))
-        }
-    }
-}
-impl From<Hostname> for String {
-    fn from(value: Hostname) -> Self {
-        value.0
-    }
-}
-impl Display for Hostname {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-impl Deref for Hostname {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 

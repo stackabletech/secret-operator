@@ -8343,13 +8343,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.73.0";
+        version = "0.74.0";
         edition = "2021";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "4d98a29b08a7d959e5e287f774cf064c02ffbd62";
-          sha256 = "0cmfbc3v9kklsfkqbnhwig45106gfizhmlmg9p1qgdjp8az43l9m";
+          url = "https://github.com/stackabletech//operator-rs.git";
+          rev = "f09a7908cb6bd10344a26b4859cc3e795212bb3e";
+          sha256 = "0369czn7swn2wnkdgqgdds6467lrf9s54qm228dncf037avrlmaa";
         };
         libName = "stackable_operator";
         authors = [
@@ -8405,10 +8405,6 @@ rec {
             packageId = "kube";
             usesDefaultFeatures = false;
             features = [ "client" "jsonpatch" "runtime" "derive" "rustls-tls" ];
-          }
-          {
-            name = "lazy_static";
-            packageId = "lazy_static";
           }
           {
             name = "opentelemetry-jaeger";
@@ -8507,9 +8503,9 @@ rec {
         edition = "2021";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "4d98a29b08a7d959e5e287f774cf064c02ffbd62";
-          sha256 = "0cmfbc3v9kklsfkqbnhwig45106gfizhmlmg9p1qgdjp8az43l9m";
+          url = "https://github.com/stackabletech//operator-rs.git";
+          rev = "f09a7908cb6bd10344a26b4859cc3e795212bb3e";
+          sha256 = "0369czn7swn2wnkdgqgdds6467lrf9s54qm228dncf037avrlmaa";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
