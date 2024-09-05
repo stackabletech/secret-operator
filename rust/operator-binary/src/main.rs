@@ -96,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
                     tonic_reflection::server::Builder::configure()
                         .include_reflection_service(true)
                         .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
-                        .build()?,
+                        .build_v1()?,
                 )
                 .add_service(IdentityServer::new(SecretProvisionerIdentity))
                 .add_service(ControllerServer::new(SecretProvisionerController {

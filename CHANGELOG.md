@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
 
 - Fixed Kerberos keytab provisioning reusing its credential cache ([#490]).
 
+### Changed
+
+- Remove custom `h2` patch, as Kubernetes v1.26 has fixed the invalid data from Kubernetes' side ([#XXX]).
+
 [#454]: https://github.com/stackabletech/secret-operator/pull/454
 [#490]: https://github.com/stackabletech/secret-operator/pull/490
 
