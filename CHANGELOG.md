@@ -14,10 +14,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Remove custom `h2` patch, as Kubernetes v1.26 has fixed the invalid data from Kubernetes' side ([#XXX]).
+- Remove custom `h2` patch, as Kubernetes v1.26 has fixed the invalid data from Kubernetes' side ([#495]).
 
 [#454]: https://github.com/stackabletech/secret-operator/pull/454
 [#490]: https://github.com/stackabletech/secret-operator/pull/490
+[#495]: https://github.com/stackabletech/secret-operator/pull/495
 
 ## [24.7.0] - 2024-07-24
 
