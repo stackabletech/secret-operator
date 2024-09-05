@@ -851,7 +851,7 @@ rec {
         };
         resolvedDefaultFeatures = [ "alloc" "default" "std" ];
       };
-      "bindgen 0.69.4" = rec {
+      "bindgen" = rec {
         crateName = "bindgen";
         version = "0.69.4";
         edition = "2018";
@@ -947,88 +947,6 @@ rec {
           "which-rustfmt" = [ "dep:which" ];
         };
         resolvedDefaultFeatures = [ "default" "logging" "prettyplease" "runtime" "which-rustfmt" ];
-      };
-      "bindgen 0.70.1" = rec {
-        crateName = "bindgen";
-        version = "0.70.1";
-        edition = "2018";
-        sha256 = "0vyf0jp6apcy9kjyz4s8vldj0xqycnbzb6zv3skkwiqdi3nqz7gl";
-        libPath = "lib.rs";
-        authors = [
-          "Jyun-Yan You <jyyou.tw@gmail.com>"
-          "Emilio Cobos Álvarez <emilio@crisal.io>"
-          "Nick Fitzgerald <fitzgen@gmail.com>"
-          "The Servo project developers"
-        ];
-        dependencies = [
-          {
-            name = "bitflags";
-            packageId = "bitflags 2.6.0";
-          }
-          {
-            name = "cexpr";
-            packageId = "cexpr";
-          }
-          {
-            name = "clang-sys";
-            packageId = "clang-sys";
-            features = [ "clang_6_0" ];
-          }
-          {
-            name = "itertools";
-            packageId = "itertools 0.13.0";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "log";
-            packageId = "log";
-            optional = true;
-          }
-          {
-            name = "prettyplease";
-            packageId = "prettyplease";
-            optional = true;
-            features = [ "verbatim" ];
-          }
-          {
-            name = "proc-macro2";
-            packageId = "proc-macro2";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "quote";
-            packageId = "quote";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "regex";
-            packageId = "regex";
-            usesDefaultFeatures = false;
-            features = [ "std" "unicode-perl" ];
-          }
-          {
-            name = "rustc-hash";
-            packageId = "rustc-hash";
-          }
-          {
-            name = "shlex";
-            packageId = "shlex";
-          }
-          {
-            name = "syn";
-            packageId = "syn 2.0.77";
-            features = [ "full" "extra-traits" "visit-mut" ];
-          }
-        ];
-        features = {
-          "default" = [ "logging" "prettyplease" "runtime" ];
-          "experimental" = [ "dep:annotate-snippets" ];
-          "logging" = [ "dep:log" ];
-          "prettyplease" = [ "dep:prettyplease" ];
-          "runtime" = [ "clang-sys/runtime" ];
-          "static" = [ "clang-sys/static" ];
-        };
-        resolvedDefaultFeatures = [ "default" "logging" "prettyplease" "runtime" ];
       };
       "bit-set" = rec {
         crateName = "bit-set";
@@ -4253,7 +4171,7 @@ rec {
         buildDependencies = [
           {
             name = "bindgen";
-            packageId = "bindgen 0.70.1";
+            packageId = "bindgen";
           }
           {
             name = "pkg-config";
@@ -5071,7 +4989,7 @@ rec {
         buildDependencies = [
           {
             name = "bindgen";
-            packageId = "bindgen 0.69.4";
+            packageId = "bindgen";
           }
           {
             name = "pkg-config";
