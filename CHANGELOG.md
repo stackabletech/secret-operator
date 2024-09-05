@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Remove custom `h2` patch, as Kubernetes v1.26 has fixed the invalid data from Kubernetes' side ([#495]).
+- Remove custom `h2` patch, as Kubernetes 1.26 has fixed the invalid data from Kubernetes' side. Starting with 24.11 we only support at least 1.27 (as it's needed by OpenShift 4.14) ([#495]).
 
 [#454]: https://github.com/stackabletech/secret-operator/pull/454
 [#490]: https://github.com/stackabletech/secret-operator/pull/490
