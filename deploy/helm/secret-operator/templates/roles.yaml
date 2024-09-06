@@ -101,6 +101,7 @@ rules:
       - listeners.stackable.tech
     resources:
       - listenerclasses
+      - listeners
       - podlisteners
     verbs:
       - get
