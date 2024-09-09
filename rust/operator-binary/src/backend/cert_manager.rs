@@ -179,7 +179,7 @@ impl SecretBackend for CertManager {
                 // If certificate does not already exist, allow scheduling to any node
                 .get_opt::<external_crd::cert_manager::Certificate>(cert_name, &selector.namespace)
                 .await
-                .with_context(|_|GetCertManagerCertificateSnafu {
+                .with_context(|_| GetCertManagerCertificateSnafu {
                     certificate: ObjectRef::<external_crd::cert_manager::Certificate>::new(
                         cert_name,
                     )

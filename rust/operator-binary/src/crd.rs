@@ -9,7 +9,7 @@ use stackable_operator::{
 };
 use stackable_secret_operator_crd_utils::SecretReference;
 
-use crate::{backend};
+use crate::backend;
 
 /// A [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass) is a cluster-global Kubernetes resource
 /// that defines a category of secrets that the Secret Operator knows how to provision.
