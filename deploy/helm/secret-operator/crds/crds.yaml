@@ -32,6 +32,8 @@ spec:
                     - required:
                         - autoTls
                     - required:
+                        - experimentalCertManager
+                    - required:
                         - kerberosKeytab
                   properties:
                     autoTls:
@@ -78,6 +80,43 @@ spec:
                           type: string
                       required:
                         - ca
+                      type: object
+                    experimentalCertManager:
+                      description: |-
+                        The [`experimentalCertManager` backend][1] injects a TLS certificate issued by [cert-manager](https://cert-manager.io/).
+
+                        A new certificate will be requested the first time it is used by a Pod, it will be reused after that (subject to cert-manager renewal rules).
+
+                        [1]: https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-certmanager
+                      properties:
+                        defaultCertificateLifetime:
+                          default: 1d
+                          description: |-
+                            The default lifetime of certificates.
+
+                            Defaults to 1 day. This may need to be increased for external issuers that impose rate limits (such as Let's Encrypt).
+                          type: string
+                        issuer:
+                          description: A reference to the cert-manager issuer that the certificates should be requested from.
+                          properties:
+                            kind:
+                              description: |-
+                                The kind of the issuer, Issuer or ClusterIssuer.
+
+                                If Issuer then it must be in the same namespace as the Pods using it.
+                              enum:
+                                - Issuer
+                                - ClusterIssuer
+                              type: string
+                            name:
+                              description: The name of the issuer.
+                              type: string
+                          required:
+                            - kind
+                            - name
+                          type: object
+                      required:
+                        - issuer
                       type: object
                     k8sSearch:
                       description: The [`k8sSearch` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-k8ssearch) can be used to mount Secrets across namespaces into Pods.

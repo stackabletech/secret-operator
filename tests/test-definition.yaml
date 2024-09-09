@@ -26,6 +26,9 @@ tests:
   - name: tls
     dimensions:
       - openshift
+  - name: cert-manager-tls
+    dimensions:
+      - openshift
 suites:
   - name: nightly
   - name: openshift

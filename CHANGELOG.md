@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Active Directory's `samAccountName` generation can now be customized ([#454]).
+- Added experimental cert-manager backend ([#482]).
 
 ### Fixed
 
@@ -18,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - Remove custom `h2` patch, as Kubernetes 1.26 has fixed the invalid data from Kubernetes' side. Starting with 24.11 we only support at least 1.27 (as it's needed by OpenShift 4.14) ([#495]).
 
 [#454]: https://github.com/stackabletech/secret-operator/pull/454
+[#482]: https://github.com/stackabletech/secret-operator/pull/482
 [#490]: https://github.com/stackabletech/secret-operator/pull/490
 [#495]: https://github.com/stackabletech/secret-operator/pull/495
 [#497]: https://github.com/stackabletech/secret-operator/pull/497

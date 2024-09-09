@@ -97,6 +97,18 @@ shortened by a random amount between 0 and 4.8 hours, leaving a certificate that
 
 Jittering may be disabled by setting the jitter factor to 0.
 
+=== `secrets.stackable.tech/backend.cert-manager.cert.lifetime`
+
+*Required*: false
+
+*Default value*: `1d` (configured by xref:secretclass.adoc#backend-certmanager[the backend])
+
+*Backends*: xref:secretclass.adoc#backend-autotls[]
+
+The lifetime of the created certificate.
+
+The format is documented in xref:concepts:duration.adoc[].
+
 === `secrets.stackable.tech/kerberos.service.names`
 
 *Required*: false

@@ -18,6 +18,7 @@ use utils::{uds_bind_private, TonicUnixStream};
 mod backend;
 mod crd;
 mod csi_server;
+mod external_crd;
 mod format;
 mod grpc;
 mod utils;

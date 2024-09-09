@@ -34,7 +34,7 @@ volumes:
 - projected
 - hostPath
 - emptyDir
-{{ end  }}
+{{ end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -105,6 +105,14 @@ rules:
       - podlisteners
     verbs:
       - get
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - certificates
+    verbs:
+      - get
+      - patch
+      - create
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
   - apiGroups:
       - security.openshift.io
@@ -114,4 +122,4 @@ rules:
       - securitycontextconstraints
     verbs:
       - use
-{{ end  }}
+{{ end }}
