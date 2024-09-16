@@ -73,6 +73,6 @@ repos:
       - id: cargo-test
         name: cargo-test
         language: system
-        entry: cargo test
+        entry: nix-shell --run 'cargo test'
         stages: [commit, merge-commit, manual]
         pass_filenames: false
