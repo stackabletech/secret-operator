@@ -66,7 +66,7 @@ repos:
       - id: regenerate-charts
         name: regenerate-charts
         language: system
-        entry: make regenerate-charts
+        entry: nix-shell --run 'make regenerate-charts'
         stages: [commit, merge-commit, manual]
         pass_filenames: false
 
