@@ -143,7 +143,7 @@ impl PodInfo {
                 .iter()
                 .flat_map(|status| &status.pod_ips)
                 .flatten()
-                .flat_map(|ip| ip.ip.as_deref())
+                .map(|ip| &ip.ip)
                 .map(|ip| {
                     ip.parse()
                         .context(from_pod_error::IllegalAddressSnafu { address: ip })
