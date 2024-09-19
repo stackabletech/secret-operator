@@ -1,4 +1,5 @@
 = Stackable Secret Operator
+:description: Stackable Secret Operator enhances Kubernetes Secrets by provisioning Pods with TLS certificates, Kerberos keytabs, and tokens.
 :github: https://github.com/stackabletech/secret-operator/
 :crd: {crd-docs-base-url}/secret-operator/{crd-docs-version}/
 

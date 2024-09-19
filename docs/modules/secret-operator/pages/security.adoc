@@ -1,16 +1,16 @@
 = Security
+:description: The Secret Operator requires root privileges to manage secrets securely and avoid writing sensitive data to disk. Running in unprivileged mode is discouraged.
 
 == Container privileges
 
-By default, the Secret Operator runs as a set of privileged root containers. This is done for three reasons:
+By default, the Secret Operator runs as a set of privileged root containers.
+This is done for three reasons:
 
-1. We need to run as root to have permission to create the Unix domain socket hosting the Container Storage interface (CSI)
-   driver. The Kubelet communicates with the CSI driver over this socket.
-2. We need to run as root to have permission to write secret material into the pods' volume paths, as directed
-   by the CSI.
-3. We need to run as a privileged container in order to be able to mount the volume folders as RAM disks, in order to avoid
-   spilling secret material onto disk.
+1. The operator needs to run as root to have permission to create the Unix domain socket hosting the Container Storage interface (CSI) driver.
+   The Kubelet communicates with the CSI driver over this socket.
+2. The operator needs to run as root to have permission to write secret material into the pods' volume paths, as directed by the CSI.
+3. The operator needs to run as a privileged container in order to be able to mount the volume folders as RAM disks, in order to avoid spilling secret material onto disk.
 
-Running as root is currently a hard requirement. Secret Operator _can_ run in an unprivileged container (by passing
-`--set securityContext.privileged=false` to `helm upgrade`), but doing so is strongly discouraged, and users
-should be aware that it means that secret material will be written to disk.
+Running as root is currently a hard requirement.
+Secret Operator _can_ run in an unprivileged container (by passing `--set securityContext.privileged=false` to `helm upgrade`),
+but doing so is strongly discouraged, and users should be aware that it means that secret material will be written to disk.

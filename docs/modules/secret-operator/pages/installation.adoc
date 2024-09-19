@@ -2,9 +2,8 @@
 
 There are two ways to run the Stackable Secret Operator:
 
-1. Helm managed Docker container deployment on Kubernetes
-
-2. Build from source
+. Helm managed Docker container deployment on Kubernetes
+. Build from source
 
 == Prerequisites
 
@@ -14,7 +13,7 @@ You will need:
 * kubectl
 * Helm
 
-Resource sizing depends on cluster type(s), usage and scope, but as a starting point we recommend a minimum of the following resources for this operator:
+Resource sizing depends on cluster type(s), usage and scope, but as a starting point a minimum of the following resources is recommended for this operator:
 
 * 0.2 cores (e.g. i5 or similar)
 * 256MB RAM
