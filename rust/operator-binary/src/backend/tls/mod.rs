@@ -68,7 +68,7 @@ pub const DEFAULT_CERT_JITTER_FACTOR: f64 = 0.2;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("failed to get addresses for scope {scope}"))]
+    #[snafu(display("failed to get addresses for scope {:?}", format!("{scope}")))]
     ScopeAddresses {
         source: ScopeAddressesError,
         scope: SecretScope,

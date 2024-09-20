@@ -21,7 +21,7 @@ use super::{
 };
 
 const LABEL_CLASS: &str = "secrets.stackable.tech/class";
-const LABEL_SCOPE_NODE: &str = "secrets.stackable.tech/node";
+pub(super) const LABEL_SCOPE_NODE: &str = "secrets.stackable.tech/node";
 const LABEL_SCOPE_POD: &str = "secrets.stackable.tech/pod";
 const LABEL_SCOPE_SERVICE: &str = "secrets.stackable.tech/service";
 const LABEL_SCOPE_LISTENER: &str = "secrets.stackable.tech/listener";

@@ -3,7 +3,7 @@ use std::{fmt::Display, ops::Deref};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use stackable_operator::{
-    commons::networking::{Hostname, KerberosRealmName},
+    commons::networking::{HostName, KerberosRealmName},
     kube::CustomResource,
     schemars::{self, JsonSchema},
     time::Duration,
@@ -47,6 +47,16 @@ pub enum SecretClassBackend {
     ///
     /// A new certificate and keypair will be generated and signed for each Pod, keys or certificates are never reused.
     AutoTls(AutoTlsBackend),
+
+    /// The [`experimentalCertManager` backend][1] injects a TLS certificate issued
+    /// by [cert-manager](https://cert-manager.io/).
+    ///
+    /// A new certificate will be requested the first time it is used by a Pod, it
+    /// will be reused after that (subject to cert-manager renewal rules).
+    ///
+    /// [1]: DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-certmanager
+    #[serde(rename = "experimentalCertManager")]
+    CertManager(CertManagerBackend),
 
     /// The [`kerberosKeytab` backend](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-kerberoskeytab)
     /// creates a Kerberos keytab file for a selected realm.
@@ -124,13 +134,53 @@ impl AutoTlsCa {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct CertManagerBackend {
+    /// A reference to the cert-manager issuer that the certificates should be requested from.
+    pub issuer: CertManagerIssuer,
+
+    /// The default lifetime of certificates.
+    ///
+    /// Defaults to 1 day. This may need to be increased for external issuers that impose rate limits (such as Let's Encrypt).
+    #[serde(default = "CertManagerBackend::default_certificate_lifetime")]
+    pub default_certificate_lifetime: Duration,
+}
+
+impl CertManagerBackend {
+    fn default_certificate_lifetime() -> Duration {
+        backend::cert_manager::DEFAULT_CERT_LIFETIME
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CertManagerIssuer {
+    /// The kind of the issuer, Issuer or ClusterIssuer.
+    ///
+    /// If Issuer then it must be in the same namespace as the Pods using it.
+    pub kind: CertManagerIssuerKind,
+
+    /// The name of the issuer.
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, JsonSchema, strum::Display)]
+pub enum CertManagerIssuerKind {
+    /// An [Issuer](https://cert-manager.io/docs/reference/api-docs/#cert-manager.io/v1.Issuer) in the same namespace as the Pod.
+    Issuer,
+
+    /// A cluster-scoped [ClusterIssuer](https://cert-manager.io/docs/reference/api-docs/#cert-manager.io/v1.ClusterIssuer).
+    ClusterIssuer,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct KerberosKeytabBackend {
     /// The name of the Kerberos realm. This should be provided by the Kerberos administrator.
     pub realm_name: KerberosRealmName,
 
     /// The hostname of the Kerberos Key Distribution Center (KDC).
     /// This should be provided by the Kerberos administrator.
-    pub kdc: Hostname,
+    pub kdc: HostName,
 
     /// Kerberos admin configuration settings.
     pub admin: KerberosKeytabBackendAdmin,
@@ -151,7 +201,7 @@ pub enum KerberosKeytabBackendAdmin {
     Mit {
         /// The hostname of the Kerberos Admin Server.
         /// This should be provided by the Kerberos administrator.
-        kadmin_server: Hostname,
+        kadmin_server: HostName,
     },
 
     /// Credentials should be provisioned in a Microsoft Active Directory domain.
@@ -159,7 +209,7 @@ pub enum KerberosKeytabBackendAdmin {
     ActiveDirectory {
         /// An AD LDAP server, such as the AD Domain Controller.
         /// This must match the server’s FQDN, or GSSAPI authentication will fail.
-        ldap_server: Hostname,
+        ldap_server: HostName,
 
         /// Reference (name and namespace) to a Kubernetes Secret object containing
         /// the TLS CA (in `ca.crt`) that the LDAP server’s certificate should be authenticated against.

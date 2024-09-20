@@ -1,0 +1,46 @@
+# $NAMESPACE will be replaced with the namespace of the test case.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tls-consumer
+spec:
+  template:
+    spec:
+      containers:
+        - name: consumer
+          image: docker.stackable.tech/stackable/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - bash
+          args:
+            - -c
+            - |
+              set -euo pipefail
+              ls -la /stackable/tls
+              cat /stackable/tls/tls.crt | openssl x509 -noout -text
+              cat /stackable/tls/tls.crt | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
+          volumeMounts:
+            - mountPath: /stackable/tls
+              name: tls
+      volumes:
+        - name: tls
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls-$NAMESPACE
+                  secrets.stackable.tech/scope: node,pod,service=my-tls-service
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 0
+      serviceAccount: integration-tests-sa

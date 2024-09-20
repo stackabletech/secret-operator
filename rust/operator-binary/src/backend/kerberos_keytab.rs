@@ -6,7 +6,7 @@ use stackable_krb5_provision_keytab::{
     provision_keytab,
 };
 use stackable_operator::{
-    commons::networking::{Hostname, KerberosRealmName},
+    commons::networking::{HostName, KerberosRealmName},
     k8s_openapi::api::core::v1::Secret,
     kube::runtime::reflector::ObjectRef,
 };
@@ -33,7 +33,7 @@ use super::{
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("failed to get addresses for scope {scope}"))]
+    #[snafu(display("failed to get addresses for scope {:?}", format!("{scope}")))]
     ScopeAddresses {
         source: ScopeAddressesError,
         scope: SecretScope,
@@ -87,7 +87,7 @@ impl SecretBackendError for Error {
 #[derive(Debug)]
 pub struct KerberosProfile {
     pub realm_name: KerberosRealmName,
-    pub kdc: Hostname,
+    pub kdc: HostName,
     pub admin: KerberosKeytabBackendAdmin,
 }
 

@@ -18,6 +18,7 @@ use utils::{uds_bind_private, TonicUnixStream};
 mod backend;
 mod crd;
 mod csi_server;
+mod external_crd;
 mod format;
 mod grpc;
 mod utils;
@@ -96,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
                     tonic_reflection::server::Builder::configure()
                         .include_reflection_service(true)
                         .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
-                        .build()?,
+                        .build_v1()?,
                 )
                 .add_service(IdentityServer::new(SecretProvisionerIdentity))
                 .add_service(ControllerServer::new(SecretProvisionerController {

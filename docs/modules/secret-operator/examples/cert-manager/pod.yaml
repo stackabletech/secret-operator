@@ -31,7 +31,7 @@ spec:
               metadata:
                 annotations:
                   secrets.stackable.tech/class: tls-cert-manager # <2>
-                  secrets.stackable.tech/scope: service=my-app # <3>
+                  secrets.stackable.tech/scope: node,service=my-app # <3>
               spec:
                 storageClassName: secrets.stackable.tech
                 accessModes:

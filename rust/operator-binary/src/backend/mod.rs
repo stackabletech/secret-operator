@@ -1,5 +1,6 @@
 //! Collects or generates secret data based on the request in the Kubernetes `Volume` definition
 
+pub mod cert_manager;
 pub mod dynamic;
 pub mod k8s_search;
 pub mod kerberos_keytab;
@@ -8,7 +9,7 @@ pub mod scope;
 pub mod tls;
 
 use async_trait::async_trait;
-use serde::{de::Unexpected, Deserialize, Deserializer};
+use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{DateTime, FixedOffset},
@@ -16,6 +17,7 @@ use stackable_operator::{
 };
 use std::{collections::HashSet, convert::Infallible, fmt::Debug};
 
+pub use cert_manager::CertManager;
 pub use k8s_search::K8sSearch;
 pub use kerberos_keytab::KerberosKeytab;
 pub use tls::TlsGenerate;
@@ -32,6 +34,8 @@ use self::pod_info::SchedulingPodInfo;
 /// Fields beginning with `csi.storage.k8s.io/` are provided by the Kubelet
 #[derive(Deserialize, Debug)]
 pub struct SecretVolumeSelector {
+    #[serde(flatten)]
+    pub internal: InternalSecretVolumeSelectorParams,
     /// What kind of secret should be used
     #[serde(rename = "secrets.stackable.tech/class")]
     pub class: String,
@@ -89,7 +93,7 @@ pub struct SecretVolumeSelector {
     )]
     pub compat_tls_pkcs12_password: Option<String>,
 
-    /// The TLS cert lifetime.
+    /// The TLS cert lifetime (when using the [`tls`] backend).
     /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
     #[serde(
         rename = "secrets.stackable.tech/backend.autotls.cert.lifetime",
@@ -116,6 +120,33 @@ pub struct SecretVolumeSelector {
         default = "default_cert_jitter_factor"
     )]
     pub autotls_cert_jitter_factor: f64,
+
+    /// The TLS cert lifetime (when using the [`cert_manager`] backend).
+    ///
+    /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
+    #[serde(
+        rename = "secrets.stackable.tech/backend.cert-manager.cert.lifetime",
+        deserialize_with = "SecretVolumeSelector::deserialize_some",
+        default
+    )]
+    pub cert_manager_cert_lifetime: Option<Duration>,
+}
+
+/// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself.
+// These are optional even if they are set unconditionally, because otherwise we will
+// fail to restore volumes (after Node reboots etc) from before they were added during upgrades.
+//
+// They are also not set when using CSI Ephemeral volumes (see https://github.com/stackabletech/secret-operator/issues/481),
+// because this bypasses the CSI Controller entirely.
+#[derive(Deserialize, Serialize, Debug)]
+pub struct InternalSecretVolumeSelectorParams {
+    /// The name of the PersistentVolumeClaim that owns this volume
+    #[serde(
+        rename = "secrets.stackable.tech/internal.pvc.name",
+        deserialize_with = "SecretVolumeSelector::deserialize_some",
+        default
+    )]
+    pub pvc_name: Option<String>,
 }
 
 fn default_cert_restart_buffer() -> Duration {
