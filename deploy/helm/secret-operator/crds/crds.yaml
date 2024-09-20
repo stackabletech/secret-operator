@@ -158,7 +158,7 @@ spec:
                                   nullable: true
                                   properties:
                                     prefix:
-                                      default: ""
+                                      default: ''
                                       description: A prefix to be prepended to generated samAccountNames.
                                       type: string
                                     totalLength:
