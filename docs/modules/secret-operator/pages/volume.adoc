@@ -1,7 +1,8 @@
 = Volume
+:description: Stackable Secret Operator mounts secrets into Kubernetes pods using ephemeral volumes, supporting TLS, Kerberos, and scoped secrets with customizable attributes.
 
-The primary entry point for applications is by mounting a secret into a Pod object's `volume` set. This is done by using Kubernetes'
-https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#ephemeralvolumesource-v1-core[`EphemeralVolumeSource`] type.
+The primary entry point for applications is by mounting a secret into a Pod object's `volume` set.
+This is done by using Kubernetes' https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#ephemeralvolumesource-v1-core[`EphemeralVolumeSource`] type.
 For example:
 
 [source,yaml]
@@ -14,7 +15,7 @@ include::example$volume-pod.yaml[]
 <4> Kubernetes requires us to specify some boilerplate settings for a `PersistentVolumeClaim` to be well-formed
 <5> The injected volume can then be mounted into a container, just like any other volume. In this example, the secrets are provided in the `/tls` directory of the container.
 
-NOTE: Only ephemeral volumes are supported, the Secret Operator does *not* support declaring standalone `PersistentVolumeClaim` objects.
+NOTE: Only ephemeral volumes are supported, the Secret Operator does *not* support declaring standalone PersistentVolumeClaim objects.
 
 == Attributes
 
@@ -59,8 +60,7 @@ This can be either the default output format of the xref:secretclass.adoc#backen
 
 The lifetime of the created certificate.
 Please note that you can not request a lifetime longer than allowed by `maxCertificateLifetime` on the SecretClass.
-If you do so, `maxCertificateLifetime` will be used as the certificate lifetime, to adhere to the requirements
-set by the administrator who created the SecretClass.
+If you do so, `maxCertificateLifetime` will be used as the certificate lifetime, to adhere to the requirements set by the administrator who created the SecretClass.
 
 The format is documented in xref:concepts:duration.adoc[].
 
@@ -73,9 +73,8 @@ The format is documented in xref:concepts:duration.adoc[].
 *Backends*: xref:secretclass.adoc#backend-autotls[]
 
 The amount of time the Pod using the cert gets restarted before the cert expires.
-Keep in mind that there can be multiple Pods - such as 80 datanodes - trying to
-shut down at the same time. It can take some hours until all Pods are restarted
-in a rolling fashion.
+Keep in mind that there can be multiple Pods - such as 80 datanodes - trying to shut down at the same time.
+It can take some hours until all Pods are restarted in a rolling fashion.
 
 The format is documented in xref:concepts:duration.adoc[].
 
@@ -91,9 +90,7 @@ Up to this part of the Certificate's lifetime may be removed for jittering.
 
 Must be within 0.0 and 1.0.
 
-For example, given a requested lifetime of 1 day and a jitter factor of 0.2, the certificate's lifetime would be
-shortened by a random amount between 0 and 4.8 hours, leaving a certificate that will be valid for between
-19.2 and 24 hours.
+For example, given a requested lifetime of 1 day and a jitter factor of 0.2, the certificate's lifetime would be shortened by a random amount between 0 and 4.8 hours, leaving a certificate that will be valid for between 19.2 and 24 hours.
 
 Jittering may be disabled by setting the jitter factor to 0.
 
@@ -117,5 +114,6 @@ The format is documented in xref:concepts:duration.adoc[].
 
 *Backends*: xref:secretclass.adoc#backend-kerberoskeytab[]
 
-The service names to be prepended to the provisioned principals. The provisioned principals will have the form `service/scope@realm`. Multiple service names should
-be separated by commas (`,`).
+The service names to be prepended to the provisioned principals.
+The provisioned principals will have the form `service/scope@realm`.
+Multiple service names should be separated by commas (`,`).

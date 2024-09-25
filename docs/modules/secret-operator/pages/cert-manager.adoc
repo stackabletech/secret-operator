@@ -1,34 +1,37 @@
-= Cert-Manager Integration
+= Cert-Manager integration
+:description: Integrate Cert-Manager with Stackable Secret Operator to manage certificates. Follow steps for configuration, creating SecretClass, and using certificates in Pods.
+:cert-manager: https://cert-manager.io/
+:letsencrypt: https://letsencrypt.org/
 
 WARNING: The Cert-Manager backend is experimental, and subject to change.
 
-https://cert-manager.io/[Cert-Manager] is a common tool to manage certificates in Kubernetes, especially when backed by an external
-Certificate Authority (CA) such as https://letsencrypt.org/[Let\'s Encrypt].
+{cert-manager}[Cert-Manager] is a common tool to manage certificates in Kubernetes, especially when backed by an external Certificate Authority (CA) such as {letsencrypt}[Let\'s Encrypt].
 
 The Stackable Secret Operator supports requesting certificates from Cert-Manager.
 
 [#caveats]
 == Caveats
 
-Cert-Manager is designed to manage relatively long-lived certificates that are stored in Kubernetes Secrets. By contrast,
-the Stackable Secret Operator is designed to generate temporary short-lived certificates.
+Cert-Manager is designed to manage relatively long-lived certificates that are stored in Kubernetes Secrets.
+By contrast, the Stackable Secret Operator is designed to generate temporary short-lived certificates.
 
 This has a couple of repercussions:
 
-- Longer-lived certificates mean that a leaked certificate has potential to be abused for longer.
-- Application teams may have access to read Secrets in their respective applications' Namespaces.
+* Longer-lived certificates mean that a leaked certificate has potential to be abused for longer.
+* Application teams may have access to read Secrets in their respective applications' Namespaces.
 
-Where possible, we recommend using the xref:secretclass.adoc#backend-autotls[`autoTls` backend] instead.
+Where possible, it is recommended using the xref:secretclass.adoc#backend-autotls[`autoTls` backend] instead.
 
 [#issuer]
 == Configuring Cert-Manager
 
-NOTE: We recommend using the xref:secretclass.adoc#backend-autotls[`autoTls` backend] instead for self-signed PKIs. We use Cert-Manager's CA issuer here to show the broader concepts.
+NOTE: Using the xref:secretclass.adoc#backend-autotls[`autoTls` backend] instead for self-signed PKIs is recommended.
+The Cert-Manager's CA issuer is used in these examples to illustrate the broader concepts.
 
 To do this, you will first need to teach Cert-Manager how to create your certificates.
 
-In a production setup this will likely use an external CA such as ACME or OpenBao/Vault. However, to make this guide self-contained, Cert-Manager will create
-a self-signed CA certificate instead.
+In a production setup this will likely use an external CA such as ACME or OpenBao/Vault.
+However, to make this guide self-contained, Cert-Manager will create a self-signed CA certificate instead.
 
 [source,yaml]
 ----
@@ -39,8 +42,8 @@ include::example$cert-manager/issuer.yaml[]
 [#secretclass]
 == Creating a SecretClass
 
-The Stackable Secret Operator needs to know how to request the certificates from Cert-Manager. We do this by creating
-a xref:secretclass.adoc[] using the xref:secretclass.adoc#backend-certmanager[`experimentalCertManager` backend].
+The Stackable Secret Operator needs to know how to request the certificates from Cert-Manager.
+Do this by creating a xref:secretclass.adoc[] using the xref:secretclass.adoc#backend-certmanager[`experimentalCertManager` backend].
 
 [source,yaml]
 ----
@@ -53,7 +56,7 @@ include::example$cert-manager/secretclass.yaml[]
 [#pod]
 == Using the certificate
 
-Finally, we can create and expose a Pod that requests and uses the certificate!
+Finally, you can create and expose a Pod that requests and uses the certificate!
 
 [source,yaml]
 ----

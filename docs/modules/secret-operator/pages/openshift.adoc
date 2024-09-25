@@ -1,19 +1,22 @@
 = Running on OpenShift
+:description: Install Stackable Secret Operator on OpenShift via OperatorHub or Helm. Manual upgrades and cleanup are required due to OLM limitations.
+:operatorhub: https://docs.openshift.com/container-platform/4.16/operators/understanding/olm-understanding-operatorhub.html
 
 == Installation methods
 
-The Secret Operator can be installed using either using Helm or via the Operator Hub.
+The Secret Operator can be installed using either Helm or the {operatorhub}[OperatorHub].
 
-It is not possible to mix the two because they are incompatible. This means that once an operator has been installed via the Operator Hub, it cannot be upgraded with Helm or vice versa.
-
+It is not possible to mix the two because they are incompatible.
+This means that once an operator has been installed via the Operator Hub, it cannot be upgraded with Helm or vice versa.
 
 == Operator Hub Installation
 
 This operator can be installed from RedHat's Operator Hub.
 
-Unfortunately there are some things you need to be aware of when upgrading or uninstalling the operator from the Operator Hub.
+Unfortunately there are some things you need to be aware of when upgrading or uninstalling the operator from the OperatorHub.
 
-Due to limitations of the Operator Lifecycle Manager (OLM) you cannot enable automatic updates of the Stackable Secret Operator. Upgrading to a new version requires you to uninstall the existing version of the operator and then manually remove the following resources:
+Due to limitations of the Operator Lifecycle Manager (OLM) you cannot enable automatic updates of the Stackable Secret Operator.
+Upgrading to a new version requires you to uninstall the existing version of the operator and then manually remove the following resources:
 
 * SecretClass: tls
 * ServiceAccount: secret-operator-service-account
