@@ -1,0 +1,64 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |
+      #!/usr/bin/env sh
+      set -eu
+
+      CERT_MANAGER_NAMESPACE="cert-manager-beku"
+
+      MARKER_CONFIG_MAP_NAME="beku-install-marker"
+      MARKER_FINALIZER_NAME="tech.stackable.beku/$NAMESPACE"
+
+      # If a marker CM doesn't exist, skip cleanup
+      echo "checking if marker CM exists"
+      if ! kubectl --namespace "$CERT_MANAGER_NAMESPACE" get configmap "$MARKER_CONFIG_MAP_NAME" 2>/dev/null >/dev/null; then
+        echo "Cert Manager appears to have been installed outside of testing. Skipping clean up for it."
+        exit 0
+      fi
+
+      # Otherwise, clean up
+
+      # Get our finalizer index, so we can delete it.
+      echo -n "get the index of the finalizer... "
+      IDX=$(kubectl --namespace "$CERT_MANAGER_NAMESPACE" get configmap "$MARKER_CONFIG_MAP_NAME" --output 'jsonpath={.metadata.finalizers}' | jq -re --arg finalizer "$MARKER_FINALIZER_NAME" 'map(. == $finalizer) | index(true)')
+      echo "$IDX"
+
+      # TODO: move delete to here
+      # Try to delete the CM. If there are other finalizers, then it won't delete immediately
+      echo "try to delete marker CM"
+      kubectl --namespace "$CERT_MANAGER_NAMESPACE" delete configmap "$MARKER_CONFIG_MAP_NAME" --timeout 1s 2>/dev/null || true
+
+      # Check if we are the last finalizer. If we are, then we need to cleanup helm, crds, namespace
+      FINALIZERS_REMAINING_COUNT=$(kubectl --namespace cert-manager-beku get configmap beku-install-marker --output 'jsonpath={$.metadata.finalizers}' | jq length)
+
+      # Remove ourselves as a finalizer, hopefully...
+      # Unfortunately this is non-atomic because of JSON Patch (RFC 6902)
+      # limitations where we can only delete by index.
+      echo "remove ourselves as a finalizer"
+      kubectl --namespace "$CERT_MANAGER_NAMESPACE" patch configmap "$MARKER_CONFIG_MAP_NAME" --type=json --patch-file=/dev/stdin <<EOF
+        [{
+          "op": "remove",
+          "path": "/metadata/finalizers/$IDX",
+        }]
+      EOF
+
+      if [ "$FINALIZERS_REMAINING_COUNT" -gt 1 ]; then
+        # Todo, print other finalizers. Or, maybe we can check if their NS's still exist.
+        echo "Other instances are using Cert-Manager. Skipping cleanup."
+        exit 0
+      fi
+
+      echo "uninstalling helm chart"
+      helm uninstall cert-manager \
+        --wait \
+        --namespace "$CERT_MANAGER_NAMESPACE"
+
+      echo "removing crds"
+      kubectl get crds -o name | grep 'cert-manager.io' | xargs kubectl delete
+
+      echo "deleteing namespace"
+      kubectl delete namespace "$CERT_MANAGER_NAMESPACE"
+
+    timeout: 120
