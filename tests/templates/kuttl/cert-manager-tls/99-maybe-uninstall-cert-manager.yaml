@@ -12,19 +12,19 @@ commands:
       MARKER_FINALIZER_NAME="tech.stackable.beku/$NAMESPACE"
 
       # If a marker CM doesn't exist, skip cleanup
-      echo "checking if marker CM exists"
+      echo "Checking if marker ConfigMap exists"
       if ! kubectl --namespace "$CERT_MANAGER_NAMESPACE" get configmap \
         "$MARKER_CONFIG_MAP_NAME" 2>/dev/null >/dev/null
       then
-        echo "Cert Manager appears to have been installed outside of testing." \
-             "Skipping clean up for it."
+        echo "Cert-manager appears to have been installed outside of testing" \
+             "Skipping clean up for it"
         exit 0
       fi
 
       # Otherwise, clean up
 
       # Get our finalizer index, so we can delete it.
-      echo -n "get the index of the finalizer... "
+      echo -n "Getting the index of the finalizer... "
       IDX=$(
         kubectl --namespace "$CERT_MANAGER_NAMESPACE" get configmap \
           "$MARKER_CONFIG_MAP_NAME" --output 'jsonpath={.metadata.finalizers}' \
@@ -37,7 +37,7 @@ commands:
       # TODO: move delete to here
       # Try to delete the CM. If there are other finalizers, then it won't
       # delete immediately
-      echo "try to delete marker CM"
+      echo "Trying to delete the marker ConfigMap"
       kubectl --namespace "$CERT_MANAGER_NAMESPACE" delete configmap \
         "$MARKER_CONFIG_MAP_NAME" --timeout 1s 2>/dev/null || true
 
@@ -52,7 +52,7 @@ commands:
       # Remove ourselves as a finalizer, hopefully...
       # Unfortunately this is non-atomic because of JSON Patch (RFC 6902)
       # limitations where we can only delete by index.
-      echo "remove ourselves as a finalizer"
+      echo "Removing self as a finalizer"
       kubectl --namespace "$CERT_MANAGER_NAMESPACE" patch configmap \
         "$MARKER_CONFIG_MAP_NAME" --type=json --patch-file=/dev/stdin <<EOF
       [{
@@ -64,7 +64,7 @@ commands:
       if [ "$FINALIZERS_REMAINING_COUNT" -gt 1 ]; then
         # Todo, print other finalizers. Or, maybe we can check if their
         # namespaces still exist.
-        echo "Other instances are using Cert-Manager. Skipping cleanup."
+        echo "Other instances are using cert-manager. Skipping cleanup"
         exit 0
       fi
 
@@ -73,9 +73,9 @@ commands:
         --wait \
         --namespace "$CERT_MANAGER_NAMESPACE"
 
-      echo "removing crds"
+      echo "Removing CRDs"
       kubectl get crds -o name | grep 'cert-manager.io' | xargs kubectl delete
 
-      echo "deleteing namespace"
+      echo "Deleteing cert-manager namespace"
       kubectl delete namespace "$CERT_MANAGER_NAMESPACE"
     timeout: 120

@@ -15,7 +15,7 @@ commands:
       MAX_SLEEP_SECONDS=10
       RANDOM_SLEEP_SECONDS="$((RANDOM % MAX_SLEEP_SECONDS))"
       echo "Sleeping for $RANDOM_SLEEP_SECONDS seconds to reduce the chance " \
-           "of concurrent installs"
+           "of concurrent cert-manager installations"
       sleep "$RANDOM_SLEEP_SECONDS"
 
       # If cert-manager already appears to be installed, or is still installing
