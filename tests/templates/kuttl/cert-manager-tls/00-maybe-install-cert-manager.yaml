@@ -14,52 +14,69 @@ commands:
 
       MAX_SLEEP_SECONDS=10
       RANDOM_SLEEP_SECONDS="$((RANDOM % MAX_SLEEP_SECONDS))"
-      echo "Sleeping for $RANDOM_SLEEP_SECONDS seconds to reduce the chance of concurrent installs"
+      echo "Sleeping for $RANDOM_SLEEP_SECONDS seconds to reduce the chance " \
+           "of concurrent installs"
       sleep "$RANDOM_SLEEP_SECONDS"
 
       # If cert-manager already appears to be installed, or is still installing
       # in another concurrent test, then add ourselves as a finalizer so it
       # doesn't get deleted while we are using it.
-      if kubectl --namespace "$CERT_MANAGER_NAMESPACE" get configmap "$MARKER_CONFIG_MAP_NAME" 2>/dev/null >/dev/null; then
-        echo "Skipping cert-manager install, it appears to have been done or is in progress."
-        echo "Adding finalizer ${MARKER_FINALIZER_NAME} to marker ConfigMap ${CERT_MANAGER_NAMESPACE}/${MARKER_CONFIG_MAP_NAME}."
-        kubectl --namespace "$CERT_MANAGER_NAMESPACE" patch configmap "$MARKER_CONFIG_MAP_NAME" --type=json --patch-file=/dev/stdin <<EOF
-          [{
-            "op": "add",
-            "path": "/metadata/finalizers/-",
-            "value": "$MARKER_FINALIZER_NAME"
-          }]
+      if kubectl --namespace "$CERT_MANAGER_NAMESPACE" get configmap \
+        "$MARKER_CONFIG_MAP_NAME" 2>/dev/null >/dev/null;
+      then
+        echo "Skipping cert-manager install, it appears to have been done or " \
+             "is in progress."
+        echo "Adding finalizer ${MARKER_FINALIZER_NAME} to marker ConfigMap" \
+             "${CERT_MANAGER_NAMESPACE}/${MARKER_CONFIG_MAP_NAME}."
+
+        kubectl --namespace "$CERT_MANAGER_NAMESPACE" patch configmap \
+          "$MARKER_CONFIG_MAP_NAME" --type=json --patch-file=/dev/stdin <<EOF
+      [{
+        "op": "add",
+        "path": "/metadata/finalizers/-",
+        "value": "$MARKER_FINALIZER_NAME"
+      }]
       EOF
+
         # Now wait until the deployment has finished
-        while ! helm list --namespace "$CERT_MANAGER_NAMESPACE" | grep cert-manager >/dev/null; do
+        while ! helm list --namespace "$CERT_MANAGER_NAMESPACE" \
+          | grep cert-manager >/dev/null
+        do
           echo "Waiting for another instance to finish installing cert-manager"
           sleep 5
         done
-        echo "Done waiting"
+        echo "Finished waiting for another installation of cert-manager"
         exit 0
       else
-        # If cert-manager appears to be installed, but we didn't do it, skip install
+        # If cert-manager appears to be installed, but we didn't do it, skip
+        # install
         if kubectl get crds -o name | grep 'cert-manager.io'; then
-          echo "Cert Manager appears to already be installed outside of testing. Skipping install."
+          echo "Cert Manager appears to already be installed outside of " \
+               "testing. Skipping install."
           exit 0
         fi
       fi
 
       # Otherwise, we need to install cert-manager
 
-      # Create the namespace, and add finalizer for this test (keyed with $NAMESPACE)?
+      # Create the namespace, and add finalizer for this test (keyed with
+      # $NAMESPACE)
       kubectl create namespace "$CERT_MANAGER_NAMESPACE"
 
       # Create a marker CM and add ourselves as the first and only finalizer
-      echo "Creating marker ConfigMap ${CERT_MANAGER_NAMESPACE}/${MARKER_CONFIG_MAP_NAME}."
-      kubectl --namespace "$CERT_MANAGER_NAMESPACE" create configmap "$MARKER_CONFIG_MAP_NAME"
-      echo "Adding finalizer ${MARKER_FINALIZER_NAME} to marker ConfigMap ${CERT_MANAGER_NAMESPACE}/${MARKER_CONFIG_MAP_NAME}."
-      kubectl --namespace "$CERT_MANAGER_NAMESPACE" patch configmap "$MARKER_CONFIG_MAP_NAME" --type=json --patch-file=/dev/stdin <<EOF
-        [{
-          "op": "add",
-          "path": "/metadata/finalizers",
-          "value": ["$MARKER_FINALIZER_NAME"]
-        }]
+      echo "Creating marker ConfigMap ${CERT_MANAGER_NAMESPACE}/" \
+           "${MARKER_CONFIG_MAP_NAME}."
+      kubectl --namespace "$CERT_MANAGER_NAMESPACE" create configmap \
+        "$MARKER_CONFIG_MAP_NAME"
+      echo "Adding finalizer ${MARKER_FINALIZER_NAME} to marker ConfigMap" \
+           "${CERT_MANAGER_NAMESPACE}/${MARKER_CONFIG_MAP_NAME}."
+      kubectl --namespace "$CERT_MANAGER_NAMESPACE" patch configmap \
+        "$MARKER_CONFIG_MAP_NAME" --type=json --patch-file=/dev/stdin <<EOF
+      [{
+        "op": "add",
+        "path": "/metadata/finalizers",
+        "value": ["$MARKER_FINALIZER_NAME"]
+      }]
       EOF
 
       helm repo add jetstack https://charts.jetstack.io --force-update
