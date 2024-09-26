@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 - Fixed Kerberos keytab provisioning reusing its credential cache ([#490]).
 - Fixed listener volumes missing a required permission to inspect manually provisioned listeners ([#497]).
+- test: Fixed cert-manager tests by installing cert-manager if it doesn't exist ([#505]).
 
 ### Changed
 
@@ -23,6 +24,7 @@ All notable changes to this project will be documented in this file.
 [#490]: https://github.com/stackabletech/secret-operator/pull/490
 [#495]: https://github.com/stackabletech/secret-operator/pull/495
 [#497]: https://github.com/stackabletech/secret-operator/pull/497
+[#505]: https://github.com/stackabletech/secret-operator/pull/505
 
 ## [24.7.0] - 2024-07-24
 
