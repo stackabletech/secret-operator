@@ -76,6 +76,6 @@ commands:
       echo "Removing CRDs"
       kubectl get crds -o name | grep 'cert-manager.io' | xargs kubectl delete
 
-      echo "Deleteing cert-manager namespace"
+      echo "Deleting cert-manager namespace"
       kubectl delete namespace "$CERT_MANAGER_NAMESPACE"
     timeout: 120
