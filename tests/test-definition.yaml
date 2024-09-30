@@ -31,7 +31,7 @@ tests:
       - openshift
   - name: tls
     dimensions:
-      - tls-rsa-key-length    
+      - tls-rsa-key-length
       - openshift
   - name: cert-manager-tls
     dimensions:
