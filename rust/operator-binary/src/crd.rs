@@ -124,6 +124,8 @@ pub struct AutoTlsCa {
     #[serde(default = "AutoTlsCa::default_ca_certificate_lifetime")]
     pub ca_certificate_lifetime: Duration,
 
+    /// The TLS algorithm and required configuration settings.
+    /// Currently only RSA and key length of 2048, 4096 or 8192 bits can be configured.
     #[serde(default = "TlsKeyGeneration::default_tls_key_generation")]
     pub key_generation: TlsKeyGeneration,
 }
