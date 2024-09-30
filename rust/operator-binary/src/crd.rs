@@ -152,17 +152,20 @@ impl TlsKeyGeneration {
 #[serde(rename_all = "camelCase")]
 // Rust does not allow to start identifiers with numbers, thats why we use the L prefix for "length".
 pub enum TlsRsaKeyLength {
+    #[serde(rename = "2048")]
     L2048,
+    #[serde(rename = "4096")]
     L4096,
-    L8192,
+    #[serde(rename = "8192")]
+    L8192
 }
 
 impl TlsRsaKeyLength {
     pub fn as_bits(&self) -> u32 {
-        match &self {
+        match &self  {
             Self::L2048 => 2048,
             Self::L4096 => 4096,
-            Self::L8192 => 8192,
+            Self::L8192 => 8192
         }
     }
 }

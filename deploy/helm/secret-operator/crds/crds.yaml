@@ -61,7 +61,7 @@ spec:
                             keyGeneration:
                               default:
                                 rsa:
-                                  length: l4096
+                                  length: '4096'
                               oneOf:
                                 - required:
                                     - rsa
@@ -70,9 +70,9 @@ spec:
                                   properties:
                                     length:
                                       enum:
-                                        - l2048
-                                        - l4096
-                                        - l8192
+                                        - '2048'
+                                        - '4096'
+                                        - '8192'
                                       type: string
                                   required:
                                     - length
