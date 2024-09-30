@@ -157,15 +157,15 @@ pub enum TlsRsaKeyLength {
     #[serde(rename = "4096")]
     L4096,
     #[serde(rename = "8192")]
-    L8192
+    L8192,
 }
 
 impl TlsRsaKeyLength {
     pub fn as_bits(&self) -> u32 {
-        match &self  {
+        match &self {
             Self::L2048 => 2048,
             Self::L4096 => 4096,
-            Self::L8192 => 8192
+            Self::L8192 => 8192,
         }
     }
 }
