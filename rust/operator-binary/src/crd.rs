@@ -407,6 +407,9 @@ mod test {
                 secret:
                   name: secret-provisioner-tls-ca
                   namespace: default
+                keyGeneration:
+                  rsa:
+                    length: "8192"
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(input);
         let secret_class: SecretClass =
@@ -422,6 +425,7 @@ mod test {
                         },
                         auto_generate: false,
                         ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
+                        key_generation: TlsKeyGeneration::Rsa { length: TlsRsaKeyLength::L8192 }
                     },
                     max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
                 })
@@ -457,7 +461,8 @@ mod test {
                             namespace: "default".to_string(),
                         },
                         auto_generate: true,
-                        ca_certificate_lifetime: Duration::from_days_unchecked(100)
+                        ca_certificate_lifetime: Duration::from_days_unchecked(100),
+                        key_generation: TlsKeyGeneration::default_tls_key_generation()
                     },
                     max_certificate_lifetime: Duration::from_days_unchecked(31),
                 })
