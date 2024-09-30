@@ -425,7 +425,9 @@ mod test {
                         },
                         auto_generate: false,
                         ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
-                        key_generation: TlsKeyGeneration::Rsa { length: TlsRsaKeyLength::L8192 }
+                        key_generation: TlsKeyGeneration::Rsa {
+                            length: TlsRsaKeyLength::L8192
+                        }
                     },
                     max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
                 })
