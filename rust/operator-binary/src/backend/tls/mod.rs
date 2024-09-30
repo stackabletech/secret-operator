@@ -238,8 +238,8 @@ impl SecretBackend for TlsGenerate {
 
         let conf = Conf::new(ConfMethod::default()).unwrap();
 
-        let pod_key_length = match &self.key_generation {
-            TlsKeyGeneration::Rsa { length } => length.as_bits(),
+        let pod_key_length = match self.key_generation {
+            TlsKeyGeneration::Rsa { length } => length,
         };
 
         let pod_key = Rsa::generate(pod_key_length)

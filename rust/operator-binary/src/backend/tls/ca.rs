@@ -192,8 +192,8 @@ impl CertificateAuthority {
         let not_after = now + config.ca_certificate_lifetime;
         let conf = Conf::new(ConfMethod::default()).unwrap();
 
-        let private_key_length = match &config.key_generation {
-            TlsKeyGeneration::Rsa { length } => length.as_bits(),
+        let private_key_length = match config.key_generation {
+            TlsKeyGeneration::Rsa { length } => length,
         };
 
         let private_key = Rsa::generate(private_key_length)

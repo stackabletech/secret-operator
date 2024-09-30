@@ -10,6 +10,12 @@ dimensions:
     values:
       - "false"
       - "true"
+  - name: tls-rsa-key-length
+    values:
+      - 2048
+      - 4096
+      # 8192 bits takes forever. Requires either more CPU or higher timeout in the test.
+      # - 8192
 tests:
   - name: kerberos
     dimensions:
@@ -25,6 +31,7 @@ tests:
       - openshift
   - name: tls
     dimensions:
+      - tls-rsa-key-length    
       - openshift
   - name: cert-manager-tls
     dimensions:

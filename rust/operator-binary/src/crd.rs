@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use stackable_operator::{
     kube::CustomResource,
-    schemars::{self, JsonSchema},
+    schemars::{self, schema::Schema, JsonSchema},
     time::Duration,
 };
 use stackable_secret_operator_crd_utils::SecretReference;
@@ -137,37 +137,46 @@ impl AutoTlsCa {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum TlsKeyGeneration {
-    Rsa { length: TlsRsaKeyLength },
+    Rsa {
+        #[schemars(schema_with = "tls_key_length_schema")]
+        length: u32,
+    },
 }
 
 impl TlsKeyGeneration {
     fn default_tls_key_generation() -> Self {
-        Self::Rsa {
-            length: TlsRsaKeyLength::L4096,
-        }
+        Self::Rsa { length: 4096 }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-// Rust does not allow to start identifiers with numbers, thats why we use the L prefix for "length".
-pub enum TlsRsaKeyLength {
-    #[serde(rename = "2048")]
-    L2048,
-    #[serde(rename = "4096")]
-    L4096,
-    #[serde(rename = "8192")]
-    L8192,
-}
-
-impl TlsRsaKeyLength {
-    pub fn as_bits(&self) -> u32 {
-        match &self {
-            Self::L2048 => 2048,
-            Self::L4096 => 4096,
-            Self::L8192 => 8192,
-        }
-    }
+// Could not get a "standard" enum with assigned values/discriminants to work as integers in the schema
+// The following was generated and requires the length to be provided as string (we want an integer)
+// keyGeneration:
+//   default:
+//     rsa:
+//       length: '4096'
+//   oneOf:
+//     - required:
+//         - rsa
+//   properties:
+//     rsa:
+//       properties:
+//         length:
+//           enum:
+//             - '2048'
+//             - '4096'
+//             - '8192'
+//           type: string
+pub fn tls_key_length_schema(_: &mut schemars::gen::SchemaGenerator) -> Schema {
+    serde_json::from_value(serde_json::json!({
+        "type": "integer",
+        "enum": [
+            2048,
+            4096,
+            8192
+        ]
+    }))
+    .expect("Failed to parse JSON of custom tls key length enum")
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -409,7 +418,7 @@ mod test {
                   namespace: default
                 keyGeneration:
                   rsa:
-                    length: "8192"
+                    length: 8192
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(input);
         let secret_class: SecretClass =
@@ -425,9 +434,7 @@ mod test {
                         },
                         auto_generate: false,
                         ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
-                        key_generation: TlsKeyGeneration::Rsa {
-                            length: TlsRsaKeyLength::L8192
-                        }
+                        key_generation: TlsKeyGeneration::Rsa { length: 8192 }
                     },
                     max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
                 })
