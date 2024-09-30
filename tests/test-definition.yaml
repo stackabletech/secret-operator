@@ -10,7 +10,7 @@ dimensions:
     values:
       - "false"
       - "true"
-  - name: tls-rsa-key-length
+  - name: rsa-key-length
     values:
       - 2048
       - 4096
@@ -31,7 +31,7 @@ tests:
       - openshift
   - name: tls
     dimensions:
-      - tls-rsa-key-length
+      - rsa-key-length
       - openshift
   - name: cert-manager-tls
     dimensions:
