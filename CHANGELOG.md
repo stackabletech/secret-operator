@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 - Fixed Kerberos keytab provisioning reusing its credential cache ([#490]).
 - Fixed listener volumes missing a required permission to inspect manually provisioned listeners ([#497]).
+- test: Fixed cert-manager tests by installing cert-manager if it doesn't exist ([#505]).
 
 ### Changed
 
@@ -23,6 +24,7 @@ All notable changes to this project will be documented in this file.
 [#490]: https://github.com/stackabletech/secret-operator/pull/490
 [#495]: https://github.com/stackabletech/secret-operator/pull/495
 [#497]: https://github.com/stackabletech/secret-operator/pull/497
+[#505]: https://github.com/stackabletech/secret-operator/pull/505
 
 ## [24.7.0] - 2024-07-24
 
@@ -35,9 +37,9 @@ All notable changes to this project will be documented in this file.
 
 - [BREAKING] The TLS CA Secret is now installed into the Namespace of the operator (typically `stackable-operators`), rather than `default` ([#397]).
   - Existing users can either migrate by either:
-      - (Recommended) Copying the CA into the new location
-        (`kubectl -n default get secret/secret-provisioner-tls-ca -o json | jq '.metadata.namespace = "stackable-operators"' | kubectl create -f-`)
-      - Setting the `secretClasses.tls.caSecretNamespace` Helm flag (`--set secretClasses.tls.caSecretNamespace=default`)
+    - (Recommended) Copying the CA into the new location
+      (`kubectl -n default get secret/secret-provisioner-tls-ca -o json | jq '.metadata.namespace = "stackable-operators"' | kubectl create -f-`)
+    - Setting the `secretClasses.tls.caSecretNamespace` Helm flag (`--set secretClasses.tls.caSecretNamespace=default`)
 - Reduce CA default lifetime to one year ([#403])
 - Update the image docker.stackable.tech/k8s/sig-storage/csi-provisioner
   in the Helm values to v4.0.1 ([#440]).
@@ -79,7 +81,6 @@ All notable changes to this project will be documented in this file.
 [#352]: https://github.com/stackabletech/secret-operator/pull/352
 [#357]: https://github.com/stackabletech/secret-operator/pull/357
 [#361]: https://github.com/stackabletech/secret-operator/pull/361
-
 
 ## [23.11.0] - 2023-11-24
 
