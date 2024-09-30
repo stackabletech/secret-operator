@@ -123,11 +123,47 @@ pub struct AutoTlsCa {
     /// If `autoGenerate: false` then the Secret Operator will log a warning instead.
     #[serde(default = "AutoTlsCa::default_ca_certificate_lifetime")]
     pub ca_certificate_lifetime: Duration,
+
+    #[serde(default = "TlsKeyGeneration::default_tls_key_generation")]
+    pub key_generation: TlsKeyGeneration,
 }
 
 impl AutoTlsCa {
     fn default_ca_certificate_lifetime() -> Duration {
         backend::tls::DEFAULT_CA_CERT_LIFETIME
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum TlsKeyGeneration {
+    Rsa { length: TlsRsaKeyLength },
+}
+
+impl TlsKeyGeneration {
+    fn default_tls_key_generation() -> Self {
+        Self::Rsa {
+            length: TlsRsaKeyLength::L4096,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+// Rust does not allow to start identifiers with numbers, thats why we use the L prefix for "length".
+pub enum TlsRsaKeyLength {
+    L2048,
+    L4096,
+    L8192,
+}
+
+impl TlsRsaKeyLength {
+    pub fn as_bits(&self) -> u32 {
+        match &self {
+            Self::L2048 => 2048,
+            Self::L4096 => 4096,
+            Self::L8192 => 8192,
+        }
     }
 }
 

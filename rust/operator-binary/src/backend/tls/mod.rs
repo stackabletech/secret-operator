@@ -28,7 +28,7 @@ use stackable_operator::{
 use time::OffsetDateTime;
 
 use crate::{
-    crd,
+    crd::{self, TlsKeyGeneration},
     format::{well_known, SecretData, WellKnownSecretData},
     utils::iterator_try_concat_bytes,
 };
@@ -132,6 +132,7 @@ impl SecretBackendError for Error {
 pub struct TlsGenerate {
     ca_manager: ca::Manager,
     max_cert_lifetime: Duration,
+    key_generation: TlsKeyGeneration,
 }
 
 impl TlsGenerate {
@@ -147,6 +148,7 @@ impl TlsGenerate {
             secret: ca_secret,
             auto_generate: auto_generate_ca,
             ca_certificate_lifetime,
+            key_generation,
         }: &crd::AutoTlsCa,
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
@@ -158,11 +160,13 @@ impl TlsGenerate {
                     manage_ca: *auto_generate_ca,
                     ca_certificate_lifetime: *ca_certificate_lifetime,
                     rotate_if_ca_expires_before: Some(*ca_certificate_lifetime / 2),
+                    key_generation: key_generation.clone(),
                 },
             )
             .await
             .context(LoadCaSnafu)?,
             max_cert_lifetime,
+            key_generation: key_generation.clone(),
         })
     }
 }
@@ -233,7 +237,12 @@ impl SecretBackend for TlsGenerate {
         }
 
         let conf = Conf::new(ConfMethod::default()).unwrap();
-        let pod_key = Rsa::generate(2048)
+
+        let pod_key_length = match &self.key_generation {
+            TlsKeyGeneration::Rsa { length } => length.as_bits(),
+        };
+
+        let pod_key = Rsa::generate(pod_key_length)
             .and_then(PKey::try_from)
             .context(GenerateKeySnafu)?;
         let mut addresses = Vec::new();
