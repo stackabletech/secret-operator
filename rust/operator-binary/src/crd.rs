@@ -442,7 +442,7 @@ mod test {
                         },
                         auto_generate: false,
                         ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
-                        key_generation: TlsKeyGeneration::Rsa { length: 3072 }
+                        key_generation: TlsKeyGeneration::Rsa { length: TLS_RSA_KEY_LENGTH_3072 }
                     },
                     max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
                 })

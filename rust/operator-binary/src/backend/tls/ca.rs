@@ -155,6 +155,7 @@ pub struct Config {
     /// and smaller than [`Self::ca_certificate_lifetime`].
     pub rotate_if_ca_expires_before: Option<Duration>,
 
+    /// Configuration how TLS private keys should be created.
     pub key_generation: TlsKeyGeneration,
 }
 
