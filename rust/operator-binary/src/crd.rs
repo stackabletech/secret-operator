@@ -178,7 +178,7 @@ pub fn tls_key_length_schema(_: &mut schemars::gen::SchemaGenerator) -> Schema {
             8192
         ]
     }))
-    .expect("Failed to parse JSON of custom tls key length enum")
+    .expect("Failed to parse JSON of custom tls key length schema")
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
