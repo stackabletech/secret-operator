@@ -140,45 +140,51 @@ impl AutoTlsCa {
 #[serde(rename_all = "camelCase")]
 pub enum TlsKeyGeneration {
     Rsa {
-        #[schemars(schema_with = "tls_key_length_schema")]
+        #[schemars(schema_with = "TlsKeyGeneration::tls_key_length_schema")]
         length: u32,
     },
 }
 
 impl TlsKeyGeneration {
-    fn default_tls_key_generation() -> Self {
-        Self::Rsa { length: 2048 }
-    }
-}
+    pub const TLS_RSA_KEY_LENGTH_2048: u32 = 2048;
+    pub const TLS_RSA_KEY_LENGTH_3072: u32 = 3072;
+    pub const TLS_RSA_KEY_LENGTH_4096: u32 = 4096;
 
-// Could not get a "standard" enum with assigned values/discriminants to work as integers in the schema
-// The following was generated and requires the length to be provided as string (we want an integer)
-// keyGeneration:
-//   default:
-//     rsa:
-//       length: '2048'
-//   oneOf:
-//     - required:
-//         - rsa
-//   properties:
-//     rsa:
-//       properties:
-//         length:
-//           enum:
-//             - '2048'
-//             - '3072' 
-//             - '4096'
-//           type: string
-pub fn tls_key_length_schema(_: &mut schemars::gen::SchemaGenerator) -> Schema {
-    serde_json::from_value(serde_json::json!({
-        "type": "integer",
-        "enum": [
-            2048,
-            3072,
-            4096
-        ]
-    }))
-    .expect("Failed to parse JSON of custom tls key length schema")
+    fn default_tls_key_generation() -> Self {
+        Self::Rsa {
+            length: Self::TLS_RSA_KEY_LENGTH_2048,
+        }
+    }
+
+    // Could not get a "standard" enum with assigned values/discriminants to work as integers in the schema
+    // The following was generated and requires the length to be provided as string (we want an integer)
+    // keyGeneration:
+    //   default:
+    //     rsa:
+    //       length: '2048'
+    //   oneOf:
+    //     - required:
+    //         - rsa
+    //   properties:
+    //     rsa:
+    //       properties:
+    //         length:
+    //           enum:
+    //             - '2048'
+    //             - '3072'
+    //             - '4096'
+    //           type: string
+    pub fn tls_key_length_schema(_: &mut schemars::gen::SchemaGenerator) -> Schema {
+        serde_json::from_value(serde_json::json!({
+            "type": "integer",
+            "enum": [
+                Self::TLS_RSA_KEY_LENGTH_2048,
+                Self::TLS_RSA_KEY_LENGTH_3072,
+                Self::TLS_RSA_KEY_LENGTH_4096
+            ]
+        }))
+        .expect("Failed to parse JSON of custom tls key length schema")
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
