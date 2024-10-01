@@ -61,7 +61,7 @@ spec:
                             keyGeneration:
                               default:
                                 rsa:
-                                  length: 4096
+                                  length: 2048
                               description: The TLS algorithm and required configuration settings. Currently only RSA and key length of 2048, 4096 or 8192 bits can be configured.
                               oneOf:
                                 - required:
@@ -72,8 +72,8 @@ spec:
                                     length:
                                       enum:
                                         - 2048
+                                        - 3072
                                         - 4096
-                                        - 8192
                                       type: integer
                                   required:
                                     - length

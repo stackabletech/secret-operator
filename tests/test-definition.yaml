@@ -13,9 +13,8 @@ dimensions:
   - name: rsa-key-length
     values:
       - 2048
-      - 4096
-      # 8192 bits takes forever. Requires either more CPU or higher timeout in the test.
-      # - 8192
+      - 3072
+      # - 4096
 tests:
   - name: kerberos
     dimensions:

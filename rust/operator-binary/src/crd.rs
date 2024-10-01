@@ -125,7 +125,7 @@ pub struct AutoTlsCa {
     pub ca_certificate_lifetime: Duration,
 
     /// The TLS algorithm and required configuration settings.
-    /// Currently only RSA and key length of 2048, 4096 or 8192 bits can be configured.
+    /// Currently only RSA and key length of 2048, 3072 or 4096 bits can be configured.
     #[serde(default = "TlsKeyGeneration::default_tls_key_generation")]
     pub key_generation: TlsKeyGeneration,
 }
@@ -156,7 +156,7 @@ impl TlsKeyGeneration {
 // keyGeneration:
 //   default:
 //     rsa:
-//       length: '4096'
+//       length: '2048'
 //   oneOf:
 //     - required:
 //         - rsa
@@ -166,16 +166,16 @@ impl TlsKeyGeneration {
 //         length:
 //           enum:
 //             - '2048'
+//             - '3072' 
 //             - '4096'
-//             - '8192'
 //           type: string
 pub fn tls_key_length_schema(_: &mut schemars::gen::SchemaGenerator) -> Schema {
     serde_json::from_value(serde_json::json!({
         "type": "integer",
         "enum": [
             2048,
-            4096,
-            8192
+            3072,
+            4096
         ]
     }))
     .expect("Failed to parse JSON of custom tls key length schema")
@@ -420,7 +420,7 @@ mod test {
                   namespace: default
                 keyGeneration:
                   rsa:
-                    length: 8192
+                    length: 3072
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(input);
         let secret_class: SecretClass =
@@ -436,7 +436,7 @@ mod test {
                         },
                         auto_generate: false,
                         ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
-                        key_generation: TlsKeyGeneration::Rsa { length: 8192 }
+                        key_generation: TlsKeyGeneration::Rsa { length: 3072 }
                     },
                     max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
                 })
