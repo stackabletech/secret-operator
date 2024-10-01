@@ -481,7 +481,7 @@ mod test {
                         },
                         auto_generate: true,
                         ca_certificate_lifetime: Duration::from_days_unchecked(100),
-                        key_generation: TlsKeyGeneration::default_tls_key_generation()
+                        key_generation: TlsKeyGeneration::default()
                     },
                     max_certificate_lifetime: Duration::from_days_unchecked(31),
                 })
