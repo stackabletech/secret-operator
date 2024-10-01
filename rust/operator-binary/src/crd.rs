@@ -124,9 +124,9 @@ pub struct AutoTlsCa {
     #[serde(default = "AutoTlsCa::default_ca_certificate_lifetime")]
     pub ca_certificate_lifetime: Duration,
 
-    /// The TLS algorithm and required configuration settings.
-    /// Currently only RSA and key length of 2048, 3072 or 4096 bits can be configured.
-    #[serde(default = "TlsKeyGeneration::default_tls_key_generation")]
+    /// The algorithm used to generate a keypair and required configuration settings.
+    /// Currently only RSA and a key length of 2048, 3072 or 4096 bits can be configured.
+    #[serde(default)]
     pub key_generation: TlsKeyGeneration,
 }
 
@@ -149,12 +149,6 @@ impl TlsKeyGeneration {
     pub const TLS_RSA_KEY_LENGTH_2048: u32 = 2048;
     pub const TLS_RSA_KEY_LENGTH_3072: u32 = 3072;
     pub const TLS_RSA_KEY_LENGTH_4096: u32 = 4096;
-
-    fn default_tls_key_generation() -> Self {
-        Self::Rsa {
-            length: Self::TLS_RSA_KEY_LENGTH_2048,
-        }
-    }
 
     // Could not get a "standard" enum with assigned values/discriminants to work as integers in the schema
     // The following was generated and requires the length to be provided as string (we want an integer)
@@ -184,6 +178,14 @@ impl TlsKeyGeneration {
             ]
         }))
         .expect("Failed to parse JSON of custom tls key length schema")
+    }
+}
+
+impl Default for TlsKeyGeneration {
+    fn default() -> Self {
+        Self::Rsa {
+            length: Self::TLS_RSA_KEY_LENGTH_2048,
+        }
     }
 }
 

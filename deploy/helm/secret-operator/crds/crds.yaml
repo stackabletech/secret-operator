@@ -62,7 +62,7 @@ spec:
                               default:
                                 rsa:
                                   length: 2048
-                              description: The TLS algorithm and required configuration settings. Currently only RSA and key length of 2048, 3072 or 4096 bits can be configured.
+                              description: The algorithm used to generate a keypair and required configuration settings. Currently only RSA and a key length of 2048, 3072 or 4096 bits can be configured.
                               oneOf:
                                 - required:
                                     - rsa
