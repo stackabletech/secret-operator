@@ -147,7 +147,7 @@ pub enum TlsKeyGeneration {
 
 impl TlsKeyGeneration {
     fn default_tls_key_generation() -> Self {
-        Self::Rsa { length: 4096 }
+        Self::Rsa { length: 2048 }
     }
 }
 
