@@ -44,7 +44,7 @@ pub enum SecretClassBackend {
     /// issues a TLS certificate signed by the Secret Operator.
     /// The certificate authority can be provided by the administrator, or managed automatically by the Secret Operator.
     ///
-    /// A new certificate and keypair will be generated and signed for each Pod, keys or certificates are never reused.
+    /// A new certificate and key pair will be generated and signed for each Pod, keys or certificates are never reused.
     AutoTls(AutoTlsBackend),
 
     /// The [`experimentalCertManager` backend][1] injects a TLS certificate issued
@@ -124,7 +124,7 @@ pub struct AutoTlsCa {
     #[serde(default = "AutoTlsCa::default_ca_certificate_lifetime")]
     pub ca_certificate_lifetime: Duration,
 
-    /// The algorithm used to generate a keypair and required configuration settings.
+    /// The algorithm used to generate a key pair and required configuration settings.
     /// Currently only RSA and a key length of 2048, 3072 or 4096 bits can be configured.
     #[serde(default)]
     pub key_generation: CertificateKeyGeneration,

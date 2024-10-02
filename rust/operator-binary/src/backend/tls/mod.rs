@@ -138,7 +138,7 @@ pub struct TlsGenerate {
 impl TlsGenerate {
     /// Check if a signing CA has already been instantiated in a specified Kubernetes secret - if
     /// one is found the key is loaded and used for signing certs.
-    /// If no current authority can be found, a new keypair and self signed certificate is created
+    /// If no current authority can be found, a new key pair and self signed certificate is created
     /// and stored for future use.
     /// This allows users to provide their own CA files, but also enables secret-operator to generate
     /// an independent self-signed CA.
@@ -175,7 +175,7 @@ impl TlsGenerate {
 impl SecretBackend for TlsGenerate {
     type Error = Error;
 
-    /// Generate a keypair and sign it with the CA key.
+    /// Generate a key pair and sign it with the CA key.
     /// Then add the ca certificate and return these files for provisioning to the volume.
     async fn get_secret_data(
         &self,

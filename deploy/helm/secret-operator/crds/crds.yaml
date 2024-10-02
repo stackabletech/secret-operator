@@ -40,7 +40,7 @@ spec:
                       description: |-
                         The [`autoTls` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-autotls) issues a TLS certificate signed by the Secret Operator. The certificate authority can be provided by the administrator, or managed automatically by the Secret Operator.
 
-                        A new certificate and keypair will be generated and signed for each Pod, keys or certificates are never reused.
+                        A new certificate and key pair will be generated and signed for each Pod, keys or certificates are never reused.
                       properties:
                         ca:
                           description: Configures the certificate authority used to issue Pod certificates.
@@ -62,7 +62,7 @@ spec:
                               default:
                                 rsa:
                                   length: 2048
-                              description: The algorithm used to generate a keypair and required configuration settings. Currently only RSA and a key length of 2048, 3072 or 4096 bits can be configured.
+                              description: The algorithm used to generate a key pair and required configuration settings. Currently only RSA and a key length of 2048, 3072 or 4096 bits can be configured.
                               oneOf:
                                 - required:
                                     - rsa
