@@ -140,7 +140,7 @@ impl AutoTlsCa {
 #[serde(rename_all = "camelCase")]
 pub enum CertificateKeyGeneration {
     Rsa {
-        /// The amount of bits used for generating the RSA keypair. 
+        /// The amount of bits used for generating the RSA keypair.
         /// Currently, `2048`, `3072` and `4096` are supported. Defaults to `2048` bits.
         #[schemars(schema_with = "CertificateKeyGeneration::tls_key_length_schema")]
         length: u32,
