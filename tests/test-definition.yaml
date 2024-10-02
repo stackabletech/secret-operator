@@ -10,6 +10,11 @@ dimensions:
     values:
       - "false"
       - "true"
+  - name: rsa-key-length
+    values:
+      - 2048
+      - 3072
+      # - 4096
 tests:
   - name: kerberos
     dimensions:
@@ -25,6 +30,7 @@ tests:
       - openshift
   - name: tls
     dimensions:
+      - rsa-key-length
       - openshift
   - name: cert-manager-tls
     dimensions:

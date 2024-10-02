@@ -34,6 +34,7 @@ use tracing::{info, info_span, warn};
 
 use crate::{
     backend::SecretBackendError,
+    crd::CertificateKeyGeneration,
     utils::{asn1time_to_offsetdatetime, Asn1TimeParseError, Unloggable},
 };
 
@@ -153,6 +154,9 @@ pub struct Config {
     /// Hence, this value _should_ be larger than the PKI's maximum certificate lifetime,
     /// and smaller than [`Self::ca_certificate_lifetime`].
     pub rotate_if_ca_expires_before: Option<Duration>,
+
+    /// Configuration how TLS private keys should be created.
+    pub key_generation: CertificateKeyGeneration,
 }
 
 /// A single certificate authority certificate.
@@ -188,7 +192,12 @@ impl CertificateAuthority {
         let not_before = now - Duration::from_minutes_unchecked(5);
         let not_after = now + config.ca_certificate_lifetime;
         let conf = Conf::new(ConfMethod::default()).unwrap();
-        let private_key = Rsa::generate(2048)
+
+        let private_key_length = match config.key_generation {
+            CertificateKeyGeneration::Rsa { length } => length,
+        };
+
+        let private_key = Rsa::generate(private_key_length)
             .and_then(PKey::try_from)
             .context(GenerateKeySnafu)?;
         let certificate = X509Builder::new()

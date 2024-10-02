@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Active Directory's `samAccountName` generation can now be customized ([#454]).
 - Added experimental cert-manager backend ([#482]).
+- Make RSA key length configurable ([#506]).
 
 ### Fixed
 
@@ -25,6 +26,7 @@ All notable changes to this project will be documented in this file.
 [#495]: https://github.com/stackabletech/secret-operator/pull/495
 [#497]: https://github.com/stackabletech/secret-operator/pull/497
 [#505]: https://github.com/stackabletech/secret-operator/pull/505
+[#506]: https://github.com/stackabletech/secret-operator/pull/506
 
 ## [24.7.0] - 2024-07-24
 
