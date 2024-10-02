@@ -70,6 +70,7 @@ spec:
                                 rsa:
                                   properties:
                                     length:
+                                      description: The amount of bits used for key or certs. Currently, `2048`, `3072` and `4096` are supported. Defaults to `2048` bits.
                                       enum:
                                         - 2048
                                         - 3072
