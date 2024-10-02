@@ -34,7 +34,7 @@ use tracing::{info, info_span, warn};
 
 use crate::{
     backend::SecretBackendError,
-    crd::TlsKeyGeneration,
+    crd::CertificateKeyGeneration,
     utils::{asn1time_to_offsetdatetime, Asn1TimeParseError, Unloggable},
 };
 
@@ -156,7 +156,7 @@ pub struct Config {
     pub rotate_if_ca_expires_before: Option<Duration>,
 
     /// Configuration how TLS private keys should be created.
-    pub key_generation: TlsKeyGeneration,
+    pub key_generation: CertificateKeyGeneration,
 }
 
 /// A single certificate authority certificate.
@@ -194,7 +194,7 @@ impl CertificateAuthority {
         let conf = Conf::new(ConfMethod::default()).unwrap();
 
         let private_key_length = match config.key_generation {
-            TlsKeyGeneration::Rsa { length } => length,
+            CertificateKeyGeneration::Rsa { length } => length,
         };
 
         let private_key = Rsa::generate(private_key_length)

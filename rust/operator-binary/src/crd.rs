@@ -127,7 +127,7 @@ pub struct AutoTlsCa {
     /// The algorithm used to generate a keypair and required configuration settings.
     /// Currently only RSA and a key length of 2048, 3072 or 4096 bits can be configured.
     #[serde(default)]
-    pub key_generation: TlsKeyGeneration,
+    pub key_generation: CertificateKeyGeneration,
 }
 
 impl AutoTlsCa {
@@ -138,19 +138,19 @@ impl AutoTlsCa {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub enum TlsKeyGeneration {
+pub enum CertificateKeyGeneration {
     Rsa {
         /// The amount of bits used for key or certs. Currently, `2048`, `3072` and `4096` are
         /// supported. Defaults to `2048` bits.
-        #[schemars(schema_with = "TlsKeyGeneration::tls_key_length_schema")]
+        #[schemars(schema_with = "CertificateKeyGeneration::tls_key_length_schema")]
         length: u32,
     },
 }
 
-impl TlsKeyGeneration {
-    pub const TLS_RSA_KEY_LENGTH_2048: u32 = 2048;
-    pub const TLS_RSA_KEY_LENGTH_3072: u32 = 3072;
-    pub const TLS_RSA_KEY_LENGTH_4096: u32 = 4096;
+impl CertificateKeyGeneration {
+    pub const RSA_KEY_LENGTH_2048: u32 = 2048;
+    pub const RSA_KEY_LENGTH_3072: u32 = 3072;
+    pub const RSA_KEY_LENGTH_4096: u32 = 4096;
 
     // Could not get a "standard" enum with assigned values/discriminants to work as integers in the schema
     // The following was generated and requires the length to be provided as string (we want an integer)
@@ -174,19 +174,19 @@ impl TlsKeyGeneration {
         serde_json::from_value(serde_json::json!({
             "type": "integer",
             "enum": [
-                Self::TLS_RSA_KEY_LENGTH_2048,
-                Self::TLS_RSA_KEY_LENGTH_3072,
-                Self::TLS_RSA_KEY_LENGTH_4096
+                Self::RSA_KEY_LENGTH_2048,
+                Self::RSA_KEY_LENGTH_3072,
+                Self::RSA_KEY_LENGTH_4096
             ]
         }))
         .expect("Failed to parse JSON of custom tls key length schema")
     }
 }
 
-impl Default for TlsKeyGeneration {
+impl Default for CertificateKeyGeneration {
     fn default() -> Self {
         Self::Rsa {
-            length: Self::TLS_RSA_KEY_LENGTH_2048,
+            length: Self::RSA_KEY_LENGTH_2048,
         }
     }
 }
@@ -446,8 +446,8 @@ mod test {
                         },
                         auto_generate: false,
                         ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
-                        key_generation: TlsKeyGeneration::Rsa {
-                            length: TlsKeyGeneration::TLS_RSA_KEY_LENGTH_3072
+                        key_generation: CertificateKeyGeneration::Rsa {
+                            length: CertificateKeyGeneration::RSA_KEY_LENGTH_3072
                         }
                     },
                     max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
@@ -485,7 +485,7 @@ mod test {
                         },
                         auto_generate: true,
                         ca_certificate_lifetime: Duration::from_days_unchecked(100),
-                        key_generation: TlsKeyGeneration::default()
+                        key_generation: CertificateKeyGeneration::default()
                     },
                     max_certificate_lifetime: Duration::from_days_unchecked(31),
                 })

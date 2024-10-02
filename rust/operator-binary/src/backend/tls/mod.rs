@@ -28,7 +28,7 @@ use stackable_operator::{
 use time::OffsetDateTime;
 
 use crate::{
-    crd::{self, TlsKeyGeneration},
+    crd::{self, CertificateKeyGeneration},
     format::{well_known, SecretData, WellKnownSecretData},
     utils::iterator_try_concat_bytes,
 };
@@ -132,7 +132,7 @@ impl SecretBackendError for Error {
 pub struct TlsGenerate {
     ca_manager: ca::Manager,
     max_cert_lifetime: Duration,
-    key_generation: TlsKeyGeneration,
+    key_generation: CertificateKeyGeneration,
 }
 
 impl TlsGenerate {
@@ -239,7 +239,7 @@ impl SecretBackend for TlsGenerate {
         let conf = Conf::new(ConfMethod::default()).unwrap();
 
         let pod_key_length = match self.key_generation {
-            TlsKeyGeneration::Rsa { length } => length,
+            CertificateKeyGeneration::Rsa { length } => length,
         };
 
         let pod_key = Rsa::generate(pod_key_length)
