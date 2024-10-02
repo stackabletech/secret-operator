@@ -5,7 +5,11 @@ use stackable_krb5_provision_keytab::{
     self as provision,
     provision_keytab,
 };
-use stackable_operator::{k8s_openapi::api::core::v1::Secret, kube::runtime::reflector::ObjectRef};
+use stackable_operator::{
+    commons::networking::{HostName, KerberosRealmName},
+    k8s_openapi::api::core::v1::Secret,
+    kube::runtime::reflector::ObjectRef,
+};
 use stackable_secret_operator_crd_utils::SecretReference;
 use tempfile::tempdir;
 use tokio::{
@@ -15,8 +19,8 @@ use tokio::{
 
 use crate::{
     crd::{
-        ActiveDirectorySamAccountNameRules, Hostname, InvalidKerberosPrincipal,
-        KerberosKeytabBackendAdmin, KerberosPrincipal,
+        ActiveDirectorySamAccountNameRules, InvalidKerberosPrincipal, KerberosKeytabBackendAdmin,
+        KerberosPrincipal,
     },
     format::{well_known, SecretData, WellKnownSecretData},
     utils::Unloggable,
@@ -82,8 +86,8 @@ impl SecretBackendError for Error {
 
 #[derive(Debug)]
 pub struct KerberosProfile {
-    pub realm_name: Hostname,
-    pub kdc: Hostname,
+    pub realm_name: KerberosRealmName,
+    pub kdc: HostName,
     pub admin: KerberosKeytabBackendAdmin,
 }
 
