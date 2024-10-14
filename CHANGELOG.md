@@ -10,19 +10,23 @@ All notable changes to this project will be documented in this file.
 - Added experimental cert-manager backend ([#482]).
 - Make RSA key length configurable ([#506]).
 
+### Changed
+
+- Refactored hostname validation ([#494]).
+  - BREAKING: Hostname validation is now somewhat stricter.
+  - BREAKING: Hostname validation is now enforced in CRD.
+- Remove custom `h2` patch, as Kubernetes 1.26 has fixed the invalid data from Kubernetes' side. Starting with 24.11 we only support at least 1.27 (as it's needed by OpenShift 4.14) ([#495]).
+
 ### Fixed
 
 - Fixed Kerberos keytab provisioning reusing its credential cache ([#490]).
 - Fixed listener volumes missing a required permission to inspect manually provisioned listeners ([#497]).
 - test: Fixed cert-manager tests by installing cert-manager if it doesn't exist ([#505]).
 
-### Changed
-
-- Remove custom `h2` patch, as Kubernetes 1.26 has fixed the invalid data from Kubernetes' side. Starting with 24.11 we only support at least 1.27 (as it's needed by OpenShift 4.14) ([#495]).
-
 [#454]: https://github.com/stackabletech/secret-operator/pull/454
 [#482]: https://github.com/stackabletech/secret-operator/pull/482
 [#490]: https://github.com/stackabletech/secret-operator/pull/490
+[#494]: https://github.com/stackabletech/secret-operator/pull/494
 [#495]: https://github.com/stackabletech/secret-operator/pull/495
 [#497]: https://github.com/stackabletech/secret-operator/pull/497
 [#505]: https://github.com/stackabletech/secret-operator/pull/505
