@@ -100,7 +100,7 @@ impl<'a> AdAdmin<'a> {
         schema_distinguished_name: String,
         generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
     ) -> Result<AdAdmin<'a>> {
-        let kube = stackable_operator::client::create_client(None)
+        let kube = stackable_operator::client::initialize_operator(None)
             .await
             .context(KubeInitSnafu)?;
         let ldap_tls = native_tls::TlsConnector::builder()
