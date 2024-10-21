@@ -14,6 +14,7 @@ use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{DateTime, FixedOffset},
     time::Duration,
+    utils::cluster_domain::KUBERNETES_CLUSTER_DOMAIN,
 };
 use std::{collections::HashSet, convert::Infallible, fmt::Debug};
 
@@ -176,6 +177,9 @@ impl SecretVolumeSelector {
         scope: &scope::SecretScope,
     ) -> Result<Vec<Address>, ScopeAddressesError> {
         use scope_addresses_error::*;
+        let cluster_domain = KUBERNETES_CLUSTER_DOMAIN
+            .get()
+            .expect("KUBERNETES_CLUSTER_DOMAIN must first be set by calling initialize_operator");
         Ok(match scope {
             scope::SecretScope::Node => {
                 let mut addrs = vec![Address::Dns(pod_info.node_name.clone())];
@@ -186,20 +190,20 @@ impl SecretVolumeSelector {
                 let mut addrs = Vec::new();
                 if let Some(svc_name) = &pod_info.service_name {
                     addrs.push(Address::Dns(format!(
-                        "{}.{}.svc.cluster.local",
-                        svc_name, self.namespace
+                        "{}.{}.svc.{}",
+                        svc_name, self.namespace, cluster_domain
                     )));
                     addrs.push(Address::Dns(format!(
-                        "{}.{}.{}.svc.cluster.local",
-                        self.pod, svc_name, self.namespace
+                        "{}.{}.{}.svc.{}",
+                        self.pod, svc_name, self.namespace, cluster_domain
                     )));
                 }
                 addrs.extend(pod_info.pod_ips.iter().copied().map(Address::Ip));
                 addrs
             }
             scope::SecretScope::Service { name } => vec![Address::Dns(format!(
-                "{}.{}.svc.cluster.local",
-                name, self.namespace
+                "{}.{}.svc.{}",
+                name, self.namespace, cluster_domain
             ))],
             scope::SecretScope::ListenerVolume { name } => pod_info
                 .listener_addresses
