@@ -8504,13 +8504,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.76.0";
+        version = "0.79.0";
         edition = "2021";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "a7e70f174fb043a1766e0a80de95834cb4f7513d";
-          sha256 = "1cyyyn6lizd0wdq79fc9fjnksnzx073ipydxmh7llciq5si5dnq6";
+          rev = "a2ac5f525edfd9a2fab884ba753e79a325fbb752";
+          sha256 = "070wv4w3mqz7m3zdkh3gm377f4zm04i4dx4dv4pqxj7w6m6m0ca0";
         };
         libName = "stackable_operator";
         authors = [
@@ -8550,6 +8550,10 @@ rec {
           {
             name = "futures";
             packageId = "futures 0.3.31";
+          }
+          {
+            name = "indexmap";
+            packageId = "indexmap 2.6.0";
           }
           {
             name = "json-patch";
@@ -8616,6 +8620,10 @@ rec {
             packageId = "stackable-operator-derive";
           }
           {
+            name = "stackable-shared";
+            packageId = "stackable-shared";
+          }
+          {
             name = "strum";
             packageId = "strum";
             features = [ "derive" ];
@@ -8665,8 +8673,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "a7e70f174fb043a1766e0a80de95834cb4f7513d";
-          sha256 = "1cyyyn6lizd0wdq79fc9fjnksnzx073ipydxmh7llciq5si5dnq6";
+          rev = "a2ac5f525edfd9a2fab884ba753e79a325fbb752";
+          sha256 = "070wv4w3mqz7m3zdkh3gm377f4zm04i4dx4dv4pqxj7w6m6m0ca0";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -8878,6 +8886,47 @@ rec {
             name = "stackable-operator";
             packageId = "stackable-operator";
             features = [ "time" ];
+          }
+        ];
+
+      };
+      "stackable-shared" = rec {
+        crateName = "stackable-shared";
+        version = "0.0.1";
+        edition = "2021";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "a2ac5f525edfd9a2fab884ba753e79a325fbb752";
+          sha256 = "070wv4w3mqz7m3zdkh3gm377f4zm04i4dx4dv4pqxj7w6m6m0ca0";
+        };
+        libName = "stackable_shared";
+        authors = [
+          "Stackable GmbH <info@stackable.de>"
+        ];
+        dependencies = [
+          {
+            name = "kube";
+            packageId = "kube";
+            usesDefaultFeatures = false;
+            features = [ "client" "jsonpatch" "runtime" "derive" "rustls-tls" ];
+          }
+          {
+            name = "semver";
+            packageId = "semver";
+          }
+          {
+            name = "serde";
+            packageId = "serde";
+            features = [ "derive" ];
+          }
+          {
+            name = "serde_yaml";
+            packageId = "serde_yaml";
+          }
+          {
+            name = "snafu";
+            packageId = "snafu 0.8.5";
           }
         ];
 

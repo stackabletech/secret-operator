@@ -46,7 +46,7 @@ spec:
             {{- if .Values.kubernetesClusterDomain }}
             - name: KUBERNETES_CLUSTER_DOMAIN
               value: {{ .Values.kubernetesClusterDomain | quote }}
-            {{- end }}          
+            {{- end }}
           volumeMounts:
             - name: csi
               mountPath: /csi
