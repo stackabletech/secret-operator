@@ -97,7 +97,7 @@ impl SecretBackend for CertManager {
         let mut ip_addresses = Vec::new();
         for scope in &selector.scope {
             for address in selector
-                .scope_addresses(&cluster_info, &pod_info, scope)
+                .scope_addresses(cluster_info, &pod_info, scope)
                 .context(ScopeAddressesSnafu { scope })?
             {
                 match address {

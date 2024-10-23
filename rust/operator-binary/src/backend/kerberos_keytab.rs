@@ -204,7 +204,7 @@ cluster.local = {realm_name}
         for service_name in &selector.kerberos_service_names {
             for scope in &selector.scope {
                 for addr in selector
-                    .scope_addresses(&cluster_info, &pod_info, scope)
+                    .scope_addresses(cluster_info, &pod_info, scope)
                     .context(ScopeAddressesSnafu {
                         scope: scope.clone(),
                     })?
