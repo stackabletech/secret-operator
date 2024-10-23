@@ -4,9 +4,11 @@ use std::{
     io::{stdin, BufReader},
 };
 
+use clap::Parser;
 use krb5::{Keyblock, Keytab};
 use snafu::{ResultExt, Snafu};
 use stackable_krb5_provision_keytab::{AdminBackend, Request, Response};
+use stackable_operator::utils::cluster_info::KubernetesClusterInfoOpts;
 use tracing::info;
 
 mod active_directory;
@@ -67,12 +69,20 @@ enum Error {
     RemoveDummyFromKeytab { source: krb5::Error },
 }
 
+#[derive(clap::Parser)]
+pub struct Args {
+    #[command(flatten)]
+    pub cluster_info_opts: KubernetesClusterInfoOpts,
+}
+
 enum AdminConnection<'a> {
     Mit(mit::MitAdmin<'a>),
     ActiveDirectory(active_directory::AdAdmin<'a>),
 }
 
 async fn run() -> Result<Response, Error> {
+    let args = Args::parse();
+
     let req = serde_json::from_reader::<_, Request>(BufReader::new(stdin().lock()))
         .context(DeserializeRequestSnafu)?;
     info!("initing context");
@@ -97,6 +107,7 @@ async fn run() -> Result<Response, Error> {
             generate_sam_account_name,
         } => AdminConnection::ActiveDirectory(
             active_directory::AdAdmin::connect(
+                &args.cluster_info_opts,
                 &ldap_server,
                 &krb,
                 ldap_tls_ca_secret,

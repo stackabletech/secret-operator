@@ -13,6 +13,7 @@ krb5 = { path = "../krb5" }
 stackable-secret-operator-crd-utils = { path = "../crd-utils" }
 
 byteorder.workspace = true
+clap.workspace = true
 futures.workspace = true
 ldap3.workspace = true
 native-tls.workspace = true

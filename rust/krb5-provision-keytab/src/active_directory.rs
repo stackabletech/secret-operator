@@ -95,6 +95,7 @@ pub struct AdAdmin<'a> {
 
 impl<'a> AdAdmin<'a> {
     pub async fn connect(
+        cluster_info_opts: &KubernetesClusterInfoOpts,
         ldap_server: &str,
         krb: &'a KrbContext,
         ldap_tls_ca_secret: SecretReference,
@@ -103,10 +104,7 @@ impl<'a> AdAdmin<'a> {
         schema_distinguished_name: String,
         generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
     ) -> Result<AdAdmin<'a>> {
-        // We don't have the usual operator (e.g. CLI or env) options available here, so we can not pass in any special
-        // options that can be set. An off-the-shelf Kubernetes client is sufficient here.
-        let cluster_info_opts = KubernetesClusterInfoOpts::default();
-        let kube = stackable_operator::client::initialize_operator(None, &cluster_info_opts)
+        let kube = stackable_operator::client::initialize_operator(None, cluster_info_opts)
             .await
             .context(KubeInitSnafu)?;
         let ldap_tls = native_tls::TlsConnector::builder()
