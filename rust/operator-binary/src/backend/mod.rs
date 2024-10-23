@@ -14,7 +14,7 @@ use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{DateTime, FixedOffset},
     time::Duration,
-    utils::cluster_domain::KUBERNETES_CLUSTER_DOMAIN,
+    utils::cluster_info::KubernetesClusterInfo,
 };
 use std::{collections::HashSet, convert::Infallible, fmt::Debug};
 
@@ -37,9 +37,11 @@ use self::pod_info::SchedulingPodInfo;
 pub struct SecretVolumeSelector {
     #[serde(flatten)]
     pub internal: InternalSecretVolumeSelectorParams,
+
     /// What kind of secret should be used
     #[serde(rename = "secrets.stackable.tech/class")]
     pub class: String,
+
     /// Scopes define what the secret identifies about a pod
     ///
     /// Currently supported scopes:
@@ -54,12 +56,15 @@ pub struct SecretVolumeSelector {
         deserialize_with = "SecretScope::deserialize_vec"
     )]
     pub scope: Vec<scope::SecretScope>,
+
     /// The name of the `Pod`, provided by Kubelet
     #[serde(rename = "csi.storage.k8s.io/pod.name")]
     pub pod: String,
+
     /// The name of the `Pod`'s `Namespace`, provided by Kubelet
     #[serde(rename = "csi.storage.k8s.io/pod.namespace")]
     pub namespace: String,
+
     /// The desired format of the mounted secrets
     ///
     /// Currently supported formats:
@@ -173,13 +178,13 @@ impl SecretVolumeSelector {
     /// Returns all addresses associated with a certain [`SecretScope`]
     fn scope_addresses<'a>(
         &'a self,
+        cluster_info: &KubernetesClusterInfo,
         pod_info: &'a pod_info::PodInfo,
         scope: &scope::SecretScope,
     ) -> Result<Vec<Address>, ScopeAddressesError> {
         use scope_addresses_error::*;
-        let cluster_domain = KUBERNETES_CLUSTER_DOMAIN
-            .get()
-            .expect("KUBERNETES_CLUSTER_DOMAIN must first be set by calling initialize_operator");
+        let cluster_domain = &cluster_info.cluster_domain;
+        let namespace = &self.namespace;
         Ok(match scope {
             scope::SecretScope::Node => {
                 let mut addrs = vec![Address::Dns(pod_info.node_name.clone())];
@@ -190,20 +195,18 @@ impl SecretVolumeSelector {
                 let mut addrs = Vec::new();
                 if let Some(svc_name) = &pod_info.service_name {
                     addrs.push(Address::Dns(format!(
-                        "{}.{}.svc.{}",
-                        svc_name, self.namespace, cluster_domain
+                        "{svc_name}.{namespace}.svc.{cluster_domain}"
                     )));
                     addrs.push(Address::Dns(format!(
-                        "{}.{}.{}.svc.{}",
-                        self.pod, svc_name, self.namespace, cluster_domain
+                        "{pod}.{svc_name}.{namespace}.svc.{cluster_domain}",
+                        pod = self.pod
                     )));
                 }
                 addrs.extend(pod_info.pod_ips.iter().copied().map(Address::Ip));
                 addrs
             }
             scope::SecretScope::Service { name } => vec![Address::Dns(format!(
-                "{}.{}.svc.{}",
-                name, self.namespace, cluster_domain
+                "{name}.{namespace}.svc.{cluster_domain}",
             ))],
             scope::SecretScope::ListenerVolume { name } => pod_info
                 .listener_addresses
@@ -269,6 +272,7 @@ pub trait SecretBackend: Debug + Send + Sync {
     /// Provision or load secret data from the source.
     async fn get_secret_data(
         &self,
+        cluster_info: &KubernetesClusterInfo,
         selector: &SecretVolumeSelector,
         pod_info: pod_info::PodInfo,
     ) -> Result<SecretContents, Self::Error>;

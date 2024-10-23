@@ -9,6 +9,7 @@ use stackable_operator::{
     commons::networking::{HostName, KerberosRealmName},
     k8s_openapi::api::core::v1::Secret,
     kube::runtime::reflector::ObjectRef,
+    utils::cluster_info::KubernetesClusterInfo,
 };
 use stackable_secret_operator_crd_utils::SecretReference;
 use tempfile::tempdir;
@@ -136,6 +137,7 @@ impl SecretBackend for KerberosKeytab {
 
     async fn get_secret_data(
         &self,
+        cluster_info: &KubernetesClusterInfo,
         selector: &super::SecretVolumeSelector,
         pod_info: super::pod_info::PodInfo,
     ) -> Result<super::SecretContents, Self::Error> {
@@ -201,12 +203,11 @@ cluster.local = {realm_name}
         let mut pod_principals: Vec<KerberosPrincipal> = Vec::new();
         for service_name in &selector.kerberos_service_names {
             for scope in &selector.scope {
-                for addr in
-                    selector
-                        .scope_addresses(&pod_info, scope)
-                        .context(ScopeAddressesSnafu {
-                            scope: scope.clone(),
-                        })?
+                for addr in selector
+                    .scope_addresses(&cluster_info, &pod_info, scope)
+                    .context(ScopeAddressesSnafu {
+                        scope: scope.clone(),
+                    })?
                 {
                     if let Address::Dns(hostname) = addr {
                         pod_principals.push(

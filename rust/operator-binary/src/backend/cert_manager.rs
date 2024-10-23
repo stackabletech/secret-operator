@@ -10,6 +10,7 @@ use stackable_operator::{
     k8s_openapi::{api::core::v1::Secret, ByteString},
     kube::{api::ObjectMeta, runtime::reflector::ObjectRef},
     time::Duration,
+    utils::cluster_info::KubernetesClusterInfo,
 };
 
 use crate::{crd::CertManagerIssuer, external_crd, format::SecretData, utils::Unloggable};
@@ -83,6 +84,7 @@ impl SecretBackend for CertManager {
 
     async fn get_secret_data(
         &self,
+        cluster_info: &KubernetesClusterInfo,
         selector: &SecretVolumeSelector,
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
@@ -95,7 +97,7 @@ impl SecretBackend for CertManager {
         let mut ip_addresses = Vec::new();
         for scope in &selector.scope {
             for address in selector
-                .scope_addresses(&pod_info, scope)
+                .scope_addresses(&cluster_info, &pod_info, scope)
                 .context(ScopeAddressesSnafu { scope })?
             {
                 match address {

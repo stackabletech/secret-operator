@@ -375,7 +375,7 @@ impl Node for SecretProvisionerNode {
                 let pod_ref = ObjectRef::<Pod>::new(&selector.pod).within(&selector.namespace);
                 tracing::info!(pod = %pod_ref, ?selector, ?pod_info, ?backend, "issuing secret for Pod");
                 let data = backend
-                    .get_secret_data(&selector, pod_info)
+                    .get_secret_data(&self.client.kubernetes_cluster_info, &selector, pod_info)
                     .await
                     .context(publish_error::BackendGetSecretDataSnafu)?;
                 self.tag_pod(&self.client, &request.volume_id, &selector, &data)

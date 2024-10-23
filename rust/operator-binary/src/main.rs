@@ -8,7 +8,9 @@ use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
-use stackable_operator::{logging::TracingTarget, CustomResourceExt};
+use stackable_operator::{
+    logging::TracingTarget, utils::cluster_info::KubernetesClusterInfoOpts, CustomResourceExt,
+};
 use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio_stream::wrappers::UnixListenerStream;
@@ -36,8 +38,10 @@ struct Opts {
 struct SecretOperatorRun {
     #[clap(long, env)]
     csi_endpoint: PathBuf,
+
     #[clap(long, env)]
     node_name: String,
+
     /// Unprivileged mode disables any features that require running secret-operator in a privileged container.
     ///
     /// Currently, this means that:
@@ -46,9 +50,13 @@ struct SecretOperatorRun {
     /// Unprivileged mode is EXPERIMENTAL and heavily discouraged, since it increases the risk of leaking secrets.
     #[clap(long, env)]
     privileged: bool,
+
     /// Tracing log collector system
     #[arg(long, env, default_value_t, value_enum)]
     pub tracing_target: TracingTarget,
+
+    #[command(flatten)]
+    pub cluster_info_opts: KubernetesClusterInfoOpts,
 }
 
 mod built_info {
@@ -67,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
             node_name,
             tracing_target,
             privileged,
+            cluster_info_opts,
         }) => {
             stackable_operator::logging::initialize_logging(
                 "SECRET_PROVISIONER_LOG",
@@ -82,9 +91,10 @@ async fn main() -> anyhow::Result<()> {
                 built_info::RUSTC_VERSION,
             );
 
-            let client = stackable_operator::client::initialize_operator(Some(
-                "secrets.stackable.tech".to_string(),
-            ))
+            let client = stackable_operator::client::initialize_operator(
+                Some("secrets.stackable.tech".to_string()),
+                &cluster_info_opts,
+            )
             .await?;
             if csi_endpoint
                 .symlink_metadata()

@@ -10,7 +10,10 @@ use ldap3::{Ldap, LdapConnAsync, LdapConnSettings};
 use rand::{seq::SliceRandom, thread_rng, CryptoRng};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_krb5_provision_keytab::ActiveDirectorySamAccountNameRules;
-use stackable_operator::{k8s_openapi::api::core::v1::Secret, kube::runtime::reflector::ObjectRef};
+use stackable_operator::{
+    k8s_openapi::api::core::v1::Secret, kube::runtime::reflector::ObjectRef,
+    utils::cluster_info::KubernetesClusterInfoOpts,
+};
 use stackable_secret_operator_crd_utils::SecretReference;
 
 use crate::credential_cache::{self, CredentialCache};
@@ -100,7 +103,10 @@ impl<'a> AdAdmin<'a> {
         schema_distinguished_name: String,
         generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
     ) -> Result<AdAdmin<'a>> {
-        let kube = stackable_operator::client::initialize_operator(None)
+        // We don't have the usual operator (e.g. CLI or env) options available here, so we can not pass in any special
+        // options that can be set. An off-the-shelf Kubernetes client is sufficient here.
+        let cluster_info_opts = KubernetesClusterInfoOpts::default();
+        let kube = stackable_operator::client::initialize_operator(None, &cluster_info_opts)
             .await
             .context(KubeInitSnafu)?;
         let ldap_tls = native_tls::TlsConnector::builder()

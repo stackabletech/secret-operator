@@ -7,7 +7,9 @@ use std::{
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
-use stackable_operator::kube::runtime::reflector::ObjectRef;
+use stackable_operator::{
+    kube::runtime::reflector::ObjectRef, utils::cluster_info::KubernetesClusterInfo,
+};
 
 use crate::{
     crd::{self, SecretClass},
@@ -58,11 +60,12 @@ impl<B: SecretBackend + Send + Sync> SecretBackend for DynamicAdapter<B> {
 
     async fn get_secret_data(
         &self,
+        cluster_info: &KubernetesClusterInfo,
         selector: &super::SecretVolumeSelector,
         pod_info: PodInfo,
     ) -> Result<super::SecretContents, Self::Error> {
         self.0
-            .get_secret_data(selector, pod_info)
+            .get_secret_data(cluster_info, selector, pod_info)
             .await
             .map_err(|err| DynError(Box::new(err)))
     }
