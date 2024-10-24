@@ -9,7 +9,6 @@ use stackable_operator::{
     commons::networking::{HostName, KerberosRealmName},
     k8s_openapi::api::core::v1::Secret,
     kube::runtime::reflector::ObjectRef,
-    utils::cluster_info::KubernetesClusterInfo,
 };
 use stackable_secret_operator_crd_utils::SecretReference;
 use tempfile::tempdir;
@@ -97,7 +96,6 @@ pub struct KerberosKeytab {
     profile: KerberosProfile,
     admin_keytab: Unloggable<Vec<u8>>,
     admin_principal: KerberosPrincipal,
-    kubernetes_cluster_info: KubernetesClusterInfo,
 }
 
 impl KerberosKeytab {
@@ -128,7 +126,6 @@ impl KerberosKeytab {
             profile,
             admin_keytab: Unloggable(admin_keytab),
             admin_principal,
-            kubernetes_cluster_info: client.kubernetes_cluster_info.clone(),
         })
     }
 }
@@ -151,7 +148,6 @@ impl SecretBackend for KerberosKeytab {
                 },
             admin_keytab,
             admin_principal,
-            kubernetes_cluster_info,
         } = self;
 
         let admin_server_clause = match admin {
@@ -265,7 +261,6 @@ cluster.local = {realm_name}
                     },
                 },
             },
-            kubernetes_cluster_info,
         )
         .await
         .context(ProvisionKeytabSnafu)?;

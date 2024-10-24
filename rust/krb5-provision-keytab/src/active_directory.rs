@@ -11,8 +11,8 @@ use rand::{seq::SliceRandom, thread_rng, CryptoRng};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_krb5_provision_keytab::ActiveDirectorySamAccountNameRules;
 use stackable_operator::{
-    k8s_openapi::api::core::v1::Secret, kube::runtime::reflector::ObjectRef,
-    utils::cluster_info::KubernetesClusterInfoOpts,
+    k8s_openapi::api::core::v1::Secret,
+    kube::{self, runtime::reflector::ObjectRef},
 };
 use stackable_secret_operator_crd_utils::SecretReference;
 
@@ -22,7 +22,7 @@ use crate::credential_cache::{self, CredentialCache};
 pub enum Error {
     #[snafu(display("failed to retrieve LDAP TLS CA {ca_ref}"))]
     GetLdapTlsCa {
-        source: stackable_operator::client::Error,
+        source: kube::Error,
         ca_ref: ObjectRef<Secret>,
     },
 
@@ -45,9 +45,7 @@ pub enum Error {
     LdapAuthn { source: ldap3::LdapError },
 
     #[snafu(display("failed to init Kubernetes client"))]
-    KubeInit {
-        source: stackable_operator::client::Error,
-    },
+    KubeInit { source: kube::Error },
 
     #[snafu(display("failed to unparse Kerberos principal"))]
     UnparsePrincipal { source: krb5::Error },
@@ -95,7 +93,6 @@ pub struct AdAdmin<'a> {
 
 impl<'a> AdAdmin<'a> {
     pub async fn connect(
-        cluster_info_opts: &KubernetesClusterInfoOpts,
         ldap_server: &str,
         krb: &'a KrbContext,
         ldap_tls_ca_secret: SecretReference,
@@ -104,9 +101,7 @@ impl<'a> AdAdmin<'a> {
         schema_distinguished_name: String,
         generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
     ) -> Result<AdAdmin<'a>> {
-        let kube = stackable_operator::client::initialize_operator(None, cluster_info_opts)
-            .await
-            .context(KubeInitSnafu)?;
+        let kube = kube::Client::try_default().await.context(KubeInitSnafu)?;
         let ldap_tls = native_tls::TlsConnector::builder()
             .disable_built_in_roots(true)
             .add_root_certificate(get_ldap_ca_certificate(&kube, ldap_tls_ca_secret).await?)
@@ -184,11 +179,12 @@ impl<'a> AdAdmin<'a> {
 }
 
 async fn get_ldap_ca_certificate(
-    kube: &stackable_operator::client::Client,
+    kube: &kube::Client,
     ca_secret_ref: SecretReference,
 ) -> Result<native_tls::Certificate> {
-    let ca_secret = kube
-        .get::<Secret>(&ca_secret_ref.name, &ca_secret_ref.namespace)
+    let secrets = kube::Api::<Secret>::namespaced(kube.clone(), &ca_secret_ref.namespace);
+    let ca_secret = secrets
+        .get(&ca_secret_ref.name)
         .await
         .context(GetLdapTlsCaSnafu {
             ca_ref: ca_secret_ref,
