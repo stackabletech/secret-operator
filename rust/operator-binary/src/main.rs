@@ -26,6 +26,7 @@ mod grpc;
 mod utils;
 
 pub const APP_NAME: &str = "secret";
+pub const OPERATOR_NAME: &str = "secrets.stackable.tech";
 
 #[derive(clap::Parser)]
 #[clap(author, version)]
@@ -92,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
             );
 
             let client = stackable_operator::client::initialize_operator(
-                Some("secrets.stackable.tech".to_string()),
+                Some(OPERATOR_NAME.to_string()),
                 &cluster_info_opts,
             )
             .await?;

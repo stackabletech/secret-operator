@@ -10,6 +10,9 @@ use stackable_operator::{
 };
 use stackable_secret_operator_crd_utils::SecretReference;
 
+const OPERATOR_NAME: &str = "secrets.stackable.tech";
+const FIELD_MANAGER_SCOPE: &str = "krb5-provision-keytab";
+
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("failed to load initial cache from {cache_ref}"))]
@@ -103,7 +106,12 @@ impl CredentialCache {
                         .secrets
                         .patch(
                             &self.cache_ref.name,
-                            &PatchParams::default(),
+                            &PatchParams {
+                                field_manager: Some(format!(
+                                    "{OPERATOR_NAME}/{FIELD_MANAGER_SCOPE}"
+                                )),
+                                ..Default::default()
+                            },
                             &Patch::Merge(Secret {
                                 data: Some([(key.to_string(), ByteString(value))].into()),
                                 ..Secret::default()
