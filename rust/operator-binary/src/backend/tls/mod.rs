@@ -24,7 +24,6 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{self, FixedOffset, TimeZone},
     time::Duration,
-    utils::cluster_info::KubernetesClusterInfo,
 };
 use time::OffsetDateTime;
 
@@ -180,7 +179,6 @@ impl SecretBackend for TlsGenerate {
     /// Then add the ca certificate and return these files for provisioning to the volume.
     async fn get_secret_data(
         &self,
-        cluster_info: &KubernetesClusterInfo,
         selector: &super::SecretVolumeSelector,
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {
@@ -251,7 +249,7 @@ impl SecretBackend for TlsGenerate {
         for scope in &selector.scope {
             addresses.extend(
                 selector
-                    .scope_addresses(cluster_info, &pod_info, scope)
+                    .scope_addresses(&pod_info, scope)
                     .context(ScopeAddressesSnafu { scope })?,
             );
         }

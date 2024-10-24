@@ -10,7 +10,6 @@ use stackable_operator::{
     },
     kube::api::ListParams,
     kvp::{LabelError, LabelSelectorExt, Labels},
-    utils::cluster_info::KubernetesClusterInfo,
 };
 
 use crate::{crd::SearchNamespace, format::SecretData, utils::Unloggable};
@@ -83,7 +82,6 @@ impl SecretBackend for K8sSearch {
 
     async fn get_secret_data(
         &self,
-        _cluster_info: &KubernetesClusterInfo,
         selector: &SecretVolumeSelector,
         pod_info: PodInfo,
     ) -> Result<SecretContents, Self::Error> {

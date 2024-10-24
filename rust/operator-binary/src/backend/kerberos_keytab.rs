@@ -97,6 +97,7 @@ pub struct KerberosKeytab {
     profile: KerberosProfile,
     admin_keytab: Unloggable<Vec<u8>>,
     admin_principal: KerberosPrincipal,
+    kubernetes_cluster_info: KubernetesClusterInfo,
 }
 
 impl KerberosKeytab {
@@ -127,6 +128,7 @@ impl KerberosKeytab {
             profile,
             admin_keytab: Unloggable(admin_keytab),
             admin_principal,
+            kubernetes_cluster_info: client.kubernetes_cluster_info.clone(),
         })
     }
 }
@@ -137,7 +139,6 @@ impl SecretBackend for KerberosKeytab {
 
     async fn get_secret_data(
         &self,
-        cluster_info: &KubernetesClusterInfo,
         selector: &super::SecretVolumeSelector,
         pod_info: super::pod_info::PodInfo,
     ) -> Result<super::SecretContents, Self::Error> {
@@ -150,6 +151,7 @@ impl SecretBackend for KerberosKeytab {
                 },
             admin_keytab,
             admin_principal,
+            kubernetes_cluster_info,
         } = self;
 
         let admin_server_clause = match admin {
@@ -203,11 +205,12 @@ cluster.local = {realm_name}
         let mut pod_principals: Vec<KerberosPrincipal> = Vec::new();
         for service_name in &selector.kerberos_service_names {
             for scope in &selector.scope {
-                for addr in selector
-                    .scope_addresses(cluster_info, &pod_info, scope)
-                    .context(ScopeAddressesSnafu {
-                        scope: scope.clone(),
-                    })?
+                for addr in
+                    selector
+                        .scope_addresses(&pod_info, scope)
+                        .context(ScopeAddressesSnafu {
+                            scope: scope.clone(),
+                        })?
                 {
                     if let Address::Dns(hostname) = addr {
                         pod_principals.push(
@@ -262,7 +265,7 @@ cluster.local = {realm_name}
                     },
                 },
             },
-            cluster_info,
+            kubernetes_cluster_info,
         )
         .await
         .context(ProvisionKeytabSnafu)?;

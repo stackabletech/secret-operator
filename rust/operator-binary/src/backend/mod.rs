@@ -14,7 +14,6 @@ use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{DateTime, FixedOffset},
     time::Duration,
-    utils::cluster_info::KubernetesClusterInfo,
 };
 use std::{collections::HashSet, convert::Infallible, fmt::Debug};
 
@@ -178,12 +177,11 @@ impl SecretVolumeSelector {
     /// Returns all addresses associated with a certain [`SecretScope`]
     fn scope_addresses<'a>(
         &'a self,
-        cluster_info: &KubernetesClusterInfo,
         pod_info: &'a pod_info::PodInfo,
         scope: &scope::SecretScope,
     ) -> Result<Vec<Address>, ScopeAddressesError> {
         use scope_addresses_error::*;
-        let cluster_domain = &cluster_info.cluster_domain;
+        let cluster_domain = &pod_info.kubernetes_cluster_domain;
         let namespace = &self.namespace;
         Ok(match scope {
             scope::SecretScope::Node => {
@@ -272,7 +270,6 @@ pub trait SecretBackend: Debug + Send + Sync {
     /// Provision or load secret data from the source.
     async fn get_secret_data(
         &self,
-        cluster_info: &KubernetesClusterInfo,
         selector: &SecretVolumeSelector,
         pod_info: pod_info::PodInfo,
     ) -> Result<SecretContents, Self::Error>;
