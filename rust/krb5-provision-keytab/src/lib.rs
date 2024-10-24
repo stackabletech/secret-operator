@@ -7,6 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use stackable_operator::utils::cluster_info::KubernetesClusterInfo;
 use stackable_secret_operator_crd_utils::SecretReference;
 use tokio::{io::AsyncWriteExt, process::Command};
 
@@ -67,9 +68,19 @@ pub enum Error {
 /// Provisions a Kerberos Keytab based on the [`Request`].
 ///
 /// This function assumes that the binary produced by this crate is on the `$PATH`, and will fail otherwise.
-pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<Response, Error> {
+pub async fn provision_keytab(
+    krb5_config_path: &Path,
+    req: &Request,
+    cluster_info: &KubernetesClusterInfo,
+) -> Result<Response, Error> {
     let req_str = serde_json::to_vec(&req).context(SerializeRequestSnafu)?;
+
+    let args = vec![format!(
+        "--kubernetes-cluster-domain {kubernetes_cluster_domain}",
+        kubernetes_cluster_domain = cluster_info.cluster_domain
+    )];
     let mut child = Command::new("stackable-krb5-provision-keytab")
+        .args(args)
         .kill_on_drop(true)
         .env("KRB5_CONFIG", krb5_config_path)
         // ldap3 uses the default client keytab to authenticate to the LDAP server

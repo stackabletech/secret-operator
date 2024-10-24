@@ -262,6 +262,7 @@ cluster.local = {realm_name}
                     },
                 },
             },
+            cluster_info,
         )
         .await
         .context(ProvisionKeytabSnafu)?;
