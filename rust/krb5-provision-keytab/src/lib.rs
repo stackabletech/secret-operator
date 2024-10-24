@@ -69,6 +69,7 @@ pub enum Error {
 /// This function assumes that the binary produced by this crate is on the `$PATH`, and will fail otherwise.
 pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<Response, Error> {
     let req_str = serde_json::to_vec(&req).context(SerializeRequestSnafu)?;
+
     let mut child = Command::new("stackable-krb5-provision-keytab")
         .kill_on_drop(true)
         .env("KRB5_CONFIG", krb5_config_path)

@@ -8,7 +8,10 @@ use std::{
 use futures::{StreamExt, TryStreamExt};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    commons::listener::{AddressType, Listener, ListenerClass, PodListeners, ServiceType},
+    commons::{
+        listener::{AddressType, Listener, ListenerClass, PodListeners, ServiceType},
+        networking::DomainName,
+    },
     k8s_openapi::api::core::v1::{Node, PersistentVolumeClaim, Pod},
     kube::runtime::reflector::ObjectRef,
 };
@@ -108,6 +111,7 @@ pub struct PodInfo {
     pub node_name: String,
     pub node_ips: Vec<IpAddr>,
     pub listener_addresses: HashMap<String, Vec<Address>>,
+    pub kubernetes_cluster_domain: DomainName,
     pub scheduling: SchedulingPodInfo,
 }
 
@@ -166,6 +170,7 @@ impl PodInfo {
                 })
                 .collect::<Result<_, _>>()?,
             listener_addresses,
+            kubernetes_cluster_domain: client.kubernetes_cluster_info.cluster_domain.clone(),
             scheduling,
         })
     }

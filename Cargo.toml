@@ -19,7 +19,10 @@ byteorder = "1.5"
 clap = "4.5"
 futures = { version = "0.3", features = ["compat"] }
 h2 = "0.4"
-ldap3 = { version = "0.11", default-features = false, features = ["gssapi", "tls"] }
+ldap3 = { version = "0.11", default-features = false, features = [
+    "gssapi",
+    "tls",
+] }
 libc = "0.2"
 native-tls = "0.2"
 openssl = "0.10"
@@ -34,7 +37,9 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 snafu = "0.8"
 socket2 = { version = "0.5", features = ["all"] }
-stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "stackable-operator-0.76.0", features = ["time"] }
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "stackable-operator-0.80.0", features = [
+    "time",
+] }
 strum = { version = "0.26", features = ["derive"] }
 sys-mount = { version = "3.0", default-features = false }
 tempfile = "3.12"

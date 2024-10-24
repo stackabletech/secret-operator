@@ -2,21 +2,28 @@ use futures::{TryFuture, TryFutureExt};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{api::core::v1::Secret, ByteString},
-    kube::runtime::reflector::ObjectRef,
+    kube::{
+        self,
+        api::{Patch, PatchParams},
+        runtime::reflector::ObjectRef,
+    },
 };
 use stackable_secret_operator_crd_utils::SecretReference;
+
+const OPERATOR_NAME: &str = "secrets.stackable.tech";
+const FIELD_MANAGER_SCOPE: &str = "krb5-provision-keytab";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("failed to load initial cache from {cache_ref}"))]
     GetInitialCache {
-        source: stackable_operator::client::Error,
+        source: kube::Error,
         cache_ref: ObjectRef<Secret>,
     },
 
     #[snafu(display("failed to save credential {key} to {cache_ref}"))]
     SaveToCache {
-        source: stackable_operator::client::Error,
+        source: kube::Error,
         key: String,
         cache_ref: ObjectRef<Secret>,
     },
@@ -31,7 +38,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct CredentialCache {
     name: &'static str,
-    kube: stackable_operator::client::Client,
+    secrets: kube::Api<Secret>,
     cache_ref: SecretReference,
     current_state: Secret,
 }
@@ -39,19 +46,20 @@ impl CredentialCache {
     #[tracing::instrument(skip(kube))]
     pub async fn new(
         name: &'static str,
-        kube: stackable_operator::client::Client,
+        kube: kube::Client,
         cache_ref: SecretReference,
     ) -> Result<Self> {
+        let secrets = kube::Api::<Secret>::namespaced(kube, &cache_ref.namespace);
         Ok(Self {
             name,
-            current_state: kube
-                .get::<Secret>(&cache_ref.name, &cache_ref.namespace)
+            current_state: secrets
+                .get(&cache_ref.name)
                 .await
                 .context(GetInitialCacheSnafu {
                     cache_ref: &cache_ref,
                 })?,
             cache_ref,
-            kube,
+            secrets,
         })
     }
 
@@ -95,13 +103,19 @@ impl CredentialCache {
                 Ok(value) => {
                     tracing::info!("generated credential successfully, saving...");
                     self.current_state = self
-                        .kube
-                        .merge_patch(
-                            &self.current_state,
-                            &Secret {
+                        .secrets
+                        .patch(
+                            &self.cache_ref.name,
+                            &PatchParams {
+                                field_manager: Some(format!(
+                                    "{OPERATOR_NAME}/{FIELD_MANAGER_SCOPE}"
+                                )),
+                                ..Default::default()
+                            },
+                            &Patch::Merge(Secret {
                                 data: Some([(key.to_string(), ByteString(value))].into()),
                                 ..Secret::default()
-                            },
+                            }),
                         )
                         .await
                         .context(SaveToCacheSnafu {

@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 - Active Directory's `samAccountName` generation can now be customized ([#454]).
 - Added experimental cert-manager backend ([#482]).
 - Make RSA key length configurable ([#506]).
+- The operator can now run on Kubernetes clusters using a non-default cluster domain.
+  Use the env var `KUBERNETES_CLUSTER_DOMAIN` or the operator Helm chart property `kubernetesClusterDomain` to set a non-default cluster domain` ([#510]).
 
 ### Changed
 
@@ -31,6 +33,7 @@ All notable changes to this project will be documented in this file.
 [#497]: https://github.com/stackabletech/secret-operator/pull/497
 [#505]: https://github.com/stackabletech/secret-operator/pull/505
 [#506]: https://github.com/stackabletech/secret-operator/pull/506
+[#510]: https://github.com/stackabletech/secret-operator/pull/510
 
 ## [24.7.0] - 2024-07-24
 

@@ -36,9 +36,11 @@ use self::pod_info::SchedulingPodInfo;
 pub struct SecretVolumeSelector {
     #[serde(flatten)]
     pub internal: InternalSecretVolumeSelectorParams,
+
     /// What kind of secret should be used
     #[serde(rename = "secrets.stackable.tech/class")]
     pub class: String,
+
     /// Scopes define what the secret identifies about a pod
     ///
     /// Currently supported scopes:
@@ -53,12 +55,15 @@ pub struct SecretVolumeSelector {
         deserialize_with = "SecretScope::deserialize_vec"
     )]
     pub scope: Vec<scope::SecretScope>,
+
     /// The name of the `Pod`, provided by Kubelet
     #[serde(rename = "csi.storage.k8s.io/pod.name")]
     pub pod: String,
+
     /// The name of the `Pod`'s `Namespace`, provided by Kubelet
     #[serde(rename = "csi.storage.k8s.io/pod.namespace")]
     pub namespace: String,
+
     /// The desired format of the mounted secrets
     ///
     /// Currently supported formats:
@@ -176,6 +181,8 @@ impl SecretVolumeSelector {
         scope: &scope::SecretScope,
     ) -> Result<Vec<Address>, ScopeAddressesError> {
         use scope_addresses_error::*;
+        let cluster_domain = &pod_info.kubernetes_cluster_domain;
+        let namespace = &self.namespace;
         Ok(match scope {
             scope::SecretScope::Node => {
                 let mut addrs = vec![Address::Dns(pod_info.node_name.clone())];
@@ -186,20 +193,18 @@ impl SecretVolumeSelector {
                 let mut addrs = Vec::new();
                 if let Some(svc_name) = &pod_info.service_name {
                     addrs.push(Address::Dns(format!(
-                        "{}.{}.svc.cluster.local",
-                        svc_name, self.namespace
+                        "{svc_name}.{namespace}.svc.{cluster_domain}"
                     )));
                     addrs.push(Address::Dns(format!(
-                        "{}.{}.{}.svc.cluster.local",
-                        self.pod, svc_name, self.namespace
+                        "{pod}.{svc_name}.{namespace}.svc.{cluster_domain}",
+                        pod = self.pod
                     )));
                 }
                 addrs.extend(pod_info.pod_ips.iter().copied().map(Address::Ip));
                 addrs
             }
             scope::SecretScope::Service { name } => vec![Address::Dns(format!(
-                "{}.{}.svc.cluster.local",
-                name, self.namespace
+                "{name}.{namespace}.svc.{cluster_domain}",
             ))],
             scope::SecretScope::ListenerVolume { name } => pod_info
                 .listener_addresses
