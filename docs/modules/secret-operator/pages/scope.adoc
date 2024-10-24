@@ -24,7 +24,7 @@ volume as its parameter. This way, the scope will automatically adapt to the xre
 
 Multiple xref:listener-operator:listener.adoc[Listener]s can be bound by specifying the scope multiple times.
 
-note:: The parameter is the name of the Pod's _volume_, not the name of the PersistentVolumeClaim, PersistentVolume, or xref:listener-operator:listener.adoc[Listener]. This allows the scope to bind to replica-specific or ephemeral listeners.
+note:: The parameter is the name of the Pod's _volume_, not the name of the PersistentVolumeClaim, PersistentVolume, or xref:listener-operator:listener.adoc[Listener]. This allows the scope to bind to replica-specific or ephemeral xref:listener-operator:listener.adoc[Listener]s.
 
 [#pod]
 === `pod`
@@ -47,11 +47,11 @@ NOTE: Consider using the xrerf:#listener-volume[] scope instead, which also allo
 [#service]
 === `service`
 
-*Syntax*: `listener-volume=<SERVICE>` (for example: `listener-volume=my-service`)
+*Syntax*: `service=<SERVICE>` (for example: `service=my-service`)
 
 The `service` scope is resolved to an arbitrary Kubernetes Service in the same Namespace.
 
-NOTE: This scope only supports cluster-internal (`ClusterIP`) Services. Consider using the xrerf:#listener-volume[] scope instead.
+NOTE: This scope only supports cluster-internal (`ClusterIP`) Services. Consider using the xref:#listener-volume[] scope instead.
 
 == Example
 
