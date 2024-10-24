@@ -75,10 +75,7 @@ pub async fn provision_keytab(
 ) -> Result<Response, Error> {
     let req_str = serde_json::to_vec(&req).context(SerializeRequestSnafu)?;
 
-    let args = vec![format!(
-        "--kubernetes-cluster-domain {kubernetes_cluster_domain}",
-        kubernetes_cluster_domain = cluster_info.cluster_domain
-    )];
+    let args = vec!["--kubernetes-cluster-domain", &cluster_info.cluster_domain];
     let mut child = Command::new("stackable-krb5-provision-keytab")
         .args(args)
         .kill_on_drop(true)
