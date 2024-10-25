@@ -29,7 +29,7 @@ note:: The parameter is the name of the Pod's _volume_, not the name of the Pers
 [#pod]
 === `pod`
 
-*Syntax*: `node`
+*Syntax*: `pod`
 
 The `pod` scope is resolved to the name of the Kubernetes Pod.
 This allows the secret to differentiate between StatefulSet replicas.
