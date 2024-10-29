@@ -8525,10 +8525,6 @@ rec {
             packageId = "byteorder";
           }
           {
-            name = "clap";
-            packageId = "clap";
-          }
-          {
             name = "futures";
             packageId = "futures 0.3.31";
             features = [ "compat" ];
