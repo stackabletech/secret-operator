@@ -17,19 +17,6 @@ export CSI_ENDPOINT=unix:///csi.sock
 cargo run -- run
 ----
 
-or via docker:
-
-[source]
-----
-docker run \
---name secret-operator \
---network host \
---env KUBECONFIG=/home/stackable/.kube/config \
---env CSI_ENDPOINT=unix:///csi.sock controller \
---mount type=bind,source="$HOME/.kube/config",target="/home/stackable/.kube/config" \
-docker.stackable.tech/stackable/secret-operator:0.0.0-dev
-----
-
 == KUBERNETES_CLUSTER_DOMAIN
 
 *Default value*: cluster.local
@@ -45,22 +32,5 @@ Please see the documentation xref:guides:kubernetes-cluster-domain.adoc[on confi
 [source]
 ----
 export KUBERNETES_CLUSTER_DOMAIN=mycluster.local
-cargo run -- run --csi-endpoint unix:///csi.sock
+cargo run -- run
 ----
-
-or via docker:
-
-[source]
-----
-docker run \
---name secret-operator \
---network host \
---env KUBECONFIG=/home/stackable/.kube/config \
---env KUBERNETES_CLUSTER_DOMAIN=mycluster.local \
---mount type=bind,source="$HOME/.kube/config",target="/home/stackable/.kube/config" \
-docker.stackable.tech/stackable/secret-operator:0.0.0-dev \
-run --csi-endpoint unix:///csi.sock
-----
-
-// TODO: Add NODE_NAME?
-#== NODE_NAME
