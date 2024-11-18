@@ -4316,7 +4316,7 @@ rec {
       };
       "krb5" = rec {
         crateName = "krb5";
-        version = "0.0.0-dev";
+        version = "24.11.0";
         edition = "2021";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/krb5; };
         authors = [
@@ -4336,7 +4336,7 @@ rec {
       };
       "krb5-sys" = rec {
         crateName = "krb5-sys";
-        version = "0.0.0-dev";
+        version = "24.11.0";
         edition = "2021";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/krb5-sys; };
         libName = "krb5_sys";
@@ -8505,7 +8505,7 @@ rec {
       };
       "stackable-krb5-provision-keytab" = rec {
         crateName = "stackable-krb5-provision-keytab";
-        version = "0.0.0-dev";
+        version = "24.11.0";
         edition = "2021";
         crateBin = [
           {
@@ -8786,7 +8786,7 @@ rec {
       };
       "stackable-secret-operator" = rec {
         crateName = "stackable-secret-operator";
-        version = "0.0.0-dev";
+        version = "24.11.0";
         edition = "2021";
         crateBin = [
           {
@@ -8952,7 +8952,7 @@ rec {
       };
       "stackable-secret-operator-crd-utils" = rec {
         crateName = "stackable-secret-operator-crd-utils";
-        version = "0.0.0-dev";
+        version = "24.11.0";
         edition = "2021";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/crd-utils; };
         libName = "stackable_secret_operator_crd_utils";
