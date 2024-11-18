@@ -1,0 +1,36 @@
+= Environment variables
+
+This operator accepts the following environment variables:
+
+== CSI_ENDPOINT
+
+*Required*: true
+
+*Multiple values*: false
+
+The path to the https://github.com/container-storage-interface/spec/blob/master/spec.md[Container Storage Interface] Unix Domain Socket
+that the operator should listen on.
+
+[source]
+----
+export CSI_ENDPOINT=unix:///csi.sock
+cargo run -- run
+----
+
+== KUBERNETES_CLUSTER_DOMAIN
+
+*Default value*: cluster.local
+
+*Required*: false
+
+*Multiple values*: false
+
+This instructs the operator, which value it should use for the Kubernetes `clusterDomain` setting.
+Make sure to keep this in sync with whatever setting your cluster uses.
+Please see the documentation xref:guides:kubernetes-cluster-domain.adoc[on configuring the Kubernetes cluster domain] for more information on this feature.
+
+[source]
+----
+export KUBERNETES_CLUSTER_DOMAIN=mycluster.local
+cargo run -- run
+----
