@@ -12,7 +12,12 @@ use stackable_operator::{
     time::Duration,
 };
 
-use crate::{crd::CertManagerIssuer, external_crd, format::SecretData, utils::Unloggable};
+use crate::{
+    crd::{self, CertificateKeyGeneration},
+    external_crd::{self, cert_manager::CertificatePrivateKey},
+    format::SecretData,
+    utils::Unloggable,
+};
 
 use super::{
     k8s_search::LABEL_SCOPE_NODE,
@@ -73,8 +78,7 @@ impl SecretBackendError for Error {
 pub struct CertManager {
     // Not secret per se, but Client isn't Debug: https://github.com/stackabletech/secret-operator/issues/411
     pub client: Unloggable<stackable_operator::client::Client>,
-    pub issuer: CertManagerIssuer,
-    pub default_certificate_lifetime: Duration,
+    pub config: crd::CertManagerBackend,
 }
 
 #[async_trait]
@@ -125,14 +129,20 @@ impl SecretBackend for CertManager {
                     "{}s",
                     selector
                         .cert_manager_cert_lifetime
-                        .unwrap_or(self.default_certificate_lifetime)
+                        .unwrap_or(self.config.default_certificate_lifetime)
                         .as_secs()
                 )),
                 dns_names,
                 ip_addresses,
                 issuer_ref: external_crd::cert_manager::ObjectReference {
-                    name: self.issuer.name.clone(),
-                    kind: Some(self.issuer.kind.to_string()),
+                    name: self.config.issuer.name.clone(),
+                    kind: Some(self.config.issuer.kind.to_string()),
+                },
+                private_key: match self.config.key_generation {
+                    CertificateKeyGeneration::Rsa { length } => CertificatePrivateKey {
+                        algorithm: "RSA".to_string(),
+                        size: length,
+                    },
                 },
             },
         };
