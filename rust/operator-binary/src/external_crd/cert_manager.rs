@@ -28,6 +28,15 @@ pub struct CertificateSpec {
     #[serde(default)]
     pub ip_addresses: Vec<String>,
     pub issuer_ref: ObjectReference,
+    pub private_key: CertificatePrivateKey,
+}
+
+/// See <https://cert-manager.io/docs/reference/api-docs/#cert-manager.io/v1.CertificatePrivateKey>.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CertificatePrivateKey {
+    pub algorithm: String,
+    pub size: u32,
 }
 
 /// See <https://cert-manager.io/docs/reference/api-docs/#meta.cert-manager.io/v1.ObjectReference>.
