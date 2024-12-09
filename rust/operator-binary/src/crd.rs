@@ -203,6 +203,11 @@ pub struct CertManagerBackend {
     /// Defaults to 1 day. This may need to be increased for external issuers that impose rate limits (such as Let's Encrypt).
     #[serde(default = "CertManagerBackend::default_certificate_lifetime")]
     pub default_certificate_lifetime: Duration,
+
+    /// The algorithm used to generate a key pair and required configuration settings.
+    /// Currently only RSA and a key length of 2048, 3072 or 4096 bits can be configured.
+    #[serde(default)]
+    pub key_generation: CertificateKeyGeneration,
 }
 
 impl CertManagerBackend {

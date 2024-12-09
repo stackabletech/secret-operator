@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Made RSA key length configurable for certificates issued by cert-manager ([#528]).
+
+[#528]: https://github.com/stackabletech/secret-operator/pull/528
+
 ## [24.11.0] - 2024-11-18
 
 ### Added
