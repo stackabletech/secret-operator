@@ -9,7 +9,7 @@ secretMigrationJob:
   enabled: true
   image:
     repository: docker.stackable.tech/stackable/tools
-    tag: null  # defaults to 1.0.0-stackable{{appVersion}}
+    tag: 1.0.0-stackable24.11.0
     pullPolicy: IfNotPresent
   resources:
     requests:

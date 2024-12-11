@@ -12,8 +12,8 @@ All notable changes to this project will be documented in this file.
 
 - Helm chart: The secret migration job can be omitted via Helm values ([#536]).
 - Helm chart: The tag of the tools image used for the secret migration job can
-  be changed in the Helm values and defaults to the current SDP version instead
-  of 24.7.0 ([#536]).
+  be changed in the Helm values and defaults now to 1.0.0-stackable24.11.0
+  rather than being hard-coded to 1.0.0-stackable24.7.0 ([#536]).
 
 [#528]: https://github.com/stackabletech/secret-operator/pull/528
 [#536]: https://github.com/stackabletech/secret-operator/pull/536
