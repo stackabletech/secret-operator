@@ -8,7 +8,15 @@ All notable changes to this project will be documented in this file.
 
 - Made RSA key length configurable for certificates issued by cert-manager ([#528]).
 
+### Fixed
+
+- Helm chart: The secret migration job can be omitted via Helm values ([#536]).
+- Helm chart: The tag of the tools image used for the secret migration job can
+  be changed in the Helm values and defaults to the current SDP version instead
+  of 24.7.0 ([#536]).
+
 [#528]: https://github.com/stackabletech/secret-operator/pull/528
+[#536]: https://github.com/stackabletech/secret-operator/pull/536
 
 ## [24.11.0] - 2024-11-18
 

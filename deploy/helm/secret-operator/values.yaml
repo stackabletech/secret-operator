@@ -6,8 +6,10 @@ image:
   pullSecrets: []
 
 secretMigrationJob:
+  enabled: true
   image:
     repository: docker.stackable.tech/stackable/tools
+    tag: null  # defaults to 1.0.0-stackable{{appVersion}}
     pullPolicy: IfNotPresent
   resources:
     requests:
