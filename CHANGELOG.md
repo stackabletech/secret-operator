@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ## [24.11.1-rc2] - 2024-12-12
 
+### Fixed
+
+- Helm chart: The secret migration job can be omitted via Helm values ([#536]).
+- Helm chart: The tag of the tools image used for the secret migration job can
+  be changed in the Helm values and defaults now to 1.0.0-stackable24.11.0
+  rather than being hard-coded to 1.0.0-stackable24.7.0 ([#536]).
+
+[#536]: https://github.com/stackabletech/secret-operator/pull/536
+
 ## [24.11.1-rc1] - 2024-12-06
 
 ## [24.11.0] - 2024-11-18
