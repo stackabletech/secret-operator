@@ -128,13 +128,9 @@ pub async fn from_class(
             )
             .await?,
         ),
-        crd::SecretClassBackend::CertManager(crd::CertManagerBackend {
-            issuer,
-            default_certificate_lifetime,
-        }) => from(super::CertManager {
+        crd::SecretClassBackend::CertManager(config) => from(super::CertManager {
             client: Unloggable(client.clone()),
-            issuer,
-            default_certificate_lifetime,
+            config,
         }),
         crd::SecretClassBackend::KerberosKeytab(crd::KerberosKeytabBackend {
             realm_name,
