@@ -1,0 +1,5 @@
+cluster-ttl: 6h
+instance-size: small
+disk: 50
+nodes: 1
+parallelism: 1
