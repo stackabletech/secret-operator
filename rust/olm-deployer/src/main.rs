@@ -8,13 +8,23 @@ use anyhow::{bail, Context, Result};
 use clap::{crate_description, crate_version, Parser};
 use stackable_operator::cli::Command;
 use stackable_operator::client;
-use stackable_operator::kube::api::{Api, DynamicObject, Patch, PatchParams, ResourceExt};
+use stackable_operator::kube::api::{Api, Patch, PatchParams, ResourceExt};
 use stackable_operator::kube::discovery::{ApiResource, Discovery};
 
 use stackable_operator::kube::core::GroupVersionKind;
 use stackable_operator::logging;
 use stackable_operator::utils;
 use stackable_operator::utils::cluster_info::KubernetesClusterInfoOpts;
+use stackable_operator::{
+    k8s_openapi::{
+        api::{
+            apps::v1::{DaemonSet, Deployment},
+            core::v1::Toleration,
+        },
+        Resource,
+    },
+    kube::api::DynamicObject,
+};
 
 pub const APP_NAME: &str = "stkbl-secret-olm-deployer";
 pub const ENV_VAR_LOGGING: &str = "STKBL_SECRET_OLM_DEPLOYER_LOG";
@@ -130,21 +140,45 @@ fn dynamic_api(ar: ApiResource, client: &client::Client) -> Api<DynamicObject> {
     Api::default_namespaced_with(client.as_kube_client(), &ar)
 }
 
+fn maybe_copy_tolerations(deployment: &Deployment, res: DynamicObject) -> Result<DynamicObject> {
+    let ds: Result<DaemonSet, _> = res.clone().try_parse();
+    match ds {
+        Ok(mut daemonset) => {
+            if let Some(dts) = deployment_tolerations(deployment) {
+                if let Some(pod_spec) = daemonset
+                    .spec
+                    .as_mut()
+                    .and_then(|s| s.template.spec.as_mut())
+                {
+                    match pod_spec.tolerations.as_mut() {
+                        Some(ta) => ta.extend(dts.clone()),
+                        _ => pod_spec.tolerations = Some(dts.clone()),
+                    }
+                }
+            }
+
+            // TODO: halp!! change this to a proper conversion.
+            let ret: DynamicObject = serde_yaml::from_str(&serde_yaml::to_string(&daemonset)?)?;
+
+            Ok(ret)
+        }
+        _ => Ok(res),
+    }
+}
+
+fn deployment_tolerations(deployment: &Deployment) -> Option<&Vec<Toleration>> {
+    deployment
+        .spec
+        .as_ref()
+        .and_then(|s| s.template.spec.as_ref())
+        .and_then(|ps| ps.tolerations.as_ref())
+}
+
 #[cfg(test)]
 mod test {
+    use super::*;
     use anyhow::Result;
     use serde::Deserialize;
-    use stackable_operator::{
-        k8s_openapi::{
-            api::{
-                apps::v1::{DaemonSet, Deployment},
-                core::v1::Toleration,
-            },
-            Resource,
-        },
-        kube::api::DynamicObject,
-    };
-
     const DAEMONSET: &str = r#"
 ---
 apiVersion: apps/v1
@@ -354,48 +388,14 @@ spec:
         let data = serde_yaml::Value::deserialize(serde_yaml::Deserializer::from_str(DAEMONSET))?;
         let daemonset: DynamicObject = serde_yaml::from_value(data)?;
 
-        let daemonset: DaemonSet = maybe_copy_tolerations(&deployment, &daemonset)?.unwrap();
+        let daemonset = maybe_copy_tolerations(&deployment, daemonset)?;
 
         assert_eq!(
-            daemonset_tolerations(&daemonset),
+            daemonset_tolerations(&daemonset.try_parse::<DaemonSet>()?),
             deployment_tolerations(&deployment)
         );
 
         Ok(())
-    }
-
-    fn maybe_copy_tolerations(
-        deployment: &Deployment,
-        res: &DynamicObject,
-    ) -> Result<Option<DaemonSet>> {
-        let ds: Result<DaemonSet, _> = res.clone().try_parse();
-        match ds {
-            Ok(mut daemonset) => {
-                if let Some(dts) = deployment_tolerations(deployment) {
-                    if let Some(pod_spec) = daemonset
-                        .spec
-                        .as_mut()
-                        .and_then(|s| s.template.spec.as_mut())
-                    {
-                        match pod_spec.tolerations.as_mut() {
-                            Some(ta) => ta.extend(dts.clone()),
-                            _ => pod_spec.tolerations = Some(dts.clone()),
-                        }
-                    }
-                }
-
-                Ok(Some(daemonset))
-            }
-            _ => Ok(None),
-        }
-    }
-
-    fn deployment_tolerations(deployment: &Deployment) -> Option<&Vec<Toleration>> {
-        deployment
-            .spec
-            .as_ref()
-            .and_then(|s| s.template.spec.as_ref())
-            .and_then(|ps| ps.tolerations.as_ref())
     }
 
     fn daemonset_tolerations(res: &DaemonSet) -> Option<&Vec<Toleration>> {
