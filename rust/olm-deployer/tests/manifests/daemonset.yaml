@@ -1,0 +1,133 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: secret-operator-daemonset
+  labels:
+    app.kubernetes.io/instance: secret-operator
+    app.kubernetes.io/name: secret-operator
+    app.kubernetes.io/version: "24.11.0"
+    stackable.tech/vendor: Stackable
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: secret-operator
+      app.kubernetes.io/instance: secret-operator
+      stackable.tech/vendor: Stackable
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: secret-operator
+        app.kubernetes.io/instance: secret-operator
+        stackable.tech/vendor: Stackable
+    spec:
+      serviceAccountName: secret-operator-serviceaccount
+      securityContext: {}
+      containers:
+        - name: secret-operator
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          image: "quay.io/stackable/secret-operator@sha256:bb5063aa67336465fd3fa80a7c6fd82ac6e30ebe3ffc6dba6ca84c1f1af95bfe"
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          env:
+            - name: CSI_ENDPOINT
+              value: /csi/csi.sock
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: PRIVILEGED
+              value: "true"
+          volumeMounts:
+            - name: csi
+              mountPath: /csi
+            - name: mountpoint
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
+            - name: tmp
+              mountPath: /tmp
+        - name: external-provisioner
+          image: "quay.io/stackable/sig-storage/csi-provisioner@sha256:dd730457133f619d8759269abcfa79d7aeb817e01ba7af2d3aa1417df406ea56"
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          args:
+            - --csi-address=/csi/csi.sock
+            - --feature-gates=Topology=true
+            - --extra-create-metadata
+          volumeMounts:
+            - name: csi
+              mountPath: /csi
+        - name: node-driver-registrar
+          image: "quay.io/stackable/sig-storage/csi-node-driver-registrar@sha256:8331d680e6c40c56909f436ea3126fdca39761cf87781cd2db8d05c9082b05f5"
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          args:
+            - --csi-address=/csi/csi.sock
+            - --kubelet-registration-path=/var/lib/kubelet/plugins/secrets.stackable.tech/csi.sock
+          volumeMounts:
+            - name: registration-sock
+              mountPath: /registration
+            - name: csi
+              mountPath: /csi
+      initContainers:
+        - name: migrate-longer-csi-registration-path
+          image: "quay.io/stackable/secret-operator@sha256:bb5063aa67336465fd3fa80a7c6fd82ac6e30ebe3ffc6dba6ca84c1f1af95bfe"
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          command:
+            - /bin/bash
+            - -euo
+            - pipefail
+            - -x
+            - -c
+            - |
+              ls -la /registration
+              echo "Removing old (long) CSI registration path"
+              if [ -d "/registration/secrets.stackable.tech-reg.sock" ]; then rmdir /registration/secrets.stackable.tech-reg.sock; fi
+              ls -la /registration
+          volumeMounts:
+            - name: registration-sock
+              mountPath: /registration
+          securityContext:
+            runAsUser: 0
+      volumes:
+        - name: registration-sock
+          hostPath:
+            # node-driver-registrar appends a driver-unique filename to this path to avoid conflicts
+            # see https://github.com/stackabletech/secret-operator/issues/229 for why this path should not be too long
+            path: /var/lib/kubelet/plugins_registry
+        - name: csi
+          hostPath:
+            path: /var/lib/kubelet/plugins/secrets.stackable.tech/
+        - name: mountpoint
+          hostPath:
+            path: /var/lib/kubelet/pods/
+        - name: tmp
+          emptyDir: {}

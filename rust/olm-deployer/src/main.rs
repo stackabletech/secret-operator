@@ -10,8 +10,9 @@ use stackable_operator::cli::Command;
 use stackable_operator::client;
 use stackable_operator::k8s_openapi::api::core::v1::Namespace;
 use stackable_operator::kube::api::{Api, Patch, PatchParams, ResourceExt};
-use stackable_operator::kube::discovery::{ApiResource, Discovery};
+use stackable_operator::kube::discovery::{ApiCapabilities, ApiResource, Discovery, Scope};
 
+use stackable_operator::kube;
 use stackable_operator::kube::core::GroupVersionKind;
 use stackable_operator::logging;
 use stackable_operator::utils;
@@ -77,24 +78,25 @@ async fn main() -> Result<()> {
         let client =
             client::initialize_operator(Some(APP_NAME.to_string()), &cluster_info_opts).await?;
 
-        // discovery (to be able to infer apis from kind/plural only)
-        let discovery = Discovery::new(client.as_kube_client()).run().await?;
-
         let deployment_api = client.get_api::<Deployment>(&namespace);
         let deployment: Deployment = deployment_api.get("secret-operator-deployer").await?;
+
+        let kube_client = client.as_kube_client();
+        // discovery (to be able to infer apis from kind/plural only)
+        let discovery = Discovery::new(kube_client.clone()).run().await?;
 
         for entry in walkdir::WalkDir::new(&dir) {
             match entry {
                 Ok(manifest_file) => {
                     if manifest_file.file_type().is_file() {
                         let path = manifest_file.path();
-                        tracing::info!("Applied manifest file: {}", path.display());
+                        tracing::info!("Reading manifest file: {}", path.display());
                         let yaml = std::fs::read_to_string(path)
                             .with_context(|| format!("Failed to read {}", path.display()))?;
                         for doc in multidoc_deserialize(&yaml)? {
                             let obj: DynamicObject = serde_yaml::from_value(doc)?;
                             let obj = maybe_copy_tolerations(&deployment, obj)?;
-                            apply(obj, &client, &discovery).await?
+                            apply(obj, &kube_client, &discovery, &namespace).await?
                         }
                     }
                 }
@@ -108,7 +110,12 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn apply(obj: DynamicObject, client: &client::Client, discovery: &Discovery) -> Result<()> {
+async fn apply(
+    obj: DynamicObject,
+    client: &kube::Client,
+    discovery: &Discovery,
+    namespace: &str,
+) -> Result<()> {
     let ssapply = PatchParams::apply(APP_NAME).force();
     let gvk = if let Some(tm) = &obj.types {
         GroupVersionKind::try_from(tm)?
@@ -116,8 +123,8 @@ async fn apply(obj: DynamicObject, client: &client::Client, discovery: &Discover
         bail!("cannot apply object without valid TypeMeta {:?}", obj);
     };
     let name = obj.name_any();
-    if let Some((ar, _caps)) = discovery.resolve_gvk(&gvk) {
-        let api = dynamic_api(ar, client);
+    if let Some((ar, caps)) = discovery.resolve_gvk(&gvk) {
+        let api = dynamic_api(ar, caps, client.clone(), Some(namespace));
         tracing::trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
         let data: serde_json::Value = serde_json::to_value(&obj)?;
         let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
@@ -137,8 +144,19 @@ fn multidoc_deserialize(data: &str) -> Result<Vec<serde_yaml::Value>> {
     Ok(docs)
 }
 
-fn dynamic_api(ar: ApiResource, client: &client::Client) -> Api<DynamicObject> {
-    Api::default_namespaced_with(client.as_kube_client(), &ar)
+fn dynamic_api(
+    ar: ApiResource,
+    caps: ApiCapabilities,
+    client: kube::Client,
+    ns: Option<&str>,
+) -> Api<DynamicObject> {
+    if caps.scope == Scope::Cluster {
+        Api::all_with(client, &ar)
+    } else if let Some(namespace) = ns {
+        Api::namespaced_with(client, namespace, &ar)
+    } else {
+        Api::default_namespaced_with(client, &ar)
+    }
 }
 
 fn maybe_copy_tolerations(deployment: &Deployment, res: DynamicObject) -> Result<DynamicObject> {
