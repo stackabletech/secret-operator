@@ -8,6 +8,7 @@ use anyhow::{bail, Context, Result};
 use clap::{crate_description, crate_version, Parser};
 use stackable_operator::cli::Command;
 use stackable_operator::client;
+use stackable_operator::k8s_openapi::api::core::v1::Namespace;
 use stackable_operator::kube::api::{Api, Patch, PatchParams, ResourceExt};
 use stackable_operator::kube::discovery::{ApiResource, Discovery};
 
@@ -79,13 +80,22 @@ async fn main() -> Result<()> {
         // discovery (to be able to infer apis from kind/plural only)
         let discovery = Discovery::new(client.as_kube_client()).run().await?;
 
+        let deployment_api = client.get_api::<Deployment>(&namespace);
+        let deployment: Deployment = deployment_api.get("secret-operator-deployer").await?;
+
         for entry in walkdir::WalkDir::new(&dir) {
             match entry {
                 Ok(manifest_file) => {
                     if manifest_file.file_type().is_file() {
                         let path = manifest_file.path();
                         tracing::info!("Applied manifest file: {}", path.display());
-                        apply(path, &client, &discovery).await?;
+                        let yaml = std::fs::read_to_string(path)
+                            .with_context(|| format!("Failed to read {}", path.display()))?;
+                        for doc in multidoc_deserialize(&yaml)? {
+                            let obj: DynamicObject = serde_yaml::from_value(doc)?;
+                            let obj = maybe_copy_tolerations(&deployment, obj)?;
+                            apply(obj, &client, &discovery).await?
+                        }
                     }
                 }
                 Err(e) => {
@@ -98,31 +108,22 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn apply(
-    pth: &std::path::Path,
-    client: &client::Client,
-    discovery: &Discovery,
-) -> Result<()> {
+async fn apply(obj: DynamicObject, client: &client::Client, discovery: &Discovery) -> Result<()> {
     let ssapply = PatchParams::apply(APP_NAME).force();
-    let yaml = std::fs::read_to_string(pth)
-        .with_context(|| format!("Failed to read {}", pth.display()))?;
-    for doc in multidoc_deserialize(&yaml)? {
-        let obj: DynamicObject = serde_yaml::from_value(doc)?;
-        let gvk = if let Some(tm) = &obj.types {
-            GroupVersionKind::try_from(tm)?
-        } else {
-            bail!("cannot apply object without valid TypeMeta {:?}", obj);
-        };
-        let name = obj.name_any();
-        if let Some((ar, _caps)) = discovery.resolve_gvk(&gvk) {
-            let api = dynamic_api(ar, client);
-            tracing::trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
-            let data: serde_json::Value = serde_json::to_value(&obj)?;
-            let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
-            tracing::info!("applied {} {}", gvk.kind, name);
-        } else {
-            tracing::warn!("Cannot apply document for unknown {:?}", gvk);
-        }
+    let gvk = if let Some(tm) = &obj.types {
+        GroupVersionKind::try_from(tm)?
+    } else {
+        bail!("cannot apply object without valid TypeMeta {:?}", obj);
+    };
+    let name = obj.name_any();
+    if let Some((ar, _caps)) = discovery.resolve_gvk(&gvk) {
+        let api = dynamic_api(ar, client);
+        tracing::trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
+        let data: serde_json::Value = serde_json::to_value(&obj)?;
+        let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
+        tracing::info!("applied {} {}", gvk.kind, name);
+    } else {
+        tracing::warn!("Cannot apply document for unknown {:?}", gvk);
     }
     Ok(())
 }
