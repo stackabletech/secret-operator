@@ -1,29 +1,21 @@
-// TODO:
-//
-// - get the deployment object for the olm helper
-// - get the env, tolerations, etc from the deployment
-// - filter out the secret daemonset from the given manifest files
-// - add env, tolerations, etc to the daemonset
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use clap::{crate_description, crate_version, Parser};
 use stackable_operator::cli::Command;
 use stackable_operator::client;
-use stackable_operator::k8s_openapi::api::core::v1::Namespace;
-use stackable_operator::kube::api::{Api, Patch, PatchParams, ResourceExt};
-use stackable_operator::kube::discovery::{ApiCapabilities, ApiResource, Discovery, Scope};
+use stackable_operator::kube::api::{Api, Patch, PatchParams, ResourceExt, TypeMeta};
+use stackable_operator::kube::discovery::{ApiResource, Discovery, Scope};
 
+use stackable_operator::k8s_openapi::api::rbac::v1::ClusterRole;
+use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
 use stackable_operator::kube;
 use stackable_operator::kube::core::GroupVersionKind;
 use stackable_operator::logging;
 use stackable_operator::utils;
 use stackable_operator::utils::cluster_info::KubernetesClusterInfoOpts;
 use stackable_operator::{
-    k8s_openapi::{
-        api::{
-            apps::v1::{DaemonSet, Deployment},
-            core::v1::Toleration,
-        },
-        Resource,
+    k8s_openapi::api::{
+        apps::v1::{DaemonSet, Deployment},
+        core::v1::Toleration,
     },
     kube::api::DynamicObject,
 };
@@ -81,6 +73,9 @@ async fn main() -> Result<()> {
         let deployment_api = client.get_api::<Deployment>(&namespace);
         let deployment: Deployment = deployment_api.get("secret-operator-deployer").await?;
 
+        let cluster_role_api = client.get_all_api::<ClusterRole>();
+        let cluster_role: ClusterRole = cluster_role_api.get("secret-operator-clusterrole").await?;
+
         let kube_client = client.as_kube_client();
         // discovery (to be able to infer apis from kind/plural only)
         let discovery = Discovery::new(kube_client.clone()).run().await?;
@@ -89,14 +84,31 @@ async fn main() -> Result<()> {
             match entry {
                 Ok(manifest_file) => {
                     if manifest_file.file_type().is_file() {
+                        // ----------
                         let path = manifest_file.path();
                         tracing::info!("Reading manifest file: {}", path.display());
                         let yaml = std::fs::read_to_string(path)
                             .with_context(|| format!("Failed to read {}", path.display()))?;
                         for doc in multidoc_deserialize(&yaml)? {
                             let obj: DynamicObject = serde_yaml::from_value(doc)?;
+                            // ----------
+                            let gvk = if let Some(tm) = &obj.types {
+                                GroupVersionKind::try_from(tm)?
+                            } else {
+                                bail!("cannot apply object without valid TypeMeta {:?}", obj);
+                            };
+                            let (ar, caps) = discovery
+                                .resolve_gvk(&gvk)
+                                .context(anyhow!("cannot resolve GVK {:?}", gvk))?;
+                            let api = dynamic_api(ar, &caps.scope, kube_client.clone(), &namespace);
+                            // ---------- patch object
                             let obj = maybe_copy_tolerations(&deployment, obj)?;
-                            apply(obj, &kube_client, &discovery, &namespace).await?
+                            let obj =
+                                maybe_update_owner(obj, &caps.scope, &deployment, &cluster_role)?;
+                            // TODO: patch namespace where needed
+                            // TODO: add env vars
+                            // ---------- apply
+                            apply(&api, obj, &gvk.kind).await?
                         }
                     }
                 }
@@ -110,28 +122,58 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn apply(
-    obj: DynamicObject,
-    client: &kube::Client,
-    discovery: &Discovery,
-    namespace: &str,
-) -> Result<()> {
-    let ssapply = PatchParams::apply(APP_NAME).force();
-    let gvk = if let Some(tm) = &obj.types {
-        GroupVersionKind::try_from(tm)?
-    } else {
-        bail!("cannot apply object without valid TypeMeta {:?}", obj);
+fn maybe_update_owner(
+    dynamic_object: DynamicObject,
+    scope: &Scope,
+    deployment: &Deployment,
+    cluster_role: &ClusterRole,
+) -> Result<DynamicObject> {
+    // TODO: skip SecurityContextConstraints ?
+    let owner_ref = match scope {
+        Scope::Cluster => {
+            let tm = TypeMeta::resource::<ClusterRole>();
+            OwnerReference {
+                name: cluster_role.name_any(),
+                uid: cluster_role.metadata.uid.clone().context(format!(
+                    "ClusterRole [{}] has no uid",
+                    cluster_role.name_any()
+                ))?,
+                kind: tm.kind,
+                api_version: tm.api_version,
+                ..OwnerReference::default()
+            }
+        }
+        Scope::Namespaced => {
+            let tm = TypeMeta::resource::<Deployment>();
+            OwnerReference {
+                name: deployment.name_any(),
+                uid: deployment
+                    .metadata
+                    .uid
+                    .clone()
+                    .context(format!("Deployment [{}] has no uid", deployment.name_any()))?,
+                kind: tm.kind,
+                api_version: tm.api_version,
+                ..OwnerReference::default()
+            }
+        }
     };
-    let name = obj.name_any();
-    if let Some((ar, caps)) = discovery.resolve_gvk(&gvk) {
-        let api = dynamic_api(ar, caps, client.clone(), Some(namespace));
-        tracing::trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
-        let data: serde_json::Value = serde_json::to_value(&obj)?;
-        let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
-        tracing::info!("applied {} {}", gvk.kind, name);
-    } else {
-        tracing::warn!("Cannot apply document for unknown {:?}", gvk);
+
+    let mut ret = dynamic_object.clone();
+    match ret.metadata.owner_references {
+        Some(ref mut ors) => ors.push(owner_ref),
+        None => ret.metadata.owner_references = Some(vec![owner_ref]),
     }
+    Ok(ret)
+}
+
+async fn apply(api: &Api<DynamicObject>, obj: DynamicObject, kind: &str) -> Result<()> {
+    let name = obj.name_any();
+    let ssapply = PatchParams::apply(APP_NAME).force();
+    tracing::trace!("Applying {}: \n{}", kind, serde_yaml::to_string(&obj)?);
+    let data: serde_json::Value = serde_json::to_value(&obj)?;
+    let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
+    tracing::info!("applied {} {}", kind, name);
     Ok(())
 }
 
@@ -146,16 +188,13 @@ fn multidoc_deserialize(data: &str) -> Result<Vec<serde_yaml::Value>> {
 
 fn dynamic_api(
     ar: ApiResource,
-    caps: ApiCapabilities,
+    scope: &Scope,
     client: kube::Client,
-    ns: Option<&str>,
+    ns: &str,
 ) -> Api<DynamicObject> {
-    if caps.scope == Scope::Cluster {
-        Api::all_with(client, &ar)
-    } else if let Some(namespace) = ns {
-        Api::namespaced_with(client, namespace, &ar)
-    } else {
-        Api::default_namespaced_with(client, &ar)
+    match scope {
+        Scope::Cluster => Api::all_with(client, &ar),
+        _ => Api::namespaced_with(client, ns, &ar),
     }
 }
 
@@ -198,198 +237,44 @@ mod test {
     use super::*;
     use anyhow::Result;
     use serde::Deserialize;
-    const DAEMONSET: &str = r#"
+
+    use std::sync::LazyLock;
+
+    static DAEMONSET: LazyLock<DynamicObject> = LazyLock::new(|| {
+        const STR_DAEMONSET: &str = r#"
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: secret-operator-daemonset
-  labels:
-    app.kubernetes.io/instance: secret-operator
-    app.kubernetes.io/name: secret-operator
-    app.kubernetes.io/version: "24.11.0"
-    stackable.tech/vendor: Stackable
 spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: secret-operator
-      app.kubernetes.io/instance: secret-operator
-      stackable.tech/vendor: Stackable
   template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: secret-operator
-        app.kubernetes.io/instance: secret-operator
-        stackable.tech/vendor: Stackable
     spec:
-      serviceAccountName: secret-operator-serviceaccount
-      securityContext: {}
       containers:
         - name: secret-operator
-          securityContext:
-            privileged: true
-            runAsUser: 0
           image: "quay.io/stackable/secret-operator@sha256:bb5063aa67336465fd3fa80a7c6fd82ac6e30ebe3ffc6dba6ca84c1f1af95bfe"
-          imagePullPolicy: IfNotPresent
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
-          env:
-            - name: CSI_ENDPOINT
-              value: /csi/csi.sock
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: spec.nodeName
-            - name: PRIVILEGED
-              value: "true"
-          volumeMounts:
-            - name: csi
-              mountPath: /csi
-            - name: mountpoint
-              mountPath: /var/lib/kubelet/pods
-              mountPropagation: Bidirectional
-            - name: tmp
-              mountPath: /tmp
-        - name: external-provisioner
-          image: "quay.io/stackable/sig-storage/csi-provisioner@sha256:dd730457133f619d8759269abcfa79d7aeb817e01ba7af2d3aa1417df406ea56"
-          imagePullPolicy: IfNotPresent
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
-          args:
-            - --csi-address=/csi/csi.sock
-            - --feature-gates=Topology=true
-            - --extra-create-metadata
-          volumeMounts:
-            - name: csi
-              mountPath: /csi
-        - name: node-driver-registrar
-          image: "quay.io/stackable/sig-storage/csi-node-driver-registrar@sha256:8331d680e6c40c56909f436ea3126fdca39761cf87781cd2db8d05c9082b05f5"
-          imagePullPolicy: IfNotPresent
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
-          args:
-            - --csi-address=/csi/csi.sock
-            - --kubelet-registration-path=/var/lib/kubelet/plugins/secrets.stackable.tech/csi.sock
-          volumeMounts:
-            - name: registration-sock
-              mountPath: /registration
-            - name: csi
-              mountPath: /csi
-      initContainers:
-        - name: migrate-longer-csi-registration-path
-          image: "quay.io/stackable/secret-operator@sha256:bb5063aa67336465fd3fa80a7c6fd82ac6e30ebe3ffc6dba6ca84c1f1af95bfe"
-          imagePullPolicy: IfNotPresent
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
-          command:
-            - /bin/bash
-            - -euo
-            - pipefail
-            - -x
-            - -c
-            - |
-              ls -la /registration
-              echo "Removing old (long) CSI registration path"
-              if [ -d "/registration/secrets.stackable.tech-reg.sock" ]; then rmdir /registration/secrets.stackable.tech-reg.sock; fi
-              ls -la /registration
-          volumeMounts:
-            - name: registration-sock
-              mountPath: /registration
-          securityContext:
-            runAsUser: 0
-      volumes:
-        - name: registration-sock
-          hostPath:
-            # node-driver-registrar appends a driver-unique filename to this path to avoid conflicts
-            # see https://github.com/stackabletech/secret-operator/issues/229 for why this path should not be too long
-            path: /var/lib/kubelet/plugins_registry
-        - name: csi
-          hostPath:
-            path: /var/lib/kubelet/plugins/secrets.stackable.tech/
-        - name: mountpoint
-          hostPath:
-            path: /var/lib/kubelet/pods/
-        - name: tmp
-          emptyDir: {}
 "#;
 
-    const DEPLOYMENT: &str = r#"
+        let data =
+            serde_yaml::Value::deserialize(serde_yaml::Deserializer::from_str(STR_DAEMONSET))
+                .unwrap();
+        serde_yaml::from_value(data).unwrap()
+    });
+
+    static DEPLOYMENT: LazyLock<Deployment> = LazyLock::new(|| {
+        const STR_DEPLOYMENT: &str = r#"
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: secret-operator-deployer
-  labels:
-    app.kubernetes.io/name: secret-operator-deployer
-    app.kubernetes.io/instance: secret-operator-deployer
-    stackable.tech/vendor: Stackable
+  uid: d9287d0a-3069-47c3-8c90-b714dc6d1af5
 spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: secret-operator-deployer
-      app.kubernetes.io/instance: secret-operator-deployer
-      stackable.tech/vendor: Stackable
   template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: secret-operator-deployer
-        app.kubernetes.io/instance: secret-operator-deployer
     spec:
-      serviceAccountName: secret-operator-deployer
-      securityContext: {}
       containers:
         - name: secret-operator-deployer
-          securityContext: {}
           image: "quay.io/stackable/tools@sha256:bb02df387d8f614089fe053373f766e21b7a9a1ad04cb3408059014cb0f1388e"
-          imagePullPolicy: IfNotPresent
-          command: ["/usr/bin/bash", "/manifests/deploy.sh"]
-          env:
-            - name: SOME_IMPORTANT_FEATURE_FLAG
-              value: "turn-it-on"
-            - name: OP_VERSION
-              value: '24.11.0'
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-          resources:
-            limits:
-              cpu: 100m
-              memory: 512Mi
-            requests:
-              cpu: 100m
-              memory: 512Mi
-          volumeMounts:
-            - name: manifests
-              mountPath: /manifests
-      volumes:
-        - name: manifests
-          configMap:
-            name: secret-operator-deployer-manifests
       tolerations:
         - key: keep-out
           value: "yes"
@@ -397,23 +282,82 @@ spec:
           effect: NoSchedule
     "#;
 
+        let data =
+            serde_yaml::Value::deserialize(serde_yaml::Deserializer::from_str(STR_DEPLOYMENT))
+                .unwrap();
+        serde_yaml::from_value(data).unwrap()
+    });
+
+    static CLUSTER_ROLE: LazyLock<ClusterRole> = LazyLock::new(|| {
+        const STR_CLUSTER_ROLE: &str = r#"
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: secret-operator-clusterrole
+  uid: d9287d0a-3069-47c3-8c90-b714dc6dddaa
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+      - events
+    verbs:
+      - get
+    "#;
+        let data =
+            serde_yaml::Value::deserialize(serde_yaml::Deserializer::from_str(STR_CLUSTER_ROLE))
+                .unwrap();
+        serde_yaml::from_value(data).unwrap()
+    });
+
     #[test]
     fn test_copy_tolerations() -> Result<()> {
-        let data = serde_yaml::Value::deserialize(serde_yaml::Deserializer::from_str(DEPLOYMENT))?;
-        //let do_deployment: DynamicObject = serde_yaml::from_value(data)?;
-        //let deployment: Deployment =do_deployment.try_parse()?;
-        let deployment: Deployment = serde_yaml::from_value(data)?;
-
-        let data = serde_yaml::Value::deserialize(serde_yaml::Deserializer::from_str(DAEMONSET))?;
-        let daemonset: DynamicObject = serde_yaml::from_value(data)?;
-
-        let daemonset = maybe_copy_tolerations(&deployment, daemonset)?;
+        let daemonset = maybe_copy_tolerations(&DEPLOYMENT, DAEMONSET.clone())?;
 
         assert_eq!(
             daemonset_tolerations(&daemonset.try_parse::<DaemonSet>()?),
-            deployment_tolerations(&deployment)
+            deployment_tolerations(&DEPLOYMENT)
         );
+        Ok(())
+    }
 
+    #[test]
+    fn test_namespaced_owner() -> Result<()> {
+        let daemonset = maybe_update_owner(
+            DAEMONSET.clone(),
+            &Scope::Namespaced,
+            &DEPLOYMENT,
+            &CLUSTER_ROLE,
+        )?;
+
+        let expected = Some(vec![OwnerReference {
+            uid: "d9287d0a-3069-47c3-8c90-b714dc6d1af5".to_string(),
+            name: "secret-operator-deployer".to_string(),
+            kind: "Deployment".to_string(),
+            api_version: "apps/v1".to_string(),
+            ..OwnerReference::default()
+        }]);
+        assert_eq!(daemonset.metadata.owner_references, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn test_cluster_owner() -> Result<()> {
+        let daemonset = maybe_update_owner(
+            DAEMONSET.clone(),
+            &Scope::Cluster,
+            &DEPLOYMENT,
+            &CLUSTER_ROLE,
+        )?;
+
+        let expected = Some(vec![OwnerReference {
+            uid: "d9287d0a-3069-47c3-8c90-b714dc6dddaa".to_string(),
+            name: "secret-operator-clusterrole".to_string(),
+            kind: "ClusterRole".to_string(),
+            api_version: "rbac.authorization.k8s.io/v1".to_string(),
+            ..OwnerReference::default()
+        }]);
+        assert_eq!(daemonset.metadata.owner_references, expected);
         Ok(())
     }
 
