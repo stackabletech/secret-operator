@@ -20,7 +20,6 @@ spec:
         stackable.tech/vendor: Stackable
     spec:
       serviceAccountName: secret-operator-secret-migration-serviceaccount
-      securityContext: {}
       containers:
         - name: migrate-secret
           image: "quay.io/stackable/tools@sha256:bb02df387d8f614089fe053373f766e21b7a9a1ad04cb3408059014cb0f1388e"
@@ -32,7 +31,9 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
-          command: ["bash", "-c"]
+          command:
+            - bash
+            - -c
           args:
             - |
               #!/bin/bash
@@ -50,4 +51,9 @@ spec:
                   echo "$source_ca_secret" | jq 'del(.metadata["namespace","creationTimestamp","resourceVersion","selfLink","uid"])' | kubectl apply -n $TARGET_NAMESPACE -f -
                 fi
               fi
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
       restartPolicy: Never
