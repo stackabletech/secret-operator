@@ -1,3 +1,5 @@
+mod env;
+mod namespace;
 mod owner;
 mod tolerations;
 
@@ -108,6 +110,7 @@ async fn main() -> Result<()> {
                             )?;
                             // TODO: patch namespace where needed
                             // TODO: add env vars
+                            let obj = env::maybe_copy_env(&deployment, obj)?;
                             // TODO: patch resources
                             // ---------- apply
                             apply(&api, obj, &gvk.kind).await?

@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use stackable_operator::k8s_openapi::api::apps::v1::Deployment;
 use stackable_operator::k8s_openapi::api::rbac::v1::ClusterRole;
+use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
 use stackable_operator::kube::api::DynamicObject;
 use stackable_operator::kube::api::ResourceExt;
 use stackable_operator::kube::discovery::Scope;
@@ -13,23 +14,26 @@ pub fn maybe_update_owner(
     cluster_role: &ClusterRole,
 ) -> Result<DynamicObject> {
     // TODO: skip SecurityContextConstraints ?
-    let owner_ref = match scope {
-        Scope::Cluster => cluster_role.owner_ref(&()).context(format!(
-            "Cannot make owner ref from ClusterRole [{}]",
-            cluster_role.name_any()
-        ))?,
-        Scope::Namespaced => deployment.owner_ref(&()).context(format!(
-            "Cannot make owner ref from Deployment [{}]",
-            deployment.name_any()
-        ))?,
-    };
-
+    let owner_ref = owner_ref(scope, deployment, cluster_role)?;
     let mut ret = dynamic_object.clone();
     match ret.metadata.owner_references {
         Some(ref mut ors) => ors.push(owner_ref),
         None => ret.metadata.owner_references = Some(vec![owner_ref]),
     }
     Ok(ret)
+}
+
+fn owner_ref(scope: &Scope, depl: &Deployment, cr: &ClusterRole) -> Result<OwnerReference> {
+    match scope {
+        Scope::Cluster => cr.owner_ref(&()).context(format!(
+            "Cannot make owner ref from ClusterRole [{}]",
+            cr.name_any()
+        )),
+        Scope::Namespaced => depl.owner_ref(&()).context(format!(
+            "Cannot make owner ref from Deployment [{}]",
+            depl.name_any()
+        )),
+    }
 }
 
 #[cfg(test)]
