@@ -1,6 +1,7 @@
 mod env;
 mod namespace;
 mod owner;
+mod resources;
 mod tolerations;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -109,9 +110,8 @@ async fn main() -> Result<()> {
                                 &cluster_role,
                             )?;
                             // TODO: patch namespace where needed
-                            // TODO: add env vars
                             let obj = env::maybe_copy_env(&deployment, obj)?;
-                            // TODO: patch resources
+                            let obj = resources::copy_resources(&deployment, obj)?;
                             // ---------- apply
                             apply(&api, obj, &gvk.kind).await?
                         }
