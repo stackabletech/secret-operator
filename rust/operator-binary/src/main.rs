@@ -17,13 +17,10 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use utils::{uds_bind_private, TonicUnixStream};
 
-mod backend;
-mod crd;
-mod csi_server;
-mod external_crd;
-mod format;
-mod grpc;
-mod utils;
+use stackable_secret_operator::crd;
+use stackable_secret_operator::csi_server;
+use stackable_secret_operator::grpc;
+use stackable_secret_operator::utils;
 
 pub const APP_NAME: &str = "secret";
 pub const OPERATOR_NAME: &str = "secrets.stackable.tech";
