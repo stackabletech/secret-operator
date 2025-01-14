@@ -1,3 +1,4 @@
+mod data;
 mod env;
 mod namespace;
 mod owner;
@@ -109,7 +110,7 @@ async fn main() -> Result<()> {
                                 &deployment,
                                 &cluster_role,
                             )?;
-                            namespace::maybe_patch_namespace(&namespace, &mut obj)?;
+                            namespace::maybe_patch_namespace(&namespace, &mut obj, &gvk)?;
                             obj = env::maybe_copy_env(&deployment, obj)?;
                             obj = resources::copy_resources(&deployment, obj)?;
                             // ---------- apply
