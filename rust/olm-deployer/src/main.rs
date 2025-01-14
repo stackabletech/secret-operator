@@ -89,7 +89,7 @@ async fn main() -> Result<()> {
                         let yaml = std::fs::read_to_string(path)
                             .with_context(|| format!("Failed to read {}", path.display()))?;
                         for doc in multidoc_deserialize(&yaml)? {
-                            let obj: DynamicObject = serde_yaml::from_value(doc)?;
+                            let mut obj: DynamicObject = serde_yaml::from_value(doc)?;
                             // ----------
                             let gvk = if let Some(tm) = &obj.types {
                                 GroupVersionKind::try_from(tm)?
@@ -102,16 +102,16 @@ async fn main() -> Result<()> {
 
                             let api = dynamic_api(ar, &caps.scope, kube_client.clone(), &namespace);
                             // ---------- patch object
-                            let obj = tolerations::maybe_copy_tolerations(&deployment, obj)?;
-                            let obj = owner::maybe_update_owner(
+                            obj = tolerations::maybe_copy_tolerations(&deployment, obj)?;
+                            obj = owner::maybe_update_owner(
                                 obj,
                                 &caps.scope,
                                 &deployment,
                                 &cluster_role,
                             )?;
-                            // TODO: patch namespace where needed
-                            let obj = env::maybe_copy_env(&deployment, obj)?;
-                            let obj = resources::copy_resources(&deployment, obj)?;
+                            namespace::maybe_patch_namespace(&namespace, &mut obj)?;
+                            obj = env::maybe_copy_env(&deployment, obj)?;
+                            obj = resources::copy_resources(&deployment, obj)?;
                             // ---------- apply
                             apply(&api, obj, &gvk.kind).await?
                         }
