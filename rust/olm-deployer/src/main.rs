@@ -36,6 +36,9 @@ struct Opts {
 
 #[derive(clap::Parser)]
 struct OlmDeployerRun {
+    /// Name of the cluster role to use as owner for cluster wide resources.
+    #[arg(long, short)]
+    owner: String,
     #[arg(long, short)]
     namespace: String,
     #[arg(long, short)]
@@ -51,6 +54,7 @@ struct OlmDeployerRun {
 async fn main() -> Result<()> {
     let opts = Opts::parse();
     if let Command::Run(OlmDeployerRun {
+        owner,
         namespace,
         dir,
         tracing_target,
@@ -74,7 +78,7 @@ async fn main() -> Result<()> {
         let deployment: Deployment = deployment_api.get("secret-operator-deployer").await?;
 
         let cluster_role_api = client.get_all_api::<ClusterRole>();
-        let cluster_role: ClusterRole = cluster_role_api.get("secret-operator-clusterrole").await?;
+        let cluster_role: ClusterRole = cluster_role_api.get(&owner).await?;
 
         let kube_client = client.as_kube_client();
         // discovery (to be able to infer apis from kind/plural only)
