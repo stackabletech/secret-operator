@@ -1,0 +1,18 @@
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: tls
+  labels:
+    app.kubernetes.io/name: secret-operator
+    app.kubernetes.io/instance: secret-operator
+    stackable.tech/vendor: Stackable
+    app.kubernetes.io/version: "24.11.0"
+spec:
+  backend:
+    autoTls:
+      ca:
+        secret:
+          name: secret-provisioner-tls-ca
+          namespace: "${NAMESPACE}" # TODO patch with olm-deployer
+        autoGenerate: true

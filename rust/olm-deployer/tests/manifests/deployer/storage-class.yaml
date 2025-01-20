@@ -1,0 +1,8 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: secrets.stackable.tech
+  labels:
+    stackable.tech/vendor: Stackable
+provisioner: secrets.stackable.tech

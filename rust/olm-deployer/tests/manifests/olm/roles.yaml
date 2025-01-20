@@ -1,0 +1,78 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: secret-operator-clusterrole
+  labels:
+    stackable.tech/vendor: Stackable
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumes
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+      - create
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - persistentvolumeclaims
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - csinodes
+      - storageclasses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - patch
+  - apiGroups:
+      - secrets.stackable.tech
+    resources:
+      - secretclasses
+    verbs:
+      - get
+  - apiGroups:
+      - listeners.stackable.tech
+    resources:
+      - listenerclasses
+      - listeners
+      - podlisteners
+    verbs:
+      - get
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - certificates
+    verbs:
+      - get
+      - patch
+      - create
