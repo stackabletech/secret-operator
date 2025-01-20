@@ -73,8 +73,7 @@ podAnnotations: {}
 labels:
   stackable.tech/vendor: Stackable
 
-podSecurityContext:
-  {}
+podSecurityContext: {}
   # fsGroup: 2000
 
 securityContext:
