@@ -9,7 +9,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use clap::{crate_description, crate_version, Parser};
 use stackable_operator::cli::Command;
 use stackable_operator::client;
-use stackable_operator::kube::api::{Api, Patch, PatchParams, ResourceExt};
+use stackable_operator::kube::api::{Api, ListParams, Patch, PatchParams, ResourceExt};
 use stackable_operator::kube::discovery::{ApiResource, Discovery, Scope};
 
 use stackable_operator::k8s_openapi::api::rbac::v1::ClusterRole;
@@ -36,9 +36,10 @@ struct Opts {
 
 #[derive(clap::Parser)]
 struct OlmDeployerRun {
-    /// Name of the cluster role to use as owner for cluster wide resources.
+    // Operator version to be deployed. Used to resolve the name of the ClusterRole created by OLM and
+    // used as owner for cluster wide objecs.
     #[arg(long, short)]
-    owner: String,
+    op_version: String,
     #[arg(long, short)]
     namespace: String,
     #[arg(long, short)]
@@ -54,7 +55,7 @@ struct OlmDeployerRun {
 async fn main() -> Result<()> {
     let opts = Opts::parse();
     if let Command::Run(OlmDeployerRun {
-        owner,
+        op_version,
         namespace,
         dir,
         tracing_target,
@@ -77,8 +78,7 @@ async fn main() -> Result<()> {
         let deployment_api = client.get_api::<Deployment>(&namespace);
         let deployment: Deployment = deployment_api.get("secret-operator-deployer").await?;
 
-        let cluster_role_api = client.get_all_api::<ClusterRole>();
-        let cluster_role: ClusterRole = cluster_role_api.get(&owner).await?;
+        let cluster_role: ClusterRole = get_cluster_role(&op_version, &client).await?;
 
         let kube_client = client.as_kube_client();
         // discovery (to be able to infer apis from kind/plural only)
@@ -160,5 +160,20 @@ fn dynamic_api(
     match scope {
         Scope::Cluster => Api::all_with(client, &ar),
         _ => Api::namespaced_with(client, ns, &ar),
+    }
+}
+
+async fn get_cluster_role(op_version: &str, client: &client::Client) -> Result<ClusterRole> {
+    let labels =
+        format!("olm.owner=secret-operator.v{op_version},olm.owner.kind=ClusterServiceVersion");
+    let lp = ListParams {
+        label_selector: Some(labels.clone()),
+        ..ListParams::default()
+    };
+
+    let cluster_role_api = client.get_all_api::<ClusterRole>();
+    match cluster_role_api.list(&lp).await?.items {
+        result if result.len() == 1 => Ok(result.first().unwrap().clone()),
+        _ => bail!("ClusterRole object not found for labels {labels}"),
     }
 }
