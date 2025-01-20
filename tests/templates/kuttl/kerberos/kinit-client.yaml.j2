@@ -22,9 +22,9 @@ spec:
               echo kiniting node
               kinit -kt /stackable/krb/keytab -p HTTP/$NODE_NAME
               echo kiniting service
-              kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.$NAMESPACE.svc.cluster.local
+              kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.$NAMESPACE.svc.cluster.local.
               echo kiniting pod
-              kinit -kt /stackable/krb/keytab -p HTTP/$POD_NAME.krb5-client.$NAMESPACE.svc.cluster.local
+              kinit -kt /stackable/krb/keytab -p HTTP/$POD_NAME.krb5-client.$NAMESPACE.svc.cluster.local.
           env:
             - name: KRB5_CONFIG
               value: /stackable/krb/krb5.conf
