@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - Made RSA key length configurable for certificates issued by cert-manager ([#528]).
 
+### Changed
+
+- Append a dot (`.`) to the default cluster domain to reduce DNS requests ([#543]).
+
 ### Fixed
 
 - Helm chart: The secret migration job can be omitted via Helm values ([#536]).
@@ -17,6 +21,7 @@ All notable changes to this project will be documented in this file.
 
 [#528]: https://github.com/stackabletech/secret-operator/pull/528
 [#536]: https://github.com/stackabletech/secret-operator/pull/536
+[#543]: https://github.com/stackabletech/secret-operator/pull/543
 
 ## [24.11.0] - 2024-11-18
 
