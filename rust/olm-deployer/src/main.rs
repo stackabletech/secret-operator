@@ -172,8 +172,10 @@ async fn get_cluster_role(op_version: &str, client: &client::Client) -> Result<C
     };
 
     let cluster_role_api = client.get_all_api::<ClusterRole>();
-    match cluster_role_api.list(&lp).await?.items {
-        result if result.len() == 1 => Ok(result.first().unwrap().clone()),
-        _ => bail!("ClusterRole object not found for labels {labels}"),
+    let result = cluster_role_api.list(&lp).await?.items;
+    if !result.is_empty() {
+        Ok(result.first().unwrap().clone())
+    } else {
+        bail!("ClusterRole object not found for labels {labels}")
     }
 }
