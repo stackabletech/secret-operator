@@ -140,45 +140,13 @@ impl SecretBackend for KerberosKeytab {
         pod_info: super::pod_info::PodInfo,
     ) -> Result<super::SecretContents, Self::Error> {
         let Self {
-            profile:
-                KerberosProfile {
-                    realm_name,
-                    kdc,
-                    admin,
-                },
-            admin_keytab,
             admin_principal,
+            admin_keytab,
+            profile: KerberosProfile { admin, .. },
         } = self;
-
-        let admin_server_clause = match admin {
-            KerberosKeytabBackendAdmin::Mit { kadmin_server } => {
-                format!("  admin_server = {kadmin_server}")
-            }
-            KerberosKeytabBackendAdmin::ActiveDirectory { .. } => String::new(),
-        };
+        let profile = self.kerberos_profile(&pod_info.kubernetes_cluster_domain);
 
         let tmp = tempdir().context(TempSetupSnafu)?;
-        let profile = format!(
-            r#"
-[libdefaults]
-default_realm = {realm_name}
-rdns = false
-dns_canonicalize_hostnames = false
-udp_preference_limit = 1
-
-[realms]
-{realm_name} = {{
-  kdc = {kdc}
-{admin_server_clause}
-}}
-
-[domain_realm]
-cluster.local = {realm_name}
-cluster.local. = {realm_name}
-.cluster.local = {realm_name}
-.cluster.local. = {realm_name}
-"#
-        );
         let profile_file_path = tmp.path().join("krb5.conf");
         {
             let mut profile_file = File::create(&profile_file_path)
@@ -280,5 +248,135 @@ cluster.local. = {realm_name}
                 krb5_conf: profile.into_bytes(),
             }),
         )))
+    }
+}
+
+impl KerberosKeytab {
+    fn kerberos_profile(&self, cluster_domain: &str) -> String {
+        let Self {
+            profile:
+                KerberosProfile {
+                    realm_name,
+                    kdc,
+                    admin,
+                },
+            ..
+        } = self;
+
+        let admin_server_clause = match admin {
+            KerberosKeytabBackendAdmin::Mit { kadmin_server } => {
+                format!("  admin_server = {kadmin_server}")
+            }
+            KerberosKeytabBackendAdmin::ActiveDirectory { .. } => String::new(),
+        };
+
+        let mut domain_realm_section = "[domain_realm]".to_owned();
+        domain_realm_section.push_str(&format!(
+            "
+{cluster_domain} = {realm_name}
+.{cluster_domain} = {realm_name}
+"
+        ));
+        if let Some(cluster_domain_without_trailing_dot) = cluster_domain.strip_suffix('.') {
+            domain_realm_section.push_str(&format!(
+                "{cluster_domain_without_trailing_dot} = {realm_name}
+.{cluster_domain_without_trailing_dot} = {realm_name}
+"
+            ));
+        }
+
+        format!(
+            r#"
+[libdefaults]
+default_realm = {realm_name}
+rdns = false
+dns_canonicalize_hostnames = false
+udp_preference_limit = 1
+
+[realms]
+{realm_name} = {{
+kdc = {kdc}
+{admin_server_clause}
+}}
+
+{domain_realm_section}
+"#
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_kerberos_profile_without_trailing_dot() {
+        let kerberos_keytab = construct_kerberos_keytab();
+        let kerberos_profile = kerberos_keytab.kerberos_profile("cluster.local");
+        assert_eq!(
+            kerberos_profile,
+            "
+[libdefaults]
+default_realm = MY.CORP
+rdns = false
+dns_canonicalize_hostnames = false
+udp_preference_limit = 1
+
+[realms]
+MY.CORP = {
+kdc = krb5-kdc
+  admin_server = krb5-kdc
+}
+
+[domain_realm]
+cluster.local = MY.CORP
+.cluster.local = MY.CORP
+
+"
+        );
+    }
+
+    #[test]
+    fn test_kerberos_profile_with_trailing_dot() {
+        let kerberos_keytab = construct_kerberos_keytab();
+        let kerberos_profile = kerberos_keytab.kerberos_profile("custom.cluster.local.");
+        assert_eq!(
+            kerberos_profile,
+            "
+[libdefaults]
+default_realm = MY.CORP
+rdns = false
+dns_canonicalize_hostnames = false
+udp_preference_limit = 1
+
+[realms]
+MY.CORP = {
+kdc = krb5-kdc
+  admin_server = krb5-kdc
+}
+
+[domain_realm]
+custom.cluster.local. = MY.CORP
+.custom.cluster.local. = MY.CORP
+custom.cluster.local = MY.CORP
+.custom.cluster.local = MY.CORP
+
+"
+        );
+    }
+
+    fn construct_kerberos_keytab() -> KerberosKeytab {
+        KerberosKeytab {
+            profile: KerberosProfile {
+                realm_name: KerberosRealmName::try_from("MY.CORP".to_owned()).unwrap(),
+                kdc: "krb5-kdc".parse().unwrap(),
+                admin: KerberosKeytabBackendAdmin::Mit {
+                    kadmin_server: "krb5-kdc".parse().unwrap(),
+                },
+            },
+            admin_keytab: Unloggable(vec![]),
+            admin_principal: KerberosPrincipal::try_from("stackable-secret-operator".to_owned())
+                .unwrap(),
+        }
     }
 }
