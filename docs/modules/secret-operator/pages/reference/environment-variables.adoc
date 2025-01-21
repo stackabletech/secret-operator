@@ -19,7 +19,7 @@ cargo run -- run
 
 == KUBERNETES_CLUSTER_DOMAIN
 
-*Default value*: cluster.local.
+*Default value*: cluster.local
 
 *Required*: false
 
@@ -31,6 +31,6 @@ Please see the documentation xref:guides:kubernetes-cluster-domain.adoc[on confi
 
 [source]
 ----
-export KUBERNETES_CLUSTER_DOMAIN=mycluster.local.
+export KUBERNETES_CLUSTER_DOMAIN=mycluster.local
 cargo run -- run
 ----

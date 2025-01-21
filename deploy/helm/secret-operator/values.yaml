@@ -98,7 +98,7 @@ affinity: {}
 
 # When running on a non-default Kubernetes cluster domain, the cluster domain can be configured here.
 # See the https://docs.stackable.tech/home/stable/guides/kubernetes-cluster-domain guide for details.
-# kubernetesClusterDomain: my-cluster.local.
+# kubernetesClusterDomain: my-cluster.local
 
 # Kubelet dir may vary in environments such as microk8s, see https://github.com/stackabletech/secret-operator/issues/229
 kubeletDir: /var/lib/kubelet
