@@ -107,16 +107,16 @@ async fn main() -> Result<()> {
 
                             let api = dynamic_api(ar, &caps.scope, kube_client.clone(), &namespace);
                             // ---------- patch object
-                            obj = tolerations::maybe_copy_tolerations(&deployment, obj)?;
-                            obj = owner::maybe_update_owner(
-                                obj,
+                            tolerations::maybe_copy_tolerations(&deployment, &mut obj, &gvk)?;
+                            owner::maybe_update_owner(
+                                &mut obj,
                                 &caps.scope,
                                 &deployment,
                                 &cluster_role,
                             )?;
                             namespace::maybe_patch_namespace(&namespace, &mut obj, &gvk)?;
-                            obj = env::maybe_copy_env(&deployment, obj)?;
-                            obj = resources::copy_resources(&deployment, obj)?;
+                            env::maybe_copy_env(&deployment, &mut obj, &gvk)?;
+                            resources::maybe_copy_resources(&deployment, &mut obj, &gvk)?;
                             // ---------- apply
                             apply(&api, obj, &gvk.kind).await?
                         }

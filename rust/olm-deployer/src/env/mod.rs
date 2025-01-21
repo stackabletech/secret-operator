@@ -1,40 +1,51 @@
-use stackable_operator::k8s_openapi::api::apps::v1::{DaemonSet, Deployment};
+use stackable_operator::k8s_openapi::api::apps::v1::Deployment;
 use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
-use stackable_operator::kube::api::DynamicObject;
+use stackable_operator::kube::api::{DynamicObject, GroupVersionKind};
+use stackable_operator::kube::ResourceExt;
 
+use crate::data::container;
+
+/// Copy the environment from the "secret-operator-deployer" container in `source`
+/// to the container "secret-operator" in `target`.
+/// The `target` must be a DaemonSet object.
 pub(super) fn maybe_copy_env(
-    deployment: &Deployment,
-    res: DynamicObject,
-) -> anyhow::Result<DynamicObject> {
-    let ds: anyhow::Result<DaemonSet, _> = res.clone().try_parse();
-    match ds {
-        Ok(mut daemonset) => {
-            if let Some(ps) = daemonset
-                .spec
-                .as_mut()
-                .and_then(|s| s.template.spec.as_mut())
-            {
-                for c in ps.containers.iter_mut() {
-                    if c.name == "secret-operator" {
-                        let d_env = deployment_env_var(deployment);
-                        match c.env.as_mut() {
-                            Some(c_env) => c_env.extend(d_env.into_iter()),
-                            _ => c.env = Some(d_env),
+    source: &Deployment,
+    target: &mut DynamicObject,
+    target_gvk: &GroupVersionKind,
+) -> anyhow::Result<()> {
+    if target_gvk.kind == "DaemonSet" {
+        if let Some(env) = deployer_env_var(source) {
+            match container(target, "secret-operator")? {
+                serde_json::Value::Object(c) => {
+                    let json_env = env
+                        .iter()
+                        .map(|e| serde_json::json!(e))
+                        .collect::<Vec<serde_json::Value>>();
+
+                    match c.get_mut("env") {
+                        Some(env) => match env {
+                            v @ serde_json::Value::Null => {
+                                *v = serde_json::json!(json_env);
+                            }
+                            serde_json::Value::Array(container_env) => {
+                                container_env.extend_from_slice(&json_env)
+                            }
+                            _ => anyhow::bail!("env is not null or an array"),
+                        },
+                        None => {
+                            c.insert("env".to_string(), serde_json::json!(json_env));
                         }
                     }
                 }
+                _ => anyhow::bail!("no containers found in object {}", target.name_any()),
             }
-
-            // TODO: halp!! change this to a proper conversion.
-            let ret: DynamicObject = serde_yaml::from_str(&serde_yaml::to_string(&daemonset)?)?;
-
-            Ok(ret)
         }
-        _ => Ok(res),
     }
+
+    Ok(())
 }
 
-fn deployment_env_var(deployment: &Deployment) -> Vec<EnvVar> {
+fn deployer_env_var(deployment: &Deployment) -> Option<&Vec<EnvVar>> {
     deployment
         .spec
         .as_ref()
@@ -44,8 +55,7 @@ fn deployment_env_var(deployment: &Deployment) -> Vec<EnvVar> {
         .flatten()
         .filter(|c| c.name == "secret-operator-deployer")
         .last()
-        .and_then(|c| c.env.clone())
-        .unwrap_or_default()
+        .and_then(|c| c.env.as_ref())
 }
 
 #[cfg(test)]
@@ -112,9 +122,17 @@ spec:
 
     #[test]
     fn test_copy_env_var() -> Result<()> {
-        let daemonset = maybe_copy_env(&DEPLOYMENT, DAEMONSET.clone())?;
+        let gvk: GroupVersionKind = GroupVersionKind {
+            kind: "DaemonSet".to_string(),
+            version: "v1".to_string(),
+            group: "apps".to_string(),
+        };
 
-        let expected = vec![
+        let mut daemonset = DAEMONSET.clone();
+
+        maybe_copy_env(&DEPLOYMENT, &mut daemonset, &gvk)?;
+
+        let expected = serde_json::json!(vec![
             EnvVar {
                 name: "NAME1".to_string(),
                 value: Some("value1".to_string()),
@@ -125,24 +143,13 @@ spec:
                 value: Some("value2".to_string()),
                 ..EnvVar::default()
             },
-        ];
+        ]);
         assert_eq!(
-            daemonset_env(&daemonset.try_parse::<DaemonSet>()?),
-            expected
+            container(&mut daemonset, "secret-operator")?
+                .get("env")
+                .unwrap(),
+            &expected
         );
         Ok(())
-    }
-
-    fn daemonset_env(res: &DaemonSet) -> Vec<EnvVar> {
-        res.spec
-            .as_ref()
-            .and_then(|ds| ds.template.spec.as_ref())
-            .map(|ts| ts.containers.iter())
-            .into_iter()
-            .flatten()
-            .filter(|c| c.name == "secret-operator")
-            .last()
-            .and_then(|c| c.env.clone())
-            .unwrap_or_default()
     }
 }

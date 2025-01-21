@@ -7,20 +7,21 @@ use stackable_operator::kube::api::ResourceExt;
 use stackable_operator::kube::discovery::Scope;
 use stackable_operator::kube::Resource;
 
-pub fn maybe_update_owner(
-    dynamic_object: DynamicObject,
+/// Updates the owner list of the `target` according to it's scope.
+/// For namespaced objects it uses the `ns_owner` whereas for cluster wide
+/// objects it uses the `cluster_owner`.
+pub(super) fn maybe_update_owner(
+    target: &mut DynamicObject,
     scope: &Scope,
-    deployment: &Deployment,
-    cluster_role: &ClusterRole,
-) -> Result<DynamicObject> {
-    // TODO: skip SecurityContextConstraints ?
-    let owner_ref = owner_ref(scope, deployment, cluster_role)?;
-    let mut ret = dynamic_object.clone();
-    match ret.metadata.owner_references {
+    ns_owner: &Deployment,
+    cluster_owner: &ClusterRole,
+) -> Result<()> {
+    let owner_ref = owner_ref(scope, ns_owner, cluster_owner)?;
+    match target.metadata.owner_references {
         Some(ref mut ors) => ors.push(owner_ref),
-        None => ret.metadata.owner_references = Some(vec![owner_ref]),
+        None => target.metadata.owner_references = Some(vec![owner_ref]),
     }
-    Ok(ret)
+    Ok(())
 }
 
 fn owner_ref(scope: &Scope, depl: &Deployment, cr: &ClusterRole) -> Result<OwnerReference> {
@@ -117,8 +118,9 @@ rules:
 
     #[test]
     fn test_namespaced_owner() -> Result<()> {
-        let daemonset = maybe_update_owner(
-            DAEMONSET.clone(),
+        let mut daemonset = DAEMONSET.clone();
+        maybe_update_owner(
+            &mut daemonset,
             &Scope::Namespaced,
             &DEPLOYMENT,
             &CLUSTER_ROLE,
@@ -137,12 +139,8 @@ rules:
 
     #[test]
     fn test_cluster_owner() -> Result<()> {
-        let daemonset = maybe_update_owner(
-            DAEMONSET.clone(),
-            &Scope::Cluster,
-            &DEPLOYMENT,
-            &CLUSTER_ROLE,
-        )?;
+        let mut daemonset = DAEMONSET.clone();
+        maybe_update_owner(&mut daemonset, &Scope::Cluster, &DEPLOYMENT, &CLUSTER_ROLE)?;
 
         let expected = Some(vec![OwnerReference {
             uid: "d9287d0a-3069-47c3-8c90-b714dc6dddaa".to_string(),

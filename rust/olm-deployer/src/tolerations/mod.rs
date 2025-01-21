@@ -1,34 +1,29 @@
-use stackable_operator::k8s_openapi::api::apps::v1::{DaemonSet, Deployment};
+use stackable_operator::k8s_openapi::api::apps::v1::Deployment;
 use stackable_operator::k8s_openapi::api::core::v1::Toleration;
-use stackable_operator::kube::api::DynamicObject;
+use stackable_operator::kube::api::{DynamicObject, GroupVersionKind};
 
+use crate::data::get_or_create;
+
+/// Copies the pod tolerations from the `source` to the `target`.
+/// Does nothing if there are no tolerations or if the `target` is not
+/// a DaemonSet.
 pub(super) fn maybe_copy_tolerations(
-    deployment: &Deployment,
-    res: DynamicObject,
-) -> anyhow::Result<DynamicObject> {
-    let ds: anyhow::Result<DaemonSet, _> = res.clone().try_parse();
-    match ds {
-        Ok(mut daemonset) => {
-            if let Some(dts) = deployment_tolerations(deployment) {
-                if let Some(pod_spec) = daemonset
-                    .spec
-                    .as_mut()
-                    .and_then(|s| s.template.spec.as_mut())
-                {
-                    match pod_spec.tolerations.as_mut() {
-                        Some(ta) => ta.extend(dts.clone()),
-                        _ => pod_spec.tolerations = Some(dts.clone()),
-                    }
-                }
-            }
-
-            // TODO: halp!! change this to a proper conversion.
-            let ret: DynamicObject = serde_yaml::from_str(&serde_yaml::to_string(&daemonset)?)?;
-
-            Ok(ret)
+    source: &Deployment,
+    target: &mut DynamicObject,
+    target_gvk: &GroupVersionKind,
+) -> anyhow::Result<()> {
+    if target_gvk.kind == "DaemonSet" {
+        if let Some(tolerations) = deployment_tolerations(source) {
+            let path = "template/spec/tolerations".split("/");
+            *get_or_create(target.data.pointer_mut("/spec").unwrap(), path)? =
+                serde_json::json!(tolerations
+                    .iter()
+                    .map(|t| serde_json::json!(t))
+                    .collect::<Vec<serde_json::Value>>());
         }
-        _ => Ok(res),
     }
+
+    Ok(())
 }
 
 fn deployment_tolerations(deployment: &Deployment) -> Option<&Vec<Toleration>> {
@@ -98,19 +93,25 @@ spec:
 
     #[test]
     fn test_copy_tolerations() -> Result<()> {
-        let daemonset = maybe_copy_tolerations(&DEPLOYMENT, DAEMONSET.clone())?;
+        let gvk: GroupVersionKind = GroupVersionKind {
+            kind: "DaemonSet".to_string(),
+            version: "v1".to_string(),
+            group: "apps".to_string(),
+        };
+
+        let mut daemonset = DAEMONSET.clone();
+        maybe_copy_tolerations(&DEPLOYMENT, &mut daemonset, &gvk)?;
+
+        let expected = serde_json::json!(deployment_tolerations(&DEPLOYMENT)
+            .unwrap()
+            .iter()
+            .map(|t| serde_json::json!(t))
+            .collect::<Vec<serde_json::Value>>());
 
         assert_eq!(
-            daemonset_tolerations(&daemonset.try_parse::<DaemonSet>()?),
-            deployment_tolerations(&DEPLOYMENT)
+            daemonset.data.pointer("/spec/template/spec/tolerations"),
+            Some(&expected)
         );
         Ok(())
-    }
-
-    fn daemonset_tolerations(res: &DaemonSet) -> Option<&Vec<Toleration>> {
-        res.spec
-            .as_ref()
-            .and_then(|s| s.template.spec.as_ref())
-            .and_then(|ps| ps.tolerations.as_ref())
     }
 }

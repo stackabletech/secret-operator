@@ -1,36 +1,32 @@
-use stackable_operator::k8s_openapi::api::apps::v1::{DaemonSet, Deployment};
+use crate::data::container;
+use stackable_operator::k8s_openapi::api::apps::v1::Deployment;
 use stackable_operator::k8s_openapi::api::core::v1::ResourceRequirements;
-use stackable_operator::kube::api::DynamicObject;
+use stackable_operator::kube::api::{DynamicObject, GroupVersionKind};
+use stackable_operator::kube::ResourceExt;
 
-pub(super) fn copy_resources(
-    deployment: &Deployment,
-    res: DynamicObject,
-) -> anyhow::Result<DynamicObject> {
-    let ds: anyhow::Result<DaemonSet, _> = res.clone().try_parse();
-    match ds {
-        Ok(mut daemonset) => {
-            if let Some(ps) = daemonset
-                .spec
-                .as_mut()
-                .and_then(|s| s.template.spec.as_mut())
-            {
-                for c in ps.containers.iter_mut() {
-                    if c.name == "secret-operator" {
-                        let d_res = deployment_resources(deployment);
-                        c.resources = d_res;
-                    }
+/// Copies the resources of the container named "secret-operator-deployer" from `source`
+/// to the container "secret-operator" in `target`.
+/// Does nothing if there are no resources or if the `target` is not a DaemonSet.
+pub(super) fn maybe_copy_resources(
+    source: &Deployment,
+    target: &mut DynamicObject,
+    target_gvk: &GroupVersionKind,
+) -> anyhow::Result<()> {
+    if target_gvk.kind == "DaemonSet" {
+        if let Some(res) = deployment_resources(source) {
+            match container(target, "secret-operator")? {
+                serde_json::Value::Object(c) => {
+                    c.insert("resources".to_string(), serde_json::json!(res));
                 }
+                _ => anyhow::bail!("no containers found in object {}", target.name_any()),
             }
-            // TODO: halp!! change this to a proper conversion.
-            let ret: DynamicObject = serde_yaml::from_str(&serde_yaml::to_string(&daemonset)?)?;
-
-            Ok(ret)
         }
-        _ => Ok(res),
     }
+
+    Ok(())
 }
 
-fn deployment_resources(deployment: &Deployment) -> Option<ResourceRequirements> {
+fn deployment_resources(deployment: &Deployment) -> Option<&ResourceRequirements> {
     deployment
         .spec
         .as_ref()
@@ -40,7 +36,7 @@ fn deployment_resources(deployment: &Deployment) -> Option<ResourceRequirements>
         .flatten()
         .filter(|c| c.name == "secret-operator-deployer")
         .last()
-        .and_then(|c| c.resources.clone())
+        .and_then(|c| c.resources.as_ref())
 }
 
 #[cfg(test)]
@@ -48,6 +44,7 @@ mod test {
     use super::*;
     use anyhow::Result;
     use serde::Deserialize;
+    use stackable_operator::k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 
     use std::sync::LazyLock;
 
@@ -101,8 +98,8 @@ spec:
               value: value2
           resources:
             limits:
-              cpu: 100m
-              memory: 512Mi
+              cpu: 1000m
+              memory: 1Gi
             requests:
               cpu: 100m
               memory: 512Mi
@@ -121,25 +118,38 @@ spec:
 
     #[test]
     fn test_copy_env_var() -> Result<()> {
-        let daemonset = copy_resources(&DEPLOYMENT, DAEMONSET.clone())?;
+        let gvk: GroupVersionKind = GroupVersionKind {
+            kind: "DaemonSet".to_string(),
+            version: "v1".to_string(),
+            group: "apps".to_string(),
+        };
 
+        let mut daemonset = DAEMONSET.clone();
+        maybe_copy_resources(&DEPLOYMENT, &mut daemonset, &gvk)?;
+
+        let expected = serde_json::json!(ResourceRequirements {
+            limits: Some(
+                [
+                    ("cpu".to_string(), Quantity("1000m".to_string())),
+                    ("memory".to_string(), Quantity("1Gi".to_string()))
+                ]
+                .into()
+            ),
+            requests: Some(
+                [
+                    ("cpu".to_string(), Quantity("100m".to_string())),
+                    ("memory".to_string(), Quantity("512Mi".to_string()))
+                ]
+                .into()
+            ),
+            ..ResourceRequirements::default()
+        });
         assert_eq!(
-            daemonset_resources(&daemonset.try_parse::<DaemonSet>()?),
-            deployment_resources(&DEPLOYMENT),
+            container(&mut daemonset, "secret-operator")?
+                .get("resources")
+                .unwrap(),
+            &expected
         );
         Ok(())
-    }
-
-    fn daemonset_resources(daemonset: &DaemonSet) -> Option<ResourceRequirements> {
-        daemonset
-            .spec
-            .as_ref()
-            .and_then(|ds| ds.template.spec.as_ref())
-            .map(|ts| ts.containers.iter())
-            .into_iter()
-            .flatten()
-            .filter(|c| c.name == "secret-operator")
-            .last()
-            .and_then(|c| c.resources.clone())
     }
 }
