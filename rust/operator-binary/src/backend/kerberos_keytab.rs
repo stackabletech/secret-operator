@@ -174,7 +174,9 @@ udp_preference_limit = 1
 
 [domain_realm]
 cluster.local = {realm_name}
+cluster.local. = {realm_name}
 .cluster.local = {realm_name}
+.cluster.local. = {realm_name}
 "#
         );
         let profile_file_path = tmp.path().join("krb5.conf");

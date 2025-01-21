@@ -59,5 +59,6 @@ For example, a TLS certificate provisioned by the xref:secretclass.adoc#backend-
 xref:#node[] and xref:#pod[] would contain the following values in its `subjectAlternateName` (SAN) extension field:
 
 * The node's IP address
-* The node's fully qualified domain name (`my-node.example.com`)
-* The pod's fully qualified domain name (`my-pod.my-service.my-namespace.svc.cluster.local`)
+* The node's domain name (`my-node.example.com`)
+* The pod's domain name (`my-pod.my-service.my-namespace.svc.cluster.local`)
+* The pod's fully qualified domain name (`my-pod.my-service.my-namespace.svc.cluster.local.`)

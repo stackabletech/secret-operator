@@ -182,6 +182,14 @@ impl SecretVolumeSelector {
     ) -> Result<Vec<Address>, ScopeAddressesError> {
         use scope_addresses_error::*;
         let cluster_domain = &pod_info.kubernetes_cluster_domain;
+
+        // TODO: Docs!!!
+
+        let mut cluster_domains = vec![cluster_domain.to_string()];
+        if let Some(cluster_domain_without_trailing_dot) = cluster_domain.strip_suffix('.') {
+            cluster_domains.push(cluster_domain_without_trailing_dot.to_owned());
+        }
+
         let namespace = &self.namespace;
         Ok(match scope {
             scope::SecretScope::Node => {
@@ -192,26 +200,46 @@ impl SecretVolumeSelector {
             scope::SecretScope::Pod => {
                 let mut addrs = Vec::new();
                 if let Some(svc_name) = &pod_info.service_name {
-                    addrs.push(Address::Dns(format!(
-                        "{svc_name}.{namespace}.svc.{cluster_domain}"
-                    )));
-                    addrs.push(Address::Dns(format!(
-                        "{pod}.{svc_name}.{namespace}.svc.{cluster_domain}",
-                        pod = self.pod
-                    )));
+                    for cluster_domain in cluster_domains {
+                        addrs.push(Address::Dns(format!(
+                            "{svc_name}.{namespace}.svc.{cluster_domain}"
+                        )));
+                        addrs.push(Address::Dns(format!(
+                            "{pod}.{svc_name}.{namespace}.svc.{cluster_domain}",
+                            pod = self.pod
+                        )));
+                    }
                 }
                 addrs.extend(pod_info.pod_ips.iter().copied().map(Address::Ip));
                 addrs
             }
-            scope::SecretScope::Service { name } => vec![Address::Dns(format!(
-                "{name}.{namespace}.svc.{cluster_domain}",
-            ))],
-            scope::SecretScope::ListenerVolume { name } => pod_info
-                .listener_addresses
-                .get(name)
-                .context(NoListenerAddressesSnafu { listener: name })?
-                .to_vec(),
+            scope::SecretScope::Service { name } => cluster_domains
+                .iter()
+                .map(|d| Address::Dns(format!("{name}.{namespace}.svc.{d}")))
+                .collect(),
+            scope::SecretScope::ListenerVolume { name } => {
+                let mut addresses = pod_info
+                    .listener_addresses
+                    .get(name)
+                    .context(NoListenerAddressesSnafu { listener: name })?
+                    .to_vec();
+                Self::duplicate_addresses_without_trailing_dot(&mut addresses);
+
+                addresses
+            }
         })
+    }
+
+    /// Duplicates all DNS addresses having a trailing dot, so we also have an similar entry without
+    /// a trailing dot.
+    fn duplicate_addresses_without_trailing_dot(addresses: &mut Vec<Address>) {
+        for addr_index in 0..addresses.len() {
+            if let Address::Dns(addr) = &addresses[addr_index] {
+                if let Some(addr_without_trailing_dot) = addr.strip_suffix('.') {
+                    addresses.push(Address::Dns(addr_without_trailing_dot.to_owned()))
+                }
+            }
+        }
     }
 
     fn default_kerberos_service_names() -> Vec<String> {
