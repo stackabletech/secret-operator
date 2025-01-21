@@ -1,25 +1,23 @@
 # How to test
 
-## Prepare a test namespace
+Requirements:
 
-This namespace is hard coded in the manifests created by olm.
+1. An OpenShift cluster.
+2. Checkout the branch `secret-olm-deployer` from the [operators](https://github.com/stackabletech/openshift-certified-operators/tree/secret-olm-deployer) repo.
+3. Clone the `stackable-utils` [repo](https://github.com/stackabletech/stackable-utils)
 
-    kubectl create ns test
+Install the secret operator using OLM and the `olm-deployer`. From the `stackable-utils` repo, run:
 
-## Install the objects that OLM would install
+```bash
+$ ./olm/build-bundles.sh -c $HOME/repo/stackable/openshift-certified-operators -r 24.11.0 -o secret -d
+...
+```
 
-    kubectl create -n test -f rust/olm-deployer/tests/manifests/nginx/deployment.yaml
+The secret op and all it's dependencies should be installed and running in the `stackable-operators` namespace.
 
-    kubectl create -f rust/olm-deployer/tests/manifests/olm/crds.yaml
-    kubectl create -n test -f rust/olm-deployer/tests/manifests/olm/roles.yaml
-    kubectl create -n test -f rust/olm-deployer/tests/manifests/olm/serviceaccount.yaml
+Run the integration tests:
 
-## Finally run the olm-deployer
-
-    cargo run -p olm-deployer run --dir rust/olm-deployer/tests/manifests/deployer --namespace test
-
-## Cleanup
-
-    kubectl delete ns test
-    kubectl delete -f rust/olm-deployer/tests/manifests/olm/crds.yaml
-    kubectl delete -n test -f rust/olm-deployer/tests/manifests/olm/roles.yaml
+```bash
+$ ./scripts/run-tests --skip-operator secret --test-suite openshift
+...
+```
