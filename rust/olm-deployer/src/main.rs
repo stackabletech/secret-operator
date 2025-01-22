@@ -19,6 +19,7 @@ use stackable_operator::logging;
 use stackable_operator::utils;
 use stackable_operator::utils::cluster_info::KubernetesClusterInfoOpts;
 use stackable_operator::{k8s_openapi::api::apps::v1::Deployment, kube::api::DynamicObject};
+use tokio::time::sleep;
 
 pub const APP_NAME: &str = "stkbl-secret-olm-deployer";
 pub const ENV_VAR_LOGGING: &str = "STKBL_SECRET_OLM_DEPLOYER_LOG";
@@ -36,6 +37,8 @@ struct Opts {
 
 #[derive(clap::Parser)]
 struct OlmDeployerRun {
+    #[arg(long, short, default_value = "false")]
+    keep_alive: bool,
     // Operator version to be deployed. Used to resolve the name of the ClusterRole created by OLM and
     // used as owner for cluster wide objecs.
     #[arg(long, short)]
@@ -55,6 +58,7 @@ struct OlmDeployerRun {
 async fn main() -> Result<()> {
     let opts = Opts::parse();
     if let Command::Run(OlmDeployerRun {
+        keep_alive,
         op_version,
         namespace,
         dir,
@@ -123,9 +127,18 @@ async fn main() -> Result<()> {
                     }
                 }
                 Err(e) => {
-                    tracing::error!("Error reading manifest file: {}", e);
+                    bail!("Error reading manifest file: {}", e);
                 }
             }
+        }
+
+        if keep_alive {
+            // keep the pod running
+            tokio::spawn(async {
+                loop {
+                    sleep(std::time::Duration::from_secs(60)).await;
+                }
+            });
         }
     }
 
