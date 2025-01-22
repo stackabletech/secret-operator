@@ -134,11 +134,7 @@ async fn main() -> Result<()> {
 
         if keep_alive {
             // keep the pod running
-            tokio::spawn(async {
-                loop {
-                    sleep(std::time::Duration::from_secs(60)).await;
-                }
-            });
+            tokio::time::sleep(std::time::Duration::from_secs(u64::MAX)).await;
         }
     }
 
