@@ -19,7 +19,6 @@ use stackable_operator::logging;
 use stackable_operator::utils;
 use stackable_operator::utils::cluster_info::KubernetesClusterInfoOpts;
 use stackable_operator::{k8s_openapi::api::apps::v1::Deployment, kube::api::DynamicObject};
-use tokio::time::sleep;
 
 pub const APP_NAME: &str = "stkbl-secret-olm-deployer";
 pub const ENV_VAR_LOGGING: &str = "STKBL_SECRET_OLM_DEPLOYER_LOG";
