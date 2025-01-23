@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Made RSA key length configurable for certificates issued by cert-manager ([#528]).
+- Kerberos principal backends now also provision principals for IP address, not just DNS hostnames ([#552]).
 
 ### Changed
 
@@ -28,6 +29,7 @@ All notable changes to this project will be documented in this file.
 [#536]: https://github.com/stackabletech/secret-operator/pull/536
 [#543]: https://github.com/stackabletech/secret-operator/pull/543
 [#548]: https://github.com/stackabletech/secret-operator/pull/548
+[#552]: https://github.com/stackabletech/secret-operator/pull/552
 
 ## [24.11.0] - 2024-11-18
 
