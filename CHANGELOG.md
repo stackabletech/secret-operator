@@ -4,13 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+
+- Removed CA secret migration job ([#548]).
+  - BREAKING: This means that direct upgrades from 24.3 are no longer supported. Users of 24.3 must first upgrade to 24.7 or 24.11 before continuing. Bear in mind that we officially only support direct upgrades (24.3 -> 24.7 -> 24.11 -> ...).
+
 ### Added
 
 - Made RSA key length configurable for certificates issued by cert-manager ([#528]).
-
-### Changed
-
-- Append a dot (`.`) to the default cluster domain to reduce DNS requests ([#543]).
+- Kerberos principal backends now also provision principals for IP address, not just DNS hostnames ([#552]).
 
 ### Fixed
 
@@ -21,7 +23,8 @@ All notable changes to this project will be documented in this file.
 
 [#528]: https://github.com/stackabletech/secret-operator/pull/528
 [#536]: https://github.com/stackabletech/secret-operator/pull/536
-[#543]: https://github.com/stackabletech/secret-operator/pull/543
+[#548]: https://github.com/stackabletech/secret-operator/pull/548
+[#552]: https://github.com/stackabletech/secret-operator/pull/552
 
 ## [24.11.0] - 2024-11-18
 

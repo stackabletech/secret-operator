@@ -21,10 +21,14 @@ spec:
               klist -k /stackable/krb/keytab -teKC
               echo kiniting node
               kinit -kt /stackable/krb/keytab -p HTTP/$NODE_NAME
+              echo kiniting node ip
+              NODE_IP="$(cat /stackable/listener/nodeport-ip/default-address/address)"
+              echo node ip is "$NODE_IP"
+              kinit -kt /stackable/krb/keytab -p "HTTP/$NODE_IP"
               echo kiniting service
-              kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.$NAMESPACE.svc.cluster.local.
+              kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.$NAMESPACE.svc.cluster.local
               echo kiniting pod
-              kinit -kt /stackable/krb/keytab -p HTTP/$POD_NAME.krb5-client.$NAMESPACE.svc.cluster.local.
+              kinit -kt /stackable/krb/keytab -p HTTP/$POD_NAME.krb5-client.$NAMESPACE.svc.cluster.local
           env:
             - name: KRB5_CONFIG
               value: /stackable/krb/krb5.conf
@@ -39,6 +43,11 @@ spec:
           volumeMounts:
             - mountPath: /stackable/krb
               name: kerberos
+            - mountPath: /stackable/listener/nodeport-ip
+              name: listener-nodeport-ip
+          ports:
+            - name: dummy
+              containerPort: 9999
       volumes:
         - name: kerberos
           ephemeral:
@@ -46,9 +55,22 @@ spec:
               metadata:
                 annotations:
                   secrets.stackable.tech/class: kerberos-$NAMESPACE
-                  secrets.stackable.tech/scope: node,pod
+                  secrets.stackable.tech/scope: node,pod,listener-volume=listener-nodeport-ip
               spec:
                 storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+        - name: listener-nodeport-ip
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  listeners.stackable.tech/listener-class: nodeport-ip-$NAMESPACE
+              spec:
+                storageClassName: listeners.stackable.tech
                 accessModes:
                   - ReadWriteOnce
                 resources:

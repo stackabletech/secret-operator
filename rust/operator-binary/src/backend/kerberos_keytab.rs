@@ -208,13 +208,18 @@ cluster.local = {realm_name}
                             scope: scope.clone(),
                         })?
                 {
-                    if let Address::Dns(hostname) = addr {
-                        pod_principals.push(
-                            format!("{service_name}/{hostname}")
-                                .try_into()
-                                .context(PodPrincipalSnafu)?,
-                        );
-                    }
+                    pod_principals.push(
+                        match addr {
+                            Address::Dns(hostname) => {
+                                format!("{service_name}/{hostname}")
+                            }
+                            Address::Ip(ip) => {
+                                format!("{service_name}/{ip}")
+                            }
+                        }
+                        .try_into()
+                        .context(PodPrincipalSnafu)?,
+                    );
                 }
             }
         }

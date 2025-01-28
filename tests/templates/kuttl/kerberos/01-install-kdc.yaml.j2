@@ -3,6 +3,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
   - script: envsubst '$NAMESPACE' < secretclass.yaml | kubectl apply -f -
+  - script: envsubst '$NAMESPACE' < listenerclass.yaml | kubectl apply -f -
 ---
 apiVersion: apps/v1
 kind: StatefulSet
