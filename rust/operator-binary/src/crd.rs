@@ -368,6 +368,23 @@ impl Deref for KerberosPrincipal {
     }
 }
 
+#[derive(CustomResource, Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[kube(
+    group = "secrets.stackable.tech",
+    version = "v1alpha1",
+    kind = "TrustStore",
+    namespaced,
+    crates(
+        kube_core = "stackable_operator::kube::core",
+        k8s_openapi = "stackable_operator::k8s_openapi",
+        schemars = "stackable_operator::schemars"
+    )
+)]
+#[serde(rename_all = "camelCase")]
+pub struct TrustStoreSpec {
+    pub secret_class_name: String,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

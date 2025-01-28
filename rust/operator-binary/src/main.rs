@@ -9,9 +9,10 @@ use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
 use stackable_operator::{
-    logging::TracingTarget, utils::cluster_info::KubernetesClusterInfoOpts, CustomResourceExt,
+    cli::ProductOperatorRun, logging::TracingTarget, namespace::WatchNamespace,
+    utils::cluster_info::KubernetesClusterInfoOpts, CustomResourceExt,
 };
-use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
+use std::{os::unix::prelude::FileTypeExt, path::PathBuf, pin::pin};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
@@ -23,6 +24,7 @@ mod csi_server;
 mod external_crd;
 mod format;
 mod grpc;
+mod truststore_controller;
 mod utils;
 
 pub const APP_NAME: &str = "secret";
@@ -58,6 +60,11 @@ struct SecretOperatorRun {
 
     #[command(flatten)]
     pub cluster_info_opts: KubernetesClusterInfoOpts,
+
+    // FIXME: Use ProductOperatorRun instead?
+    /// Provides a specific namespace to watch (instead of watching all namespaces)
+    #[arg(long, env, default_value = "")]
+    pub watch_namespace: WatchNamespace,
 }
 
 mod built_info {
@@ -70,6 +77,7 @@ async fn main() -> anyhow::Result<()> {
     match opts.cmd {
         stackable_operator::cli::Command::Crd => {
             crd::SecretClass::print_yaml_schema(built_info::PKG_VERSION)?;
+            crd::TrustStore::print_yaml_schema(built_info::PKG_VERSION)?;
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun {
             csi_endpoint,
@@ -77,6 +85,7 @@ async fn main() -> anyhow::Result<()> {
             tracing_target,
             privileged,
             cluster_info_opts,
+            watch_namespace,
         }) => {
             stackable_operator::logging::initialize_logging(
                 "SECRET_PROVISIONER_LOG",
@@ -104,7 +113,7 @@ async fn main() -> anyhow::Result<()> {
                 let _ = std::fs::remove_file(&csi_endpoint);
             }
             let mut sigterm = signal(SignalKind::terminate())?;
-            Server::builder()
+            let csi_server = pin!(Server::builder()
                 .add_service(
                     tonic_reflection::server::Builder::configure()
                         .include_reflection_service(true)
@@ -116,7 +125,7 @@ async fn main() -> anyhow::Result<()> {
                     client: client.clone(),
                 }))
                 .add_service(NodeServer::new(SecretProvisionerNode {
-                    client,
+                    client: client.clone(),
                     node_name,
                     privileged,
                 }))
@@ -126,8 +135,11 @@ async fn main() -> anyhow::Result<()> {
                     )
                     .map_ok(TonicUnixStream),
                     sigterm.recv().map(|_| ()),
-                )
-                .await?;
+                ));
+            let truststore_controller =
+                pin!(truststore_controller::start(&client, &watch_namespace));
+            // TODO: handle error
+            futures::future::select(csi_server, truststore_controller).await;
         }
     }
     Ok(())

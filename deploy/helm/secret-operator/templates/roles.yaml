@@ -58,6 +58,13 @@ rules:
   - apiGroups:
       - ""
     resources:
+      - configmaps
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - ""
+    resources:
       - persistentvolumes
     verbs:
       - get
@@ -95,8 +102,11 @@ rules:
       - secrets.stackable.tech
     resources:
       - secretclasses
+      - truststores
     verbs:
       - get
+      - watch
+      - list
   - apiGroups:
       - listeners.stackable.tech
     resources:

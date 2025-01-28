@@ -67,6 +67,13 @@ impl<B: SecretBackend + Send + Sync> SecretBackend for DynamicAdapter<B> {
             .map_err(|err| DynError(Box::new(err)))
     }
 
+    async fn get_trust_data(&self) -> Result<super::SecretContents, Self::Error> {
+        self.0
+            .get_trust_data()
+            .await
+            .map_err(|err| DynError(Box::new(err)))
+    }
+
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,
