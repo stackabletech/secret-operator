@@ -4,15 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Removed
+## [24.11.1] - 2025-01-10
 
-- Removed CA secret migration job ([#548]).
-  - BREAKING: This means that direct upgrades from 24.3 are no longer supported. Users of 24.3 must first upgrade to 24.7 or 24.11 before continuing. Bear in mind that we officially only support direct upgrades (24.3 -> 24.7 -> 24.11 -> ...).
-
-### Added
-
-- Made RSA key length configurable for certificates issued by cert-manager ([#528]).
-- Kerberos principal backends now also provision principals for IP address, not just DNS hostnames ([#552]).
+## [24.11.1-rc2] - 2024-12-12
 
 ### Fixed
 
@@ -21,10 +15,9 @@ All notable changes to this project will be documented in this file.
   be changed in the Helm values and defaults now to 1.0.0-stackable24.11.0
   rather than being hard-coded to 1.0.0-stackable24.7.0 ([#536]).
 
-[#528]: https://github.com/stackabletech/secret-operator/pull/528
 [#536]: https://github.com/stackabletech/secret-operator/pull/536
-[#548]: https://github.com/stackabletech/secret-operator/pull/548
-[#552]: https://github.com/stackabletech/secret-operator/pull/552
+
+## [24.11.1-rc1] - 2024-12-06
 
 ## [24.11.0] - 2024-11-18
 
