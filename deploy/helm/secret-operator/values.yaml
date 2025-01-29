@@ -1,13 +1,13 @@
 # Default values for secret-operator.
 ---
 image:
-  repository: docker.stackable.tech/stackable/secret-operator
+  repository: oci.stackable.tech/sdp/secret-operator
   pullPolicy: IfNotPresent
   pullSecrets: []
 
 csiProvisioner:
   image:
-    repository: docker.stackable.tech/k8s/sig-storage/csi-provisioner
+    repository: oci.stackable.tech/sdp/sig-storage/csi-provisioner
     tag: v5.1.0
     pullPolicy: IfNotPresent
   resources:
@@ -19,7 +19,7 @@ csiProvisioner:
       memory: 128Mi
 csiNodeDriverRegistrar:
   image:
-    repository: docker.stackable.tech/k8s/sig-storage/csi-node-driver-registrar
+    repository: oci.stackable.tech/sdp/sig-storage/csi-node-driver-registrar
     tag: v2.13.0
     pullPolicy: IfNotPresent
   resources:
