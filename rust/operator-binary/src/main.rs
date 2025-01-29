@@ -9,7 +9,7 @@ use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
 use stackable_operator::{
-    cli::ProductOperatorRun, logging::TracingTarget, namespace::WatchNamespace,
+    logging::TracingTarget, namespace::WatchNamespace,
     utils::cluster_info::KubernetesClusterInfoOpts, CustomResourceExt,
 };
 use std::{os::unix::prelude::FileTypeExt, path::PathBuf, pin::pin};

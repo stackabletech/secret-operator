@@ -9,12 +9,8 @@ use stackable_operator::{
     time::Duration,
 };
 use stackable_secret_operator_crd_utils::SecretReference;
-use time::error::Format;
 
-use crate::{
-    backend,
-    format::{well_known::CompatibilityOptions, SecretFormat},
-};
+use crate::{backend, format::SecretFormat};
 
 /// A [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass) is a cluster-global Kubernetes resource
 /// that defines a category of secrets that the Secret Operator knows how to provision.
