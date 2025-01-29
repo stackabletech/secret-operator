@@ -1,5 +1,6 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, Snafu};
+use stackable_operator::schemars::{self, JsonSchema};
 use strum::EnumDiscriminants;
 
 use super::{convert, ConvertError, SecretFiles};
@@ -36,7 +37,7 @@ pub struct Kerberos {
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(
     name(SecretFormat),
-    derive(Deserialize),
+    derive(Serialize, Deserialize, JsonSchema),
     serde(rename_all = "kebab-case")
 )]
 pub enum WellKnownSecretData {

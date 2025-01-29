@@ -4,3 +4,4 @@ metadata:
   name: truststore
 spec:
   secretClassName: tls
+  format: tls-pkcs12

@@ -65,7 +65,7 @@ async fn reconcile(
         binary_data: Some(
             trust_data
                 .data
-                .into_files(None, &CompatibilityOptions::default())
+                .into_files(truststore.spec.format, &CompatibilityOptions::default())
                 .unwrap()
                 .into_iter()
                 .map(|(k, v)| (k, ByteString(v)))
