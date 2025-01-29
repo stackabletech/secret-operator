@@ -14,6 +14,12 @@ All notable changes to this project will be documented in this file.
 - Made RSA key length configurable for certificates issued by cert-manager ([#528]).
 - Kerberos principal backends now also provision principals for IP address, not just DNS hostnames ([#552]).
 
+[#528]: https://github.com/stackabletech/secret-operator/pull/528
+[#548]: https://github.com/stackabletech/secret-operator/pull/548
+[#552]: https://github.com/stackabletech/secret-operator/pull/552
+
+## [24.11.1] - 2025-01-10
+
 ### Fixed
 
 - Helm chart: The secret migration job can be omitted via Helm values ([#536]).
@@ -21,10 +27,7 @@ All notable changes to this project will be documented in this file.
   be changed in the Helm values and defaults now to 1.0.0-stackable24.11.0
   rather than being hard-coded to 1.0.0-stackable24.7.0 ([#536]).
 
-[#528]: https://github.com/stackabletech/secret-operator/pull/528
 [#536]: https://github.com/stackabletech/secret-operator/pull/536
-[#548]: https://github.com/stackabletech/secret-operator/pull/548
-[#552]: https://github.com/stackabletech/secret-operator/pull/552
 
 ## [24.11.0] - 2024-11-18
 
