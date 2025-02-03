@@ -10,7 +10,7 @@ use stackable_operator::{
 };
 use stackable_secret_operator_crd_utils::SecretReference;
 
-use crate::backend;
+use crate::{backend, format::SecretFormat};
 
 /// A [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass) is a cluster-global Kubernetes resource
 /// that defines a category of secrets that the Secret Operator knows how to provision.
@@ -366,6 +366,24 @@ impl Deref for KerberosPrincipal {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
+}
+
+#[derive(CustomResource, Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[kube(
+    group = "secrets.stackable.tech",
+    version = "v1alpha1",
+    kind = "TrustStore",
+    namespaced,
+    crates(
+        kube_core = "stackable_operator::kube::core",
+        k8s_openapi = "stackable_operator::k8s_openapi",
+        schemars = "stackable_operator::schemars"
+    )
+)]
+#[serde(rename_all = "camelCase")]
+pub struct TrustStoreSpec {
+    pub secret_class_name: String,
+    pub format: Option<SecretFormat>,
 }
 
 #[cfg(test)]

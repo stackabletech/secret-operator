@@ -54,8 +54,14 @@ pub fn convert_tls_to_pkcs12(
     p12_password: &str,
 ) -> Result<TlsPkcs12, TlsToPkcs12Error> {
     use tls_to_pkcs12_error::*;
-    let cert = X509::from_pem(&pem.certificate_pem).context(LoadCertSnafu)?;
-    let key = PKey::private_key_from_pem(&pem.key_pem).context(LoadKeySnafu)?;
+    let cert = pem
+        .certificate_pem
+        .map(|cert| X509::from_pem(&cert).context(LoadCertSnafu))
+        .transpose()?;
+    let key = pem
+        .key_pem
+        .map(|key| PKey::private_key_from_pem(&key).context(LoadKeySnafu))
+        .transpose()?;
 
     let mut ca_stack = Stack::<X509>::new().context(LoadCaSnafu)?;
     for ca in split_pem_certificates(&pem.ca_pem) {
@@ -66,13 +72,18 @@ pub fn convert_tls_to_pkcs12(
 
     Ok(TlsPkcs12 {
         truststore: pkcs12_truststore(&ca_stack, p12_password)?,
-        keystore: Pkcs12::builder()
-            .ca(ca_stack)
-            .cert(&cert)
-            .pkey(&key)
-            .build2(p12_password)
-            .and_then(|store| store.to_der())
-            .context(BuildKeystoreSnafu)?,
+        keystore: cert
+            .zip(key)
+            .map(|(cert, key)| {
+                Pkcs12::builder()
+                    .ca(ca_stack)
+                    .cert(&cert)
+                    .pkey(&key)
+                    .build2(p12_password)
+                    .and_then(|store| store.to_der())
+                    .context(BuildKeystoreSnafu)
+            })
+            .transpose()?,
     })
 }
 

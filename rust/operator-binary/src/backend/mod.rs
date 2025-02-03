@@ -274,6 +274,10 @@ pub trait SecretBackend: Debug + Send + Sync {
         pod_info: pod_info::PodInfo,
     ) -> Result<SecretContents, Self::Error>;
 
+    async fn get_trust_data(&self) -> Result<SecretContents, Self::Error> {
+        todo!("temporary blanket impl, remove before merging")
+    }
+
     /// Try to predict which nodes would be able to provision this secret.
     ///
     /// Should return `None` if no constraints apply, `Some(HashSet::new())` is interpreted as "no nodes match the given constraints".

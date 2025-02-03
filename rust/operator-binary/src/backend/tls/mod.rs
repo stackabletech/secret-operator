@@ -323,18 +323,37 @@ impl SecretBackend for TlsGenerate {
                                 .context(SerializeCertificateSnafu { tpe: CertType::Ca })
                         }),
                     )?,
-                    certificate_pem: pod_cert
-                        .to_pem()
-                        .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
-                    key_pem: pod_key
-                        .private_key_to_pem_pkcs8()
-                        .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
+                    certificate_pem: Some(
+                        pod_cert
+                            .to_pem()
+                            .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
+                    ),
+                    key_pem: Some(
+                        pod_key
+                            .private_key_to_pem_pkcs8()
+                            .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
+                    ),
                 },
             )))
             .expires_after(
                 time_datetime_to_chrono(expire_pod_after).context(InvalidCertLifetimeSnafu)?,
             ),
         )
+    }
+
+    async fn get_trust_data(&self) -> Result<SecretContents, Self::Error> {
+        Ok(SecretContents::new(SecretData::WellKnown(
+            WellKnownSecretData::TlsPem(well_known::TlsPem {
+                ca_pem: iterator_try_concat_bytes(self.ca_manager.trust_roots().into_iter().map(
+                    |ca| {
+                        ca.to_pem()
+                            .context(SerializeCertificateSnafu { tpe: CertType::Ca })
+                    },
+                ))?,
+                certificate_pem: None,
+                key_pem: None,
+            }),
+        )))
     }
 }
 
