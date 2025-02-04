@@ -1,6 +1,7 @@
-use stackable_operator::k8s_openapi::api::apps::v1::Deployment;
-use stackable_operator::k8s_openapi::api::core::v1::Toleration;
-use stackable_operator::kube::api::{DynamicObject, GroupVersionKind};
+use stackable_operator::{
+    k8s_openapi::api::{apps::v1::Deployment, core::v1::Toleration},
+    kube::api::{DynamicObject, GroupVersionKind},
+};
 
 use crate::data::get_or_create;
 
@@ -36,12 +37,13 @@ fn deployment_tolerations(deployment: &Deployment) -> Option<&Vec<Toleration>> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use std::sync::LazyLock;
+
     use anyhow::Result;
     use serde::Deserialize;
 
+    use super::*;
     use crate::tolerations::{deployment_tolerations, maybe_copy_tolerations};
-    use std::sync::LazyLock;
 
     static DAEMONSET: LazyLock<DynamicObject> = LazyLock::new(|| {
         const STR_DAEMONSET: &str = r#"

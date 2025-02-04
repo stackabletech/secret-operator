@@ -1,8 +1,12 @@
+use stackable_operator::{
+    k8s_openapi::api::{apps::v1::Deployment, core::v1::ResourceRequirements},
+    kube::{
+        api::{DynamicObject, GroupVersionKind},
+        ResourceExt,
+    },
+};
+
 use crate::data::container;
-use stackable_operator::k8s_openapi::api::apps::v1::Deployment;
-use stackable_operator::k8s_openapi::api::core::v1::ResourceRequirements;
-use stackable_operator::kube::api::{DynamicObject, GroupVersionKind};
-use stackable_operator::kube::ResourceExt;
 
 /// Copies the resources of the container named "secret-operator-deployer" from `source`
 /// to the container "secret-operator" in `target`.
@@ -41,12 +45,13 @@ fn deployment_resources(deployment: &Deployment) -> Option<&ResourceRequirements
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use std::sync::LazyLock;
+
     use anyhow::Result;
     use serde::Deserialize;
     use stackable_operator::k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 
-    use std::sync::LazyLock;
+    use super::*;
 
     static DAEMONSET: LazyLock<DynamicObject> = LazyLock::new(|| {
         const STR_DAEMONSET: &str = r#"

@@ -1,0 +1,9 @@
+# $NAMESPACE will be replaced with the namespace of the test case.
+---
+apiVersion: listeners.stackable.tech/v1alpha1
+kind: ListenerClass
+metadata:
+  name: nodeport-ip-$NAMESPACE
+spec:
+  serviceType: NodePort
+  preferredAddressType: IP

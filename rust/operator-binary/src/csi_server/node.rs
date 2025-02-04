@@ -20,6 +20,7 @@ use tokio::{
 };
 use tonic::{Request, Response, Status};
 
+use super::controller::TOPOLOGY_NODE;
 use crate::{
     backend::{
         self, pod_info, pod_info::PodInfo, SecretBackendError, SecretContents, SecretVolumeSelector,
@@ -35,8 +36,6 @@ use crate::{
     },
     utils::{error_full_message, FmtByteSlice},
 };
-
-use super::controller::TOPOLOGY_NODE;
 
 #[derive(Snafu, Debug)]
 #[snafu(module)]

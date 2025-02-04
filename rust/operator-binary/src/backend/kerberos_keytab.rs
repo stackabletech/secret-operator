@@ -17,6 +17,10 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
 };
 
+use super::{
+    pod_info::Address, scope::SecretScope, ScopeAddressesError, SecretBackend, SecretBackendError,
+    SecretContents,
+};
 use crate::{
     crd::{
         ActiveDirectorySamAccountNameRules, InvalidKerberosPrincipal, KerberosKeytabBackendAdmin,
@@ -24,11 +28,6 @@ use crate::{
     },
     format::{well_known, SecretData, WellKnownSecretData},
     utils::Unloggable,
-};
-
-use super::{
-    pod_info::Address, scope::SecretScope, ScopeAddressesError, SecretBackend, SecretBackendError,
-    SecretContents,
 };
 
 #[derive(Debug, Snafu)]
@@ -208,13 +207,18 @@ cluster.local = {realm_name}
                             scope: scope.clone(),
                         })?
                 {
-                    if let Address::Dns(hostname) = addr {
-                        pod_principals.push(
-                            format!("{service_name}/{hostname}")
-                                .try_into()
-                                .context(PodPrincipalSnafu)?,
-                        );
-                    }
+                    pod_principals.push(
+                        match addr {
+                            Address::Dns(hostname) => {
+                                format!("{service_name}/{hostname}")
+                            }
+                            Address::Ip(ip) => {
+                                format!("{service_name}/{ip}")
+                            }
+                        }
+                        .try_into()
+                        .context(PodPrincipalSnafu)?,
+                    );
                 }
             }
         }

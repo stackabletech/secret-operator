@@ -21,11 +21,12 @@ fn auto_tls_namespace(value: &mut serde_json::Value) -> Result<&mut Value> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use std::sync::LazyLock;
+
     use anyhow::Result;
     use serde::Deserialize;
 
-    use std::sync::LazyLock;
+    use super::*;
 
     static TLS_SECRET_CLASS: LazyLock<DynamicObject> = LazyLock::new(|| {
         const STR_TLS_SECRET_CLASS: &str = r#"

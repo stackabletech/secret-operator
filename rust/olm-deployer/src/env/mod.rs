@@ -1,7 +1,10 @@
-use stackable_operator::k8s_openapi::api::apps::v1::Deployment;
-use stackable_operator::k8s_openapi::api::core::v1::EnvVar;
-use stackable_operator::kube::api::{DynamicObject, GroupVersionKind};
-use stackable_operator::kube::ResourceExt;
+use stackable_operator::{
+    k8s_openapi::api::{apps::v1::Deployment, core::v1::EnvVar},
+    kube::{
+        api::{DynamicObject, GroupVersionKind},
+        ResourceExt,
+    },
+};
 
 use crate::data::container;
 
@@ -60,11 +63,12 @@ fn deployer_env_var(deployment: &Deployment) -> Option<&Vec<EnvVar>> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use std::sync::LazyLock;
+
     use anyhow::Result;
     use serde::Deserialize;
 
-    use std::sync::LazyLock;
+    use super::*;
 
     static DAEMONSET: LazyLock<DynamicObject> = LazyLock::new(|| {
         const STR_DAEMONSET: &str = r#"

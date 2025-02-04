@@ -1,11 +1,15 @@
 use anyhow::{Context, Result};
-use stackable_operator::k8s_openapi::api::apps::v1::Deployment;
-use stackable_operator::k8s_openapi::api::rbac::v1::ClusterRole;
-use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
-use stackable_operator::kube::api::DynamicObject;
-use stackable_operator::kube::api::ResourceExt;
-use stackable_operator::kube::discovery::Scope;
-use stackable_operator::kube::Resource;
+use stackable_operator::{
+    k8s_openapi::{
+        api::{apps::v1::Deployment, rbac::v1::ClusterRole},
+        apimachinery::pkg::apis::meta::v1::OwnerReference,
+    },
+    kube::{
+        api::{DynamicObject, ResourceExt},
+        discovery::Scope,
+        Resource,
+    },
+};
 
 /// Updates the owner list of the `target` according to it's scope.
 /// For namespaced objects it uses the `ns_owner` whereas for cluster wide
@@ -39,12 +43,13 @@ fn owner_ref(scope: &Scope, depl: &Deployment, cr: &ClusterRole) -> Result<Owner
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use std::sync::LazyLock;
+
     use anyhow::Result;
     use serde::Deserialize;
     use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
 
-    use std::sync::LazyLock;
+    use super::*;
 
     static DAEMONSET: LazyLock<DynamicObject> = LazyLock::new(|| {
         const STR_DAEMONSET: &str = r#"

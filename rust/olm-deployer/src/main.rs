@@ -7,18 +7,19 @@ mod tolerations;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{crate_description, crate_version, Parser};
-use stackable_operator::cli::Command;
-use stackable_operator::client;
-use stackable_operator::kube::api::{Api, ListParams, Patch, PatchParams, ResourceExt};
-use stackable_operator::kube::discovery::{ApiResource, Discovery, Scope};
-
-use stackable_operator::k8s_openapi::api::rbac::v1::ClusterRole;
-use stackable_operator::kube;
-use stackable_operator::kube::core::GroupVersionKind;
-use stackable_operator::logging;
-use stackable_operator::utils;
-use stackable_operator::utils::cluster_info::KubernetesClusterInfoOpts;
-use stackable_operator::{k8s_openapi::api::apps::v1::Deployment, kube::api::DynamicObject};
+use stackable_operator::{
+    cli::Command,
+    client,
+    k8s_openapi::api::{apps::v1::Deployment, rbac::v1::ClusterRole},
+    kube,
+    kube::{
+        api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
+        core::GroupVersionKind,
+        discovery::{ApiResource, Discovery, Scope},
+    },
+    logging, utils,
+    utils::cluster_info::KubernetesClusterInfoOpts,
+};
 
 pub const APP_NAME: &str = "stkbl-secret-olm-deployer";
 pub const ENV_VAR_LOGGING: &str = "STKBL_SECRET_OLM_DEPLOYER_LOG";

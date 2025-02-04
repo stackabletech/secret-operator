@@ -27,16 +27,15 @@ use stackable_operator::{
 };
 use time::OffsetDateTime;
 
-use crate::{
-    crd::{self, CertificateKeyGeneration},
-    format::{well_known, SecretData, WellKnownSecretData},
-    utils::iterator_try_concat_bytes,
-};
-
 use super::{
     pod_info::{Address, PodInfo},
     scope::SecretScope,
     ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents,
+};
+use crate::{
+    crd::{self, CertificateKeyGeneration},
+    format::{well_known, SecretData, WellKnownSecretData},
+    utils::iterator_try_concat_bytes,
 };
 
 mod ca;

@@ -1,3 +1,5 @@
+use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
+
 use anyhow::Context;
 use clap::{crate_description, crate_version, Parser};
 use csi_server::{
@@ -11,7 +13,6 @@ use grpc::csi::v1::{
 use stackable_operator::{
     logging::TracingTarget, utils::cluster_info::KubernetesClusterInfoOpts, CustomResourceExt,
 };
-use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
