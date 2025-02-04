@@ -8,26 +8,24 @@ pub mod pod_info;
 pub mod scope;
 pub mod tls;
 
+use std::{collections::HashSet, convert::Infallible, fmt::Debug};
+
 use async_trait::async_trait;
+pub use cert_manager::CertManager;
+pub use k8s_search::K8sSearch;
+pub use kerberos_keytab::KerberosKeytab;
+use pod_info::Address;
+use scope::SecretScope;
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{DateTime, FixedOffset},
     time::Duration,
 };
-use std::{collections::HashSet, convert::Infallible, fmt::Debug};
-
-pub use cert_manager::CertManager;
-pub use k8s_search::K8sSearch;
-pub use kerberos_keytab::KerberosKeytab;
 pub use tls::TlsGenerate;
 
-use pod_info::Address;
-use scope::SecretScope;
-
-use crate::format::{SecretData, SecretFormat};
-
 use self::pod_info::SchedulingPodInfo;
+use crate::format::{SecretData, SecretFormat};
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///

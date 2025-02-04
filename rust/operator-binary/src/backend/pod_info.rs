@@ -16,9 +16,8 @@ use stackable_operator::{
     kube::runtime::reflector::ObjectRef,
 };
 
-use crate::utils::trystream_any;
-
 use super::scope::SecretScope;
+use crate::utils::trystream_any;
 
 const LISTENER_PVC_ANNOTATION_LISTENER_NAME: &str = "listeners.stackable.tech/listener-name";
 const LISTENER_PVC_ANNOTATION_LISTENER_CLASS: &str = "listeners.stackable.tech/listener-class";
