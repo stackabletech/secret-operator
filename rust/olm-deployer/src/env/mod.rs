@@ -10,7 +10,7 @@ use crate::data::container;
 
 /// Copy the environment from the "secret-operator-deployer" container in `source`
 /// to the container "secret-operator" in `target`.
-/// The `target` must be a DaemonSet object.
+/// The `target` must be a DaemonSet object otherwise this is a no-op.
 pub(super) fn maybe_copy_env(
     source: &Deployment,
     target: &mut DynamicObject,

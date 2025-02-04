@@ -4,6 +4,8 @@ use stackable_operator::kube::api::{DynamicObject, GroupVersionKind};
 
 use crate::data;
 
+/// Path the namespace of the autoTls secret class.
+/// Otherwise do nothing.
 pub(super) fn maybe_patch_namespace(
     ns: &str,
     res: &mut DynamicObject,

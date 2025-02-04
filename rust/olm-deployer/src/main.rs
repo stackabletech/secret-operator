@@ -1,3 +1,16 @@
+/// This program acts as a proxy Deployment in OLM environments that installs the secret operator.
+/// The operator manifests are read from a directory and patched before being submitted to the
+/// control plane.
+/// It expects the following objects to exist (they are created by OLM) and uses them as
+/// sources for patch data:
+/// - A Deployment named "secret-operator-deployer" in the target namespace.
+/// - A ClusterRole owned by the same CSV that deployed this tool.
+///
+/// See the documentation of the `maybe_*` functions for patching details.
+///
+/// The `keep-alive` cli option prevents the program from finishing and thus for OLM
+/// to observe it as a failure.
+///
 mod data;
 mod env;
 mod namespace;
