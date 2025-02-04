@@ -7,12 +7,11 @@ use openssl::{
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 
-use crate::format::utils::split_pem_certificates;
-
 use super::{
     well_known::{CompatibilityOptions, TlsPem, TlsPkcs12},
     SecretFormat, WellKnownSecretData,
 };
+use crate::format::utils::split_pem_certificates;
 
 pub fn convert(
     from: WellKnownSecretData,
