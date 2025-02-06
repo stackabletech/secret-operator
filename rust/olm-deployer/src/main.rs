@@ -3,7 +3,7 @@
 /// control plane.
 /// It expects the following objects to exist (they are created by OLM) and uses them as
 /// sources for patch data:
-/// - A Deployment named "secret-operator-deployer" in the target namespace.
+/// - A Deployment owned by the CSV in the target namespace.
 /// - A ClusterRole owned by the same CSV that deployed this tool.
 ///
 /// See the documentation of the `maybe_*` functions for patching details.
@@ -54,7 +54,7 @@ struct OlmDeployerRun {
         long,
         short,
         default_value = "false",
-        help = "Keep running after manifests have been successfully applyed."
+        help = "Keep running after manifests have been successfully applied."
     )]
     keep_alive: bool,
     #[arg(
