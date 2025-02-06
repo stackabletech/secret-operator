@@ -50,15 +50,22 @@ struct Opts {
 
 #[derive(clap::Parser)]
 struct OlmDeployerRun {
-    #[arg(long, short, default_value = "false")]
+    #[arg(
+        long,
+        short,
+        default_value = "false",
+        help = "Keep running after manifests have been successfully applyed."
+    )]
     keep_alive: bool,
-    // Operator version to be deployed. Used to resolve the name of the ClusterRole created by OLM and
-    // used as owner for cluster wide objecs.
-    #[arg(long, short)]
-    op_version: String,
-    #[arg(long, short)]
+    #[arg(
+        long,
+        short,
+        help = "Name of ClusterServiceVersion object that owns this Deployment."
+    )]
+    csv: String,
+    #[arg(long, short, help = "Namespace of the ClusterServiceVersion object.")]
     namespace: String,
-    #[arg(long, short)]
+    #[arg(long, short, help = "Directory with manifests to patch and apply.")]
     dir: std::path::PathBuf,
     /// Tracing log collector system
     #[arg(long, env, default_value_t, value_enum)]
@@ -72,7 +79,7 @@ async fn main() -> Result<()> {
     let opts = Opts::parse();
     if let Command::Run(OlmDeployerRun {
         keep_alive,
-        op_version,
+        csv,
         namespace,
         dir,
         tracing_target,
@@ -92,10 +99,8 @@ async fn main() -> Result<()> {
         let client =
             client::initialize_operator(Some(APP_NAME.to_string()), &cluster_info_opts).await?;
 
-        let deployment_api = client.get_api::<Deployment>(&namespace);
-        let deployment: Deployment = deployment_api.get("secret-operator-deployer").await?;
-
-        let cluster_role: ClusterRole = get_cluster_role(&op_version, &client).await?;
+        let deployment = get_deployment(&csv, &namespace, &client).await?;
+        let cluster_role = get_cluster_role(&csv, &client).await?;
 
         let kube_client = client.as_kube_client();
         // discovery (to be able to infer apis from kind/plural only)
@@ -185,9 +190,8 @@ fn dynamic_api(
     }
 }
 
-async fn get_cluster_role(op_version: &str, client: &client::Client) -> Result<ClusterRole> {
-    let labels =
-        format!("olm.owner=secret-operator.v{op_version},olm.owner.kind=ClusterServiceVersion");
+async fn get_cluster_role(csv: &str, client: &client::Client) -> Result<ClusterRole> {
+    let labels = format!("olm.owner={csv},olm.owner.kind=ClusterServiceVersion");
     let lp = ListParams {
         label_selector: Some(labels.clone()),
         ..ListParams::default()
@@ -199,5 +203,22 @@ async fn get_cluster_role(op_version: &str, client: &client::Client) -> Result<C
         Ok(result.first().unwrap().clone())
     } else {
         bail!("ClusterRole object not found for labels {labels}")
+    }
+}
+
+async fn get_deployment(csv: &str, namespace: &str, client: &client::Client) -> Result<Deployment> {
+    let labels = format!("olm.owner={csv},olm.owner.kind=ClusterServiceVersion");
+    let lp = ListParams {
+        label_selector: Some(labels.clone()),
+        ..ListParams::default()
+    };
+
+    let deployment_api = client.get_api::<Deployment>(namespace);
+    let result = deployment_api.list(&lp).await?.items;
+
+    match result.len() {
+        0 => bail!("no deployment owned by the csv {csv} found in namespace {namespace}"),
+        1 => Ok(result.first().unwrap().clone()),
+        _ => bail!("multiple deployments owned by the csv {csv} found but only one was expected"),
     }
 }
