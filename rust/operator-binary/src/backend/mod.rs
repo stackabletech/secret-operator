@@ -179,7 +179,8 @@ impl SecretVolumeSelector {
         scope: &scope::SecretScope,
     ) -> Result<Vec<Address>, ScopeAddressesError> {
         use scope_addresses_error::*;
-        let cluster_domain = &pod_info.kubernetes_cluster_domain;
+        // Turn FQDNs into bare domain names by removing the trailing dot
+        let cluster_domain = pod_info.kubernetes_cluster_domain.trim_end_matches(".");
         let namespace = &self.namespace;
         Ok(match scope {
             scope::SecretScope::Node => {
@@ -208,7 +209,13 @@ impl SecretVolumeSelector {
                 .listener_addresses
                 .get(name)
                 .context(NoListenerAddressesSnafu { listener: name })?
-                .to_vec(),
+                .iter()
+                .map(|addr| match addr {
+                    // Turn FQDNs into bare domain names by removing the trailing dot
+                    Address::Dns(dns) => Address::Dns(dns.trim_end_matches(".").to_string()),
+                    _ => addr.clone(),
+                })
+                .collect(),
         })
     }
 
