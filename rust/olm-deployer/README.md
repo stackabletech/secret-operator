@@ -13,6 +13,9 @@ $ ./olm/build-bundles.sh -c $HOME/repo/stackable/openshift-certified-operators -
 ...
 ```
 
+[!NOTE]
+Bundle images are published to `oci.stackable.tech` so you need to log in there first.
+
 The secret op and all it's dependencies should be installed and running in the `stackable-operators` namespace.
 
 Run the integration tests:
