@@ -1,11 +1,13 @@
+use std::collections::HashMap;
+
+use clap::crate_version;
+use tonic::{Request, Response, Status};
+
 use crate::grpc::csi::v1::{
     identity_server::Identity, plugin_capability, GetPluginCapabilitiesRequest,
     GetPluginCapabilitiesResponse, GetPluginInfoRequest, GetPluginInfoResponse, PluginCapability,
     ProbeRequest, ProbeResponse,
 };
-use clap::crate_version;
-use std::collections::HashMap;
-use tonic::{Request, Response, Status};
 
 pub struct SecretProvisionerIdentity;
 

@@ -1,3 +1,4 @@
+use std::fmt::Write as _; // import without risk of name clashing
 use std::{
     fmt::{Debug, LowerHex},
     ops::{Deref, DerefMut},
@@ -10,7 +11,6 @@ use openssl::asn1::{Asn1Time, Asn1TimeRef, TimeDiff};
 use pin_project::pin_project;
 use snafu::{OptionExt as _, ResultExt as _, Snafu};
 use socket2::Socket;
-use std::fmt::Write as _; // import without risk of name clashing
 use time::OffsetDateTime;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
@@ -207,9 +207,8 @@ mod tests {
     use openssl::asn1::Asn1Time;
     use time::OffsetDateTime;
 
-    use crate::utils::{error_full_message, trystream_any, FmtByteSlice};
-
     use super::{asn1time_to_offsetdatetime, iterator_try_concat_bytes};
+    use crate::utils::{error_full_message, trystream_any, FmtByteSlice};
 
     #[test]
     fn fmt_hex_byte_slice() {

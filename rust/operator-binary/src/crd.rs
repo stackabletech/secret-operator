@@ -376,7 +376,6 @@ impl Deref for KerberosPrincipal {
 #[cfg(test)]
 mod test {
     use super::*;
-
     use crate::{
         backend::tls::{DEFAULT_CA_CERT_LIFETIME, DEFAULT_MAX_CERT_LIFETIME},
         crd::{AutoTlsBackend, SecretClass, SecretClassSpec},
