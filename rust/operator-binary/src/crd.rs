@@ -328,7 +328,7 @@ pub struct KerberosPrincipal(String);
 #[snafu(module)]
 pub enum InvalidKerberosPrincipal {
     #[snafu(display(
-        "principal contains illegal characters (allowed: alphanumeric, /, @, -, and .)"
+        "principal contains illegal characters (allowed: alphanumeric, /, @, -, _, and .)"
     ))]
     IllegalCharacter,
 
@@ -342,7 +342,12 @@ impl TryFrom<String> for KerberosPrincipal {
         if value.starts_with('-') {
             invalid_kerberos_principal::StartWithDashSnafu.fail()
         } else if value.contains(|chr: char| {
-            !chr.is_alphanumeric() && chr != '/' && chr != '@' && chr != '.' && chr != '-'
+            !chr.is_alphanumeric()
+                && chr != '/'
+                && chr != '@'
+                && chr != '.'
+                && chr != '-'
+                && chr != '_'
         }) {
             invalid_kerberos_principal::IllegalCharacterSnafu.fail()
         } else {

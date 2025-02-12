@@ -19,11 +19,16 @@ All notable changes to this project will be documented in this file.
 
 - Default to OCI for image metadata ([#544]).
 
+### Fixed
+
+- Underscores are now allowed in Kerberos principal names ([#563]).
+
 [#528]: https://github.com/stackabletech/secret-operator/pull/528
-[#548]: https://github.com/stackabletech/secret-operator/pull/548
-[#552]: https://github.com/stackabletech/secret-operator/pull/552
 [#544]: https://github.com/stackabletech/secret-operator/pull/544
 [#546]: https://github.com/stackabletech/secret-operator/pull/546
+[#548]: https://github.com/stackabletech/secret-operator/pull/548
+[#552]: https://github.com/stackabletech/secret-operator/pull/552
+[#563]: https://github.com/stackabletech/secret-operator/pull/563
 
 ## [24.11.1] - 2025-01-10
 
