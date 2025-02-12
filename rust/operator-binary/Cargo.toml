@@ -23,6 +23,7 @@ p12.workspace = true
 pin-project.workspace = true
 prost-types.workspace = true
 prost.workspace = true
+rand.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 snafu.workspace = true
@@ -39,7 +40,6 @@ tonic.workspace = true
 tracing.workspace = true
 uuid.workspace = true
 yasna.workspace = true
-rand.workspace = true
 
 [dev-dependencies]
 serde_yaml.workspace = true
