@@ -184,7 +184,7 @@ impl SecretVolumeSelector {
         let namespace = &self.namespace;
         Ok(match scope {
             scope::SecretScope::Node => {
-                let mut addrs = vec![Address::Dns(pod_info.node_name.clone())];
+                let mut addrs = vec![Address::Dns(pod_info.node_name.trim_end_matches(".").to_owned())];
                 addrs.extend(pod_info.node_ips.iter().copied().map(Address::Ip));
                 addrs
             }
