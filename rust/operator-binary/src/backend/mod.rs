@@ -179,7 +179,7 @@ impl SecretVolumeSelector {
         scope: &scope::SecretScope,
     ) -> Result<Vec<Address>, ScopeAddressesError> {
         use scope_addresses_error::*;
-        // Turn FQDNs into bare domain names by removing the trailing dot
+        // Turn FQDNs into bare domain names by removing the trailing dots
         let cluster_domain = pod_info.kubernetes_cluster_domain.trim_end_matches(".");
         let namespace = &self.namespace;
         Ok(match scope {
@@ -211,7 +211,7 @@ impl SecretVolumeSelector {
                 .context(NoListenerAddressesSnafu { listener: name })?
                 .iter()
                 .map(|addr| match addr {
-                    // Turn FQDNs into bare domain names by removing the trailing dot
+                    // Turn FQDNs into bare domain names by removing the trailing dots
                     Address::Dns(dns) => Address::Dns(dns.trim_end_matches(".").to_string()),
                     _ => addr.clone(),
                 })
@@ -302,5 +302,116 @@ pub trait SecretBackendError: std::error::Error + Send + Sync + 'static {
 impl SecretBackendError for Infallible {
     fn grpc_code(&self) -> tonic::Code {
         match *self {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use pod_info::PodInfo;
+
+    use super::*;
+
+    #[test]
+    fn test_scope_addresses_without_trailing_dot() {
+        let pod_info = construct_pod_info("cluster.local");
+
+        assert_eq!(
+            calculate_scope(&pod_info, &SecretScope::Pod),
+            vec![
+                dns("my-sts.default.svc.cluster.local"),
+                dns("my-sts-0.my-sts.default.svc.cluster.local"),
+                ip("10.0.0.42"),
+            ]
+        );
+
+        assert_eq!(
+            calculate_scope(
+                &pod_info,
+                &SecretScope::Service {
+                    name: "my-service".to_owned()
+                }
+            ),
+            vec![dns("my-service.default.svc.cluster.local"),]
+        );
+
+        assert_eq!(
+            calculate_scope(&pod_info, &SecretScope::Node),
+            vec![dns("my-node"), ip("192.168.0.1"),]
+        );
+    }
+
+    #[test]
+    fn test_scope_addresses_with_trailing_dot() {
+        let pod_info = construct_pod_info("custom.cluster.local.");
+
+        assert_eq!(
+            calculate_scope(&pod_info, &SecretScope::Pod),
+            vec![
+                dns("my-sts.default.svc.custom.cluster.local"),
+                dns("my-sts-0.my-sts.default.svc.custom.cluster.local"),
+                ip("10.0.0.42"),
+            ]
+        );
+
+        assert_eq!(
+            calculate_scope(
+                &pod_info,
+                &SecretScope::Service {
+                    name: "my-service".to_owned()
+                }
+            ),
+            vec![
+                dns("my-service.default.svc.custom.cluster.local")
+            ]
+        );
+
+        assert_eq!(
+            calculate_scope(&pod_info, &SecretScope::Node),
+            vec![dns("my-node"), ip("192.168.0.1"),]
+        );
+    }
+
+    fn construct_pod_info(cluster_domain: &str) -> PodInfo {
+        PodInfo {
+            pod_ips: vec!["10.0.0.42".parse().unwrap()],
+            service_name: Some("my-sts".to_owned()),
+            node_name: "my-node".to_owned(),
+            node_ips: vec!["192.168.0.1".parse().unwrap()],
+            listener_addresses: HashMap::from([]),
+            kubernetes_cluster_domain: cluster_domain.parse().unwrap(),
+            scheduling: SchedulingPodInfo {
+                namespace: "default".to_owned(),
+                volume_listener_names: HashMap::new(),
+                has_node_scope: false,
+            },
+        }
+    }
+
+    fn calculate_scope(pod_info: &PodInfo, scope: &SecretScope) -> Vec<Address> {
+        let secret_volume_selector = construct_secret_volume_selector();
+        secret_volume_selector
+            .scope_addresses(pod_info, scope)
+            .unwrap()
+    }
+
+    fn dns(dns: &str) -> Address {
+        Address::Dns(dns.to_owned())
+    }
+
+    fn ip(ip: &str) -> Address {
+        Address::Ip(ip.parse().unwrap())
+    }
+
+    fn construct_secret_volume_selector() -> SecretVolumeSelector {
+        serde_yaml::from_str(
+            r#"
+secrets.stackable.tech/class: tls
+csi.storage.k8s.io/pod.name: my-sts-0
+csi.storage.k8s.io/pod.namespace: default
+        "#,
+        )
+        .unwrap()
     }
 }
