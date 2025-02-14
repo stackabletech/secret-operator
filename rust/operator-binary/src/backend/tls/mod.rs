@@ -252,6 +252,14 @@ impl SecretBackend for TlsGenerate {
                     .context(ScopeAddressesSnafu { scope })?,
             );
         }
+        for address in &mut addresses {
+            if let Address::Dns(dns) = address {
+                // Turn FQDNs into bare domain names by removing the trailing dot
+                if dns.ends_with('.') {
+                    dns.pop();
+                }
+            }
+        }
         let ca = self
             .ca_manager
             .find_certificate_authority_for_signing(not_after)

@@ -175,7 +175,7 @@ impl PodInfo {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Address {
     Dns(String),
     Ip(IpAddr),
