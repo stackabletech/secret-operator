@@ -6,7 +6,9 @@ use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{
-        api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector, ByteString,
+        api::core::v1::{ConfigMap, Secret},
+        apimachinery::pkg::apis::meta::v1::LabelSelector,
+        ByteString,
     },
     kube::api::ListParams,
     kvp::{LabelError, LabelSelectorExt, Labels},
@@ -17,7 +19,7 @@ use crate::{crd::SearchNamespace, format::SecretData, utils::Unloggable};
 use super::{
     pod_info::{PodInfo, SchedulingPodInfo},
     scope::SecretScope,
-    SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
+    SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector, TrustSelector,
 };
 
 const LABEL_CLASS: &str = "secrets.stackable.tech/class";
@@ -65,12 +67,13 @@ pub struct K8sSearch {
     // Not secret per se, but isn't Debug: https://github.com/stackabletech/secret-operator/issues/411
     pub client: Unloggable<stackable_operator::client::Client>,
     pub search_namespace: SearchNamespace,
+    pub truststore_configmap_name: Option<String>,
 }
 
 impl K8sSearch {
-    fn search_ns_for_pod<'a>(&'a self, selector: &'a SecretVolumeSelector) -> &'a str {
+    fn search_ns_for_target<'a>(&'a self, target_namespace: &'a str) -> &'a str {
         match &self.search_namespace {
-            SearchNamespace::Pod {} => &selector.namespace,
+            SearchNamespace::Pod {} => target_namespace,
             SearchNamespace::Name(ns) => ns,
         }
     }
@@ -90,7 +93,7 @@ impl SecretBackend for K8sSearch {
         let secret = self
             .client
             .list::<Secret>(
-                self.search_ns_for_pod(selector),
+                self.search_ns_for_target(&selector.namespace),
                 &ListParams::default().labels(&label_selector),
             )
             .await
@@ -108,6 +111,33 @@ impl SecretBackend for K8sSearch {
         )))
     }
 
+    async fn get_trust_data(
+        &self,
+        selector: &TrustSelector,
+    ) -> Result<SecretContents, Self::Error> {
+        let cm = self
+            .client
+            .get::<ConfigMap>(
+                self.truststore_configmap_name.as_deref().unwrap(),
+                self.search_ns_for_target(&selector.namespace),
+            )
+            .await
+            .unwrap();
+        Ok(SecretContents::new(SecretData::Unknown(
+            cm.binary_data
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(k, ByteString(v))| (k, v))
+                .chain(
+                    cm.data
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|(k, v)| (k, v.into_bytes())),
+                )
+                .collect(),
+        )))
+    }
+
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,
@@ -119,7 +149,7 @@ impl SecretBackend for K8sSearch {
             Ok(Some(
                 self.client
                     .list::<Secret>(
-                        self.search_ns_for_pod(selector),
+                        self.search_ns_for_target(&selector.namespace),
                         &ListParams::default().labels(&label_selector),
                     )
                     .await

@@ -13,7 +13,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    backend,
+    backend::{self, TrustSelector},
     crd::{SecretClass, TrustStore},
     format::well_known::CompatibilityOptions,
 };
@@ -57,7 +57,10 @@ async fn reconcile(
     let backend = backend::dynamic::from_class(&ctx.client, secret_class)
         .await
         .unwrap();
-    let trust_data = backend.get_trust_data().await.unwrap();
+    let selector = TrustSelector {
+        namespace: truststore.metadata.namespace.clone().unwrap(),
+    };
+    let trust_data = backend.get_trust_data(&selector).await.unwrap();
     let trust_cm = ConfigMap {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(truststore)

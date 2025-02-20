@@ -69,6 +69,13 @@ pub enum SecretClassBackend {
 pub struct K8sSearchBackend {
     /// Configures the namespace searched for Secret objects.
     pub search_namespace: SearchNamespace,
+
+    /// Name of a ConfigMap that contains the information required to validate against this SecretClass.
+    ///
+    /// Resolved relative to `search_namespace`.
+    ///
+    /// Required to request a TrustStore for this SecretClass.
+    pub truststore_configmap_name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

@@ -24,6 +24,7 @@ use super::{
     pod_info::{Address, PodInfo, SchedulingPodInfo},
     scope::SecretScope,
     ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
+    TrustSelector,
 };
 
 /// Default lifetime of certs when no annotations are set on the Volume.
@@ -171,6 +172,13 @@ impl SecretBackend for CertManager {
                 .map(|(k, ByteString(v))| (k, v))
                 .collect(),
         )))
+    }
+
+    async fn get_trust_data(
+        &self,
+        _selector: &TrustSelector,
+    ) -> Result<SecretContents, Self::Error> {
+        todo!()
     }
 
     async fn get_qualified_node_names(

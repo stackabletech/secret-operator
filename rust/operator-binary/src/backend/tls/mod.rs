@@ -341,7 +341,10 @@ impl SecretBackend for TlsGenerate {
         )
     }
 
-    async fn get_trust_data(&self) -> Result<SecretContents, Self::Error> {
+    async fn get_trust_data(
+        &self,
+        _selector: &super::TrustSelector,
+    ) -> Result<SecretContents, Self::Error> {
         Ok(SecretContents::new(SecretData::WellKnown(
             WellKnownSecretData::TlsPem(well_known::TlsPem {
                 ca_pem: iterator_try_concat_bytes(self.ca_manager.trust_roots().into_iter().map(

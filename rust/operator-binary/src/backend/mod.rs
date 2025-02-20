@@ -137,6 +137,12 @@ pub struct SecretVolumeSelector {
     pub cert_manager_cert_lifetime: Option<Duration>,
 }
 
+/// Configuration provided by the [`TrustStore`] selecting what trust data should be provided.
+pub struct TrustSelector {
+    /// The name of the [`TrustStore`]'s `Namespace`.
+    pub namespace: String,
+}
+
 /// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself.
 // These are optional even if they are set unconditionally, because otherwise we will
 // fail to restore volumes (after Node reboots etc) from before they were added during upgrades.
@@ -274,9 +280,8 @@ pub trait SecretBackend: Debug + Send + Sync {
         pod_info: pod_info::PodInfo,
     ) -> Result<SecretContents, Self::Error>;
 
-    async fn get_trust_data(&self) -> Result<SecretContents, Self::Error> {
-        todo!("temporary blanket impl, remove before merging")
-    }
+    async fn get_trust_data(&self, selector: &TrustSelector)
+        -> Result<SecretContents, Self::Error>;
 
     /// Try to predict which nodes would be able to provision this secret.
     ///

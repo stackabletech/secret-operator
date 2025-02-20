@@ -289,7 +289,10 @@ cluster.local = {realm_name}
         )))
     }
 
-    async fn get_trust_data(&self) -> Result<SecretContents, Self::Error> {
+    async fn get_trust_data(
+        &self,
+        _selector: &super::TrustSelector,
+    ) -> Result<SecretContents, Self::Error> {
         TrustExportUnsupportedSnafu.fail()
     }
 }
