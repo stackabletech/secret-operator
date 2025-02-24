@@ -13,16 +13,23 @@ All notable changes to this project will be documented in this file.
 
 - Made RSA key length configurable for certificates issued by cert-manager ([#528]).
 - Kerberos principal backends now also provision principals for IP address, not just DNS hostnames ([#552]).
+- OLM deployment helper ([#546]).
 
 ### Changed
 
 - Default to OCI for image metadata ([#544]).
 - [BREAKING] When using a fully qualified domain name, only the variant without the trailing dot is added to the SANs. This should only improve the behavior in scenarios where FQDNs are used and not affect anything else ([#564]).
 
+### Fixed
+
+- Underscores are now allowed in Kerberos principal names ([#563]).
+
 [#528]: https://github.com/stackabletech/secret-operator/pull/528
+[#544]: https://github.com/stackabletech/secret-operator/pull/544
+[#546]: https://github.com/stackabletech/secret-operator/pull/546
 [#548]: https://github.com/stackabletech/secret-operator/pull/548
 [#552]: https://github.com/stackabletech/secret-operator/pull/552
-[#544]: https://github.com/stackabletech/secret-operator/pull/544
+[#563]: https://github.com/stackabletech/secret-operator/pull/563
 [#564]: https://github.com/stackabletech/secret-operator/pull/564
 
 ## [24.11.1] - 2025-01-10

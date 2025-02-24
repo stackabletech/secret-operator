@@ -20,8 +20,8 @@ clap = "4.5"
 futures = { version = "0.3", features = ["compat"] }
 h2 = "0.4"
 ldap3 = { version = "0.11", default-features = false, features = [
-    "gssapi",
-    "tls",
+  "gssapi",
+  "tls",
 ] }
 libc = "0.2"
 native-tls = "0.2"
@@ -49,6 +49,7 @@ tonic-build = "0.12"
 tonic-reflection = "0.12"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+walkdir = "2.5.0"
 uuid = { version = "1.10.0", features = ["v4"] }
 yasna = "0.5"
 
