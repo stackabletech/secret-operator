@@ -273,7 +273,7 @@ impl SecretBackend for TlsGenerate {
                     })?
                     .build();
                 x509.set_subject_name(&subject_name)?;
-                x509.set_issuer_name(ca.certificate.issuer_name())?;
+                x509.set_issuer_name(ca.certificate.subject_name())?;
                 x509.set_not_before(Asn1Time::from_unix(not_before.unix_timestamp())?.as_ref())?;
                 x509.set_not_after(Asn1Time::from_unix(not_after.unix_timestamp())?.as_ref())?;
                 x509.set_pubkey(&pod_key)?;

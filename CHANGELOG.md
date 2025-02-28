@@ -23,6 +23,8 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - Underscores are now allowed in Kerberos principal names ([#563]).
+- The issuer in generated TLS certificates is set to the subject of the issuing
+  certificate ([#566]).
 
 [#528]: https://github.com/stackabletech/secret-operator/pull/528
 [#544]: https://github.com/stackabletech/secret-operator/pull/544
@@ -31,6 +33,7 @@ All notable changes to this project will be documented in this file.
 [#552]: https://github.com/stackabletech/secret-operator/pull/552
 [#563]: https://github.com/stackabletech/secret-operator/pull/563
 [#564]: https://github.com/stackabletech/secret-operator/pull/564
+[#566]: https://github.com/stackabletech/secret-operator/pull/566
 
 ## [24.11.1] - 2025-01-10
 
