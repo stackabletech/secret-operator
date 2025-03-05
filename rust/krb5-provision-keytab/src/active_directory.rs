@@ -7,7 +7,7 @@ use std::{
 use byteorder::{LittleEndian, WriteBytesExt};
 use krb5::{Keyblock, Keytab, KrbContext, Principal, PrincipalUnparseOptions};
 use ldap3::{Ldap, LdapConnAsync, LdapConnSettings};
-use rand::{seq::SliceRandom, thread_rng, CryptoRng};
+use rand::{seq::IndexedRandom, CryptoRng};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_krb5_provision_keytab::ActiveDirectorySamAccountNameRules;
 use stackable_operator::{
@@ -199,7 +199,7 @@ async fn get_ldap_ca_certificate(
 }
 
 fn generate_random_string(len: usize, dict: &[char]) -> String {
-    let mut rng = thread_rng();
+    let mut rng = rand::rng();
     // Assert that `rng` is crypto-safe
     let _: &dyn CryptoRng = &rng;
     let str = (0..len)
