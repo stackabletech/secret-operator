@@ -359,7 +359,7 @@ impl<'a> Keyblock<'a> {
         }
     }
 }
-impl<'a> Drop for Keyblock<'a> {
+impl Drop for Keyblock<'_> {
     fn drop(&mut self) {
         unsafe {
             krb5_sys::krb5_free_keyblock(self.ctx.raw, self.raw);

@@ -163,7 +163,7 @@ impl<'a> ServerHandle<'a> {
         })
     }
 }
-impl<'a> Drop for ServerHandle<'a> {
+impl Drop for ServerHandle<'_> {
     fn drop(&mut self) {
         unsafe {
             Error::from_ret(krb5_sys::kadm5_destroy(self.raw))

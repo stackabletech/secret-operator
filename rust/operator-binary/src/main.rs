@@ -100,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
             .await?;
             if csi_endpoint
                 .symlink_metadata()
-                .map_or(false, |meta| meta.file_type().is_socket())
+                .is_ok_and(|meta| meta.file_type().is_socket())
             {
                 let _ = std::fs::remove_file(&csi_endpoint);
             }
