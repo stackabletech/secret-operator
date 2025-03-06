@@ -212,7 +212,7 @@ impl SecretBackend for TlsGenerate {
             }
             .fail();
         }
-        let jitter_factor = rand::thread_rng().gen_range(0.0..jitter_factor_cap);
+        let jitter_factor = rand::rng().random_range(0.0..jitter_factor_cap);
         let jitter_amount = Duration::from(cert_lifetime.mul_f64(jitter_factor));
         let unjittered_cert_lifetime = cert_lifetime;
         let cert_lifetime = cert_lifetime - jitter_amount;

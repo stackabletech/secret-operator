@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Bump `stackable-operator` to 0.87.0 and `rand` to 0.9 ([#569]).
 - Default to OCI for image metadata ([#544]).
 - [BREAKING] When using a fully qualified domain name, only the variant without the trailing dot is added to the SANs. This should only improve the behavior in scenarios where FQDNs are used and not affect anything else ([#564]).
 
@@ -34,6 +35,7 @@ All notable changes to this project will be documented in this file.
 [#563]: https://github.com/stackabletech/secret-operator/pull/563
 [#564]: https://github.com/stackabletech/secret-operator/pull/564
 [#566]: https://github.com/stackabletech/secret-operator/pull/566
+[#569]: https://github.com/stackabletech/secret-operator/pull/569
 
 ## [24.11.1] - 2025-01-10
 
