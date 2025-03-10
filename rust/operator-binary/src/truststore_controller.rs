@@ -30,6 +30,7 @@ use crate::{
     backend::{self, TrustSelector},
     crd::{self, SearchNamespace, SecretClass, TrustStore},
     format::well_known::CompatibilityOptions,
+    utils::Flattened,
 };
 
 pub async fn start(client: &stackable_operator::client::Client, watch_namespace: &WatchNamespace) {
@@ -187,28 +188,31 @@ async fn reconcile(
         namespace: truststore.metadata.namespace.clone().unwrap(),
     };
     let trust_data = backend.get_trust_data(&selector).await.unwrap();
+    let (Flattened(string_data), Flattened(binary_data)) = trust_data
+        .data
+        .into_files(truststore.spec.format, &CompatibilityOptions::default())
+        .unwrap()
+        .into_iter()
+        // Try to put valid UTF-8 data into `data`, but fall back to `binary_data` otherwise
+        .map(|(k, v)| match String::from_utf8(v) {
+            Ok(v) => (Some((k, v)), None),
+            Err(v) => (None, Some((k, ByteString(v.into_bytes())))),
+        })
+        .collect();
     let trust_cm = ConfigMap {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(truststore)
             .ownerreference_from_resource(truststore, None, Some(true))
             .unwrap()
             .build(),
-        binary_data: Some(
-            trust_data
-                .data
-                .into_files(truststore.spec.format, &CompatibilityOptions::default())
-                .unwrap()
-                .into_iter()
-                .map(|(k, v)| (k, ByteString(v)))
-                .collect(),
-        ),
+        data: Some(string_data),
+        binary_data: Some(binary_data),
         ..Default::default()
     };
     ctx.client
         .apply_patch("truststore", &trust_cm, &trust_cm)
         .await
         .unwrap();
-    // TODO: Configure watch instead
     Ok(controller::Action::await_change())
 }
 
