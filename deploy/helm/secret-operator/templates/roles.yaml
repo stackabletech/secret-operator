@@ -62,6 +62,9 @@ rules:
     verbs:
       - create
       - patch
+      - get
+      - watch
+      - list
   - apiGroups:
       - ""
     resources:

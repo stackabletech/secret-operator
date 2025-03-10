@@ -2902,6 +2902,7 @@ dependencies = [
  "clap",
  "futures 0.3.31",
  "h2",
+ "kube-runtime",
  "libc",
  "openssl",
  "p12",

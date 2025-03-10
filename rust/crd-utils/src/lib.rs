@@ -5,7 +5,10 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
     k8s_openapi::api::core::v1::Secret,
-    kube::runtime::reflector::ObjectRef,
+    kube::{
+        api::{ObjectMeta, PartialObjectMeta},
+        runtime::reflector::ObjectRef,
+    },
     schemars::{self, JsonSchema},
 };
 
@@ -33,5 +36,22 @@ impl From<SecretReference> for ObjectRef<Secret> {
 impl From<&SecretReference> for ObjectRef<Secret> {
     fn from(val: &SecretReference) -> Self {
         ObjectRef::<Secret>::new(&val.name).within(&val.namespace)
+    }
+}
+
+impl SecretReference {
+    fn matches(&self, secret_meta: &ObjectMeta) -> bool {
+        secret_meta.name.as_deref() == Some(&self.name)
+            && secret_meta.namespace.as_deref() == Some(&self.namespace)
+    }
+}
+impl PartialEq<Secret> for SecretReference {
+    fn eq(&self, secret: &Secret) -> bool {
+        self.matches(&secret.metadata)
+    }
+}
+impl PartialEq<PartialObjectMeta<Secret>> for SecretReference {
+    fn eq(&self, secret: &PartialObjectMeta<Secret>) -> bool {
+        self.matches(&secret.metadata)
     }
 }

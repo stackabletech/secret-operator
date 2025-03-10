@@ -5265,6 +5265,7 @@ rec {
         features = {
           "unstable-runtime" = [ "unstable-runtime-subscribe" "unstable-runtime-stream-control" "unstable-runtime-reconcile-on" ];
         };
+        resolvedDefaultFeatures = [ "unstable-runtime-stream-control" ];
       };
       "lazy_static" = rec {
         crateName = "lazy_static";
@@ -9237,6 +9238,11 @@ rec {
           {
             name = "h2";
             packageId = "h2";
+          }
+          {
+            name = "kube-runtime";
+            packageId = "kube-runtime";
+            features = [ "unstable-runtime-stream-control" ];
           }
           {
             name = "libc";

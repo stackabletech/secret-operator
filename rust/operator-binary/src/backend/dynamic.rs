@@ -123,11 +123,11 @@ pub async fn from_class(
     Ok(match class.spec.backend {
         crd::SecretClassBackend::K8sSearch(crd::K8sSearchBackend {
             search_namespace,
-            truststore_configmap_name,
+            trust_store_config_map_name,
         }) => from(super::K8sSearch {
             client: Unloggable(client.clone()),
             search_namespace,
-            truststore_configmap_name,
+            trust_store_config_map_name,
         }),
         crd::SecretClassBackend::AutoTls(crd::AutoTlsBackend {
             ca,

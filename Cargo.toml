@@ -19,6 +19,7 @@ byteorder = "1.5"
 clap = "4.5"
 futures = { version = "0.3", features = ["compat"] }
 h2 = "0.4"
+kube-runtime = { version = "0.98", features = ["unstable-runtime-stream-control"] }
 ldap3 = { version = "0.11", default-features = false, features = [
     "gssapi",
     "tls",

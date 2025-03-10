@@ -1,39 +1,165 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 
 use futures::StreamExt;
+use kube_runtime::WatchStreamExt as _;
 use snafu::Snafu;
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
-    k8s_openapi::{api::core::v1::ConfigMap, ByteString},
+    k8s_openapi::{
+        api::core::v1::{ConfigMap, Secret},
+        ByteString,
+    },
     kube::{
+        api::PartialObjectMeta,
         core::DeserializeGuard,
-        runtime::{controller, watcher, Controller},
+        runtime::{
+            controller,
+            reflector::{self, ObjectRef},
+            watcher, Controller,
+        },
+        Resource,
     },
     namespace::WatchNamespace,
 };
 
 use crate::{
     backend::{self, TrustSelector},
-    crd::{SecretClass, TrustStore},
+    crd::{self, SearchNamespace, SecretClass, TrustStore},
     format::well_known::CompatibilityOptions,
 };
 
 pub async fn start(client: &stackable_operator::client::Client, watch_namespace: &WatchNamespace) {
-    Controller::new(
+    let (secretclasses, secretclasses_writer) = reflector::store();
+    let controller = Controller::new(
         watch_namespace.get_api::<DeserializeGuard<TrustStore>>(client),
         watcher::Config::default(),
-    )
-    .run(
-        reconcile,
-        error_policy,
-        Arc::new(Ctx {
-            client: client.clone(),
-        }),
-    )
-    .for_each(|x| async move {
-        println!("{x:?}");
-    })
-    .await;
+    );
+    let truststores = controller.store();
+    controller
+        .watches_stream(
+            watcher(
+                client.get_api::<DeserializeGuard<SecretClass>>(&()),
+                watcher::Config::default(),
+            )
+            .reflect(secretclasses_writer)
+            .touched_objects(),
+            {
+                let truststores = truststores.clone();
+                move |secretclass| {
+                    truststores
+                        .state()
+                        .into_iter()
+                        .filter(move |ts| {
+                            ts.0.as_ref().is_ok_and(|ts| {
+                                Some(&ts.spec.secret_class_name) == secretclass.meta().name.as_ref()
+                            })
+                        })
+                        .map(|ts| ObjectRef::from_obj(&*ts))
+                }
+            },
+        )
+        // TODO: merge this into the other ConfigMap watch
+        .owns(
+            watch_namespace.get_api::<PartialObjectMeta<ConfigMap>>(client),
+            watcher::Config::default(),
+        )
+        // TODO: refactor...
+        .watches(
+            watch_namespace.get_api::<PartialObjectMeta<ConfigMap>>(client),
+            watcher::Config::default(),
+            {
+                let truststores = truststores.clone();
+                let secretclasses = secretclasses.clone();
+                move |cm| {
+                    let cm_namespace = cm.metadata.namespace.as_deref().unwrap();
+                    let potentially_matching_secretclasses = secretclasses
+                        .state()
+                        .into_iter()
+                        .filter_map(move |sc| {
+                            sc.0.as_ref().ok().and_then(|sc| match &sc.spec.backend {
+                                crd::SecretClassBackend::K8sSearch(backend) => {
+                                    let name_matches =
+                                        backend.trust_store_config_map_name == cm.metadata.name;
+                                    (name_matches
+                                        && backend
+                                            .search_namespace
+                                            .can_match_namespace(cm_namespace))
+                                    .then(|| {
+                                        (ObjectRef::from_obj(sc), backend.search_namespace.clone())
+                                    })
+                                }
+                                crd::SecretClassBackend::AutoTls(_) => None,
+                                crd::SecretClassBackend::CertManager(_) => None,
+                                crd::SecretClassBackend::KerberosKeytab(_) => None,
+                            })
+                        })
+                        .collect::<HashMap<ObjectRef<SecretClass>, SearchNamespace>>();
+                    truststores
+                        .state()
+                        .into_iter()
+                        .filter(move |ts| {
+                            ts.0.as_ref().is_ok_and(|ts| {
+                                let secret_class_ref =
+                                    ObjectRef::<SecretClass>::new(&ts.spec.secret_class_name);
+                                potentially_matching_secretclasses
+                                    .get(&secret_class_ref)
+                                    .is_some_and(|secret_class_ns| {
+                                        secret_class_ns
+                                            .resolve(ts.metadata.namespace.as_deref().unwrap())
+                                            == cm.metadata.namespace.as_deref().unwrap()
+                                    })
+                            })
+                        })
+                        .map(|ts| ObjectRef::from_obj(&*ts))
+                }
+            },
+        )
+        .watches(
+            watch_namespace.get_api::<PartialObjectMeta<Secret>>(client),
+            watcher::Config::default(),
+            move |secret| {
+                let matching_secretclasses = secretclasses
+                    .state()
+                    .into_iter()
+                    .filter_map(move |sc| {
+                        sc.0.as_ref().ok().and_then(|sc| match &sc.spec.backend {
+                            crd::SecretClassBackend::AutoTls(backend) => {
+                                (backend.ca.secret == secret).then(|| ObjectRef::from_obj(sc))
+                            }
+                            crd::SecretClassBackend::K8sSearch(_) => None,
+                            crd::SecretClassBackend::CertManager(_) => None,
+                            crd::SecretClassBackend::KerberosKeytab(_) => None,
+                        })
+                    })
+                    .collect::<HashSet<ObjectRef<SecretClass>>>();
+                truststores
+                    .state()
+                    .into_iter()
+                    .filter(move |ts| {
+                        ts.0.as_ref().is_ok_and(|ts| {
+                            let secret_class_ref =
+                                ObjectRef::<SecretClass>::new(&ts.spec.secret_class_name);
+                            matching_secretclasses.contains(&secret_class_ref)
+                        })
+                    })
+                    .map(|ts| ObjectRef::from_obj(&*ts))
+            },
+        )
+        .run(
+            reconcile,
+            error_policy,
+            Arc::new(Ctx {
+                client: client.clone(),
+            }),
+        )
+        .for_each(|x| async move {
+            println!("{x:?}");
+        })
+        .await;
 }
 
 #[derive(Debug, Snafu)]
@@ -64,6 +190,8 @@ async fn reconcile(
     let trust_cm = ConfigMap {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(truststore)
+            .ownerreference_from_resource(truststore, None, Some(true))
+            .unwrap()
             .build(),
         binary_data: Some(
             trust_data
@@ -81,7 +209,7 @@ async fn reconcile(
         .await
         .unwrap();
     // TODO: Configure watch instead
-    Ok(controller::Action::requeue(Duration::from_secs(5)))
+    Ok(controller::Action::await_change())
 }
 
 fn error_policy(

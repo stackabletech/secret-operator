@@ -75,10 +75,10 @@ pub struct K8sSearchBackend {
     /// Resolved relative to `search_namespace`.
     ///
     /// Required to request a TrustStore for this SecretClass.
-    pub truststore_configmap_name: Option<String>,
+    pub trust_store_config_map_name: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum SearchNamespace {
     /// The Secret objects are located in the same namespace as the Pod object.
@@ -88,6 +88,22 @@ pub enum SearchNamespace {
     /// The Secret objects are located in a single global namespace.
     /// Should be used for secrets that are provisioned by the cluster administrator.
     Name(String),
+}
+
+impl SearchNamespace {
+    pub fn resolve<'a>(&'a self, pod_namespace: &'a str) -> &'a str {
+        match self {
+            SearchNamespace::Pod {} => pod_namespace,
+            SearchNamespace::Name(ns) => ns,
+        }
+    }
+
+    pub fn can_match_namespace(&self, potential_match_namespace: &str) -> bool {
+        match self {
+            SearchNamespace::Pod {} => true,
+            SearchNamespace::Name(ns) => ns == potential_match_namespace,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

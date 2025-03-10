@@ -67,16 +67,7 @@ pub struct K8sSearch {
     // Not secret per se, but isn't Debug: https://github.com/stackabletech/secret-operator/issues/411
     pub client: Unloggable<stackable_operator::client::Client>,
     pub search_namespace: SearchNamespace,
-    pub truststore_configmap_name: Option<String>,
-}
-
-impl K8sSearch {
-    fn search_ns_for_target<'a>(&'a self, target_namespace: &'a str) -> &'a str {
-        match &self.search_namespace {
-            SearchNamespace::Pod {} => target_namespace,
-            SearchNamespace::Name(ns) => ns,
-        }
-    }
+    pub trust_store_config_map_name: Option<String>,
 }
 
 #[async_trait]
@@ -93,7 +84,7 @@ impl SecretBackend for K8sSearch {
         let secret = self
             .client
             .list::<Secret>(
-                self.search_ns_for_target(&selector.namespace),
+                self.search_namespace.resolve(&selector.namespace),
                 &ListParams::default().labels(&label_selector),
             )
             .await
@@ -118,8 +109,8 @@ impl SecretBackend for K8sSearch {
         let cm = self
             .client
             .get::<ConfigMap>(
-                self.truststore_configmap_name.as_deref().unwrap(),
-                self.search_ns_for_target(&selector.namespace),
+                self.trust_store_config_map_name.as_deref().unwrap(),
+                self.search_namespace.resolve(&selector.namespace),
             )
             .await
             .unwrap();
@@ -149,7 +140,7 @@ impl SecretBackend for K8sSearch {
             Ok(Some(
                 self.client
                     .list::<Secret>(
-                        self.search_ns_for_target(&selector.namespace),
+                        self.search_namespace.resolve(&selector.namespace),
                         &ListParams::default().labels(&label_selector),
                     )
                     .await
