@@ -6,7 +6,7 @@ use std::{
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use krb5::{Keyblock, Keytab, KrbContext, Principal, PrincipalUnparseOptions};
-use ldap3::{Ldap, LdapConnAsync, LdapConnSettings};
+use ldap3::{Ldap, LdapConnAsync, LdapConnSettings, Scope, SearchEntry};
 use rand::{seq::IndexedRandom, CryptoRng};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_krb5_provision_keytab::ActiveDirectorySamAccountNameRules;
@@ -15,6 +15,7 @@ use stackable_operator::{
     kube::{self, runtime::reflector::ObjectRef},
 };
 use stackable_secret_operator_crd_utils::SecretReference;
+use tracing::info;
 
 use crate::credential_cache::{self, CredentialCache};
 
@@ -70,6 +71,15 @@ pub enum Error {
 
     #[snafu(display("configured samAccountName prefix is longer than the requested length"))]
     SamAccountNamePrefixLongerThanRequestedLength,
+
+    #[snafu(display("failed to execute LDAP search"))]
+    SearchLdap { source: ldap3::LdapError },
+
+    #[snafu(display("failed to extract successful LDAP search"))]
+    SearchLdapSuccess { source: ldap3::LdapError },
+
+    #[snafu(display("the user did not have an associated kvno"))]
+    KvnoNotFound,
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -162,18 +172,28 @@ impl<'a> AdAdmin<'a> {
             // FIXME: What about cases where ldap.add() succeeds but not the cache write?
             .context(PasswordCacheSnafu)??;
         let password_c = CString::new(password).context(DecodePasswordSnafu)?;
-        principal
-            .default_salt()
-            .and_then(|salt| {
-                Keyblock::from_password(
-                    self.krb,
-                    krb5::enctype::AES256_CTS_HMAC_SHA1_96,
-                    &password_c,
-                    &salt,
-                )
-            })
-            .and_then(|key| kt.add(principal, 0, &key.as_ref()))
-            .context(AddToKeytabSnafu)?;
+
+        let kvno = get_user_kvno(&mut self.ldap, principal, &self.user_distinguished_name).await?;
+        if let Some(kvno) = kvno {
+            info!("using kvno {kvno}");
+            principal
+                .default_salt()
+                .and_then(|salt| {
+                    Keyblock::from_password(
+                        self.krb,
+                        krb5::enctype::AES256_CTS_HMAC_SHA1_96,
+                        &password_c,
+                        &salt,
+                    )
+                })
+                .and_then(|key| kt.add(principal, kvno, &key.as_ref()))
+                .context(AddToKeytabSnafu)?;
+        } else {
+            // FIXME: if we can't detect the kvno then some applications may not
+            // authenticate if the keytab/kvno does not match the kvno of the
+            // ticket from the KDC. Always throw an exception?
+            //return Err(Error::KvnoNotFound);
+        }
         Ok(())
     }
 }
@@ -349,4 +369,50 @@ async fn create_ad_user(
         _ => create_user_result.success().context(CreateLdapUserSnafu)?,
     };
     Ok(())
+}
+
+#[tracing::instrument(skip(ldap), fields(%principal, %user_dn_base))]
+async fn get_user_kvno(
+    ldap: &mut Ldap,
+    principal: &Principal<'_>,
+    user_dn_base: &str,
+) -> Result<Option<u32>> {
+    let princ_name = principal
+        .unparse(PrincipalUnparseOptions::default())
+        .context(UnparsePrincipalSnafu)?;
+    let principal_cn = ldap3::dn_escape(&princ_name);
+    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
+
+    let distinguished_name = &format!("CN={principal_cn},{user_dn_base}");
+    info!("search with distinguished_name {:?}", distinguished_name);
+
+    // Perform search with KVNO attribute
+    let (search_results, _) = ldap
+        .search(
+            distinguished_name,
+            Scope::Base,
+            "(objectClass=user)",
+            vec!["msDS-KeyVersionNumber"],
+        )
+        .await
+        .context(SearchLdapSnafu)?
+        .success()
+        .context(SearchLdapSuccessSnafu)?;
+
+    // Extract KVNO from first result
+    let mut kvno = None;
+
+    if let Some(entry) = search_results.into_iter().next() {
+        let entry = SearchEntry::construct(entry);
+        info!("detected entry {:?}", entry);
+        kvno = entry
+            .attrs
+            .get("msDS-KeyVersionNumber")
+            .and_then(|v| v.first())
+            .and_then(|s| s.parse::<u32>().ok());
+    }
+
+    info!("detected kvno {:?}", kvno);
+
+    Ok(kvno)
 }
