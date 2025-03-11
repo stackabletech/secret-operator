@@ -175,7 +175,6 @@ impl<'a> AdAdmin<'a> {
 
         let kvno = get_user_kvno(&mut self.ldap, principal, &self.user_distinguished_name).await?;
         if let Some(kvno) = kvno {
-            info!("using kvno {kvno}");
             principal
                 .default_salt()
                 .and_then(|salt| {
@@ -192,7 +191,7 @@ impl<'a> AdAdmin<'a> {
             // FIXME: if we can't detect the kvno then some applications may not
             // authenticate if the keytab/kvno does not match the kvno of the
             // ticket from the KDC. Always throw an exception?
-            //return Err(Error::KvnoNotFound);
+            return Err(Error::KvnoNotFound);
         }
         Ok(())
     }
