@@ -186,9 +186,9 @@ impl<'a> AdAdmin<'a> {
                 .and_then(|key| kt.add(principal, kvno, &key.as_ref()))
                 .context(AddToKeytabSnafu)?;
         } else {
-            // FIXME: if we can't detect the kvno then some applications may not
+            // TODO: if we can't detect the kvno then some applications may not
             // authenticate if the keytab/kvno does not match the kvno of the
-            // ticket from the KDC. Always throw an exception?
+            // ticket from the KDC. So always throw an exception?
             return Err(Error::KvnoNotFound);
         }
         Ok(())
