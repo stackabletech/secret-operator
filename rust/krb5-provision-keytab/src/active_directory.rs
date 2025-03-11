@@ -146,9 +146,7 @@ impl<'a> AdAdmin<'a> {
         principal: &Principal<'_>,
         kt: &mut Keytab<'_>,
     ) -> Result<()> {
-        let princ_name = principal
-            .unparse(PrincipalUnparseOptions::default())
-            .context(UnparsePrincipalSnafu)?;
+        let princ_name = get_principal_data(principal)?.princ_name;
         let password_cache_key = princ_name.replace(['/', '@'], "__");
         let password = self
             .password_cache
@@ -281,18 +279,12 @@ async fn create_ad_user(
     const AD_ENCTYPE_AES256_HMAC_SHA1: u32 = 0x10;
 
     tracing::info!("creating principal");
-    let princ_name = principal
-        .unparse(PrincipalUnparseOptions::default())
-        .context(UnparsePrincipalSnafu)?;
-    let princ_name_realmless = principal
-        .unparse(PrincipalUnparseOptions {
-            realm: krb5::PrincipalRealmDisplayMode::Never,
-            ..Default::default()
-        })
-        .context(UnparsePrincipalSnafu)?;
-    let principal_cn = ldap3::dn_escape(&princ_name);
-    // FIXME: AD restricts RDNs to 64 characters
-    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
+
+    let principal_data = get_principal_data(principal)?;
+    let princ_name = principal_data.princ_name;
+    let principal_cn = principal_data.principal_cn;
+    let princ_name_realmless = principal_data.princ_name_realmless;
+
     let sam_account_name = generate_sam_account_name
         .map(|sam_rules| {
             let mut name = sam_rules.prefix.clone();
@@ -370,18 +362,39 @@ async fn create_ad_user(
     Ok(())
 }
 
+pub struct PrincipalData {
+    princ_name: String,
+    principal_cn: String,
+    princ_name_realmless: String,
+}
+
+fn get_principal_data(principal: &Principal<'_>) -> Result<PrincipalData> {
+    let princ_name = principal
+        .unparse(PrincipalUnparseOptions::default())
+        .context(UnparsePrincipalSnafu)?;
+    let principal_cn = ldap3::dn_escape(&princ_name);
+    // FIXME: AD restricts RDNs to 64 characters
+    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn).to_string();
+    let princ_name_realmless = principal
+        .unparse(PrincipalUnparseOptions {
+            realm: krb5::PrincipalRealmDisplayMode::Never,
+            ..Default::default()
+        })
+        .context(UnparsePrincipalSnafu)?;
+    Ok(PrincipalData {
+        princ_name,
+        principal_cn,
+        princ_name_realmless,
+    })
+}
+
 #[tracing::instrument(skip(ldap), fields(%principal, %user_dn_base))]
 async fn get_user_kvno(
     ldap: &mut Ldap,
     principal: &Principal<'_>,
     user_dn_base: &str,
 ) -> Result<Option<u32>> {
-    let princ_name = principal
-        .unparse(PrincipalUnparseOptions::default())
-        .context(UnparsePrincipalSnafu)?;
-    let principal_cn = ldap3::dn_escape(&princ_name);
-    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
-
+    let principal_cn = get_principal_data(principal)?.principal_cn;
     let distinguished_name = &format!("CN={principal_cn},{user_dn_base}");
     info!("search with distinguished_name {:?}", distinguished_name);
 
