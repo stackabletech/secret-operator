@@ -1,8 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::StreamExt;
 use kube_runtime::WatchStreamExt as _;
@@ -28,7 +24,7 @@ use stackable_operator::{
 
 use crate::{
     backend::{self, TrustSelector},
-    crd::{self, SearchNamespace, SecretClass, TrustStore},
+    crd::{SearchNamespaceMatchCondition, SecretClass, TrustStore},
     format::{self, well_known::CompatibilityOptions},
     utils::Flattened,
 };
@@ -76,29 +72,21 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
                 let truststores = truststores.clone();
                 let secretclasses = secretclasses.clone();
                 move |cm| {
-                    let cm_namespace = cm.metadata.namespace.as_deref();
                     let potentially_matching_secretclasses = secretclasses
                         .state()
                         .into_iter()
                         .filter_map(move |sc| {
-                            sc.0.as_ref().ok().and_then(|sc| match &sc.spec.backend {
-                                crd::SecretClassBackend::K8sSearch(backend) => {
-                                    let name_matches =
-                                        backend.trust_store_config_map_name == cm.metadata.name;
-                                    (name_matches
-                                        && backend
-                                            .search_namespace
-                                            .can_match_namespace(cm_namespace?))
-                                    .then(|| {
-                                        (ObjectRef::from_obj(sc), backend.search_namespace.clone())
-                                    })
-                                }
-                                crd::SecretClassBackend::AutoTls(_) => None,
-                                crd::SecretClassBackend::CertManager(_) => None,
-                                crd::SecretClassBackend::KerberosKeytab(_) => None,
+                            sc.0.as_ref().ok().and_then(|sc| {
+                                let conditions = sc
+                                    .spec
+                                    .backend
+                                    .refers_to_config_map(&cm)
+                                    .collect::<Vec<_>>();
+                                (!conditions.is_empty())
+                                    .then(|| (ObjectRef::from_obj(sc), conditions))
                             })
                         })
-                        .collect::<HashMap<ObjectRef<SecretClass>, SearchNamespace>>();
+                        .collect::<HashMap<ObjectRef<SecretClass>, Vec<SearchNamespaceMatchCondition>>>();
                     truststores
                         .state()
                         .into_iter()
@@ -111,9 +99,10 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
                                     ObjectRef::<SecretClass>::new(&ts.spec.secret_class_name);
                                 potentially_matching_secretclasses
                                     .get(&secret_class_ref)
-                                    .is_some_and(|secret_class_ns| {
-                                        Some(secret_class_ns.resolve(ts_namespace))
-                                            == cm.metadata.namespace.as_deref()
+                                    .is_some_and(|conds| {
+                                        conds
+                                            .iter()
+                                            .any(|cond| cond.matches_pod_namespace(ts_namespace))
                                     })
                             })
                         })
@@ -125,28 +114,37 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
             watch_namespace.get_api::<PartialObjectMeta<Secret>>(client),
             watcher::Config::default(),
             move |secret| {
-                let matching_secretclasses = secretclasses
+                let potentially_matching_secretclasses = secretclasses
                     .state()
                     .into_iter()
                     .filter_map(move |sc| {
-                        sc.0.as_ref().ok().and_then(|sc| match &sc.spec.backend {
-                            crd::SecretClassBackend::AutoTls(backend) => {
-                                (backend.ca.secret == secret).then(|| ObjectRef::from_obj(sc))
-                            }
-                            crd::SecretClassBackend::K8sSearch(_) => None,
-                            crd::SecretClassBackend::CertManager(_) => None,
-                            crd::SecretClassBackend::KerberosKeytab(_) => None,
+                        sc.0.as_ref().ok().and_then(|sc| {
+                            let conditions = sc
+                                .spec
+                                .backend
+                                .refers_to_secret(&secret)
+                                .collect::<Vec<_>>();
+                            (!conditions.is_empty()).then(|| (ObjectRef::from_obj(sc), conditions))
                         })
                     })
-                    .collect::<HashSet<ObjectRef<SecretClass>>>();
+                    .collect::<HashMap<ObjectRef<SecretClass>, Vec<SearchNamespaceMatchCondition>>>();
                 truststores
                     .state()
                     .into_iter()
                     .filter(move |ts| {
                         ts.0.as_ref().is_ok_and(|ts| {
+                            let Some(ts_namespace) = ts.metadata.namespace.as_deref() else {
+                                return false;
+                            };
                             let secret_class_ref =
                                 ObjectRef::<SecretClass>::new(&ts.spec.secret_class_name);
-                            matching_secretclasses.contains(&secret_class_ref)
+                            potentially_matching_secretclasses
+                                .get(&secret_class_ref)
+                                .is_some_and(|conds| {
+                                    conds
+                                        .iter()
+                                        .any(|cond| cond.matches_pod_namespace(ts_namespace))
+                                })
                         })
                     })
                     .map(|ts| ObjectRef::from_obj(&*ts))

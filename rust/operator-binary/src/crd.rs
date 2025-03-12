@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use stackable_operator::{
     commons::networking::{HostName, KerberosRealmName},
-    kube::CustomResource,
+    k8s_openapi::api::core::v1::{ConfigMap, Secret},
+    kube::{api::PartialObjectMeta, CustomResource},
     schemars::{self, schema::Schema, JsonSchema},
     time::Duration,
 };
@@ -64,6 +65,51 @@ pub enum SecretClassBackend {
     KerberosKeytab(KerberosKeytabBackend),
 }
 
+impl SecretClassBackend {
+    // Currently no `refers_to_*` method actually returns more than one element,
+    // but returning `Iterator` instead of `Option` to ensure that all consumers are ready
+    // for adding more conditions.
+
+    // The matcher methods are on the CRD type rather than the initialized `Backend` impls
+    // to avoid having to initialize the backend for each watch event.
+
+    /// Returns the conditions where the backend refers to `config_map`.
+    pub fn refers_to_config_map(
+        &self,
+        config_map: &PartialObjectMeta<ConfigMap>,
+    ) -> impl Iterator<Item = SearchNamespaceMatchCondition> {
+        let cm_namespace = config_map.metadata.namespace.as_deref();
+        match self {
+            Self::K8sSearch(backend) => {
+                let name_matches = backend.trust_store_config_map_name == config_map.metadata.name;
+                cm_namespace
+                    .filter(|_| name_matches)
+                    .and_then(|cm_ns| backend.search_namespace.matches_namespace(cm_ns))
+            }
+            Self::AutoTls(_) => None,
+            Self::CertManager(_) => None,
+            Self::KerberosKeytab(_) => None,
+        }
+        .into_iter()
+    }
+
+    /// Returns the conditions where the backend refers to `secret`.
+    pub fn refers_to_secret(
+        &self,
+        secret: &PartialObjectMeta<Secret>,
+    ) -> impl Iterator<Item = SearchNamespaceMatchCondition> {
+        match self {
+            Self::AutoTls(backend) => {
+                (backend.ca.secret == *secret).then_some(SearchNamespaceMatchCondition::True)
+            }
+            Self::K8sSearch(_) => None,
+            Self::CertManager(_) => None,
+            Self::KerberosKeytab(_) => None,
+        }
+        .into_iter()
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct K8sSearchBackend {
@@ -98,10 +144,43 @@ impl SearchNamespace {
         }
     }
 
-    pub fn can_match_namespace(&self, potential_match_namespace: &str) -> bool {
+    /// Returns [`Some`] if this `SearchNamespace` could possibly match an object in the namespace
+    /// `object_namespace`, otherwise [`None`].
+    ///
+    /// This is optimistic, you then need to call [`SearchMatchCondition::matches_pod_namespace`]
+    /// to evaluate the match for a specific pod's namespace.
+    pub fn matches_namespace(
+        &self,
+        object_namespace: &str,
+    ) -> Option<SearchNamespaceMatchCondition> {
         match self {
-            SearchNamespace::Pod {} => true,
-            SearchNamespace::Name(ns) => ns == potential_match_namespace,
+            SearchNamespace::Pod {} => Some(SearchNamespaceMatchCondition::IfPodIsInNamespace {
+                namespace: object_namespace.to_string(),
+            }),
+            SearchNamespace::Name(ns) => {
+                (ns == object_namespace).then_some(SearchNamespaceMatchCondition::True)
+            }
+        }
+    }
+}
+
+/// A partially evaluated match returned by [`SearchNamespace::matches_namespace`].
+/// Use [`matches_pod_namespace`] to evaluate fully.
+#[derive(Debug)]
+pub enum SearchNamespaceMatchCondition {
+    /// The target object matches the search namespace.
+    True,
+
+    /// The target object only matches the search namespace if mounted into a pod in
+    /// `namespace`.
+    IfPodIsInNamespace { namespace: String },
+}
+
+impl SearchNamespaceMatchCondition {
+    pub fn matches_pod_namespace(&self, pod_ns: &str) -> bool {
+        match self {
+            Self::True => true,
+            Self::IfPodIsInNamespace { namespace } => namespace == pod_ns,
         }
     }
 }
