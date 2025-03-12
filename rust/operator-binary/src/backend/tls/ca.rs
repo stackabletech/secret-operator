@@ -191,7 +191,8 @@ impl CertificateAuthority {
         let now = OffsetDateTime::now_utc();
         let not_before = now - Duration::from_minutes_unchecked(5);
         let not_after = now + config.ca_certificate_lifetime;
-        let conf = Conf::new(ConfMethod::default()).unwrap();
+        let conf =
+            Conf::new(ConfMethod::default()).expect("failed to initialize OpenSSL configuration");
 
         let private_key_length = match config.key_generation {
             CertificateKeyGeneration::Rsa { length } => length,

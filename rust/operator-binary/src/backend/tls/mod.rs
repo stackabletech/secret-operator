@@ -236,7 +236,8 @@ impl SecretBackend for TlsGenerate {
             .fail()?;
         }
 
-        let conf = Conf::new(ConfMethod::default()).unwrap();
+        let conf =
+            Conf::new(ConfMethod::default()).expect("failed to initialize OpenSSL configuration");
 
         let pod_key_length = match self.key_generation {
             CertificateKeyGeneration::Rsa { length } => length,

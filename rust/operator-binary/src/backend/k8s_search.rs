@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use async_trait::async_trait;
+use kube_runtime::reflector::ObjectRef;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{
@@ -48,6 +49,15 @@ pub enum Error {
 
     #[snafu(display("failed to build label"))]
     BuildLabel { source: LabelError },
+
+    #[snafu(display("no trust store ConfigMap is configured for this backend"))]
+    NoTrustStore,
+
+    #[snafu(display("failed to query for trust store source {configmap}"))]
+    GetTrustStore {
+        source: stackable_operator::client::Error,
+        configmap: ObjectRef<ConfigMap>,
+    },
 }
 
 impl SecretBackendError for Error {
@@ -58,6 +68,8 @@ impl SecretBackendError for Error {
             Error::NoSecret { .. } => tonic::Code::FailedPrecondition,
             Error::NoListener { .. } => tonic::Code::FailedPrecondition,
             Error::BuildLabel { .. } => tonic::Code::FailedPrecondition,
+            Error::NoTrustStore => tonic::Code::FailedPrecondition,
+            Error::GetTrustStore { .. } => tonic::Code::Internal,
         }
     }
 }
@@ -106,14 +118,18 @@ impl SecretBackend for K8sSearch {
         &self,
         selector: &TrustSelector,
     ) -> Result<SecretContents, Self::Error> {
+        let cm_name = self
+            .trust_store_config_map_name
+            .as_deref()
+            .context(NoTrustStoreSnafu)?;
+        let cm_ns = self.search_namespace.resolve(&selector.namespace);
         let cm = self
             .client
-            .get::<ConfigMap>(
-                self.trust_store_config_map_name.as_deref().unwrap(),
-                self.search_namespace.resolve(&selector.namespace),
-            )
+            .get::<ConfigMap>(cm_name, cm_ns)
             .await
-            .unwrap();
+            .with_context(|_| GetTrustStoreSnafu {
+                configmap: ObjectRef::<ConfigMap>::new(cm_name).within(cm_ns),
+            })?;
         Ok(SecretContents::new(SecretData::Unknown(
             cm.binary_data
                 .unwrap_or_default()

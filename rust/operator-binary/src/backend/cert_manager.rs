@@ -61,6 +61,9 @@ pub enum Error {
         source: stackable_operator::client::Error,
         certificate: ObjectRef<external_crd::cert_manager::Certificate>,
     },
+
+    #[snafu(display("the certManager backend does not currently support TrustStore exports"))]
+    TrustExportUnsupported,
 }
 
 impl SecretBackendError for Error {
@@ -71,6 +74,7 @@ impl SecretBackendError for Error {
             Error::GetSecret { .. } => tonic::Code::Unavailable,
             Error::GetCertManagerCertificate { .. } => tonic::Code::Unavailable,
             Error::ApplyCertManagerCertificate { .. } => tonic::Code::Unavailable,
+            Error::TrustExportUnsupported => tonic::Code::FailedPrecondition,
         }
     }
 }
@@ -178,7 +182,7 @@ impl SecretBackend for CertManager {
         &self,
         _selector: &TrustSelector,
     ) -> Result<SecretContents, Self::Error> {
-        todo!()
+        TrustExportUnsupportedSnafu.fail()
     }
 
     async fn get_qualified_node_names(

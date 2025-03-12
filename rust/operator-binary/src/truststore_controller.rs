@@ -6,7 +6,7 @@ use std::{
 
 use futures::StreamExt;
 use kube_runtime::WatchStreamExt as _;
-use snafu::Snafu;
+use snafu::{OptionExt as _, ResultExt as _, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::{
@@ -15,7 +15,7 @@ use stackable_operator::{
     },
     kube::{
         api::PartialObjectMeta,
-        core::DeserializeGuard,
+        core::{error_boundary, DeserializeGuard},
         runtime::{
             controller,
             reflector::{self, ObjectRef},
@@ -29,7 +29,7 @@ use stackable_operator::{
 use crate::{
     backend::{self, TrustSelector},
     crd::{self, SearchNamespace, SecretClass, TrustStore},
-    format::well_known::CompatibilityOptions,
+    format::{self, well_known::CompatibilityOptions},
     utils::Flattened,
 };
 
@@ -76,7 +76,7 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
                 let truststores = truststores.clone();
                 let secretclasses = secretclasses.clone();
                 move |cm| {
-                    let cm_namespace = cm.metadata.namespace.as_deref().unwrap();
+                    let cm_namespace = cm.metadata.namespace.as_deref();
                     let potentially_matching_secretclasses = secretclasses
                         .state()
                         .into_iter()
@@ -88,7 +88,7 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
                                     (name_matches
                                         && backend
                                             .search_namespace
-                                            .can_match_namespace(cm_namespace))
+                                            .can_match_namespace(cm_namespace?))
                                     .then(|| {
                                         (ObjectRef::from_obj(sc), backend.search_namespace.clone())
                                     })
@@ -104,14 +104,16 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
                         .into_iter()
                         .filter(move |ts| {
                             ts.0.as_ref().is_ok_and(|ts| {
+                                let Some(ts_namespace) = ts.metadata.namespace.as_deref() else {
+                                    return false;
+                                };
                                 let secret_class_ref =
                                     ObjectRef::<SecretClass>::new(&ts.spec.secret_class_name);
                                 potentially_matching_secretclasses
                                     .get(&secret_class_ref)
                                     .is_some_and(|secret_class_ns| {
-                                        secret_class_ns
-                                            .resolve(ts.metadata.namespace.as_deref().unwrap())
-                                            == cm.metadata.namespace.as_deref().unwrap()
+                                        Some(secret_class_ns.resolve(ts_namespace))
+                                            == cm.metadata.namespace.as_deref()
                                     })
                             })
                         })
@@ -164,7 +166,41 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
 }
 
 #[derive(Debug, Snafu)]
-pub enum Error {}
+pub enum Error {
+    #[snafu(display("TrustStore object is invalid"))]
+    InvalidTrustStore {
+        source: error_boundary::InvalidObject,
+    },
+
+    #[snafu(display("failed to get SecretClass for TrustStore"))]
+    GetSecretClass {
+        source: stackable_operator::client::Error,
+    },
+
+    #[snafu(display("failed to initialize SecretClass backend"))]
+    InitBackend {
+        source: backend::dynamic::FromClassError,
+    },
+
+    #[snafu(display("failed to get trust data from backend"))]
+    BackendGetTrustData { source: backend::dynamic::DynError },
+
+    #[snafu(display("TrustStore has no associated Namespace"))]
+    NoTrustStoreNamespace,
+
+    #[snafu(display("failed to convert trust data into desired format"))]
+    FormatData { source: format::IntoFilesError },
+
+    #[snafu(display("failed to build owner reference to the TrustStore"))]
+    BuildOwnerReference {
+        source: stackable_operator::builder::meta::Error,
+    },
+
+    #[snafu(display("failed to apply ConfigMap for the TrustStore"))]
+    ApplyTrustStoreConfigMap {
+        source: stackable_operator::client::Error,
+    },
+}
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 struct Ctx {
@@ -175,23 +211,34 @@ async fn reconcile(
     truststore: Arc<DeserializeGuard<TrustStore>>,
     ctx: Arc<Ctx>,
 ) -> Result<controller::Action> {
-    let truststore = truststore.0.as_ref().unwrap();
+    let truststore = truststore
+        .0
+        .as_ref()
+        .map_err(error_boundary::InvalidObject::clone)
+        .context(InvalidTrustStoreSnafu)?;
     let secret_class = ctx
         .client
         .get::<SecretClass>(&truststore.spec.secret_class_name, &())
         .await
-        .unwrap();
+        .context(GetSecretClassSnafu)?;
     let backend = backend::dynamic::from_class(&ctx.client, secret_class)
         .await
-        .unwrap();
+        .context(InitBackendSnafu)?;
     let selector = TrustSelector {
-        namespace: truststore.metadata.namespace.clone().unwrap(),
+        namespace: truststore
+            .metadata
+            .namespace
+            .clone()
+            .context(NoTrustStoreNamespaceSnafu)?,
     };
-    let trust_data = backend.get_trust_data(&selector).await.unwrap();
+    let trust_data = backend
+        .get_trust_data(&selector)
+        .await
+        .context(BackendGetTrustDataSnafu)?;
     let (Flattened(string_data), Flattened(binary_data)) = trust_data
         .data
         .into_files(truststore.spec.format, &CompatibilityOptions::default())
-        .unwrap()
+        .context(FormatDataSnafu)?
         .into_iter()
         // Try to put valid UTF-8 data into `data`, but fall back to `binary_data` otherwise
         .map(|(k, v)| match String::from_utf8(v) {
@@ -203,7 +250,7 @@ async fn reconcile(
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(truststore)
             .ownerreference_from_resource(truststore, None, Some(true))
-            .unwrap()
+            .context(BuildOwnerReferenceSnafu)?
             .build(),
         data: Some(string_data),
         binary_data: Some(binary_data),
@@ -212,7 +259,7 @@ async fn reconcile(
     ctx.client
         .apply_patch("truststore", &trust_cm, &trust_cm)
         .await
-        .unwrap();
+        .context(ApplyTrustStoreConfigMapSnafu)?;
     Ok(controller::Action::await_change())
 }
 
