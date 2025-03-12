@@ -64,91 +64,23 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
             watch_namespace.get_api::<PartialObjectMeta<ConfigMap>>(client),
             watcher::Config::default(),
         )
-        // TODO: refactor...
         .watches(
             watch_namespace.get_api::<PartialObjectMeta<ConfigMap>>(client),
             watcher::Config::default(),
-            {
-                let truststores = truststores.clone();
-                let secretclasses = secretclasses.clone();
-                move |cm| {
-                    let potentially_matching_secretclasses = secretclasses
-                        .state()
-                        .into_iter()
-                        .filter_map(move |sc| {
-                            sc.0.as_ref().ok().and_then(|sc| {
-                                let conditions = sc
-                                    .spec
-                                    .backend
-                                    .refers_to_config_map(&cm)
-                                    .collect::<Vec<_>>();
-                                (!conditions.is_empty())
-                                    .then(|| (ObjectRef::from_obj(sc), conditions))
-                            })
-                        })
-                        .collect::<HashMap<ObjectRef<SecretClass>, Vec<SearchNamespaceMatchCondition>>>();
-                    truststores
-                        .state()
-                        .into_iter()
-                        .filter(move |ts| {
-                            ts.0.as_ref().is_ok_and(|ts| {
-                                let Some(ts_namespace) = ts.metadata.namespace.as_deref() else {
-                                    return false;
-                                };
-                                let secret_class_ref =
-                                    ObjectRef::<SecretClass>::new(&ts.spec.secret_class_name);
-                                potentially_matching_secretclasses
-                                    .get(&secret_class_ref)
-                                    .is_some_and(|conds| {
-                                        conds
-                                            .iter()
-                                            .any(|cond| cond.matches_pod_namespace(ts_namespace))
-                                    })
-                            })
-                        })
-                        .map(|ts| ObjectRef::from_obj(&*ts))
-                }
-            },
+            secretclass_dependency_watch_mapper(
+                truststores.clone(),
+                secretclasses.clone(),
+                |secretclass, cm| secretclass.spec.backend.refers_to_config_map(cm),
+            ),
         )
         .watches(
             watch_namespace.get_api::<PartialObjectMeta<Secret>>(client),
             watcher::Config::default(),
-            move |secret| {
-                let potentially_matching_secretclasses = secretclasses
-                    .state()
-                    .into_iter()
-                    .filter_map(move |sc| {
-                        sc.0.as_ref().ok().and_then(|sc| {
-                            let conditions = sc
-                                .spec
-                                .backend
-                                .refers_to_secret(&secret)
-                                .collect::<Vec<_>>();
-                            (!conditions.is_empty()).then(|| (ObjectRef::from_obj(sc), conditions))
-                        })
-                    })
-                    .collect::<HashMap<ObjectRef<SecretClass>, Vec<SearchNamespaceMatchCondition>>>();
-                truststores
-                    .state()
-                    .into_iter()
-                    .filter(move |ts| {
-                        ts.0.as_ref().is_ok_and(|ts| {
-                            let Some(ts_namespace) = ts.metadata.namespace.as_deref() else {
-                                return false;
-                            };
-                            let secret_class_ref =
-                                ObjectRef::<SecretClass>::new(&ts.spec.secret_class_name);
-                            potentially_matching_secretclasses
-                                .get(&secret_class_ref)
-                                .is_some_and(|conds| {
-                                    conds
-                                        .iter()
-                                        .any(|cond| cond.matches_pod_namespace(ts_namespace))
-                                })
-                        })
-                    })
-                    .map(|ts| ObjectRef::from_obj(&*ts))
-            },
+            secretclass_dependency_watch_mapper(
+                truststores,
+                secretclasses,
+                |secretclass, secret| secretclass.spec.backend.refers_to_secret(secret),
+            ),
         )
         .run(
             reconcile,
@@ -161,6 +93,53 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
             println!("{x:?}");
         })
         .await;
+}
+
+/// Resolves modifications to dependencies of [`SecretClass`] objects into
+/// a list of affected [`TrustStore`]s.
+fn secretclass_dependency_watch_mapper<Dep: Resource, Conds>(
+    truststores: reflector::Store<DeserializeGuard<TrustStore>>,
+    secretclasses: reflector::Store<DeserializeGuard<SecretClass>>,
+    reference_conditions: impl Copy + Fn(&SecretClass, &Dep) -> Conds,
+) -> impl Fn(Dep) -> Vec<ObjectRef<DeserializeGuard<TrustStore>>>
+where
+    Conds: IntoIterator<Item = SearchNamespaceMatchCondition>,
+{
+    move |dep| {
+        let potentially_matching_secretclasses = secretclasses
+            .state()
+            .into_iter()
+            .filter_map(move |sc| {
+                sc.0.as_ref().ok().and_then(|sc| {
+                    let conditions = reference_conditions(sc, &dep)
+                        .into_iter()
+                        .collect::<Vec<_>>();
+                    (!conditions.is_empty()).then(|| (ObjectRef::from_obj(sc), conditions))
+                })
+            })
+            .collect::<HashMap<ObjectRef<SecretClass>, Vec<SearchNamespaceMatchCondition>>>();
+        truststores
+            .state()
+            .into_iter()
+            .filter(move |ts| {
+                ts.0.as_ref().is_ok_and(|ts| {
+                    let Some(ts_namespace) = ts.metadata.namespace.as_deref() else {
+                        return false;
+                    };
+                    let secret_class_ref =
+                        ObjectRef::<SecretClass>::new(&ts.spec.secret_class_name);
+                    potentially_matching_secretclasses
+                        .get(&secret_class_ref)
+                        .is_some_and(|conds| {
+                            conds
+                                .iter()
+                                .any(|cond| cond.matches_pod_namespace(ts_namespace))
+                        })
+                })
+            })
+            .map(|ts| ObjectRef::from_obj(&*ts))
+            .collect()
+    }
 }
 
 #[derive(Debug, Snafu)]
