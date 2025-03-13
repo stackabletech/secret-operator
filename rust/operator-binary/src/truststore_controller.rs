@@ -1,7 +1,10 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::StreamExt;
-use kube_runtime::WatchStreamExt as _;
+use kube_runtime::{
+    events::{Recorder, Reporter},
+    WatchStreamExt as _,
+};
 use snafu::{OptionExt as _, ResultExt as _, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
@@ -19,15 +22,21 @@ use stackable_operator::{
         },
         Resource,
     },
+    logging::controller::{report_controller_reconciled, ReconcilerError},
     namespace::WatchNamespace,
 };
+use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     backend::{self, TrustSelector},
     crd::{SearchNamespaceMatchCondition, SecretClass, TrustStore},
     format::{self, well_known::CompatibilityOptions},
     utils::Flattened,
+    OPERATOR_NAME,
 };
+
+const CONTROLLER_NAME: &str = "truststore";
+const FULL_CONTROLLER_NAME: &str = "truststore.secrets.stackable.tech";
 
 pub async fn start(client: &stackable_operator::client::Client, watch_namespace: &WatchNamespace) {
     let (secretclasses, secretclasses_writer) = reflector::store();
@@ -36,6 +45,13 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
         watcher::Config::default(),
     );
     let truststores = controller.store();
+    let event_recorder = Arc::new(Recorder::new(
+        client.as_kube_client(),
+        Reporter {
+            controller: FULL_CONTROLLER_NAME.to_string(),
+            instance: None,
+        },
+    ));
     controller
         .watches_stream(
             watcher(
@@ -89,8 +105,16 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
                 client: client.clone(),
             }),
         )
-        .for_each(|x| async move {
-            println!("{x:?}");
+        .for_each_concurrent(16, move |res| {
+            let event_recorder = event_recorder.clone();
+            async move {
+                report_controller_reconciled(
+                    &event_recorder,
+                    &format!("{CONTROLLER_NAME}.{OPERATOR_NAME}"),
+                    &res,
+                )
+                .await
+            }
         })
         .await;
 }
@@ -142,7 +166,8 @@ where
     }
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Snafu, EnumDiscriminants)]
+#[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
     #[snafu(display("TrustStore object is invalid"))]
     InvalidTrustStore {
@@ -179,6 +204,16 @@ pub enum Error {
     },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
+impl ReconcilerError for Error {
+    fn category(&self) -> &'static str {
+        ErrorDiscriminants::from(self).into()
+    }
+
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        // TODO
+        None
+    }
+}
 
 struct Ctx {
     client: stackable_operator::client::Client,
@@ -234,7 +269,7 @@ async fn reconcile(
         ..Default::default()
     };
     ctx.client
-        .apply_patch("truststore", &trust_cm, &trust_cm)
+        .apply_patch(CONTROLLER_NAME, &trust_cm, &trust_cm)
         .await
         .context(ApplyTrustStoreConfigMapSnafu)?;
     Ok(controller::Action::await_change())
