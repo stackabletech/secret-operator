@@ -4,6 +4,7 @@ use std::{
     sync::OnceLock,
 };
 
+use crate::credential_cache::{self, CredentialCache};
 use byteorder::{LittleEndian, WriteBytesExt};
 use krb5::{Keyblock, Keytab, KrbContext, Principal, PrincipalUnparseOptions};
 use ldap3::{Ldap, LdapConnAsync, LdapConnSettings, Scope, SearchEntry};
@@ -15,9 +16,6 @@ use stackable_operator::{
     kube::{self, runtime::reflector::ObjectRef},
 };
 use stackable_secret_operator_crd_utils::SecretReference;
-use tracing::info;
-
-use crate::credential_cache::{self, CredentialCache};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -186,9 +184,9 @@ impl<'a> AdAdmin<'a> {
                 .and_then(|key| kt.add(principal, kvno, &key.as_ref()))
                 .context(AddToKeytabSnafu)?;
         } else {
-            // TODO: if we can't detect the kvno then some applications may not
+            // If we can't detect the kvno then some applications may not
             // authenticate if the keytab/kvno does not match the kvno of the
-            // ticket from the KDC. So always throw an exception?
+            // ticket from the KDC. So always throw an exception.
             return Err(Error::KvnoNotFound);
         }
         Ok(())
@@ -373,7 +371,7 @@ fn get_principal_data(principal: &Principal<'_>) -> Result<PrincipalData> {
         .unparse(PrincipalUnparseOptions::default())
         .context(UnparsePrincipalSnafu)?;
     let principal_cn = ldap3::dn_escape(&princ_name);
-    // FIXME: AD restricts RDNs to 64 characters
+    // AD restricts RDNs to 64 characters
     let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn).to_string();
     let princ_name_realmless = principal
         .unparse(PrincipalUnparseOptions {
@@ -396,7 +394,7 @@ async fn get_user_kvno(
 ) -> Result<Option<u32>> {
     let principal_cn = get_principal_data(principal)?.principal_cn;
     let distinguished_name = &format!("CN={principal_cn},{user_dn_base}");
-    info!("search with distinguished_name {:?}", distinguished_name);
+    tracing::info!("searching for kvno using DN {distinguished_name}");
 
     // Perform search with KVNO attribute
     let (search_results, _) = ldap
@@ -411,20 +409,21 @@ async fn get_user_kvno(
         .success()
         .context(SearchLdapSuccessSnafu)?;
 
-    // Extract KVNO from first result
     let mut kvno = None;
 
+    // Extract KVNO from first result
     if let Some(entry) = search_results.into_iter().next() {
         let entry = SearchEntry::construct(entry);
-        info!("detected entry {:?}", entry);
+        tracing::debug!("detected search result entry {:?}", entry);
         kvno = entry
             .attrs
             .get("msDS-KeyVersionNumber")
             .and_then(|v| v.first())
             .and_then(|s| s.parse::<u32>().ok());
+        tracing::debug!("detected kvno {:?} for DN {distinguished_name}", kvno);
+    } else {
+        tracing::info!("no kvno detected for DN {distinguished_name}");
     }
-
-    info!("detected kvno {:?}", kvno);
 
     Ok(kvno)
 }
