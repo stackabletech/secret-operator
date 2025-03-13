@@ -1,7 +1,0 @@
-apiVersion: secrets.stackable.tech/v1alpha1
-kind: TrustStore
-metadata:
-  name: truststore
-spec:
-  secretClassName: tls
-  format: tls-pkcs12
