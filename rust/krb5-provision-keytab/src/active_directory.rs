@@ -4,7 +4,6 @@ use std::{
     sync::OnceLock,
 };
 
-use crate::credential_cache::{self, CredentialCache};
 use byteorder::{LittleEndian, WriteBytesExt};
 use krb5::{Keyblock, Keytab, KrbContext, Principal, PrincipalUnparseOptions};
 use ldap3::{Ldap, LdapConnAsync, LdapConnSettings, Scope, SearchEntry};
@@ -16,6 +15,8 @@ use stackable_operator::{
     kube::{self, runtime::reflector::ObjectRef},
 };
 use stackable_secret_operator_crd_utils::SecretReference;
+
+use crate::credential_cache::{self, CredentialCache};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
