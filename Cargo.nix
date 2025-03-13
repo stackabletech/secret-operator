@@ -6584,7 +6584,7 @@ rec {
         crateName = "p12";
         version = "0.6.3";
         edition = "2021";
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./vendor/p12; };
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/p12; };
         authors = [
           "hjiayz <hjiayz@gmail.com>"
           "Marc-Antoine Perennou <Marc-Antoine@Perennou.com>"

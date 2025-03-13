@@ -11,6 +11,8 @@ readme = "README.md"
 license = "MIT OR Apache-2.0"
 rust-version = "1.56.0"
 
+# Dependencies are tracked inline for now, to minimize divergence from upstream
+
 [dependencies]
 des = "^0.8"
 getrandom = "^0.2"

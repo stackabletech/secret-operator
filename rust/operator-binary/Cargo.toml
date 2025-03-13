@@ -11,6 +11,7 @@ publish = false
 [dependencies]
 stackable-krb5-provision-keytab = { path = "../krb5-provision-keytab" }
 stackable-secret-operator-crd-utils = { path = "../crd-utils" }
+p12 = { path = "../p12" }
 
 anyhow.workspace = true
 async-trait.workspace = true
@@ -20,7 +21,6 @@ h2.workspace = true
 kube-runtime.workspace = true
 libc.workspace = true
 openssl.workspace = true
-p12.workspace = true
 pin-project.workspace = true
 prost-types.workspace = true
 prost.workspace = true

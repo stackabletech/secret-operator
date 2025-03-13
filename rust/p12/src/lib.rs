@@ -404,6 +404,8 @@ impl MacData {
 
 fn rand() -> Option<[u8; 8]> {
     let mut buf = [0u8; 8];
+    // HACK: use null salt for determinism since we don't care about pkcs#12 encryption anyway
+    return Some(buf);
     if getrandom(&mut buf).is_ok() {
         Some(buf)
     } else {
@@ -1000,8 +1002,10 @@ impl SafeBag {
 
 #[test]
 fn test_create_p12() {
-    use std::fs::File;
-    use std::io::{Read, Write};
+    use std::{
+        fs::File,
+        io::{Read, Write},
+    };
     let mut cafile = File::open("ca.der").unwrap();
     let mut ca = vec![];
     cafile.read_to_end(&mut ca).unwrap();
@@ -1030,8 +1034,10 @@ fn test_create_p12() {
 }
 #[test]
 fn test_create_p12_without_password() {
-    use std::fs::File;
-    use std::io::{Read, Write};
+    use std::{
+        fs::File,
+        io::{Read, Write},
+    };
     let mut cafile = File::open("ca.der").unwrap();
     let mut ca = vec![];
     cafile.read_to_end(&mut ca).unwrap();
