@@ -109,6 +109,16 @@ fn pkcs12_truststore<'a>(
     let java_oracle_trusted_key_usage_oid =
         yasna::models::ObjectIdentifier::from_slice(&[2, 16, 840, 1, 113894, 746875, 1, 1]);
 
+    // We don't care about actually encrypting the truststore securely, but if we use a random salt then the pkcs#12 bundle will be different for every write
+    // (=> TrustStore controller will get stuck reconciling indefinitely.)
+    // So let's just use a fixed salt instead.
+    struct DummyRng;
+    impl p12::Rng for DummyRng {
+        fn generate_salt(&mut self) -> Option<[u8; 8]> {
+            Some([0; 8])
+        }
+    }
+
     let mut truststore_bags = Vec::new();
     for ca in ca_list {
         truststore_bags.push(p12::SafeBag {
@@ -124,8 +134,12 @@ fn pkcs12_truststore<'a>(
     }
     let password_as_bmp_string = bmp_string(p12_password);
     let encrypted_data = p12::ContentInfo::EncryptedData(
-        p12::EncryptedData::from_safe_bags(&truststore_bags[..], &password_as_bmp_string)
-            .context(tls_to_pkcs12_error::EncryptDataForTruststoreSnafu)?,
+        p12::EncryptedData::from_safe_bags(
+            &truststore_bags[..],
+            &password_as_bmp_string,
+            &mut DummyRng,
+        )
+        .context(tls_to_pkcs12_error::EncryptDataForTruststoreSnafu)?,
     );
     let truststore_data = yasna::construct_der(|w| {
         w.write_sequence_of(|w| {
@@ -134,7 +148,11 @@ fn pkcs12_truststore<'a>(
     });
     Ok(p12::PFX {
         version: 3,
-        mac_data: Some(p12::MacData::new(&truststore_data, &password_as_bmp_string)),
+        mac_data: Some(p12::MacData::new(
+            &truststore_data,
+            &password_as_bmp_string,
+            &mut DummyRng,
+        )),
         auth_safe: p12::ContentInfo::Data(truststore_data),
     }
     .to_der())

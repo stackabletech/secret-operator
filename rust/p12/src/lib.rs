@@ -89,7 +89,11 @@ impl EncryptedContentInfo {
         yasna::construct_der(|w| self.write(w))
     }
 
-    pub fn from_safe_bags(safe_bags: &[SafeBag], password: &[u8]) -> Option<EncryptedContentInfo> {
+    pub fn from_safe_bags(
+        safe_bags: &[SafeBag],
+        password: &[u8],
+        rng: &mut impl Rng,
+    ) -> Option<EncryptedContentInfo> {
         let data = yasna::construct_der(|w| {
             w.write_sequence_of(|w| {
                 for sb in safe_bags {
@@ -97,7 +101,7 @@ impl EncryptedContentInfo {
                 }
             })
         });
-        let salt = rand()?.to_vec();
+        let salt = rng.generate_salt()?.to_vec();
         let encrypted_content =
             pbe_with_sha1_and40_bit_rc2_cbc_encrypt(&data, password, &salt, ITERATIONS)?;
         let content_encryption_algorithm =
@@ -138,8 +142,13 @@ impl EncryptedData {
             self.encrypted_content_info.write(w.next());
         })
     }
-    pub fn from_safe_bags(safe_bags: &[SafeBag], password: &[u8]) -> Option<Self> {
-        let encrypted_content_info = EncryptedContentInfo::from_safe_bags(safe_bags, password)?;
+    pub fn from_safe_bags(
+        safe_bags: &[SafeBag],
+        password: &[u8],
+        rng: &mut impl Rng,
+    ) -> Option<Self> {
+        let encrypted_content_info =
+            EncryptedContentInfo::from_safe_bags(safe_bags, password, rng)?;
         Some(EncryptedData {
             encrypted_content_info,
         })
@@ -385,8 +394,8 @@ impl MacData {
         mac.verify_slice(&self.mac.digest).is_ok()
     }
 
-    pub fn new(data: &[u8], password: &[u8]) -> MacData {
-        let salt = rand().unwrap();
+    pub fn new(data: &[u8], password: &[u8], rng: &mut impl Rng) -> MacData {
+        let salt = rng.generate_salt().unwrap();
         let key = pbepkcs12sha1(password, &salt, ITERATIONS, 3, 20);
         let mut mac = HmacSha1::new_from_slice(&key).unwrap();
         mac.update(data);
@@ -402,14 +411,20 @@ impl MacData {
     }
 }
 
-fn rand() -> Option<[u8; 8]> {
-    let mut buf = [0u8; 8];
-    // HACK: use null salt for determinism since we don't care about pkcs#12 encryption anyway
-    return Some(buf);
-    if getrandom(&mut buf).is_ok() {
-        Some(buf)
-    } else {
-        None
+/// Random number generator
+pub trait Rng {
+    fn generate_salt(&mut self) -> Option<[u8; 8]>;
+}
+
+pub struct SystemRng;
+impl Rng for SystemRng {
+    fn generate_salt(&mut self) -> Option<[u8; 8]> {
+        let mut buf = [0u8; 8];
+        if getrandom(&mut buf).is_ok() {
+            Some(buf)
+        } else {
+            None
+        }
     }
 }
 
@@ -427,12 +442,13 @@ impl PFX {
         ca_der: Option<&[u8]>,
         password: &str,
         name: &str,
+        rng: &mut impl Rng,
     ) -> Option<PFX> {
         let mut cas = vec![];
         if let Some(ca) = ca_der {
             cas.push(ca);
         }
-        Self::new_with_cas(cert_der, key_der, &cas, password, name)
+        Self::new_with_cas(cert_der, key_der, &cas, password, name, rng)
     }
     pub fn new_with_cas(
         cert_der: &[u8],
@@ -440,9 +456,10 @@ impl PFX {
         ca_der_list: &[&[u8]],
         password: &str,
         name: &str,
+        rng: &mut impl Rng,
     ) -> Option<PFX> {
         let password = bmp_string(password);
-        let salt = rand()?.to_vec();
+        let salt = rng.generate_salt()?.to_vec();
         let encrypted_data =
             pbe_with_sha_and3_key_triple_des_cbc_encrypt(key_der, &password, &salt, ITERATIONS)?;
         let param = Pkcs12PbeParams {
@@ -474,7 +491,7 @@ impl PFX {
         let contents = yasna::construct_der(|w| {
             w.write_sequence_of(|w| {
                 ContentInfo::EncryptedData(
-                    EncryptedData::from_safe_bags(&cert_bags, &password)
+                    EncryptedData::from_safe_bags(&cert_bags, &password, rng)
                         .ok_or_else(|| ASN1Error::new(ASN1ErrorKind::Invalid))
                         .unwrap(),
                 )
@@ -487,7 +504,7 @@ impl PFX {
                 .write(w.next());
             });
         });
-        let mac_data = MacData::new(&contents, &password);
+        let mac_data = MacData::new(&contents, &password, rng);
         Some(PFX {
             version: 3,
             auth_safe: ContentInfo::Data(contents),
@@ -1015,7 +1032,7 @@ fn test_create_p12() {
     fcert.read_to_end(&mut cert).unwrap();
     let mut key = vec![];
     fkey.read_to_end(&mut key).unwrap();
-    let p12 = PFX::new(&cert, &key, Some(&ca), "changeit", "look")
+    let p12 = PFX::new(&cert, &key, Some(&ca), "changeit", "look", &mut SystemRng)
         .unwrap()
         .to_der();
 
@@ -1046,7 +1063,7 @@ fn test_create_p12_without_password() {
     let mut cert = vec![];
     fcert.read_to_end(&mut cert).unwrap();
 
-    let p12 = PFX::new(&cert, &[], Some(&ca), "", "look")
+    let p12 = PFX::new(&cert, &[], Some(&ca), "", "look", &mut SystemRng)
         .unwrap()
         .to_der();
 
