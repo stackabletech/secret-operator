@@ -161,3 +161,26 @@ pub enum TlsToPkcs12Error {
     #[snafu(display("failed to encrypt data for truststore"))]
     EncryptDataForTruststore,
 }
+
+#[cfg(test)]
+mod tests {
+    use openssl::{hash::MessageDigest, pkey::PKey, rsa::Rsa, x509::X509};
+
+    use crate::format::convert::pkcs12_truststore;
+
+    #[test]
+    fn pkcs12_truststore_should_be_deterministic() -> anyhow::Result<()> {
+        let pkey = PKey::try_from(Rsa::generate(2048)?)?;
+        let mut x509 = X509::builder()?;
+        x509.set_pubkey(&pkey)?;
+        x509.set_version(3 - 1)?;
+        x509.sign(&pkey, MessageDigest::sha256())?;
+        let cert = x509.build();
+        let password = "";
+        assert_eq!(
+            pkcs12_truststore([cert.as_ref()], password)?,
+            pkcs12_truststore([cert.as_ref()], password)?,
+        );
+        Ok(())
+    }
+}

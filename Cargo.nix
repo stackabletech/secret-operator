@@ -57,6 +57,16 @@ rec {
       # File a bug if you depend on any for non-debug work!
       debug = internal.debugCrate { inherit packageId; };
     };
+    "p12" = rec {
+      packageId = "p12";
+      build = internal.buildRustCrateWithFeatures {
+        packageId = "p12";
+      };
+
+      # Debug support which might change between releases.
+      # File a bug if you depend on any for non-debug work!
+      debug = internal.debugCrate { inherit packageId; };
+    };
     "stackable-krb5-provision-keytab" = rec {
       packageId = "stackable-krb5-provision-keytab";
       build = internal.buildRustCrateWithFeatures {
@@ -3105,6 +3115,33 @@ rec {
           "rustc-dep-of-std" = [ "core" "alloc" "compiler_builtins/rustc-dep-of-std" ];
         };
         resolvedDefaultFeatures = [ "default" ];
+      };
+      "hex" = rec {
+        crateName = "hex";
+        version = "0.4.3";
+        edition = "2018";
+        sha256 = "0w1a4davm1lgzpamwnba907aysmlrnygbqmfis2mqjx5m552a93z";
+        authors = [
+          "KokaKiwi <kokakiwi@kokakiwi.net>"
+        ];
+        features = {
+          "default" = [ "std" ];
+          "serde" = [ "dep:serde" ];
+          "std" = [ "alloc" ];
+        };
+        resolvedDefaultFeatures = [ "alloc" "default" "std" ];
+      };
+      "hex-literal" = rec {
+        crateName = "hex-literal";
+        version = "0.3.4";
+        edition = "2018";
+        sha256 = "1q54yvyy0zls9bdrx15hk6yj304npndy9v4crn1h1vd95sfv5gby";
+        procMacro = true;
+        libName = "hex_literal";
+        authors = [
+          "RustCrypto Developers"
+        ];
+
       };
       "hmac" = rec {
         crateName = "hmac";
@@ -6547,7 +6584,7 @@ rec {
         crateName = "p12";
         version = "0.6.3";
         edition = "2021";
-        sha256 = "094jzl331mj5gg6xcbpanqa1bmj7x7hk3pw4wkkq5zjkvq3371yl";
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./vendor/p12; };
         authors = [
           "hjiayz <hjiayz@gmail.com>"
           "Marc-Antoine Perennou <Marc-Antoine@Perennou.com>"
@@ -6591,6 +6628,16 @@ rec {
             name = "yasna";
             packageId = "yasna";
             features = [ "std" ];
+          }
+        ];
+        devDependencies = [
+          {
+            name = "hex";
+            packageId = "hex";
+          }
+          {
+            name = "hex-literal";
+            packageId = "hex-literal";
           }
         ];
 
