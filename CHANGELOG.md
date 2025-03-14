@@ -26,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - Underscores are now allowed in Kerberos principal names ([#563]).
 - The issuer in generated TLS certificates is set to the subject of the issuing
   certificate ([#566]).
+- Lookup KVNO from Active Directory rather than hard coding it ([#571]).
 
 [#528]: https://github.com/stackabletech/secret-operator/pull/528
 [#544]: https://github.com/stackabletech/secret-operator/pull/544
@@ -36,6 +37,7 @@ All notable changes to this project will be documented in this file.
 [#564]: https://github.com/stackabletech/secret-operator/pull/564
 [#566]: https://github.com/stackabletech/secret-operator/pull/566
 [#569]: https://github.com/stackabletech/secret-operator/pull/569
+[#571]: https://github.com/stackabletech/secret-operator/pull/571
 
 ## [24.11.1] - 2025-01-10
 

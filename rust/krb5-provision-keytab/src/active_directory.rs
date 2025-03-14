@@ -6,7 +6,7 @@ use std::{
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use krb5::{Keyblock, Keytab, KrbContext, Principal, PrincipalUnparseOptions};
-use ldap3::{Ldap, LdapConnAsync, LdapConnSettings};
+use ldap3::{Ldap, LdapConnAsync, LdapConnSettings, Scope, SearchEntry};
 use rand::{seq::IndexedRandom, CryptoRng};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_krb5_provision_keytab::ActiveDirectorySamAccountNameRules;
@@ -70,6 +70,15 @@ pub enum Error {
 
     #[snafu(display("configured samAccountName prefix is longer than the requested length"))]
     SamAccountNamePrefixLongerThanRequestedLength,
+
+    #[snafu(display("failed to execute LDAP search"))]
+    SearchLdap { source: ldap3::LdapError },
+
+    #[snafu(display("failed to extract successful LDAP search"))]
+    SearchLdapSuccess { source: ldap3::LdapError },
+
+    #[snafu(display("the user did not have an associated kvno"))]
+    KvnoNotFound,
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -136,9 +145,7 @@ impl<'a> AdAdmin<'a> {
         principal: &Principal<'_>,
         kt: &mut Keytab<'_>,
     ) -> Result<()> {
-        let princ_name = principal
-            .unparse(PrincipalUnparseOptions::default())
-            .context(UnparsePrincipalSnafu)?;
+        let princ_name = get_principal_data(principal)?.princ_name;
         let password_cache_key = princ_name.replace(['/', '@'], "__");
         let password = self
             .password_cache
@@ -162,18 +169,27 @@ impl<'a> AdAdmin<'a> {
             // FIXME: What about cases where ldap.add() succeeds but not the cache write?
             .context(PasswordCacheSnafu)??;
         let password_c = CString::new(password).context(DecodePasswordSnafu)?;
-        principal
-            .default_salt()
-            .and_then(|salt| {
-                Keyblock::from_password(
-                    self.krb,
-                    krb5::enctype::AES256_CTS_HMAC_SHA1_96,
-                    &password_c,
-                    &salt,
-                )
-            })
-            .and_then(|key| kt.add(principal, 0, &key.as_ref()))
-            .context(AddToKeytabSnafu)?;
+
+        let kvno = get_user_kvno(&mut self.ldap, principal, &self.user_distinguished_name).await?;
+        if let Some(kvno) = kvno {
+            principal
+                .default_salt()
+                .and_then(|salt| {
+                    Keyblock::from_password(
+                        self.krb,
+                        krb5::enctype::AES256_CTS_HMAC_SHA1_96,
+                        &password_c,
+                        &salt,
+                    )
+                })
+                .and_then(|key| kt.add(principal, kvno, &key.as_ref()))
+                .context(AddToKeytabSnafu)?;
+        } else {
+            // If we can't detect the kvno then some applications may not
+            // authenticate if the keytab/kvno does not match the kvno of the
+            // ticket from the KDC. So always throw an exception.
+            return Err(Error::KvnoNotFound);
+        }
         Ok(())
     }
 }
@@ -262,18 +278,12 @@ async fn create_ad_user(
     const AD_ENCTYPE_AES256_HMAC_SHA1: u32 = 0x10;
 
     tracing::info!("creating principal");
-    let princ_name = principal
-        .unparse(PrincipalUnparseOptions::default())
-        .context(UnparsePrincipalSnafu)?;
-    let princ_name_realmless = principal
-        .unparse(PrincipalUnparseOptions {
-            realm: krb5::PrincipalRealmDisplayMode::Never,
-            ..Default::default()
-        })
-        .context(UnparsePrincipalSnafu)?;
-    let principal_cn = ldap3::dn_escape(&princ_name);
-    // FIXME: AD restricts RDNs to 64 characters
-    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn);
+
+    let principal_data = get_principal_data(principal)?;
+    let princ_name = principal_data.princ_name;
+    let principal_cn = principal_data.principal_cn;
+    let princ_name_realmless = principal_data.princ_name_realmless;
+
     let sam_account_name = generate_sam_account_name
         .map(|sam_rules| {
             let mut name = sam_rules.prefix.clone();
@@ -349,4 +359,72 @@ async fn create_ad_user(
         _ => create_user_result.success().context(CreateLdapUserSnafu)?,
     };
     Ok(())
+}
+
+pub struct PrincipalData {
+    princ_name: String,
+    principal_cn: String,
+    princ_name_realmless: String,
+}
+
+fn get_principal_data(principal: &Principal<'_>) -> Result<PrincipalData> {
+    let princ_name = principal
+        .unparse(PrincipalUnparseOptions::default())
+        .context(UnparsePrincipalSnafu)?;
+    let principal_cn = ldap3::dn_escape(&princ_name);
+    // AD restricts RDNs to 64 characters
+    let principal_cn = principal_cn.get(..64).unwrap_or(&*principal_cn).to_string();
+    let princ_name_realmless = principal
+        .unparse(PrincipalUnparseOptions {
+            realm: krb5::PrincipalRealmDisplayMode::Never,
+            ..Default::default()
+        })
+        .context(UnparsePrincipalSnafu)?;
+    Ok(PrincipalData {
+        princ_name,
+        principal_cn,
+        princ_name_realmless,
+    })
+}
+
+#[tracing::instrument(skip(ldap), fields(%principal, %user_dn_base))]
+async fn get_user_kvno(
+    ldap: &mut Ldap,
+    principal: &Principal<'_>,
+    user_dn_base: &str,
+) -> Result<Option<u32>> {
+    let principal_cn = get_principal_data(principal)?.principal_cn;
+    let distinguished_name = &format!("CN={principal_cn},{user_dn_base}");
+    tracing::info!("searching for kvno using DN {distinguished_name}");
+
+    // Perform search with KVNO attribute
+    let (search_results, _) = ldap
+        .search(
+            distinguished_name,
+            Scope::Base,
+            "(objectClass=user)",
+            vec!["msDS-KeyVersionNumber"],
+        )
+        .await
+        .context(SearchLdapSnafu)?
+        .success()
+        .context(SearchLdapSuccessSnafu)?;
+
+    let mut kvno = None;
+
+    // Extract KVNO from first result
+    if let Some(entry) = search_results.into_iter().next() {
+        let entry = SearchEntry::construct(entry);
+        tracing::debug!("detected search result entry {:?}", entry);
+        kvno = entry
+            .attrs
+            .get("msDS-KeyVersionNumber")
+            .and_then(|v| v.first())
+            .and_then(|s| s.parse::<u32>().ok());
+        tracing::debug!("detected kvno {:?} for DN {distinguished_name}", kvno);
+    } else {
+        tracing::info!("no kvno detected for DN {distinguished_name}");
+    }
+
+    Ok(kvno)
 }
