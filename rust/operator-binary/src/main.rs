@@ -137,9 +137,11 @@ async fn main() -> anyhow::Result<()> {
                     sigterm.recv().map(|_| ()),
                 ));
             let truststore_controller =
-                pin!(truststore_controller::start(&client, &watch_namespace));
-            // TODO: handle error
-            futures::future::select(csi_server, truststore_controller).await;
+                pin!(truststore_controller::start(&client, &watch_namespace).map(Ok));
+            futures::future::select(csi_server, truststore_controller)
+                .await
+                .factor_first()
+                .0?;
         }
     }
     Ok(())
