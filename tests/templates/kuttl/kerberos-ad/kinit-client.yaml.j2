@@ -11,7 +11,7 @@ spec:
     spec:
       containers:
         - name: client
-          image: docker.stackable.tech/stackable/krb5:{{ test_scenario['values']['krb5'] }}-stackable0.0.0-dev
+          image: oci.stackable.tech/sdp/krb5:{{ test_scenario['values']['krb5'] }}-stackable0.0.0-dev
           command:
             - bash
           args:

@@ -13,7 +13,35 @@ All notable changes to this project will be documented in this file.
 
 - Made RSA key length configurable for certificates issued by cert-manager ([#528]).
 - Kerberos principal backends now also provision principals for IP address, not just DNS hostnames ([#552]).
+- OLM deployment helper ([#546]).
 - Added TrustStore CRD for requesting CA certificate information ([#557]).
+
+### Changed
+
+- Bump `stackable-operator` to 0.87.0 and `rand` to 0.9 ([#569]).
+- Default to OCI for image metadata ([#544]).
+- [BREAKING] When using a fully qualified domain name, only the variant without the trailing dot is added to the SANs. This should only improve the behavior in scenarios where FQDNs are used and not affect anything else ([#564]).
+
+### Fixed
+
+- Underscores are now allowed in Kerberos principal names ([#563]).
+- The issuer in generated TLS certificates is set to the subject of the issuing
+  certificate ([#566]).
+- Lookup KVNO from Active Directory rather than hard coding it ([#571]).
+
+[#528]: https://github.com/stackabletech/secret-operator/pull/528
+[#544]: https://github.com/stackabletech/secret-operator/pull/544
+[#546]: https://github.com/stackabletech/secret-operator/pull/546
+[#548]: https://github.com/stackabletech/secret-operator/pull/548
+[#552]: https://github.com/stackabletech/secret-operator/pull/552
+[#557]: https://github.com/stackabletech/secret-operator/pull/557
+[#563]: https://github.com/stackabletech/secret-operator/pull/563
+[#564]: https://github.com/stackabletech/secret-operator/pull/564
+[#566]: https://github.com/stackabletech/secret-operator/pull/566
+[#569]: https://github.com/stackabletech/secret-operator/pull/569
+[#571]: https://github.com/stackabletech/secret-operator/pull/571
+
+## [24.11.1] - 2025-01-10
 
 ### Fixed
 
@@ -22,11 +50,7 @@ All notable changes to this project will be documented in this file.
   be changed in the Helm values and defaults now to 1.0.0-stackable24.11.0
   rather than being hard-coded to 1.0.0-stackable24.7.0 ([#536]).
 
-[#528]: https://github.com/stackabletech/secret-operator/pull/528
 [#536]: https://github.com/stackabletech/secret-operator/pull/536
-[#548]: https://github.com/stackabletech/secret-operator/pull/548
-[#552]: https://github.com/stackabletech/secret-operator/pull/552
-[#557]: https://github.com/stackabletech/secret-operator/pull/557
 
 ## [24.11.0] - 2024-11-18
 

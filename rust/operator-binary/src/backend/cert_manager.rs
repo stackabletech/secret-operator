@@ -12,19 +12,18 @@ use stackable_operator::{
     time::Duration,
 };
 
-use crate::{
-    crd::{self, CertificateKeyGeneration},
-    external_crd::{self, cert_manager::CertificatePrivateKey},
-    format::SecretData,
-    utils::Unloggable,
-};
-
 use super::{
     k8s_search::LABEL_SCOPE_NODE,
     pod_info::{Address, PodInfo, SchedulingPodInfo},
     scope::SecretScope,
     ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
     TrustSelector,
+};
+use crate::{
+    crd::{self, CertificateKeyGeneration},
+    external_crd::{self, cert_manager::CertificatePrivateKey},
+    format::SecretData,
+    utils::Unloggable,
 };
 
 /// Default lifetime of certs when no annotations are set on the Volume.

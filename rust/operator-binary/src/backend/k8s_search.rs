@@ -15,13 +15,12 @@ use stackable_operator::{
     kvp::{LabelError, LabelSelectorExt, Labels},
 };
 
-use crate::{crd::SearchNamespace, format::SecretData, utils::Unloggable};
-
 use super::{
     pod_info::{PodInfo, SchedulingPodInfo},
     scope::SecretScope,
     SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector, TrustSelector,
 };
+use crate::{crd::SearchNamespace, format::SecretData, utils::Unloggable};
 
 const LABEL_CLASS: &str = "secrets.stackable.tech/class";
 pub(super) const LABEL_SCOPE_NODE: &str = "secrets.stackable.tech/node";

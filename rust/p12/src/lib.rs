@@ -4,11 +4,10 @@
 //!
 
 use getrandom::getrandom;
-use lazy_static::lazy_static;
-use yasna::{models::ObjectIdentifier, ASN1Error, ASN1ErrorKind, BERReader, DERWriter, Tag};
-
 use hmac::{Hmac, Mac};
+use lazy_static::lazy_static;
 use sha1::{Digest, Sha1};
+use yasna::{models::ObjectIdentifier, ASN1Error, ASN1ErrorKind, BERReader, DERWriter, Tag};
 
 type HmacSha1 = Hmac<Sha1>;
 

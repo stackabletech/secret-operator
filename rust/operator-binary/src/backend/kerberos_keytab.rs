@@ -17,6 +17,10 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
 };
 
+use super::{
+    pod_info::Address, scope::SecretScope, ScopeAddressesError, SecretBackend, SecretBackendError,
+    SecretContents,
+};
 use crate::{
     crd::{
         ActiveDirectorySamAccountNameRules, InvalidKerberosPrincipal, KerberosKeytabBackendAdmin,
@@ -24,11 +28,6 @@ use crate::{
     },
     format::{well_known, SecretData, WellKnownSecretData},
     utils::Unloggable,
-};
-
-use super::{
-    pod_info::Address, scope::SecretScope, ScopeAddressesError, SecretBackend, SecretBackendError,
-    SecretContents,
 };
 
 #[derive(Debug, Snafu)]

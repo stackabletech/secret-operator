@@ -1,3 +1,5 @@
+use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
+
 use anyhow::Context;
 use clap::{crate_description, crate_version, Parser};
 use csi_server::{
@@ -9,7 +11,6 @@ use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
 use stackable_operator::{cli::ProductOperatorRun, CustomResourceExt};
-use std::{os::unix::prelude::FileTypeExt, path::PathBuf, pin::pin};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
@@ -100,7 +101,7 @@ async fn main() -> anyhow::Result<()> {
             .await?;
             if csi_endpoint
                 .symlink_metadata()
-                .map_or(false, |meta| meta.file_type().is_socket())
+                .is_ok_and(|meta| meta.file_type().is_socket())
             {
                 let _ = std::fs::remove_file(&csi_endpoint);
             }

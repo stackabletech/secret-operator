@@ -27,16 +27,15 @@ use stackable_operator::{
 };
 use time::OffsetDateTime;
 
-use crate::{
-    crd::{self, CertificateKeyGeneration},
-    format::{well_known, SecretData, WellKnownSecretData},
-    utils::iterator_try_concat_bytes,
-};
-
 use super::{
     pod_info::{Address, PodInfo},
     scope::SecretScope,
     ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents,
+};
+use crate::{
+    crd::{self, CertificateKeyGeneration},
+    format::{well_known, SecretData, WellKnownSecretData},
+    utils::iterator_try_concat_bytes,
 };
 
 mod ca;
@@ -213,7 +212,7 @@ impl SecretBackend for TlsGenerate {
             }
             .fail();
         }
-        let jitter_factor = rand::thread_rng().gen_range(0.0..jitter_factor_cap);
+        let jitter_factor = rand::rng().random_range(0.0..jitter_factor_cap);
         let jitter_amount = Duration::from(cert_lifetime.mul_f64(jitter_factor));
         let unjittered_cert_lifetime = cert_lifetime;
         let cert_lifetime = cert_lifetime - jitter_amount;
@@ -254,6 +253,14 @@ impl SecretBackend for TlsGenerate {
                     .context(ScopeAddressesSnafu { scope })?,
             );
         }
+        for address in &mut addresses {
+            if let Address::Dns(dns) = address {
+                // Turn FQDNs into bare domain names by removing the trailing dot
+                if dns.ends_with('.') {
+                    dns.pop();
+                }
+            }
+        }
         let ca = self
             .ca_manager
             .find_certificate_authority_for_signing(not_after)
@@ -267,7 +274,7 @@ impl SecretBackend for TlsGenerate {
                     })?
                     .build();
                 x509.set_subject_name(&subject_name)?;
-                x509.set_issuer_name(ca.certificate.issuer_name())?;
+                x509.set_issuer_name(ca.certificate.subject_name())?;
                 x509.set_not_before(Asn1Time::from_unix(not_before.unix_timestamp())?.as_ref())?;
                 x509.set_not_after(Asn1Time::from_unix(not_after.unix_timestamp())?.as_ref())?;
                 x509.set_pubkey(&pod_key)?;
