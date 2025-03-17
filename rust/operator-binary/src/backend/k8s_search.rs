@@ -130,18 +130,18 @@ impl SecretBackend for K8sSearch {
             .with_context(|_| GetTrustStoreSnafu {
                 configmap: ObjectRef::<ConfigMap>::new(cm_name).within(cm_ns),
             })?;
+        let binary_data = cm
+            .binary_data
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, ByteString(v))| (k, v));
+        let str_data = cm
+            .data
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| (k, v.into_bytes()));
         Ok(SecretContents::new(SecretData::Unknown(
-            cm.binary_data
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(k, ByteString(v))| (k, v))
-                .chain(
-                    cm.data
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|(k, v)| (k, v.into_bytes())),
-                )
-                .collect(),
+            binary_data.chain(str_data).collect(),
         )))
     }
 
