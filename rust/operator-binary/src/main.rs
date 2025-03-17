@@ -8,10 +8,7 @@ use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
-use stackable_operator::{
-    logging::TracingTarget, namespace::WatchNamespace,
-    utils::cluster_info::KubernetesClusterInfoOpts, CustomResourceExt,
-};
+use stackable_operator::{cli::ProductOperatorRun, CustomResourceExt};
 use std::{os::unix::prelude::FileTypeExt, path::PathBuf, pin::pin};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio_stream::wrappers::UnixListenerStream;
@@ -54,17 +51,8 @@ struct SecretOperatorRun {
     #[clap(long, env)]
     privileged: bool,
 
-    /// Tracing log collector system
-    #[arg(long, env, default_value_t, value_enum)]
-    pub tracing_target: TracingTarget,
-
-    #[command(flatten)]
-    pub cluster_info_opts: KubernetesClusterInfoOpts,
-
-    // FIXME: Use ProductOperatorRun instead?
-    /// Provides a specific namespace to watch (instead of watching all namespaces)
-    #[arg(long, env, default_value = "")]
-    pub watch_namespace: WatchNamespace,
+    #[clap(flatten)]
+    common: ProductOperatorRun,
 }
 
 mod built_info {
@@ -82,10 +70,14 @@ async fn main() -> anyhow::Result<()> {
         stackable_operator::cli::Command::Run(SecretOperatorRun {
             csi_endpoint,
             node_name,
-            tracing_target,
             privileged,
-            cluster_info_opts,
-            watch_namespace,
+            common:
+                ProductOperatorRun {
+                    product_config: _,
+                    watch_namespace,
+                    tracing_target,
+                    cluster_info_opts,
+                },
         }) => {
             stackable_operator::logging::initialize_logging(
                 "SECRET_PROVISIONER_LOG",
