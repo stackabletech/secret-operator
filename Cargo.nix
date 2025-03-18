@@ -6746,7 +6746,7 @@ rec {
       };
       "p12" = rec {
         crateName = "p12";
-        version = "0.6.3";
+        version = "0.0.0-dev";
         edition = "2021";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/p12; };
         authors = [

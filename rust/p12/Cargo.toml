@@ -1,10 +1,10 @@
 [package]
 name = "p12"
-version = "0.6.3"
+version.workspace = true
 authors = ["hjiayz <hjiayz@gmail.com>", "Marc-Antoine Perennou <Marc-Antoine@Perennou.com>"]
 edition = "2021"
 keywords = ["pkcs12", "pkcs"]
-description = "pure rust pkcs12 tool"
+description = "pure rust pkcs12 tool (Stackable fork)"
 homepage = "https://github.com/hjiayz/p12"
 repository = "https://github.com/hjiayz/p12"
 readme = "README.md"
