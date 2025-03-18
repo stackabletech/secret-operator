@@ -147,7 +147,7 @@ impl SearchNamespace {
     /// Returns [`Some`] if this `SearchNamespace` could possibly match an object in the namespace
     /// `object_namespace`, otherwise [`None`].
     ///
-    /// This is optimistic, you then need to call [`SearchMatchCondition::matches_pod_namespace`]
+    /// This is optimistic, you then need to call [`SearchNamespaceMatchCondition::matches_pod_namespace`]
     /// to evaluate the match for a specific pod's namespace.
     pub fn matches_namespace(
         &self,
@@ -165,7 +165,7 @@ impl SearchNamespace {
 }
 
 /// A partially evaluated match returned by [`SearchNamespace::matches_namespace`].
-/// Use [`matches_pod_namespace`] to evaluate fully.
+/// Use [`Self::matches_pod_namespace`] to evaluate fully.
 #[derive(Debug)]
 pub enum SearchNamespaceMatchCondition {
     /// The target object matches the search namespace.

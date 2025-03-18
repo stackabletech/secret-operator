@@ -25,6 +25,8 @@ use stackable_operator::{
 pub use tls::TlsGenerate;
 
 use self::pod_info::SchedulingPodInfo;
+#[cfg(doc)]
+use crate::crd::TrustStore;
 use crate::format::{SecretData, SecretFormat};
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
