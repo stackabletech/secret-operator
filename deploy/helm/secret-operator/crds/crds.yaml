@@ -341,9 +341,13 @@ spec:
           description: Auto-generated derived type for TrustStoreSpec via `CustomResource`
           properties:
             spec:
+              description: |-
+                A [TrustStore](https://docs.stackable.tech/home/nightly/secret-operator/truststore) requests information about how to validate secrets issued by a [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass).
+
+                The requested information is written to a ConfigMap with the same name as the TrustStore.
               properties:
                 format:
-                  description: Auto-generated discriminant enum variants
+                  description: The [format](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#format) that the data should be converted into.
                   enum:
                     - tls-pem
                     - tls-pkcs12
@@ -351,6 +355,7 @@ spec:
                   nullable: true
                   type: string
                 secretClassName:
+                  description: The name of the SecretClass that the request concerns.
                   type: string
               required:
                 - secretClassName

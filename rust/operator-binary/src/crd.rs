@@ -475,6 +475,10 @@ impl Deref for KerberosPrincipal {
     }
 }
 
+/// A [TrustStore](DOCS_BASE_URL_PLACEHOLDER/secret-operator/truststore) requests information about how to
+/// validate secrets issued by a [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass).
+///
+/// The requested information is written to a ConfigMap with the same name as the TrustStore.
 #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[kube(
     group = "secrets.stackable.tech",
@@ -489,7 +493,10 @@ impl Deref for KerberosPrincipal {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct TrustStoreSpec {
+    /// The name of the SecretClass that the request concerns.
     pub secret_class_name: String,
+
+    /// The [format](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#format) that the data should be converted into.
     pub format: Option<SecretFormat>,
 }
 
