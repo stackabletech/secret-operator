@@ -50,6 +50,61 @@ The xref:secretclass.adoc#format[format] that the secret should be written as.
 
 This can be either the default output format of the xref:secretclass.adoc#backend[backend], or a format that it defines a conversion into.
 
+=== `secrets.stackable.tech/format.tls-pkcs12.keystore-name`
+
+*Required*: false
+
+*Default value*: `keystore.p12`
+
+*Backends*: xref:secretclass.adoc#backend-autotls[]
+
+An alternative name for the keystore file.
+Has no effect if the `format` is not `tls-pkcs12`.
+
+=== `secrets.stackable.tech/format.tls-pkcs12.truststore-name`
+
+*Required*: false
+
+*Default value*: `truststore.p12`
+
+*Backends*: xref:secretclass.adoc#backend-autotls[]
+
+An alternative name for the truststore file.
+Has no effect if the `format` is not `tls-pkcs12`.
+
+=== `secrets.stackable.tech/format.tls-pem.cert-name`
+
+*Required*: false
+
+*Default value*: `tls.crt`
+
+*Backends*: xref:secretclass.adoc#backend-autotls[]
+
+An alternative name for TLS PEM certificate.
+Has no effect if the `format` is not `tls-pem`.
+
+=== `secrets.stackable.tech/format.tls-pem.key-name`
+
+*Required*: false
+
+*Default value*: `tls.key`
+
+*Backends*: xref:secretclass.adoc#backend-autotls[]
+
+An alternative name for TLS PEM certificate key.
+Has no effect if the `format` is not `tls-pem`.
+
+=== `secrets.stackable.tech/format.tls-pem.ca-name`
+
+*Required*: false
+
+*Default value*: `ca.crt`
+
+*Backends*: xref:secretclass.adoc#backend-autotls[]
+
+An alternative name for TLS PEM certificate authority.
+Has no effect if the `format` is not `tls-pem`.
+
 === `secrets.stackable.tech/backend.autotls.cert.lifetime`
 
 *Required*: false
