@@ -1,4 +1,4 @@
-use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
+use std::{os::unix::prelude::FileTypeExt, path::PathBuf, pin::pin};
 
 use anyhow::Context;
 use clap::{crate_description, crate_version, Parser};
