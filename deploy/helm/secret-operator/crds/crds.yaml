@@ -42,6 +42,28 @@ spec:
 
                         A new certificate and key pair will be generated and signed for each Pod, keys or certificates are never reused.
                       properties:
+                        additionalTrustRoots:
+                          default: []
+                          description: Additional trust roots which are added to the provided `ca.crt` file.
+                          items:
+                            properties:
+                              secret:
+                                description: 'Reference (name and namespace) to a Kubernetes Secret object where additional certificates are stored. The extensions of the keys denote its contents: A key suffixed with `.pem` contains a stack of base64 encoded DER certificates, a key suffixed with `.cer`, `.cert`, or `.crt` contains either a binary DER certificate or a stack of base64 encoded DER certificates.'
+                                properties:
+                                  name:
+                                    description: Name of the Secret being referred to.
+                                    type: string
+                                  namespace:
+                                    description: Namespace of the Secret being referred to.
+                                    type: string
+                                required:
+                                  - name
+                                  - namespace
+                                type: object
+                            required:
+                              - secret
+                            type: object
+                          type: array
                         ca:
                           description: Configures the certificate authority used to issue Pod certificates.
                           properties:
