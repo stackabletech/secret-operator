@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Made RSA key length configurable for certificates issued by cert-manager ([#528]).
 - Kerberos principal backends now also provision principals for IP address, not just DNS hostnames ([#552]).
 - OLM deployment helper ([#546]).
+- Allow the specification of additional trust roots in autoTls SecretClasses ([#573]).
 
 ### Changed
 
@@ -38,6 +39,7 @@ All notable changes to this project will be documented in this file.
 [#566]: https://github.com/stackabletech/secret-operator/pull/566
 [#569]: https://github.com/stackabletech/secret-operator/pull/569
 [#571]: https://github.com/stackabletech/secret-operator/pull/571
+[#573]: https://github.com/stackabletech/secret-operator/pull/573
 
 ## [24.11.1] - 2025-01-10
 

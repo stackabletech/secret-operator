@@ -1,6 +1,6 @@
 //! Dynamically provisions and picks Certificate Authorities.
 
-use std::{collections::BTreeMap, fmt::Display};
+use std::{collections::BTreeMap, ffi::OsStr, fmt::Display, path::Path};
 
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},
@@ -34,7 +34,7 @@ use tracing::{info, info_span, warn};
 
 use crate::{
     backend::SecretBackendError,
-    crd::CertificateKeyGeneration,
+    crd::{AdditionalTrustRoot, CertificateKeyGeneration},
     utils::{asn1time_to_offsetdatetime, Asn1TimeParseError, Unloggable},
 };
 
@@ -55,8 +55,8 @@ pub enum Error {
     #[snafu(display("failed to generate certificate key"))]
     GenerateKey { source: openssl::error::ErrorStack },
 
-    #[snafu(display("failed to load CA {secret}"))]
-    FindCa {
+    #[snafu(display("failed to load {secret}"))]
+    FindSecret {
         source: kube::Error,
         secret: ObjectRef<Secret>,
     },
@@ -73,6 +73,12 @@ pub enum Error {
     #[snafu(display("failed to load certificate from key {key:?} of {secret}"))]
     LoadCertificate {
         source: openssl::error::ErrorStack,
+        key: String,
+        secret: ObjectRef<Secret>,
+    },
+
+    #[snafu(display("unsupported certificate format in key {key:?} of {secret}; supported extensions: .cer, .cert, .crt, .pem"))]
+    UnsupportedCertificateFormat {
         key: String,
         secret: ObjectRef<Secret>,
     },
@@ -106,9 +112,10 @@ impl SecretBackendError for Error {
         match self {
             Error::GenerateKey { .. } => tonic::Code::Internal,
             Error::MissingCertificate { .. } => tonic::Code::FailedPrecondition,
-            Error::FindCa { .. } => tonic::Code::Unavailable,
+            Error::FindSecret { .. } => tonic::Code::Unavailable,
             Error::CaNotFoundAndGenDisabled { .. } => tonic::Code::FailedPrecondition,
             Error::LoadCertificate { .. } => tonic::Code::FailedPrecondition,
+            Error::UnsupportedCertificateFormat { .. } => tonic::Code::InvalidArgument,
             Error::ParseLifetime { .. } => tonic::Code::FailedPrecondition,
             Error::BuildCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
@@ -293,12 +300,14 @@ impl CertificateAuthority {
 #[derive(Debug)]
 pub struct Manager {
     certificate_authorities: Vec<CertificateAuthority>,
+    additional_trusted_certificates: Vec<X509>,
 }
 
 impl Manager {
     pub async fn load_or_create(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
+        additional_trust_roots: &[AdditionalTrustRoot],
         config: &Config,
     ) -> Result<Self> {
         // Use entry API rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
@@ -306,7 +315,7 @@ impl Manager {
         let ca_secret = secrets_api
             .entry(&secret_ref.name)
             .await
-            .with_context(|_| FindCaSnafu { secret: secret_ref })?;
+            .with_context(|_| FindSecretSnafu { secret: secret_ref })?;
         let mut update_ca_secret = false;
         let mut certificate_authorities = match &ca_secret {
             Entry::Occupied(ca_secret) => {
@@ -441,9 +450,65 @@ impl Manager {
                 return SaveRequestedButForbiddenSnafu.fail();
             }
         }
+
+        let mut additional_trusted_certificates = vec![];
+        for AdditionalTrustRoot { secret } in additional_trust_roots {
+            additional_trusted_certificates
+                .extend(Self::read_certificates_from_secret(client, secret).await?);
+        }
+
         Ok(Self {
             certificate_authorities,
+            additional_trusted_certificates,
         })
+    }
+
+    /// Read certificates from the given Secret
+    ///
+    /// The keys are assumed to be filenames and their extensions denote the expected format of the
+    /// certificate.
+    async fn read_certificates_from_secret(
+        client: &stackable_operator::client::Client,
+        secret_ref: &SecretReference,
+    ) -> Result<Vec<X509>> {
+        let mut certificates = vec![];
+
+        let secrets_api = &client.get_api::<Secret>(&secret_ref.namespace);
+        let secret = secrets_api
+            .get(&secret_ref.name)
+            .await
+            .with_context(|_| FindSecretSnafu { secret: secret_ref })?;
+
+        let secret_data = secret.data.unwrap_or_default();
+        for (key, ByteString(value)) in &secret_data {
+            let extension = Path::new(key).extension().and_then(OsStr::to_str);
+            let certs = match extension {
+                Some("pem") => X509::stack_from_pem(value),
+                Some("cer") | Some("cert") | Some("crt") => X509::from_der(value)
+                    .map(|cert| vec![cert])
+                    .or(X509::stack_from_pem(value)),
+                _ => {
+                    return UnsupportedCertificateFormatSnafu {
+                        key,
+                        secret: secret_ref,
+                    }
+                    .fail();
+                }
+            }
+            .context(LoadCertificateSnafu {
+                key,
+                secret: secret_ref,
+            })?;
+            info!(
+                "Add the certificate(s) {certs:?} from the key [{key}] of [{secret_ref}] to the additional trust roots.",
+                certs = certs,
+                secret_ref = secret_ref,
+                key = key,
+            );
+            certificates.extend(certs);
+        }
+
+        Ok(certificates)
     }
 
     /// Get an appropriate [`CertificateAuthority`] for signing a given certificate.
@@ -467,5 +532,6 @@ impl Manager {
         self.certificate_authorities
             .iter()
             .map(|ca| &ca.certificate)
+            .chain(&self.additional_trusted_certificates)
     }
 }

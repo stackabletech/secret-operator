@@ -33,7 +33,7 @@ use super::{
     ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents,
 };
 use crate::{
-    crd::{self, CertificateKeyGeneration},
+    crd::{self, AdditionalTrustRoot, CertificateKeyGeneration},
     format::{well_known, SecretData, WellKnownSecretData},
     utils::iterator_try_concat_bytes,
 };
@@ -149,12 +149,14 @@ impl TlsGenerate {
             ca_certificate_lifetime,
             key_generation,
         }: &crd::AutoTlsCa,
+        additional_trust_roots: &[AdditionalTrustRoot],
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
         Ok(Self {
             ca_manager: ca::Manager::load_or_create(
                 client,
                 ca_secret,
+                additional_trust_roots,
                 &ca::Config {
                     manage_ca: *auto_generate_ca,
                     ca_certificate_lifetime: *ca_certificate_lifetime,
