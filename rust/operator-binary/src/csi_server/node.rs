@@ -6,7 +6,7 @@ use std::{
 
 use openssl::sha::Sha256;
 use serde::{de::IntoDeserializer, Deserialize};
-use snafu::{ResultExt, Snafu};
+use snafu::{ensure, ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::Pod,
@@ -98,6 +98,18 @@ enum PublishError {
         path: PathBuf,
     },
 
+    #[snafu(display("failed to canonicalize path {}", path.display()))]
+    CanonicalizePath {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+
+    #[snafu(display("encountered invalid path base in {}, expected {}", path.display(), expected_base.display()))]
+    InvalidPathBase {
+        path: PathBuf,
+        expected_base: PathBuf,
+    },
+
     #[snafu(display("failed to tag pod with expiry metadata"))]
     TagPod {
         source: stackable_operator::client::Error,
@@ -126,6 +138,8 @@ impl From<PublishError> for Status {
             PublishError::SetDirPermissions { .. } => Status::unavailable(full_msg),
             PublishError::CreateFile { .. } => Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
+            PublishError::CanonicalizePath { .. } => Status::unavailable(full_msg),
+            PublishError::InvalidPathBase { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
             PublishError::BuildAnnotation { .. } => Status::unavailable(full_msg),
         }
@@ -234,6 +248,22 @@ impl SecretProvisionerNode {
             .context(publish_error::FormatDataSnafu)?
         {
             let item_path = target_path.join(k);
+
+            // Prevent unwanted path traversals by first canonicalizing the final
+            // path and then validating that the path starts with the base we
+            // expect.
+            let item_path = item_path
+                .canonicalize()
+                .context(publish_error::CanonicalizePathSnafu { path: &item_path })?;
+
+            ensure!(
+                item_path.starts_with(target_path),
+                publish_error::InvalidPathBaseSnafu {
+                    path: &item_path,
+                    expected_base: &target_path
+                }
+            );
+
             if let Some(item_path_parent) = item_path.parent() {
                 create_dir_all(item_path_parent)
                     .await
