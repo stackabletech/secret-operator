@@ -4,12 +4,12 @@ use strum::EnumDiscriminants;
 
 use super::{convert, ConvertError, SecretFiles};
 
-const FILE_PEM_CERT_CERT: &str = "tls.crt";
-const FILE_PEM_CERT_KEY: &str = "tls.key";
-const FILE_PEM_CERT_CA: &str = "ca.crt";
+pub const FILE_PEM_CERT_CERT: &str = "tls.crt";
+pub const FILE_PEM_CERT_KEY: &str = "tls.key";
+pub const FILE_PEM_CERT_CA: &str = "ca.crt";
 
-const FILE_PKCS12_CERT_KEYSTORE: &str = "keystore.p12";
-const FILE_PKCS12_CERT_TRUSTSTORE: &str = "truststore.p12";
+pub const FILE_PKCS12_CERT_KEYSTORE: &str = "keystore.p12";
+pub const FILE_PKCS12_CERT_TRUSTSTORE: &str = "truststore.p12";
 
 const FILE_KERBEROS_KEYTAB_KEYTAB: &str = "keytab";
 const FILE_KERBEROS_KEYTAB_KRB5_CONF: &str = "krb5.conf";
@@ -46,24 +46,24 @@ pub enum WellKnownSecretData {
 }
 
 impl WellKnownSecretData {
-    pub fn into_files(self) -> SecretFiles {
+    pub fn into_files(self, names: &NamingOptions) -> SecretFiles {
         match self {
             WellKnownSecretData::TlsPem(TlsPem {
                 certificate_pem,
                 key_pem,
                 ca_pem,
             }) => [
-                (FILE_PEM_CERT_CERT.to_string(), certificate_pem),
-                (FILE_PEM_CERT_KEY.to_string(), key_pem),
-                (FILE_PEM_CERT_CA.to_string(), ca_pem),
+                (names.tls_pem_cert_name.to_string(), certificate_pem),
+                (names.tls_pem_key_name.to_string(), key_pem),
+                (names.tls_pem_ca_name.to_string(), ca_pem),
             ]
             .into(),
             WellKnownSecretData::TlsPkcs12(TlsPkcs12 {
                 keystore,
                 truststore,
             }) => [
-                (FILE_PKCS12_CERT_KEYSTORE.to_string(), keystore),
-                (FILE_PKCS12_CERT_TRUSTSTORE.to_string(), truststore),
+                (names.tls_pkcs12_keystore_name.to_string(), keystore),
+                (names.tls_pkcs12_truststore_name.to_string(), truststore),
             ]
             .into(),
             WellKnownSecretData::Kerberos(Kerberos { keytab, krb5_conf }) => [
@@ -121,6 +121,18 @@ impl WellKnownSecretData {
 #[derive(Default)]
 pub struct CompatibilityOptions {
     pub tls_pkcs12_password: Option<String>,
+}
+
+/// Options to customize the well-known format file names.
+///
+/// The fields will either contain the default value or the custom user-provided one. This is also
+/// the reason why the fields are not wrapped in [`Option`].
+pub struct NamingOptions {
+    pub tls_pkcs12_keystore_name: String,
+    pub tls_pkcs12_truststore_name: String,
+    pub tls_pem_cert_name: String,
+    pub tls_pem_key_name: String,
+    pub tls_pem_ca_name: String,
 }
 
 #[derive(Snafu, Debug)]

@@ -7,6 +7,7 @@ pub use self::{
     convert::ConvertError,
     well_known::{FromFilesError as ParseError, SecretFormat, WellKnownSecretData},
 };
+use crate::format::well_known::NamingOptions;
 
 mod convert;
 mod utils;
@@ -30,13 +31,14 @@ impl SecretData {
     pub fn into_files(
         self,
         format: Option<SecretFormat>,
+        names: &NamingOptions,
         compat: &CompatibilityOptions,
     ) -> Result<SecretFiles, IntoFilesError> {
         if let Some(format) = format {
-            Ok(self.parse()?.convert_to(format, compat)?.into_files())
+            Ok(self.parse()?.convert_to(format, compat)?.into_files(names))
         } else {
             Ok(match self {
-                SecretData::WellKnown(data) => data.into_files(),
+                SecretData::WellKnown(data) => data.into_files(names),
                 SecretData::Unknown(files) => files,
             })
         }

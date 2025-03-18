@@ -25,7 +25,13 @@ use stackable_operator::{
 pub use tls::TlsGenerate;
 
 use self::pod_info::SchedulingPodInfo;
-use crate::format::{SecretData, SecretFormat};
+use crate::format::{
+    well_known::{
+        FILE_PEM_CERT_CA, FILE_PEM_CERT_CERT, FILE_PEM_CERT_KEY, FILE_PKCS12_CERT_KEYSTORE,
+        FILE_PKCS12_CERT_TRUSTSTORE,
+    },
+    SecretData, SecretFormat,
+};
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
@@ -96,6 +102,51 @@ pub struct SecretVolumeSelector {
     )]
     pub compat_tls_pkcs12_password: Option<String>,
 
+    /// An alternative name used for the TLS PKCS#12 keystore file.
+    ///
+    /// Has no effect if the `format` is not `tls-pkcs12`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pkcs12.keystore-name",
+        default = "default_pkcs12_keystore_name"
+    )]
+    pub tls_pkcs12_keystore_name: String,
+
+    /// An alternative name used for the TLS PKCS#12 keystore file.
+    ///
+    /// Has no effect if the `format` is not `tls-pkcs12`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pkcs12.truststore-name",
+        default = "default_pkcs12_truststore_name"
+    )]
+    pub tls_pkcs12_truststore_name: String,
+
+    /// An alternative name used for the TLS PEM certificate.
+    ///
+    /// Has no effect if the `format` is not `tls-pem`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pem.cert-name",
+        default = "default_tls_pem_cert_name"
+    )]
+    pub tls_pem_cert_name: String,
+
+    /// An alternative name used for the TLS PEM certificate key.
+    ///
+    /// Has no effect if the `format` is not `tls-pem`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pem.key-name",
+        default = "default_tls_pem_key_name"
+    )]
+    pub tls_pem_key_name: String,
+
+    /// An alternative name used for the TLS PEM certificate authority.
+    ///
+    /// Has no effect if the `format` is not `tls-pem`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pem.ca-name",
+        default = "default_tls_pem_ca_name"
+    )]
+    pub tls_pem_ca_name: String,
+
     /// The TLS cert lifetime (when using the [`tls`] backend).
     /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
     #[serde(
@@ -162,6 +213,26 @@ fn default_cert_lifetime() -> Duration {
 
 fn default_cert_jitter_factor() -> f64 {
     tls::DEFAULT_CERT_JITTER_FACTOR
+}
+
+fn default_pkcs12_keystore_name() -> String {
+    FILE_PKCS12_CERT_KEYSTORE.to_owned()
+}
+
+fn default_pkcs12_truststore_name() -> String {
+    FILE_PKCS12_CERT_TRUSTSTORE.to_owned()
+}
+
+fn default_tls_pem_cert_name() -> String {
+    FILE_PEM_CERT_CERT.to_owned()
+}
+
+fn default_tls_pem_key_name() -> String {
+    FILE_PEM_CERT_KEY.to_owned()
+}
+
+fn default_tls_pem_ca_name() -> String {
+    FILE_PEM_CERT_CA.to_owned()
 }
 
 #[derive(Snafu, Debug)]

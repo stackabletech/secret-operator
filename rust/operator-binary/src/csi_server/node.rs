@@ -23,9 +23,15 @@ use tonic::{Request, Response, Status};
 use super::controller::TOPOLOGY_NODE;
 use crate::{
     backend::{
-        self, pod_info, pod_info::PodInfo, SecretBackendError, SecretContents, SecretVolumeSelector,
+        self,
+        pod_info::{self, PodInfo},
+        SecretBackendError, SecretContents, SecretVolumeSelector,
     },
-    format::{self, well_known::CompatibilityOptions, SecretFormat},
+    format::{
+        self,
+        well_known::{CompatibilityOptions, NamingOptions},
+        SecretFormat,
+    },
     grpc::csi::v1::{
         node_server::Node, NodeExpandVolumeRequest, NodeExpandVolumeResponse,
         NodeGetCapabilitiesRequest, NodeGetCapabilitiesResponse, NodeGetInfoRequest,
@@ -209,6 +215,7 @@ impl SecretProvisionerNode {
         target_path: &Path,
         data: SecretContents,
         format: Option<SecretFormat>,
+        names: &NamingOptions,
         compat: &CompatibilityOptions,
     ) -> Result<(), PublishError> {
         let create_secret = {
@@ -223,7 +230,7 @@ impl SecretProvisionerNode {
         };
         for (k, v) in data
             .data
-            .into_files(format, compat)
+            .into_files(format, names, compat)
             .context(publish_error::FormatDataSnafu)?
         {
             let item_path = target_path.join(k);
@@ -384,6 +391,13 @@ impl Node for SecretProvisionerNode {
                     &target_path,
                     data,
                     selector.format,
+                    &NamingOptions {
+                        tls_pkcs12_keystore_name: selector.tls_pkcs12_keystore_name,
+                        tls_pkcs12_truststore_name: selector.tls_pkcs12_truststore_name,
+                        tls_pem_cert_name: selector.tls_pem_cert_name,
+                        tls_pem_key_name: selector.tls_pem_key_name,
+                        tls_pem_ca_name: selector.tls_pem_ca_name,
+                    },
                     &CompatibilityOptions {
                         tls_pkcs12_password: selector.compat_tls_pkcs12_password,
                     },
