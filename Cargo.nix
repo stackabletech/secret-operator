@@ -3211,21 +3211,6 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" ];
       };
-      "hex" = rec {
-        crateName = "hex";
-        version = "0.4.3";
-        edition = "2018";
-        sha256 = "0w1a4davm1lgzpamwnba907aysmlrnygbqmfis2mqjx5m552a93z";
-        authors = [
-          "KokaKiwi <kokakiwi@kokakiwi.net>"
-        ];
-        features = {
-          "default" = [ "std" ];
-          "serde" = [ "dep:serde" ];
-          "std" = [ "alloc" ];
-        };
-        resolvedDefaultFeatures = [ "alloc" "default" "std" ];
-      };
       "hex-literal" = rec {
         crateName = "hex-literal";
         version = "0.3.4";
@@ -6810,10 +6795,6 @@ rec {
           }
         ];
         devDependencies = [
-          {
-            name = "hex";
-            packageId = "hex";
-          }
           {
             name = "hex-literal";
             packageId = "hex-literal";
