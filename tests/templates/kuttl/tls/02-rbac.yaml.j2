@@ -4,6 +4,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: use-integration-tests-scc
 rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - create
 {% if test_scenario['values']['openshift'] == "true" %}
   - apiGroups: ["security.openshift.io"]
     resources: ["securitycontextconstraints"]

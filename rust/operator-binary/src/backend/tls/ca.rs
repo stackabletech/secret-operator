@@ -77,7 +77,7 @@ pub enum Error {
         secret: ObjectRef<Secret>,
     },
 
-    #[snafu(display("unsupported certificate format in key {key:?} of {secret}; supported extensions: .cer, .cert, .crt, .pem"))]
+    #[snafu(display("unsupported certificate format in key {key:?} of {secret}; supported extensions: .cer, .cert, .crt, .der, .pem"))]
     UnsupportedCertificateFormat {
         key: String,
         secret: ObjectRef<Secret>,
@@ -484,6 +484,7 @@ impl Manager {
             let extension = Path::new(key).extension().and_then(OsStr::to_str);
             let certs = match extension {
                 Some("pem") => X509::stack_from_pem(value),
+                Some("der") => X509::from_der(value).map(|cert| vec![cert]),
                 Some("cer") | Some("cert") | Some("crt") => X509::from_der(value)
                     .map(|cert| vec![cert])
                     .or(X509::stack_from_pem(value)),

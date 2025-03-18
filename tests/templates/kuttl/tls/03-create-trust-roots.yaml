@@ -1,0 +1,61 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-trust-roots
+spec:
+  template:
+    spec:
+      containers:
+        - name: create-trust-roots
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - bash
+          args:
+            - -c
+            - |
+              set -euo pipefail
+
+              function create_cert {
+                  outform=$1
+                  cn=$2
+
+                  openssl req \
+                      -x509 \
+                      -nodes \
+                      -outform "$outform" \
+                      -subj "/CN=$cn"
+              }
+
+              # .pem file with one PEM certificate
+              create_cert PEM "cert 1" > cert1.pem
+
+              # .pem file with multiple PEM certificates
+              create_cert PEM "cert 2a" > cert2.pem
+              create_cert PEM "cert 2b" >> cert2.pem
+
+              # .der file with one DER certificate
+              create_cert DER "cert 3" > cert3.der
+
+              # .crt file with one DER certificate
+              create_cert DER "cert 4" > cert4.crt
+
+              # .crt file with multiple PEM certificates
+              create_cert PEM "cert 5a" > cert5.crt
+              create_cert PEM "cert 5b" >> cert5.crt
+
+              kubectl create secret generic trust-roots-1 \
+                  --from-file=cert1.pem \
+                  --from-file=cert2.pem \
+                  --from-file=cert3.der
+
+              kubectl create secret generic trust-roots-2 \
+                  --from-file=cert4.crt \
+                  --from-file=cert5.crt
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 0
+      serviceAccount: integration-tests-sa
