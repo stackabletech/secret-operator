@@ -297,3 +297,55 @@ impl SecretBackendError for Infallible {
         match *self {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use serde::de::{value::MapDeserializer, IntoDeserializer};
+
+    use super::*;
+
+    fn required_fields_map() -> HashMap<String, String> {
+        HashMap::from([
+            (
+                "secrets.stackable.tech/class".to_owned(),
+                "my-class".to_owned(),
+            ),
+            (
+                "csi.storage.k8s.io/pod.name".to_owned(),
+                "my-pod".to_owned(),
+            ),
+            (
+                "csi.storage.k8s.io/pod.namespace".to_owned(),
+                "my-namespace".to_owned(),
+            ),
+        ])
+    }
+
+    #[test]
+    fn deserialize_selector() {
+        let map = required_fields_map();
+
+        let _ =
+            SecretVolumeSelector::deserialize::<MapDeserializer<'_, _, serde::de::value::Error>>(
+                map.into_deserializer(),
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn deserialize_selector_compat() {
+        let mut map = required_fields_map();
+        map.insert(
+            "secrets.stackable.tech/format.compatibility.tls-pkcs12.password".to_owned(),
+            "supersecret".to_owned(),
+        );
+
+        let _ =
+            SecretVolumeSelector::deserialize::<MapDeserializer<'_, _, serde::de::value::Error>>(
+                map.into_deserializer(),
+            )
+            .unwrap();
+    }
+}
