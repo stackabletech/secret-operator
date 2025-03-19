@@ -147,8 +147,9 @@ pub struct AdditionalTrustRoot {
     /// Reference (name and namespace) to a Kubernetes Secret object where additional certificates
     /// are stored.
     /// The extensions of the keys denote its contents: A key suffixed with `.pem` contains a stack
-    /// of base64 encoded DER certificates, a key suffixed with `.cer`, `.cert`, or `.crt` contains
-    /// either a binary DER certificate or a stack of base64 encoded DER certificates.
+    /// of base64 encoded DER certificates, a key suffixed with `.der` contains a binary DER
+    /// certificate, and a key suffixed with `.cer`, `.cert`, or `.crt` contains either a binary DER
+    /// certificate or a stack of base64 encoded DER certificates.
     pub secret: SecretReference,
 }
 
