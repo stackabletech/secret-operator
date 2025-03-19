@@ -229,7 +229,7 @@ impl SecretProvisionerNode {
         target_path: &Path,
         data: SecretContents,
         format: Option<SecretFormat>,
-        names: &NamingOptions,
+        names: NamingOptions,
         compat: &CompatibilityOptions,
     ) -> Result<(), PublishError> {
         let create_secret = {
@@ -421,13 +421,7 @@ impl Node for SecretProvisionerNode {
                     &target_path,
                     data,
                     selector.format,
-                    &NamingOptions {
-                        tls_pkcs12_keystore_name: selector.tls_pkcs12_keystore_name,
-                        tls_pkcs12_truststore_name: selector.tls_pkcs12_truststore_name,
-                        tls_pem_cert_name: selector.tls_pem_cert_name,
-                        tls_pem_key_name: selector.tls_pem_key_name,
-                        tls_pem_ca_name: selector.tls_pem_ca_name,
-                    },
+                    selector.names,
                     &CompatibilityOptions {
                         tls_pkcs12_password: selector.compat_tls_pkcs12_password,
                     },

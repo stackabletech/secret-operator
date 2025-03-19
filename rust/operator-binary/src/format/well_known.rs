@@ -4,12 +4,12 @@ use strum::EnumDiscriminants;
 
 use super::{convert, ConvertError, SecretFiles};
 
-pub const FILE_PEM_CERT_CERT: &str = "tls.crt";
-pub const FILE_PEM_CERT_KEY: &str = "tls.key";
-pub const FILE_PEM_CERT_CA: &str = "ca.crt";
+const FILE_PEM_CERT_CERT: &str = "tls.crt";
+const FILE_PEM_CERT_KEY: &str = "tls.key";
+const FILE_PEM_CERT_CA: &str = "ca.crt";
 
-pub const FILE_PKCS12_CERT_KEYSTORE: &str = "keystore.p12";
-pub const FILE_PKCS12_CERT_TRUSTSTORE: &str = "truststore.p12";
+const FILE_PKCS12_CERT_KEYSTORE: &str = "keystore.p12";
+const FILE_PKCS12_CERT_TRUSTSTORE: &str = "truststore.p12";
 
 const FILE_KERBEROS_KEYTAB_KEYTAB: &str = "keytab";
 const FILE_KERBEROS_KEYTAB_KRB5_CONF: &str = "krb5.conf";
@@ -46,24 +46,24 @@ pub enum WellKnownSecretData {
 }
 
 impl WellKnownSecretData {
-    pub fn into_files(self, names: &NamingOptions) -> SecretFiles {
+    pub fn into_files(self, names: NamingOptions) -> SecretFiles {
         match self {
             WellKnownSecretData::TlsPem(TlsPem {
                 certificate_pem,
                 key_pem,
                 ca_pem,
             }) => [
-                (names.tls_pem_cert_name.to_string(), certificate_pem),
-                (names.tls_pem_key_name.to_string(), key_pem),
-                (names.tls_pem_ca_name.to_string(), ca_pem),
+                (names.tls_pem_cert_name, certificate_pem),
+                (names.tls_pem_key_name, key_pem),
+                (names.tls_pem_ca_name, ca_pem),
             ]
             .into(),
             WellKnownSecretData::TlsPkcs12(TlsPkcs12 {
                 keystore,
                 truststore,
             }) => [
-                (names.tls_pkcs12_keystore_name.to_string(), keystore),
-                (names.tls_pkcs12_truststore_name.to_string(), truststore),
+                (names.tls_pkcs12_keystore_name, keystore),
+                (names.tls_pkcs12_truststore_name, truststore),
             ]
             .into(),
             WellKnownSecretData::Kerberos(Kerberos { keytab, krb5_conf }) => [
@@ -127,12 +127,72 @@ pub struct CompatibilityOptions {
 ///
 /// The fields will either contain the default value or the custom user-provided one. This is also
 /// the reason why the fields are not wrapped in [`Option`].
+#[derive(Debug, Deserialize)]
 pub struct NamingOptions {
+    /// An alternative name used for the TLS PKCS#12 keystore file.
+    ///
+    /// Has no effect if the `format` is not `tls-pkcs12`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pkcs12.keystore-name",
+        default = "default_pkcs12_keystore_name"
+    )]
     pub tls_pkcs12_keystore_name: String,
+
+    /// An alternative name used for the TLS PKCS#12 keystore file.
+    ///
+    /// Has no effect if the `format` is not `tls-pkcs12`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pkcs12.truststore-name",
+        default = "default_pkcs12_truststore_name"
+    )]
     pub tls_pkcs12_truststore_name: String,
+
+    /// An alternative name used for the TLS PEM certificate.
+    ///
+    /// Has no effect if the `format` is not `tls-pem`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pem.cert-name",
+        default = "default_tls_pem_cert_name"
+    )]
     pub tls_pem_cert_name: String,
+
+    /// An alternative name used for the TLS PEM certificate key.
+    ///
+    /// Has no effect if the `format` is not `tls-pem`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pem.key-name",
+        default = "default_tls_pem_key_name"
+    )]
     pub tls_pem_key_name: String,
+
+    /// An alternative name used for the TLS PEM certificate authority.
+    ///
+    /// Has no effect if the `format` is not `tls-pem`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pem.ca-name",
+        default = "default_tls_pem_ca_name"
+    )]
     pub tls_pem_ca_name: String,
+}
+
+fn default_pkcs12_keystore_name() -> String {
+    FILE_PKCS12_CERT_KEYSTORE.to_owned()
+}
+
+fn default_pkcs12_truststore_name() -> String {
+    FILE_PKCS12_CERT_TRUSTSTORE.to_owned()
+}
+
+fn default_tls_pem_cert_name() -> String {
+    FILE_PEM_CERT_CERT.to_owned()
+}
+
+fn default_tls_pem_key_name() -> String {
+    FILE_PEM_CERT_KEY.to_owned()
+}
+
+fn default_tls_pem_ca_name() -> String {
+    FILE_PEM_CERT_CA.to_owned()
 }
 
 #[derive(Snafu, Debug)]

@@ -31,7 +31,7 @@ impl SecretData {
     pub fn into_files(
         self,
         format: Option<SecretFormat>,
-        names: &NamingOptions,
+        names: NamingOptions,
         compat: &CompatibilityOptions,
     ) -> Result<SecretFiles, IntoFilesError> {
         if let Some(format) = format {
