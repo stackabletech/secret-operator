@@ -230,7 +230,7 @@ impl SecretProvisionerNode {
         data: SecretContents,
         format: Option<SecretFormat>,
         names: NamingOptions,
-        compat: &CompatibilityOptions,
+        compat: CompatibilityOptions,
     ) -> Result<(), PublishError> {
         let create_secret = {
             let mut opts = OpenOptions::new();
@@ -420,11 +420,10 @@ impl Node for SecretProvisionerNode {
                 self.save_secret_data(
                     &target_path,
                     data,
+                    // NOTE (@Techassi): At this point, we might want to pass the whole selector instead
                     selector.format,
                     selector.names,
-                    &CompatibilityOptions {
-                        tls_pkcs12_password: selector.compat_tls_pkcs12_password,
-                    },
+                    selector.compat,
                 )
                 .await?;
                 Ok(Response::new(NodePublishVolumeResponse {}))

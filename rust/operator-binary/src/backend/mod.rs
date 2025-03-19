@@ -25,7 +25,10 @@ use stackable_operator::{
 pub use tls::TlsGenerate;
 
 use self::pod_info::SchedulingPodInfo;
-use crate::format::{well_known::NamingOptions, SecretData, SecretFormat};
+use crate::format::{
+    well_known::{CompatibilityOptions, NamingOptions},
+    SecretData, SecretFormat,
+};
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
@@ -85,16 +88,9 @@ pub struct SecretVolumeSelector {
     )]
     pub kerberos_service_names: Vec<String>,
 
-    /// The password used to encrypt the TLS PKCS#12 keystore
-    ///
-    /// Required for some applications that misbehave with blank keystore passwords (such as Hadoop).
-    /// Has no effect if `format` is not `tls-pkcs12`.
-    #[serde(
-        rename = "secrets.stackable.tech/format.compatibility.tls-pkcs12.password",
-        deserialize_with = "SecretVolumeSelector::deserialize_some",
-        default
-    )]
-    pub compat_tls_pkcs12_password: Option<String>,
+    /// Compatibility options used by (legacy) applications.
+    #[serde(flatten)]
+    pub compat: CompatibilityOptions,
 
     /// The (custom) filenames used by secrets.
     #[serde(flatten)]

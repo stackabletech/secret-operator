@@ -32,7 +32,7 @@ impl SecretData {
         self,
         format: Option<SecretFormat>,
         names: NamingOptions,
-        compat: &CompatibilityOptions,
+        compat: CompatibilityOptions,
     ) -> Result<SecretFiles, IntoFilesError> {
         if let Some(format) = format {
             Ok(self.parse()?.convert_to(format, compat)?.into_files(names))

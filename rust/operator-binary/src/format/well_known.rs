@@ -109,7 +109,7 @@ impl WellKnownSecretData {
     pub fn convert_to(
         self,
         to: SecretFormat,
-        compat: &CompatibilityOptions,
+        compat: CompatibilityOptions,
     ) -> Result<Self, ConvertError> {
         convert::convert(self, to, compat)
     }
@@ -118,8 +118,16 @@ impl WellKnownSecretData {
 /// Options that some (legacy) applications require to ensure compatibility.
 ///
 /// The expectation is that this will be unset the vast majority of the time.
-#[derive(Default)]
+#[derive(Debug, Default, Deserialize)]
 pub struct CompatibilityOptions {
+    /// The password used to encrypt the TLS PKCS#12 keystore
+    ///
+    /// Required for some applications that misbehave with blank keystore passwords (such as Hadoop).
+    /// Has no effect if `format` is not `tls-pkcs12`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.compatibility.tls-pkcs12.password",
+        default
+    )]
     pub tls_pkcs12_password: Option<String>,
 }
 
