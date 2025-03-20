@@ -1,0 +1,23 @@
+= TrustStore
+:description: A TrustStore in Kubernetes retrieves the trust anchors from a SecretClass.
+
+A _TrustStore_ is a Kubernetes resource that can be used to request the trust anchor information (such as the TLS certificate authorities) from a xref:secretclass.adoc[].
+
+This can be used to access a protected service from other services that do not require their own certificates (or from clients running outside of Kubernetes).
+
+A TrustStore looks like this:
+
+[source,yaml]
+----
+include::example$truststore-tls.yaml[]
+----
+<1> Also used to name the created ConfigMap
+<2> The name of the xref:secretclass.adoc[]
+<3> The requested xref:secretclass.adoc#format[format]
+
+This will create a ConfigMap named `truststore-pem` containing a `ca.crt` with the trust root certificates.
+It can then either be mounted into a Pod or retrieved and used from outside of Kubernetes.
+
+NOTE: Make sure to have a procedure for updating the retrieved certificates. The Secret Operator will automatically rotate
+      the xref:secretclass.adoc#backend-autotls[autoTls] certificate authority as needed, but all trust roots will require
+      some form of update occasionally.

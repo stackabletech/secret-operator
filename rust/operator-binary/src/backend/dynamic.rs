@@ -66,6 +66,16 @@ impl<B: SecretBackend + Send + Sync> SecretBackend for DynamicAdapter<B> {
             .map_err(|err| DynError(Box::new(err)))
     }
 
+    async fn get_trust_data(
+        &self,
+        selector: &super::TrustSelector,
+    ) -> Result<super::SecretContents, Self::Error> {
+        self.0
+            .get_trust_data(selector)
+            .await
+            .map_err(|err| DynError(Box::new(err)))
+    }
+
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,
@@ -110,12 +120,14 @@ pub async fn from_class(
     class: SecretClass,
 ) -> Result<Box<Dynamic>, FromClassError> {
     Ok(match class.spec.backend {
-        crd::SecretClassBackend::K8sSearch(crd::K8sSearchBackend { search_namespace }) => {
-            from(super::K8sSearch {
-                client: Unloggable(client.clone()),
-                search_namespace,
-            })
-        }
+        crd::SecretClassBackend::K8sSearch(crd::K8sSearchBackend {
+            search_namespace,
+            trust_store_config_map_name,
+        }) => from(super::K8sSearch {
+            client: Unloggable(client.clone()),
+            search_namespace,
+            trust_store_config_map_name,
+        }),
         crd::SecretClassBackend::AutoTls(crd::AutoTlsBackend {
             ca,
             max_certificate_lifetime,

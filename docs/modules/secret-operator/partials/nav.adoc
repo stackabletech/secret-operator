@@ -6,6 +6,7 @@
 ** xref:secret-operator:secretclass.adoc[]
 ** xref:secret-operator:scope.adoc[]
 ** xref:secret-operator:volume.adoc[]
+** xref:secret-operator:truststore.adoc[]
 * Guides
 ** xref:secret-operator:cert-manager.adoc[]
 * xref:secret-operator:security.adoc[]

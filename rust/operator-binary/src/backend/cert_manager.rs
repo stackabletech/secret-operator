@@ -17,6 +17,7 @@ use super::{
     pod_info::{Address, PodInfo, SchedulingPodInfo},
     scope::SecretScope,
     ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
+    TrustSelector,
 };
 use crate::{
     crd::{self, CertificateKeyGeneration},
@@ -59,6 +60,9 @@ pub enum Error {
         source: stackable_operator::client::Error,
         certificate: ObjectRef<external_crd::cert_manager::Certificate>,
     },
+
+    #[snafu(display("the certManager backend does not currently support TrustStore exports"))]
+    TrustExportUnsupported,
 }
 
 impl SecretBackendError for Error {
@@ -69,6 +73,7 @@ impl SecretBackendError for Error {
             Error::GetSecret { .. } => tonic::Code::Unavailable,
             Error::GetCertManagerCertificate { .. } => tonic::Code::Unavailable,
             Error::ApplyCertManagerCertificate { .. } => tonic::Code::Unavailable,
+            Error::TrustExportUnsupported => tonic::Code::FailedPrecondition,
         }
     }
 }
@@ -170,6 +175,13 @@ impl SecretBackend for CertManager {
                 .map(|(k, ByteString(v))| (k, v))
                 .collect(),
         )))
+    }
+
+    async fn get_trust_data(
+        &self,
+        _selector: &TrustSelector,
+    ) -> Result<SecretContents, Self::Error> {
+        TrustExportUnsupportedSnafu.fail()
     }
 
     async fn get_qualified_node_names(

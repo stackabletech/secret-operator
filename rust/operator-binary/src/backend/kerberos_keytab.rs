@@ -66,6 +66,9 @@ pub enum Error {
 
     #[snafu(display("failed to read keytab"))]
     ReadKeytab { source: std::io::Error },
+
+    #[snafu(display("the kerberosKeytab backend does not currently support TrustStore exports"))]
+    TrustExportUnsupported,
 }
 impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
@@ -79,6 +82,7 @@ impl SecretBackendError for Error {
             Error::PodPrincipal { .. } => tonic::Code::FailedPrecondition,
             Error::ReadKeytab { .. } => tonic::Code::Unavailable,
             Error::ScopeAddresses { .. } => tonic::Code::Unavailable,
+            Error::TrustExportUnsupported => tonic::Code::FailedPrecondition,
         }
     }
 }
@@ -282,5 +286,12 @@ cluster.local = {realm_name}
                 krb5_conf: profile.into_bytes(),
             }),
         )))
+    }
+
+    async fn get_trust_data(
+        &self,
+        _selector: &super::TrustSelector,
+    ) -> Result<SecretContents, Self::Error> {
+        TrustExportUnsupportedSnafu.fail()
     }
 }

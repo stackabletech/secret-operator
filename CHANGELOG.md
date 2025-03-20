@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Made RSA key length configurable for certificates issued by cert-manager ([#528]).
 - Kerberos principal backends now also provision principals for IP address, not just DNS hostnames ([#552]).
 - OLM deployment helper ([#546]).
+- Added TrustStore CRD for requesting CA certificate information ([#557]).
 
 ### Changed
 
@@ -33,6 +34,7 @@ All notable changes to this project will be documented in this file.
 [#546]: https://github.com/stackabletech/secret-operator/pull/546
 [#548]: https://github.com/stackabletech/secret-operator/pull/548
 [#552]: https://github.com/stackabletech/secret-operator/pull/552
+[#557]: https://github.com/stackabletech/secret-operator/pull/557
 [#563]: https://github.com/stackabletech/secret-operator/pull/563
 [#564]: https://github.com/stackabletech/secret-operator/pull/564
 [#566]: https://github.com/stackabletech/secret-operator/pull/566

@@ -1,5 +1,6 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, Snafu};
+use stackable_operator::schemars::{self, JsonSchema};
 use strum::EnumDiscriminants;
 
 use super::{convert, ConvertError, SecretFiles};
@@ -16,14 +17,14 @@ const FILE_KERBEROS_KEYTAB_KRB5_CONF: &str = "krb5.conf";
 
 #[derive(Debug)]
 pub struct TlsPem {
-    pub certificate_pem: Vec<u8>,
-    pub key_pem: Vec<u8>,
+    pub certificate_pem: Option<Vec<u8>>,
+    pub key_pem: Option<Vec<u8>>,
     pub ca_pem: Vec<u8>,
 }
 
 #[derive(Debug)]
 pub struct TlsPkcs12 {
-    pub keystore: Vec<u8>,
+    pub keystore: Option<Vec<u8>>,
     pub truststore: Vec<u8>,
 }
 
@@ -36,7 +37,7 @@ pub struct Kerberos {
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(
     name(SecretFormat),
-    derive(Deserialize),
+    derive(Serialize, Deserialize, JsonSchema),
     serde(rename_all = "kebab-case")
 )]
 pub enum WellKnownSecretData {
@@ -53,19 +54,23 @@ impl WellKnownSecretData {
                 key_pem,
                 ca_pem,
             }) => [
-                (FILE_PEM_CERT_CERT.to_string(), certificate_pem),
-                (FILE_PEM_CERT_KEY.to_string(), key_pem),
-                (FILE_PEM_CERT_CA.to_string(), ca_pem),
+                Some(FILE_PEM_CERT_CERT.to_string()).zip(certificate_pem),
+                Some(FILE_PEM_CERT_KEY.to_string()).zip(key_pem),
+                Some((FILE_PEM_CERT_CA.to_string(), ca_pem)),
             ]
-            .into(),
+            .into_iter()
+            .flatten()
+            .collect(),
             WellKnownSecretData::TlsPkcs12(TlsPkcs12 {
                 keystore,
                 truststore,
             }) => [
-                (FILE_PKCS12_CERT_KEYSTORE.to_string(), keystore),
-                (FILE_PKCS12_CERT_TRUSTSTORE.to_string(), truststore),
+                Some(FILE_PKCS12_CERT_KEYSTORE.to_string()).zip(keystore),
+                Some((FILE_PKCS12_CERT_TRUSTSTORE.to_string(), truststore)),
             ]
-            .into(),
+            .into_iter()
+            .flatten()
+            .collect(),
             WellKnownSecretData::Kerberos(Kerberos { keytab, krb5_conf }) => [
                 (FILE_KERBEROS_KEYTAB_KEYTAB.to_string(), keytab),
                 (FILE_KERBEROS_KEYTAB_KRB5_CONF.to_string(), krb5_conf),
@@ -84,13 +89,13 @@ impl WellKnownSecretData {
         if let Ok(certificate_pem) = take_file(SecretFormat::TlsPem, FILE_PEM_CERT_CERT) {
             let mut take_file = |file| take_file(SecretFormat::TlsPem, file);
             Ok(WellKnownSecretData::TlsPem(TlsPem {
-                certificate_pem,
-                key_pem: take_file(FILE_PEM_CERT_KEY)?,
+                certificate_pem: Some(certificate_pem),
+                key_pem: Some(take_file(FILE_PEM_CERT_KEY)?),
                 ca_pem: take_file(FILE_PEM_CERT_CA)?,
             }))
         } else if let Ok(keystore) = take_file(SecretFormat::TlsPkcs12, FILE_PKCS12_CERT_KEYSTORE) {
             Ok(WellKnownSecretData::TlsPkcs12(TlsPkcs12 {
-                keystore,
+                keystore: Some(keystore),
                 truststore: take_file(SecretFormat::TlsPkcs12, FILE_PKCS12_CERT_TRUSTSTORE)?,
             }))
         } else if let Ok(keytab) = take_file(SecretFormat::Kerberos, FILE_KERBEROS_KEYTAB_KEYTAB) {

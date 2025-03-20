@@ -1,0 +1,8 @@
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: TrustStore
+metadata:
+  name: truststore-pem # <1>
+spec:
+  secretClassName: tls # <2>
+  format: tls-pem # <3>

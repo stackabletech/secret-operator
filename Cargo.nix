@@ -67,6 +67,16 @@ rec {
       # File a bug if you depend on any for non-debug work!
       debug = internal.debugCrate { inherit packageId; };
     };
+    "p12" = rec {
+      packageId = "p12";
+      build = internal.buildRustCrateWithFeatures {
+        packageId = "p12";
+      };
+
+      # Debug support which might change between releases.
+      # File a bug if you depend on any for non-debug work!
+      debug = internal.debugCrate { inherit packageId; };
+    };
     "stackable-krb5-provision-keytab" = rec {
       packageId = "stackable-krb5-provision-keytab";
       build = internal.buildRustCrateWithFeatures {
@@ -3201,6 +3211,18 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" ];
       };
+      "hex-literal" = rec {
+        crateName = "hex-literal";
+        version = "0.3.4";
+        edition = "2018";
+        sha256 = "1q54yvyy0zls9bdrx15hk6yj304npndy9v4crn1h1vd95sfv5gby";
+        procMacro = true;
+        libName = "hex_literal";
+        authors = [
+          "RustCrypto Developers"
+        ];
+
+      };
       "hmac" = rec {
         crateName = "hmac";
         version = "0.12.1";
@@ -5380,6 +5402,7 @@ rec {
         features = {
           "unstable-runtime" = [ "unstable-runtime-subscribe" "unstable-runtime-stream-control" "unstable-runtime-reconcile-on" ];
         };
+        resolvedDefaultFeatures = [ "unstable-runtime-stream-control" ];
       };
       "lazy_static" = rec {
         crateName = "lazy_static";
@@ -6723,9 +6746,9 @@ rec {
       };
       "p12" = rec {
         crateName = "p12";
-        version = "0.6.3";
+        version = "0.0.0-dev";
         edition = "2021";
-        sha256 = "094jzl331mj5gg6xcbpanqa1bmj7x7hk3pw4wkkq5zjkvq3371yl";
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/p12; };
         authors = [
           "hjiayz <hjiayz@gmail.com>"
           "Marc-Antoine Perennou <Marc-Antoine@Perennou.com>"
@@ -6769,6 +6792,12 @@ rec {
             name = "yasna";
             packageId = "yasna";
             features = [ "std" ];
+          }
+        ];
+        devDependencies = [
+          {
+            name = "hex-literal";
+            packageId = "hex-literal";
           }
         ];
 
@@ -9508,6 +9537,11 @@ rec {
           {
             name = "h2";
             packageId = "h2";
+          }
+          {
+            name = "kube-runtime";
+            packageId = "kube-runtime";
+            features = [ "unstable-runtime-stream-control" ];
           }
           {
             name = "libc";

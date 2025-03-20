@@ -25,6 +25,8 @@ use stackable_operator::{
 pub use tls::TlsGenerate;
 
 use self::pod_info::SchedulingPodInfo;
+#[cfg(doc)]
+use crate::crd::TrustStore;
 use crate::format::{SecretData, SecretFormat};
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
@@ -133,6 +135,12 @@ pub struct SecretVolumeSelector {
         default
     )]
     pub cert_manager_cert_lifetime: Option<Duration>,
+}
+
+/// Configuration provided by the [`TrustStore`] selecting what trust data should be provided.
+pub struct TrustSelector {
+    /// The name of the [`TrustStore`]'s `Namespace`.
+    pub namespace: String,
 }
 
 /// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself.
@@ -271,6 +279,9 @@ pub trait SecretBackend: Debug + Send + Sync {
         selector: &SecretVolumeSelector,
         pod_info: pod_info::PodInfo,
     ) -> Result<SecretContents, Self::Error>;
+
+    async fn get_trust_data(&self, selector: &TrustSelector)
+        -> Result<SecretContents, Self::Error>;
 
     /// Try to predict which nodes would be able to provision this secret.
     ///
