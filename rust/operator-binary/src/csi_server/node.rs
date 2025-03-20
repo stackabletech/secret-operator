@@ -6,7 +6,7 @@ use std::{
 
 use openssl::sha::Sha256;
 use serde::{de::IntoDeserializer, Deserialize};
-use snafu::{ResultExt, Snafu};
+use snafu::{ensure, ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::Pod,
@@ -23,9 +23,15 @@ use tonic::{Request, Response, Status};
 use super::controller::TOPOLOGY_NODE;
 use crate::{
     backend::{
-        self, pod_info, pod_info::PodInfo, SecretBackendError, SecretContents, SecretVolumeSelector,
+        self,
+        pod_info::{self, PodInfo},
+        SecretBackendError, SecretContents, SecretVolumeSelector,
     },
-    format::{self, well_known::CompatibilityOptions, SecretFormat},
+    format::{
+        self,
+        well_known::{CompatibilityOptions, NamingOptions},
+        SecretFormat,
+    },
     grpc::csi::v1::{
         node_server::Node, NodeExpandVolumeRequest, NodeExpandVolumeResponse,
         NodeGetCapabilitiesRequest, NodeGetCapabilitiesResponse, NodeGetInfoRequest,
@@ -92,6 +98,18 @@ enum PublishError {
         path: PathBuf,
     },
 
+    #[snafu(display("failed to canonicalize path {}", path.display()))]
+    CanonicalizePath {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+
+    #[snafu(display("encountered invalid path base in {}, expected {}", path.display(), expected_base.display()))]
+    InvalidPathBase {
+        path: PathBuf,
+        expected_base: PathBuf,
+    },
+
     #[snafu(display("failed to tag pod with expiry metadata"))]
     TagPod {
         source: stackable_operator::client::Error,
@@ -120,6 +138,8 @@ impl From<PublishError> for Status {
             PublishError::SetDirPermissions { .. } => Status::unavailable(full_msg),
             PublishError::CreateFile { .. } => Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
+            PublishError::CanonicalizePath { .. } => Status::unavailable(full_msg),
+            PublishError::InvalidPathBase { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
             PublishError::BuildAnnotation { .. } => Status::unavailable(full_msg),
         }
@@ -209,7 +229,8 @@ impl SecretProvisionerNode {
         target_path: &Path,
         data: SecretContents,
         format: Option<SecretFormat>,
-        compat: &CompatibilityOptions,
+        names: NamingOptions,
+        compat: CompatibilityOptions,
     ) -> Result<(), PublishError> {
         let create_secret = {
             let mut opts = OpenOptions::new();
@@ -223,10 +244,26 @@ impl SecretProvisionerNode {
         };
         for (k, v) in data
             .data
-            .into_files(format, compat)
+            .into_files(format, names, compat)
             .context(publish_error::FormatDataSnafu)?
         {
             let item_path = target_path.join(k);
+
+            // Prevent unwanted path traversals by first canonicalizing the final
+            // path and then validating that the path starts with the base we
+            // expect.
+            let item_path = item_path
+                .canonicalize()
+                .context(publish_error::CanonicalizePathSnafu { path: &item_path })?;
+
+            ensure!(
+                item_path.starts_with(target_path),
+                publish_error::InvalidPathBaseSnafu {
+                    path: &item_path,
+                    expected_base: &target_path
+                }
+            );
+
             if let Some(item_path_parent) = item_path.parent() {
                 create_dir_all(item_path_parent)
                     .await
@@ -383,10 +420,10 @@ impl Node for SecretProvisionerNode {
                 self.save_secret_data(
                     &target_path,
                     data,
+                    // NOTE (@Techassi): At this point, we might want to pass the whole selector instead
                     selector.format,
-                    &CompatibilityOptions {
-                        tls_pkcs12_password: selector.compat_tls_pkcs12_password,
-                    },
+                    selector.names,
+                    selector.compat,
                 )
                 .await?;
                 Ok(Response::new(NodePublishVolumeResponse {}))
