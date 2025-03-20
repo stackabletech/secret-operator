@@ -17,8 +17,8 @@
 . Does the PersistentVolume have any relevant events? (`kubectl describe pv/$PV_NAME`)
 . Is the CSIDriver object named `secrets.stackable.tech` configured correctly?
 . Is the CSI driver registered on the relevant CSINode objects? (`kubectl get csinode/$NODE_NAME -o yaml` should contain the driver `secrets.stackable.tech`)
-.. If not, please check if your Kubernetes distribution uses a non-default kubeletdir dir.
-   The distributions known to using a non-default kubelet dir are listed in the xref:installation.adoc[installation guide].
+.. If not, please check if your Kubernetes distribution uses a non-default kubelet dir.
+   The distributions known to be using a non-default kubelet dir are listed in the xref:installation.adoc[installation guide].
    Please follow the special installation guide there.
 . Does the secret-operator sidecar container named `node-driver-registrar` have any relevant log entries?
 . Does the kubelet have any relevant log entries?
