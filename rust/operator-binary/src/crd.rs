@@ -149,20 +149,14 @@ pub enum AdditionalTrustRoot {
     /// The extensions of the keys denote its contents: A key suffixed with `.crt` contains a stack
     /// of base64 encoded DER certificates, a key suffixed with `.der` contains a binary DER
     /// certificate.
-    ConfigMap {
-        #[serde(flatten)]
-        config_map: ConfigMapReference,
-    },
+    ConfigMap(ConfigMapReference),
 
     /// Reference (name and namespace) to a Kubernetes Secret object where additional certificates
     /// are stored.
     /// The extensions of the keys denote its contents: A key suffixed with `.crt` contains a stack
     /// of base64 encoded DER certificates, a key suffixed with `.der` contains a binary DER
     /// certificate.
-    Secret {
-        #[serde(flatten)]
-        secret: SecretReference,
-    },
+    Secret(SecretReference),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -491,18 +485,14 @@ mod test {
                         key_generation: CertificateKeyGeneration::default()
                     },
                     additional_trust_roots: vec![
-                        AdditionalTrustRoot::ConfigMap {
-                            config_map: ConfigMapReference {
-                                name: "tls-root-ca-config-map".to_string(),
-                                namespace: "default".to_string(),
-                            }
-                        },
-                        AdditionalTrustRoot::Secret {
-                            secret: SecretReference {
-                                name: "tls-root-ca-secret".to_string(),
-                                namespace: "default".to_string(),
-                            }
-                        }
+                        AdditionalTrustRoot::ConfigMap(ConfigMapReference {
+                            name: "tls-root-ca-config-map".to_string(),
+                            namespace: "default".to_string(),
+                        }),
+                        AdditionalTrustRoot::Secret(SecretReference {
+                            name: "tls-root-ca-secret".to_string(),
+                            namespace: "default".to_string(),
+                        })
                     ],
                     max_certificate_lifetime: Duration::from_days_unchecked(31),
                 })

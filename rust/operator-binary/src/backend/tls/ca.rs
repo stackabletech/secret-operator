@@ -464,10 +464,10 @@ impl Manager {
         let mut additional_trusted_certificates = vec![];
         for entry in additional_trust_roots {
             let certs = match entry {
-                AdditionalTrustRoot::ConfigMap { config_map } => {
+                AdditionalTrustRoot::ConfigMap(config_map) => {
                     Self::read_certificates_from_config_map(client, config_map).await?
                 }
-                AdditionalTrustRoot::Secret { secret } => {
+                AdditionalTrustRoot::Secret(secret) => {
                     Self::read_certificates_from_secret(client, secret).await?
                 }
             };
