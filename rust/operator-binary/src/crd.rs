@@ -8,7 +8,7 @@ use stackable_operator::{
     schemars::{self, schema::Schema, JsonSchema},
     time::Duration,
 };
-use stackable_secret_operator_crd_utils::SecretReference;
+use stackable_secret_operator_crd_utils::{ConfigMapReference, SecretReference};
 
 use crate::backend;
 
@@ -143,14 +143,26 @@ impl AutoTlsCa {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct AdditionalTrustRoot {
+pub enum AdditionalTrustRoot {
+    /// Reference (name and namespace) to a Kubernetes ConfigMap object where additional
+    /// certificates are stored.
+    /// The extensions of the keys denote its contents: A key suffixed with `.crt` contains a stack
+    /// of base64 encoded DER certificates, a key suffixed with `.der` contains a binary DER
+    /// certificate.
+    ConfigMap {
+        #[serde(flatten)]
+        config_map: ConfigMapReference,
+    },
+
     /// Reference (name and namespace) to a Kubernetes Secret object where additional certificates
     /// are stored.
-    /// The extensions of the keys denote its contents: A key suffixed with `.pem` contains a stack
+    /// The extensions of the keys denote its contents: A key suffixed with `.crt` contains a stack
     /// of base64 encoded DER certificates, a key suffixed with `.der` contains a binary DER
-    /// certificate, and a key suffixed with `.cer`, `.cert`, or `.crt` contains either a binary DER
-    /// certificate or a stack of base64 encoded DER certificates.
-    pub secret: SecretReference,
+    /// certificate.
+    Secret {
+        #[serde(flatten)]
+        secret: SecretReference,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -454,8 +466,11 @@ mod test {
                 autoGenerate: true
                 caCertificateLifetime: 100d
               additionalTrustRoots:
+                - configMap:
+                    name: tls-root-ca-config-map
+                    namespace: default
                 - secret:
-                    name: tls-root-ca
+                    name: tls-root-ca-secret
                     namespace: default
               maxCertificateLifetime: 31d
         "#;
@@ -475,12 +490,20 @@ mod test {
                         ca_certificate_lifetime: Duration::from_days_unchecked(100),
                         key_generation: CertificateKeyGeneration::default()
                     },
-                    additional_trust_roots: vec![AdditionalTrustRoot {
-                        secret: SecretReference {
-                            name: "tls-root-ca".to_string(),
-                            namespace: "default".to_string(),
+                    additional_trust_roots: vec![
+                        AdditionalTrustRoot::ConfigMap {
+                            config_map: ConfigMapReference {
+                                name: "tls-root-ca-config-map".to_string(),
+                                namespace: "default".to_string(),
+                            }
+                        },
+                        AdditionalTrustRoot::Secret {
+                            secret: SecretReference {
+                                name: "tls-root-ca-secret".to_string(),
+                                namespace: "default".to_string(),
+                            }
                         }
-                    }],
+                    ],
                     max_certificate_lifetime: Duration::from_days_unchecked(31),
                 })
             }

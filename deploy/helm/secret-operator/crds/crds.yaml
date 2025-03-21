@@ -46,9 +46,27 @@ spec:
                           default: []
                           description: Additional trust roots which are added to the provided `ca.crt` file.
                           items:
+                            oneOf:
+                              - required:
+                                  - configMap
+                              - required:
+                                  - secret
                             properties:
+                              configMap:
+                                description: 'Reference (name and namespace) to a Kubernetes ConfigMap object where additional certificates are stored. The extensions of the keys denote its contents: A key suffixed with `.crt` contains a stack of base64 encoded DER certificates, a key suffixed with `.der` contains a binary DER certificate.'
+                                properties:
+                                  name:
+                                    description: Name of the ConfigMap being referred to.
+                                    type: string
+                                  namespace:
+                                    description: Namespace of the ConfigMap being referred to.
+                                    type: string
+                                required:
+                                  - name
+                                  - namespace
+                                type: object
                               secret:
-                                description: 'Reference (name and namespace) to a Kubernetes Secret object where additional certificates are stored. The extensions of the keys denote its contents: A key suffixed with `.pem` contains a stack of base64 encoded DER certificates, a key suffixed with `.der` contains a binary DER certificate, and a key suffixed with `.cer`, `.cert`, or `.crt` contains either a binary DER certificate or a stack of base64 encoded DER certificates.'
+                                description: 'Reference (name and namespace) to a Kubernetes Secret object where additional certificates are stored. The extensions of the keys denote its contents: A key suffixed with `.crt` contains a stack of base64 encoded DER certificates, a key suffixed with `.der` contains a binary DER certificate.'
                                 properties:
                                   name:
                                     description: Name of the Secret being referred to.
@@ -60,8 +78,6 @@ spec:
                                   - name
                                   - namespace
                                 type: object
-                            required:
-                              - secret
                             type: object
                           type: array
                         ca:

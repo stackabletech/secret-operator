@@ -27,31 +27,29 @@ spec:
                       -subj "/CN=$cn"
               }
 
-              # .pem file with one PEM certificate
-              create_cert PEM "cert 1" > cert1.pem
+              # .crt files with one PEM certificate
+              create_cert PEM "cert 1" > cert1.crt
+              create_cert PEM "cert 2" > cert2.crt
 
-              # .pem file with multiple PEM certificates
-              create_cert PEM "cert 2a" > cert2.pem
-              create_cert PEM "cert 2b" >> cert2.pem
+              # .crt files with multiple PEM certificates
+              create_cert PEM "cert 3a" > cert3.crt
+              create_cert PEM "cert 3b" >> cert3.crt
+              create_cert PEM "cert 4a" > cert4.crt
+              create_cert PEM "cert 4b" >> cert4.crt
 
-              # .der file with one DER certificate
-              create_cert DER "cert 3" > cert3.der
+              # .der files with one DER certificate
+              create_cert DER "cert 5" > cert5.der
+              create_cert DER "cert 6" > cert6.der
 
-              # .crt file with one DER certificate
-              create_cert DER "cert 4" > cert4.crt
+              kubectl create configmap trust-roots \
+                  --from-file=cert1.crt \
+                  --from-file=cert3.crt \
+                  --from-file=cert5.der
 
-              # .crt file with multiple PEM certificates
-              create_cert PEM "cert 5a" > cert5.crt
-              create_cert PEM "cert 5b" >> cert5.crt
-
-              kubectl create secret generic trust-roots-1 \
-                  --from-file=cert1.pem \
-                  --from-file=cert2.pem \
-                  --from-file=cert3.der
-
-              kubectl create secret generic trust-roots-2 \
+              kubectl create secret generic trust-roots \
+                  --from-file=cert2.crt \
                   --from-file=cert4.crt \
-                  --from-file=cert5.crt
+                  --from-file=cert6.der
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000

@@ -52,12 +52,13 @@ spec:
 
               assert_trusted_roots_contain "secret-operator self-signed"
               assert_trusted_roots_contain "cert 1"
-              assert_trusted_roots_contain "cert 2a"
-              assert_trusted_roots_contain "cert 2b"
-              assert_trusted_roots_contain "cert 3"
-              assert_trusted_roots_contain "cert 4"
-              assert_trusted_roots_contain "cert 5a"
-              assert_trusted_roots_contain "cert 5b"
+              assert_trusted_roots_contain "cert 2"
+              assert_trusted_roots_contain "cert 3a"
+              assert_trusted_roots_contain "cert 3b"
+              assert_trusted_roots_contain "cert 4a"
+              assert_trusted_roots_contain "cert 4b"
+              assert_trusted_roots_contain "cert 5"
+              assert_trusted_roots_contain "cert 6"
           volumeMounts:
             - mountPath: /stackable/tls-3d
               name: tls-3d
