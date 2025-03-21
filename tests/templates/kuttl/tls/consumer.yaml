@@ -40,6 +40,25 @@ spec:
 
               cat /stackable/tls-3d/tls.crt | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
               cat /stackable/tls-42h/tls.crt | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
+
+
+              function assert_trusted_roots_contain {
+                  subject=$1
+
+                  while openssl x509 -subject -noout; do :; done \
+                      < /stackable/tls-3d/ca.crt \
+                      | grep --line-regexp "subject=CN *= *$subject"
+              }
+
+              assert_trusted_roots_contain "secret-operator self-signed"
+              assert_trusted_roots_contain "cert 1"
+              assert_trusted_roots_contain "cert 2"
+              assert_trusted_roots_contain "cert 3a"
+              assert_trusted_roots_contain "cert 3b"
+              assert_trusted_roots_contain "cert 4a"
+              assert_trusted_roots_contain "cert 4b"
+              assert_trusted_roots_contain "cert 5"
+              assert_trusted_roots_contain "cert 6"
           volumeMounts:
             - mountPath: /stackable/tls-3d
               name: tls-3d

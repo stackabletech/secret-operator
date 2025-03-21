@@ -8,7 +8,7 @@ use stackable_operator::{
     schemars::{self, schema::Schema, JsonSchema},
     time::Duration,
 };
-use stackable_secret_operator_crd_utils::SecretReference;
+use stackable_secret_operator_crd_utils::{ConfigMapReference, SecretReference};
 
 use crate::backend;
 
@@ -89,6 +89,10 @@ pub struct AutoTlsBackend {
     /// Configures the certificate authority used to issue Pod certificates.
     pub ca: AutoTlsCa,
 
+    /// Additional trust roots which are added to the provided `ca.crt` file.
+    #[serde(default)]
+    pub additional_trust_roots: Vec<AdditionalTrustRoot>,
+
     /// Maximum lifetime the created certificates are allowed to have.
     /// In case consumers request a longer lifetime than allowed by this setting,
     /// the lifetime will be the minimum of both, so this setting takes precedence.
@@ -135,6 +139,24 @@ impl AutoTlsCa {
     fn default_ca_certificate_lifetime() -> Duration {
         backend::tls::DEFAULT_CA_CERT_LIFETIME
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum AdditionalTrustRoot {
+    /// Reference (name and namespace) to a Kubernetes ConfigMap object where additional
+    /// certificates are stored.
+    /// The extensions of the keys denote its contents: A key suffixed with `.crt` contains a stack
+    /// of base64 encoded DER certificates, a key suffixed with `.der` contains a binary DER
+    /// certificate.
+    ConfigMap(ConfigMapReference),
+
+    /// Reference (name and namespace) to a Kubernetes Secret object where additional certificates
+    /// are stored.
+    /// The extensions of the keys denote its contents: A key suffixed with `.crt` contains a stack
+    /// of base64 encoded DER certificates, a key suffixed with `.der` contains a binary DER
+    /// certificate.
+    Secret(SecretReference),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -417,6 +439,7 @@ mod test {
                             length: CertificateKeyGeneration::RSA_KEY_LENGTH_3072
                         }
                     },
+                    additional_trust_roots: vec![],
                     max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
                 })
             }
@@ -436,6 +459,13 @@ mod test {
                   namespace: default
                 autoGenerate: true
                 caCertificateLifetime: 100d
+              additionalTrustRoots:
+                - configMap:
+                    name: tls-root-ca-config-map
+                    namespace: default
+                - secret:
+                    name: tls-root-ca-secret
+                    namespace: default
               maxCertificateLifetime: 31d
         "#;
         let deserializer = serde_yaml::Deserializer::from_str(input);
@@ -454,6 +484,16 @@ mod test {
                         ca_certificate_lifetime: Duration::from_days_unchecked(100),
                         key_generation: CertificateKeyGeneration::default()
                     },
+                    additional_trust_roots: vec![
+                        AdditionalTrustRoot::ConfigMap(ConfigMapReference {
+                            name: "tls-root-ca-config-map".to_string(),
+                            namespace: "default".to_string(),
+                        }),
+                        AdditionalTrustRoot::Secret(SecretReference {
+                            name: "tls-root-ca-secret".to_string(),
+                            namespace: "default".to_string(),
+                        })
+                    ],
                     max_certificate_lifetime: Duration::from_days_unchecked(31),
                 })
             }

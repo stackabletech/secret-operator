@@ -1,6 +1,6 @@
 //! Dynamically provisions and picks Certificate Authorities.
 
-use std::{collections::BTreeMap, fmt::Display};
+use std::{collections::BTreeMap, ffi::OsStr, fmt::Display, path::Path};
 
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},
@@ -17,24 +17,27 @@ use openssl::{
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    k8s_openapi::{api::core::v1::Secret, ByteString},
+    k8s_openapi::{
+        api::core::v1::{ConfigMap, Secret},
+        ByteString,
+    },
     kube::{
         self,
         api::{
             entry::{self, Entry},
-            PostParams,
+            DynamicObject, PostParams,
         },
         runtime::reflector::ObjectRef,
     },
     time::Duration,
 };
-use stackable_secret_operator_crd_utils::SecretReference;
+use stackable_secret_operator_crd_utils::{ConfigMapReference, SecretReference};
 use time::OffsetDateTime;
 use tracing::{info, info_span, warn};
 
 use crate::{
     backend::SecretBackendError,
-    crd::CertificateKeyGeneration,
+    crd::{AdditionalTrustRoot, CertificateKeyGeneration},
     utils::{asn1time_to_offsetdatetime, Asn1TimeParseError, Unloggable},
 };
 
@@ -55,8 +58,14 @@ pub enum Error {
     #[snafu(display("failed to generate certificate key"))]
     GenerateKey { source: openssl::error::ErrorStack },
 
-    #[snafu(display("failed to load CA {secret}"))]
-    FindCa {
+    #[snafu(display("failed to load {config_map}"))]
+    FindConfigMap {
+        source: kube::Error,
+        config_map: ObjectRef<ConfigMap>,
+    },
+
+    #[snafu(display("failed to load {secret}"))]
+    FindSecret {
         source: kube::Error,
         secret: ObjectRef<Secret>,
     },
@@ -70,11 +79,17 @@ pub enum Error {
         secret: ObjectRef<Secret>,
     },
 
-    #[snafu(display("failed to load certificate from key {key:?} of {secret}"))]
+    #[snafu(display("failed to load certificate from key {key:?} of {object}"))]
     LoadCertificate {
         source: openssl::error::ErrorStack,
         key: String,
-        secret: ObjectRef<Secret>,
+        object: ObjectRef<DynamicObject>,
+    },
+
+    #[snafu(display("unsupported certificate format in key {key:?} of {object}; supported extensions: .crt, .der"))]
+    UnsupportedCertificateFormat {
+        key: String,
+        object: ObjectRef<DynamicObject>,
     },
 
     #[snafu(display("failed to parse CA lifetime from key {key:?} of {secret}"))]
@@ -106,9 +121,11 @@ impl SecretBackendError for Error {
         match self {
             Error::GenerateKey { .. } => tonic::Code::Internal,
             Error::MissingCertificate { .. } => tonic::Code::FailedPrecondition,
-            Error::FindCa { .. } => tonic::Code::Unavailable,
+            Error::FindConfigMap { .. } => tonic::Code::Unavailable,
+            Error::FindSecret { .. } => tonic::Code::Unavailable,
             Error::CaNotFoundAndGenDisabled { .. } => tonic::Code::FailedPrecondition,
             Error::LoadCertificate { .. } => tonic::Code::FailedPrecondition,
+            Error::UnsupportedCertificateFormat { .. } => tonic::Code::InvalidArgument,
             Error::ParseLifetime { .. } => tonic::Code::FailedPrecondition,
             Error::BuildCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
@@ -261,7 +278,7 @@ impl CertificateAuthority {
         )
         .with_context(|_| LoadCertificateSnafu {
             key: key_certificate,
-            secret: secret_ref,
+            object: secret_ref,
         })?;
         let private_key = PKey::private_key_from_pem(
             &secret_data
@@ -274,7 +291,7 @@ impl CertificateAuthority {
         )
         .with_context(|_| LoadCertificateSnafu {
             key: key_private_key,
-            secret: secret_ref,
+            object: secret_ref,
         })?;
         Ok(CertificateAuthority {
             not_after: asn1time_to_offsetdatetime(certificate.not_after()).with_context(|_| {
@@ -293,12 +310,14 @@ impl CertificateAuthority {
 #[derive(Debug)]
 pub struct Manager {
     certificate_authorities: Vec<CertificateAuthority>,
+    additional_trusted_certificates: Vec<X509>,
 }
 
 impl Manager {
     pub async fn load_or_create(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
+        additional_trust_roots: &[AdditionalTrustRoot],
         config: &Config,
     ) -> Result<Self> {
         // Use entry API rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
@@ -306,7 +325,7 @@ impl Manager {
         let ca_secret = secrets_api
             .entry(&secret_ref.name)
             .await
-            .with_context(|_| FindCaSnafu { secret: secret_ref })?;
+            .with_context(|_| FindSecretSnafu { secret: secret_ref })?;
         let mut update_ca_secret = false;
         let mut certificate_authorities = match &ca_secret {
             Entry::Occupied(ca_secret) => {
@@ -441,8 +460,122 @@ impl Manager {
                 return SaveRequestedButForbiddenSnafu.fail();
             }
         }
+
+        let mut additional_trusted_certificates = vec![];
+        for entry in additional_trust_roots {
+            let certs = match entry {
+                AdditionalTrustRoot::ConfigMap(config_map) => {
+                    Self::read_certificates_from_config_map(client, config_map).await?
+                }
+                AdditionalTrustRoot::Secret(secret) => {
+                    Self::read_certificates_from_secret(client, secret).await?
+                }
+            };
+            additional_trusted_certificates.extend(certs);
+        }
+
         Ok(Self {
             certificate_authorities,
+            additional_trusted_certificates,
+        })
+    }
+
+    /// Read certificates from the given ConfigMap
+    ///
+    /// The keys are assumed to be filenames and their extensions denote the expected format of the
+    /// certificate.
+    async fn read_certificates_from_config_map(
+        client: &stackable_operator::client::Client,
+        config_map_ref: &ConfigMapReference,
+    ) -> Result<Vec<X509>> {
+        let mut certificates = vec![];
+
+        let config_map_api = &client.get_api::<ConfigMap>(&config_map_ref.namespace);
+        let config_map = config_map_api
+            .get(&config_map_ref.name)
+            .await
+            .with_context(|_| FindConfigMapSnafu {
+                config_map: config_map_ref,
+            })?;
+
+        let config_map_data = config_map.data.unwrap_or_default();
+        let config_map_binary_data = config_map.binary_data.unwrap_or_default();
+        let data = config_map_data
+            .iter()
+            .map(|(key, value)| (key, value.as_bytes()))
+            .chain(
+                config_map_binary_data
+                    .iter()
+                    .map(|(key, ByteString(value))| (key, value.as_ref())),
+            );
+        for (key, value) in data {
+            let certs = Self::deserialize_certificate(key, value, config_map_ref.into())?;
+            info!(
+                ?certs,
+                %config_map_ref,
+                %key,
+                "adding certificates from additional trust root",
+            );
+            certificates.extend(certs);
+        }
+
+        Ok(certificates)
+    }
+
+    /// Read certificates from the given Secret
+    ///
+    /// The keys are assumed to be filenames and their extensions denote the expected format of the
+    /// certificate.
+    async fn read_certificates_from_secret(
+        client: &stackable_operator::client::Client,
+        secret_ref: &SecretReference,
+    ) -> Result<Vec<X509>> {
+        let mut certificates = vec![];
+
+        let secrets_api = &client.get_api::<Secret>(&secret_ref.namespace);
+        let secret = secrets_api
+            .get(&secret_ref.name)
+            .await
+            .with_context(|_| FindSecretSnafu { secret: secret_ref })?;
+
+        let secret_data = secret.data.unwrap_or_default();
+        for (key, ByteString(value)) in &secret_data {
+            let certs = Self::deserialize_certificate(key, value, secret_ref.into())?;
+            info!(
+                ?certs,
+                %secret_ref,
+                %key,
+                "adding certificates from additional trust root",
+            );
+            certificates.extend(certs);
+        }
+
+        Ok(certificates)
+    }
+
+    /// Deserialize a certificate from the given value. The format is determined by the extension
+    /// of the key.
+    fn deserialize_certificate(
+        key: &str,
+        value: &[u8],
+        object_ref: ObjectRef<DynamicObject>,
+    ) -> Result<Vec<X509>> {
+        let extension = Path::new(key).extension().and_then(OsStr::to_str);
+
+        match extension {
+            Some("crt") => X509::stack_from_pem(value),
+            Some("der") => X509::from_der(value).map(|cert| vec![cert]),
+            _ => {
+                return UnsupportedCertificateFormatSnafu {
+                    key,
+                    object: object_ref,
+                }
+                .fail();
+            }
+        }
+        .context(LoadCertificateSnafu {
+            key,
+            object: object_ref,
         })
     }
 
@@ -467,5 +600,6 @@ impl Manager {
         self.certificate_authorities
             .iter()
             .map(|ca| &ca.certificate)
+            .chain(&self.additional_trusted_certificates)
     }
 }
