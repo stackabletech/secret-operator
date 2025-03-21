@@ -7,8 +7,8 @@ releases:
     description: Integration test
     products:
       commons:
-        operatorVersion: 0.0.0-dev
+        operatorVersion: 25.3.0
       secret:
-        operatorVersion: 0.0.0-dev
+        operatorVersion: 25.3.0
       listener:
-        operatorVersion: 0.0.0-dev
+        operatorVersion: 25.3.0

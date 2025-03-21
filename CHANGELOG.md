@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [25.3.0] - 2025-03-21
+
 ### Removed
 
 - Removed CA secret migration job ([#548]).
