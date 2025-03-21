@@ -501,10 +501,10 @@ impl Manager {
                 secret: secret_ref,
             })?;
             info!(
-                "Add the certificate(s) {certs:?} from the key [{key}] of [{secret_ref}] to the additional trust roots.",
-                certs = certs,
-                secret_ref = secret_ref,
-                key = key,
+                %certs,
+                %secret_ref,
+                %key,
+                "adding certificates from additional trust root",
             );
             certificates.extend(certs);
         }
