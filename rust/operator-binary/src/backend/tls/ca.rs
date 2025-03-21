@@ -485,7 +485,7 @@ impl Manager {
             let certs = match extension {
                 Some("pem") => X509::stack_from_pem(value),
                 Some("der") => X509::from_der(value).map(|cert| vec![cert]),
-                Some("cer") | Some("cert") | Some("crt") => X509::from_der(value)
+                Some("cer" | "cert" | "crt") => X509::from_der(value)
                     .map(|cert| vec![cert])
                     .or(X509::stack_from_pem(value)),
                 _ => {
