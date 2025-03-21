@@ -501,7 +501,7 @@ impl Manager {
                 secret: secret_ref,
             })?;
             info!(
-                %certs,
+                ?certs,
                 %secret_ref,
                 %key,
                 "adding certificates from additional trust root",
