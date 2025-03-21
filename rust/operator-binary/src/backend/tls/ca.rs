@@ -562,7 +562,7 @@ impl Manager {
     ) -> Result<Vec<X509>> {
         let extension = Path::new(key).extension().and_then(OsStr::to_str);
 
-        let certs = match extension {
+        match extension {
             Some("crt") => X509::stack_from_pem(value),
             Some("der") => X509::from_der(value).map(|cert| vec![cert]),
             _ => {
@@ -576,9 +576,7 @@ impl Manager {
         .context(LoadCertificateSnafu {
             key,
             object: object_ref,
-        })?;
-
-        Ok(certs)
+        })
     }
 
     /// Get an appropriate [`CertificateAuthority`] for signing a given certificate.
