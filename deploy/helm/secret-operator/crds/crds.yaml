@@ -22,10 +22,10 @@ spec:
           description: Auto-generated derived type for SecretClassSpec via `CustomResource`
           properties:
             spec:
-              description: A [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass) is a cluster-global Kubernetes resource that defines a category of secrets that the Secret Operator knows how to provision.
+              description: A [SecretClass](https://docs.stackable.tech/home/25.3/secret-operator/secretclass) is a cluster-global Kubernetes resource that defines a category of secrets that the Secret Operator knows how to provision.
               properties:
                 backend:
-                  description: Each SecretClass is associated with a single [backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend), which dictates the mechanism for issuing that kind of Secret.
+                  description: Each SecretClass is associated with a single [backend](https://docs.stackable.tech/home/25.3/secret-operator/secretclass#backend), which dictates the mechanism for issuing that kind of Secret.
                   oneOf:
                     - required:
                         - k8sSearch
@@ -38,7 +38,7 @@ spec:
                   properties:
                     autoTls:
                       description: |-
-                        The [`autoTls` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-autotls) issues a TLS certificate signed by the Secret Operator. The certificate authority can be provided by the administrator, or managed automatically by the Secret Operator.
+                        The [`autoTls` backend](https://docs.stackable.tech/home/25.3/secret-operator/secretclass#backend-autotls) issues a TLS certificate signed by the Secret Operator. The certificate authority can be provided by the administrator, or managed automatically by the Secret Operator.
 
                         A new certificate and key pair will be generated and signed for each Pod, keys or certificates are never reused.
                       properties:
@@ -147,7 +147,7 @@ spec:
 
                         A new certificate will be requested the first time it is used by a Pod, it will be reused after that (subject to cert-manager renewal rules).
 
-                        [1]: https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-certmanager
+                        [1]: https://docs.stackable.tech/home/25.3/secret-operator/secretclass#backend-certmanager
                       properties:
                         defaultCertificateLifetime:
                           default: 1d
@@ -201,7 +201,7 @@ spec:
                         - issuer
                       type: object
                     k8sSearch:
-                      description: The [`k8sSearch` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-k8ssearch) can be used to mount Secrets across namespaces into Pods.
+                      description: The [`k8sSearch` backend](https://docs.stackable.tech/home/25.3/secret-operator/secretclass#backend-k8ssearch) can be used to mount Secrets across namespaces into Pods.
                       properties:
                         searchNamespace:
                           description: Configures the namespace searched for Secret objects.
@@ -222,7 +222,7 @@ spec:
                         - searchNamespace
                       type: object
                     kerberosKeytab:
-                      description: The [`kerberosKeytab` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-kerberoskeytab) creates a Kerberos keytab file for a selected realm. The Kerberos KDC and administrator credentials must be provided by the administrator.
+                      description: The [`kerberosKeytab` backend](https://docs.stackable.tech/home/25.3/secret-operator/secretclass#backend-kerberoskeytab) creates a Kerberos keytab file for a selected realm. The Kerberos KDC and administrator credentials must be provided by the administrator.
                       properties:
                         admin:
                           description: Kerberos admin configuration settings.
