@@ -98,8 +98,8 @@ enum PublishError {
         path: PathBuf,
     },
 
-    #[snafu(display("file path {path:?} must not contain more than one component"))]
-    InvalidComponentCount { path: PathBuf },
+    #[snafu(display("file path {path:?} must only contain normal components"))]
+    InvalidComponents { path: PathBuf },
 
     #[snafu(display("file path {path:?} must not be absolute"))]
     InvalidAbsolutePath { path: PathBuf },
@@ -132,7 +132,7 @@ impl From<PublishError> for Status {
             PublishError::SetDirPermissions { .. } => Status::unavailable(full_msg),
             PublishError::CreateFile { .. } => Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
-            PublishError::InvalidComponentCount { .. } => Status::unavailable(full_msg),
+            PublishError::InvalidComponents { .. } => Status::unavailable(full_msg),
             PublishError::InvalidAbsolutePath { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
             PublishError::BuildAnnotation { .. } => Status::unavailable(full_msg),
@@ -257,16 +257,13 @@ impl SecretProvisionerNode {
                 publish_error::InvalidAbsolutePathSnafu { path: &file_path }
             );
 
-            // Ensure that the file path only consists of a single normal
-            // component. This prevents any path traversals up the path using
-            // '..'.
+            // Ensure that the file path only contains normal components. This
+            // prevents any path traversals up the path using '..'.
             ensure!(
                 file_path
                     .components()
-                    .filter(|c| matches!(c, Component::Normal(_)))
-                    .count()
-                    == 1,
-                publish_error::InvalidComponentCountSnafu { path: &file_path }
+                    .all(|c| matches!(c, Component::Normal(_))),
+                publish_error::InvalidComponentsSnafu { path: &file_path }
             );
 
             // Now, we can join the base and file path
