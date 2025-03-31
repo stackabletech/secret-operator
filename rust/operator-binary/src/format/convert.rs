@@ -16,7 +16,7 @@ use crate::format::utils::split_pem_certificates;
 pub fn convert(
     from: WellKnownSecretData,
     to: SecretFormat,
-    compat: &CompatibilityOptions,
+    compat: CompatibilityOptions,
 ) -> Result<WellKnownSecretData, ConvertError> {
     match (from, to) {
         // Converting into the current format is always a no-op

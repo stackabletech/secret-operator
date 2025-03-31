@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Add format-specific annotations to override secret file names ([#572]). The following new
+  annotations are available:
+  - `secrets.stackable.tech/format.tls-pkcs12.keystore-name`
+  - `secrets.stackable.tech/format.tls-pkcs12.truststore-name`
+  - `secrets.stackable.tech/format.tls-pem.cert-name`
+  - `secrets.stackable.tech/format.tls-pem.key-name`
+  - `secrets.stackable.tech/format.tls-pem.ca-name`
+
+[#572]: https://github.com/stackabletech/secret-operator/pull/572
+
 ## [25.3.0] - 2025-03-21
 
 ### Removed

@@ -1,12 +1,12 @@
 use std::{
     fs::Permissions,
     os::unix::prelude::PermissionsExt,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 use openssl::sha::Sha256;
 use serde::{de::IntoDeserializer, Deserialize};
-use snafu::{ResultExt, Snafu};
+use snafu::{ensure, ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::Pod,
@@ -23,9 +23,15 @@ use tonic::{Request, Response, Status};
 use super::controller::TOPOLOGY_NODE;
 use crate::{
     backend::{
-        self, pod_info, pod_info::PodInfo, SecretBackendError, SecretContents, SecretVolumeSelector,
+        self,
+        pod_info::{self, PodInfo},
+        SecretBackendError, SecretContents, SecretVolumeSelector,
     },
-    format::{self, well_known::CompatibilityOptions, SecretFormat},
+    format::{
+        self,
+        well_known::{CompatibilityOptions, NamingOptions},
+        SecretFormat,
+    },
     grpc::csi::v1::{
         node_server::Node, NodeExpandVolumeRequest, NodeExpandVolumeResponse,
         NodeGetCapabilitiesRequest, NodeGetCapabilitiesResponse, NodeGetInfoRequest,
@@ -59,13 +65,13 @@ enum PublishError {
     #[snafu(display("backend failed to get secret data"))]
     BackendGetSecretData { source: backend::dynamic::DynError },
 
-    #[snafu(display("failed to create secret parent dir {}", path.display()))]
+    #[snafu(display("failed to create secret parent dir {path:?}"))]
     CreateDir {
         source: std::io::Error,
         path: PathBuf,
     },
 
-    #[snafu(display("failed to mount volume mount directory {}", path.display()))]
+    #[snafu(display("failed to mount volume mount directory {path:?}"))]
     Mount {
         source: std::io::Error,
         path: PathBuf,
@@ -74,23 +80,29 @@ enum PublishError {
     #[snafu(display("failed to convert secret data into desired format"))]
     FormatData { source: format::IntoFilesError },
 
-    #[snafu(display("failed to set volume permissions for {}", path.display()))]
+    #[snafu(display("failed to set volume permissions for {path:?}"))]
     SetDirPermissions {
         source: std::io::Error,
         path: PathBuf,
     },
 
-    #[snafu(display("failed to create secret file {}", path.display()))]
+    #[snafu(display("failed to create secret file {path:?}"))]
     CreateFile {
         source: std::io::Error,
         path: PathBuf,
     },
 
-    #[snafu(display("failed to write secret file {}", path.display()))]
+    #[snafu(display("failed to write secret file {path:?}"))]
     WriteFile {
         source: std::io::Error,
         path: PathBuf,
     },
+
+    #[snafu(display("file path {path:?} must only contain normal components"))]
+    InvalidComponents { path: PathBuf },
+
+    #[snafu(display("file path {path:?} must not be absolute"))]
+    InvalidAbsolutePath { path: PathBuf },
 
     #[snafu(display("failed to tag pod with expiry metadata"))]
     TagPod {
@@ -120,6 +132,8 @@ impl From<PublishError> for Status {
             PublishError::SetDirPermissions { .. } => Status::unavailable(full_msg),
             PublishError::CreateFile { .. } => Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
+            PublishError::InvalidComponents { .. } => Status::unavailable(full_msg),
+            PublishError::InvalidAbsolutePath { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
             PublishError::BuildAnnotation { .. } => Status::unavailable(full_msg),
         }
@@ -209,7 +223,8 @@ impl SecretProvisionerNode {
         target_path: &Path,
         data: SecretContents,
         format: Option<SecretFormat>,
-        compat: &CompatibilityOptions,
+        names: NamingOptions,
+        compat: CompatibilityOptions,
     ) -> Result<(), PublishError> {
         let create_secret = {
             let mut opts = OpenOptions::new();
@@ -223,10 +238,37 @@ impl SecretProvisionerNode {
         };
         for (k, v) in data
             .data
-            .into_files(format, compat)
+            .into_files(format, names, compat)
             .context(publish_error::FormatDataSnafu)?
         {
-            let item_path = target_path.join(k);
+            // The following few lines of code do some basic checks against
+            // unwanted path traversals. In the future, we want to leverage
+            // capability based filesystem operations (openat) to prevent these
+            // traversals.
+
+            // First, let's turn the (potentially custom) file path into a path.
+            let file_path = PathBuf::from(k);
+
+            // Next, ensure the path is not absolute (does not contain root),
+            // because joining an absolute path with a different path will
+            // replace the exiting path entirely.
+            ensure!(
+                !file_path.has_root(),
+                publish_error::InvalidAbsolutePathSnafu { path: &file_path }
+            );
+
+            // Ensure that the file path only contains normal components. This
+            // prevents any path traversals up the path using '..'.
+            ensure!(
+                file_path
+                    .components()
+                    .all(|c| matches!(c, Component::Normal(_))),
+                publish_error::InvalidComponentsSnafu { path: &file_path }
+            );
+
+            // Now, we can join the base and file path
+            let item_path = target_path.join(file_path);
+
             if let Some(item_path_parent) = item_path.parent() {
                 create_dir_all(item_path_parent)
                     .await
@@ -383,10 +425,10 @@ impl Node for SecretProvisionerNode {
                 self.save_secret_data(
                     &target_path,
                     data,
+                    // NOTE (@Techassi): At this point, we might want to pass the whole selector instead
                     selector.format,
-                    &CompatibilityOptions {
-                        tls_pkcs12_password: selector.compat_tls_pkcs12_password,
-                    },
+                    selector.names,
+                    selector.compat,
                 )
                 .await?;
                 Ok(Response::new(NodePublishVolumeResponse {}))
