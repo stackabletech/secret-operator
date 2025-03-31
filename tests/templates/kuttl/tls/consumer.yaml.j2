@@ -17,8 +17,10 @@ spec:
             - |
 {% if test_scenario['values']['custom-secret-names'] %}
               CERT_NAME=custom-tls.crt
+              CA_NAME=custom-ca.crt
 {% else %}
               CERT_NAME=tls.crt
+              CA_NAME=ca.crt
 {% endif %}
             - |
               set -euo pipefail
@@ -52,7 +54,7 @@ spec:
                   subject=$1
 
                   while openssl x509 -subject -noout; do :; done \
-                      < /stackable/tls-3d/ca.crt \
+                      < "/stackable/tls-3d/$CA_NAME" \
                       | grep --line-regexp "subject=CN *= *$subject"
               }
 
@@ -81,6 +83,7 @@ spec:
                   secrets.stackable.tech/backend.autotls.cert.lifetime: 3d
 {% if test_scenario['values']['custom-secret-names'] %}
                   secrets.stackable.tech/format.tls-pem.cert-name: custom-tls.crt
+                  secrets.stackable.tech/format.tls-pem.ca-name: custom-ca.crt
 {% endif %}
               spec:
                 storageClassName: secrets.stackable.tech
@@ -99,6 +102,7 @@ spec:
                   secrets.stackable.tech/backend.autotls.cert.lifetime: 31d
 {% if test_scenario['values']['custom-secret-names'] %}
                   secrets.stackable.tech/format.tls-pem.cert-name: custom-tls.crt
+                  secrets.stackable.tech/format.tls-pem.ca-name: custom-ca.crt
 {% endif %}
               spec:
                 storageClassName: secrets.stackable.tech
