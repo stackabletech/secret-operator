@@ -65,13 +65,13 @@ enum PublishError {
     #[snafu(display("backend failed to get secret data"))]
     BackendGetSecretData { source: backend::dynamic::DynError },
 
-    #[snafu(display("failed to create secret parent dir {}", path.display()))]
+    #[snafu(display("failed to create secret parent dir {path:?}"))]
     CreateDir {
         source: std::io::Error,
         path: PathBuf,
     },
 
-    #[snafu(display("failed to mount volume mount directory {}", path.display()))]
+    #[snafu(display("failed to mount volume mount directory {path:?}"))]
     Mount {
         source: std::io::Error,
         path: PathBuf,
@@ -80,28 +80,28 @@ enum PublishError {
     #[snafu(display("failed to convert secret data into desired format"))]
     FormatData { source: format::IntoFilesError },
 
-    #[snafu(display("failed to set volume permissions for {}", path.display()))]
+    #[snafu(display("failed to set volume permissions for {path:?}"))]
     SetDirPermissions {
         source: std::io::Error,
         path: PathBuf,
     },
 
-    #[snafu(display("failed to create secret file {}", path.display()))]
+    #[snafu(display("failed to create secret file {path:?}"))]
     CreateFile {
         source: std::io::Error,
         path: PathBuf,
     },
 
-    #[snafu(display("failed to write secret file {}", path.display()))]
+    #[snafu(display("failed to write secret file {path:?}"))]
     WriteFile {
         source: std::io::Error,
         path: PathBuf,
     },
 
-    #[snafu(display("file path {} must not contain more than one component", path.display()))]
+    #[snafu(display("file path {path:?} must not contain more than one component"))]
     InvalidComponentCount { path: PathBuf },
 
-    #[snafu(display("file path {} must not be absolute", path.display()))]
+    #[snafu(display("file path {path:?} must not be absolute"))]
     InvalidAbsolutePath { path: PathBuf },
 
     #[snafu(display("failed to tag pod with expiry metadata"))]
