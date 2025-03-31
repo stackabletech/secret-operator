@@ -1,7 +1,7 @@
 use std::{
     fs::Permissions,
     os::unix::prelude::PermissionsExt,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 use openssl::sha::Sha256;
@@ -98,17 +98,11 @@ enum PublishError {
         path: PathBuf,
     },
 
-    #[snafu(display("failed to canonicalize path {}", path.display()))]
-    CanonicalizePath {
-        source: std::io::Error,
-        path: PathBuf,
-    },
+    #[snafu(display("file path {} must not contain more than one component", path.display()))]
+    InvalidComponentCount { path: PathBuf },
 
-    #[snafu(display("encountered invalid path base in {}, expected {}", path.display(), expected_base.display()))]
-    InvalidPathBase {
-        path: PathBuf,
-        expected_base: PathBuf,
-    },
+    #[snafu(display("file path {} must not be absolute", path.display()))]
+    InvalidAbsolutePath { path: PathBuf },
 
     #[snafu(display("failed to tag pod with expiry metadata"))]
     TagPod {
@@ -138,8 +132,8 @@ impl From<PublishError> for Status {
             PublishError::SetDirPermissions { .. } => Status::unavailable(full_msg),
             PublishError::CreateFile { .. } => Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
-            PublishError::CanonicalizePath { .. } => Status::unavailable(full_msg),
-            PublishError::InvalidPathBase { .. } => Status::unavailable(full_msg),
+            PublishError::InvalidComponentCount { .. } => Status::unavailable(full_msg),
+            PublishError::InvalidAbsolutePath { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
             PublishError::BuildAnnotation { .. } => Status::unavailable(full_msg),
         }
@@ -247,22 +241,36 @@ impl SecretProvisionerNode {
             .into_files(format, names, compat)
             .context(publish_error::FormatDataSnafu)?
         {
-            let item_path = target_path.join(k);
+            // The following few lines of code do some basic checks against
+            // unwanted path traversals. In the future, we want to leverage
+            // capability based filesystem operations (openat) to prevent these
+            // traversals.
 
-            // Prevent unwanted path traversals by first canonicalizing the final
-            // path and then validating that the path starts with the base we
-            // expect.
-            let item_path = item_path
-                .canonicalize()
-                .context(publish_error::CanonicalizePathSnafu { path: &item_path })?;
+            // First, let's turn the (potentially custom) file path into a path.
+            let file_path = PathBuf::from(k);
 
+            // Next, ensure the path is not absolute (does not contain root),
+            // because joining an absolute path with a different path will
+            // replace the exiting path entirely.
             ensure!(
-                item_path.starts_with(target_path),
-                publish_error::InvalidPathBaseSnafu {
-                    path: &item_path,
-                    expected_base: &target_path
-                }
+                !file_path.has_root(),
+                publish_error::InvalidAbsolutePathSnafu { path: &file_path }
             );
+
+            // Ensure that the file path only consists of a single normal
+            // component. This prevents any path traversals up the path using
+            // '..'.
+            ensure!(
+                file_path
+                    .components()
+                    .filter(|c| matches!(c, Component::Normal(_)))
+                    .count()
+                    == 1,
+                publish_error::InvalidComponentCountSnafu { path: &file_path }
+            );
+
+            // Now, we can join the base and file path
+            let item_path = target_path.join(file_path);
 
             if let Some(item_path_parent) = item_path.parent() {
                 create_dir_all(item_path_parent)
