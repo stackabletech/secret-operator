@@ -5,9 +5,9 @@ use stackable_operator::{
         apimachinery::pkg::apis::meta::v1::OwnerReference,
     },
     kube::{
+        Resource,
         api::{DynamicObject, ResourceExt},
         discovery::Scope,
-        Resource,
     },
 };
 

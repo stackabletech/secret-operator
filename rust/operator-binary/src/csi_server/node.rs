@@ -5,17 +5,17 @@ use std::{
 };
 
 use openssl::sha::Sha256;
-use serde::{de::IntoDeserializer, Deserialize};
-use snafu::{ensure, ResultExt, Snafu};
+use serde::{Deserialize, de::IntoDeserializer};
+use snafu::{ResultExt, Snafu, ensure};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::Pod,
     kube::runtime::reflector::ObjectRef,
     kvp::{AnnotationError, Annotations},
 };
-use sys_mount::{unmount, Mount, MountFlags, UnmountFlags};
+use sys_mount::{Mount, MountFlags, UnmountFlags, unmount};
 use tokio::{
-    fs::{create_dir_all, OpenOptions},
+    fs::{OpenOptions, create_dir_all},
     io::AsyncWriteExt,
 };
 use tonic::{Request, Response, Status};
@@ -23,24 +23,22 @@ use tonic::{Request, Response, Status};
 use super::controller::TOPOLOGY_NODE;
 use crate::{
     backend::{
-        self,
+        self, SecretBackendError, SecretContents, SecretVolumeSelector,
         pod_info::{self, PodInfo},
-        SecretBackendError, SecretContents, SecretVolumeSelector,
     },
     format::{
-        self,
+        self, SecretFormat,
         well_known::{CompatibilityOptions, NamingOptions},
-        SecretFormat,
     },
     grpc::csi::v1::{
-        node_server::Node, NodeExpandVolumeRequest, NodeExpandVolumeResponse,
-        NodeGetCapabilitiesRequest, NodeGetCapabilitiesResponse, NodeGetInfoRequest,
-        NodeGetInfoResponse, NodeGetVolumeStatsRequest, NodeGetVolumeStatsResponse,
-        NodePublishVolumeRequest, NodePublishVolumeResponse, NodeStageVolumeRequest,
-        NodeStageVolumeResponse, NodeUnpublishVolumeRequest, NodeUnpublishVolumeResponse,
-        NodeUnstageVolumeRequest, NodeUnstageVolumeResponse, Topology,
+        NodeExpandVolumeRequest, NodeExpandVolumeResponse, NodeGetCapabilitiesRequest,
+        NodeGetCapabilitiesResponse, NodeGetInfoRequest, NodeGetInfoResponse,
+        NodeGetVolumeStatsRequest, NodeGetVolumeStatsResponse, NodePublishVolumeRequest,
+        NodePublishVolumeResponse, NodeStageVolumeRequest, NodeStageVolumeResponse,
+        NodeUnpublishVolumeRequest, NodeUnpublishVolumeResponse, NodeUnstageVolumeRequest,
+        NodeUnstageVolumeResponse, Topology, node_server::Node,
     },
-    utils::{error_full_message, FmtByteSlice},
+    utils::{FmtByteSlice, error_full_message},
 };
 
 #[derive(Snafu, Debug)]
@@ -352,7 +350,7 @@ impl SecretProvisionerNode {
                     }
                     _ => {
                         return Err(err)
-                            .context(unpublish_error::UnmountSnafu { path: target_path })
+                            .context(unpublish_error::UnmountSnafu { path: target_path });
                     }
                 },
             };

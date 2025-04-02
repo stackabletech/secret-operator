@@ -1,5 +1,5 @@
-use anyhow::{bail, Result};
-use stackable_operator::kube::{api::DynamicObject, ResourceExt};
+use anyhow::{Result, bail};
+use stackable_operator::kube::{ResourceExt, api::DynamicObject};
 
 pub fn data_field_as_mut<'a>(
     value: &'a mut serde_json::Value,

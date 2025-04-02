@@ -18,8 +18,8 @@ mod owner;
 mod resources;
 mod tolerations;
 
-use anyhow::{anyhow, bail, Context, Result};
-use clap::{crate_description, crate_version, Parser};
+use anyhow::{Context, Result, anyhow, bail};
+use clap::{Parser, crate_description, crate_version};
 use stackable_operator::{
     cli::Command,
     client,

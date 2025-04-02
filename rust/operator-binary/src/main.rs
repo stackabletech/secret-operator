@@ -1,7 +1,7 @@
 use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
 
 use anyhow::Context;
-use clap::{crate_description, crate_version, Parser};
+use clap::{Parser, crate_description, crate_version};
 use csi_server::{
     controller::SecretProvisionerController, identity::SecretProvisionerIdentity,
     node::SecretProvisionerNode,
@@ -11,12 +11,12 @@ use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
 use stackable_operator::{
-    logging::TracingTarget, utils::cluster_info::KubernetesClusterInfoOpts, CustomResourceExt,
+    CustomResourceExt, logging::TracingTarget, utils::cluster_info::KubernetesClusterInfoOpts,
 };
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
-use utils::{uds_bind_private, TonicUnixStream};
+use utils::{TonicUnixStream, uds_bind_private};
 
 mod backend;
 mod crd;
