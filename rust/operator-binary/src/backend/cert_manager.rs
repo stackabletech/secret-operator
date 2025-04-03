@@ -7,16 +7,16 @@ use std::collections::HashSet;
 use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    k8s_openapi::{api::core::v1::Secret, ByteString},
+    k8s_openapi::{ByteString, api::core::v1::Secret},
     kube::{api::ObjectMeta, runtime::reflector::ObjectRef},
     time::Duration,
 };
 
 use super::{
+    ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
     k8s_search::LABEL_SCOPE_NODE,
     pod_info::{Address, PodInfo, SchedulingPodInfo},
     scope::SecretScope,
-    ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
 };
 use crate::{
     crd::{self, CertificateKeyGeneration},
@@ -32,7 +32,9 @@ const FIELD_MANAGER_SCOPE: &str = "backend.cert-manager";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("unable to find PersistentVolumeClaim for volume (try deleting and recreating the Pod, ensure you are using the `ephemeral:` volume type, rather than `csi:`)"))]
+    #[snafu(display(
+        "unable to find PersistentVolumeClaim for volume (try deleting and recreating the Pod, ensure you are using the `ephemeral:` volume type, rather than `csi:`)"
+    ))]
     NoPvcName,
 
     #[snafu(display("failed to get addresses for scope {:?}", format!("{scope}")))]

@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use futures::{pin_mut, Stream, StreamExt};
+use futures::{Stream, StreamExt, pin_mut};
 use openssl::asn1::{Asn1Time, Asn1TimeRef, TimeDiff};
 use pin_project::pin_project;
 use snafu::{OptionExt as _, ResultExt as _, Snafu};
@@ -208,7 +208,7 @@ mod tests {
     use time::OffsetDateTime;
 
     use super::{asn1time_to_offsetdatetime, iterator_try_concat_bytes};
-    use crate::utils::{error_full_message, trystream_any, FmtByteSlice};
+    use crate::utils::{FmtByteSlice, error_full_message, trystream_any};
 
     #[test]
     fn fmt_hex_byte_slice() {

@@ -16,11 +16,12 @@ pub(super) fn maybe_copy_tolerations(
     if target_gvk.kind == "DaemonSet" {
         if let Some(tolerations) = deployment_tolerations(source) {
             let path = "template/spec/tolerations".split("/");
-            *get_or_create(target.data.pointer_mut("/spec").unwrap(), path)? =
-                serde_json::json!(tolerations
+            *get_or_create(target.data.pointer_mut("/spec").unwrap(), path)? = serde_json::json!(
+                tolerations
                     .iter()
                     .map(|t| serde_json::json!(t))
-                    .collect::<Vec<serde_json::Value>>());
+                    .collect::<Vec<serde_json::Value>>()
+            );
         }
     }
 
@@ -104,11 +105,13 @@ spec:
         let mut daemonset = DAEMONSET.clone();
         maybe_copy_tolerations(&DEPLOYMENT, &mut daemonset, &gvk)?;
 
-        let expected = serde_json::json!(deployment_tolerations(&DEPLOYMENT)
-            .unwrap()
-            .iter()
-            .map(|t| serde_json::json!(t))
-            .collect::<Vec<serde_json::Value>>());
+        let expected = serde_json::json!(
+            deployment_tolerations(&DEPLOYMENT)
+                .unwrap()
+                .iter()
+                .map(|t| serde_json::json!(t))
+                .collect::<Vec<serde_json::Value>>()
+        );
 
         assert_eq!(
             daemonset.data.pointer("/spec/template/spec/tolerations"),

@@ -18,15 +18,15 @@ use tokio::{
 };
 
 use super::{
-    pod_info::Address, scope::SecretScope, ScopeAddressesError, SecretBackend, SecretBackendError,
-    SecretContents,
+    ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents, pod_info::Address,
+    scope::SecretScope,
 };
 use crate::{
     crd::{
         ActiveDirectorySamAccountNameRules, InvalidKerberosPrincipal, KerberosKeytabBackendAdmin,
         KerberosPrincipal,
     },
-    format::{well_known, SecretData, WellKnownSecretData},
+    format::{SecretData, WellKnownSecretData, well_known},
     utils::Unloggable,
 };
 

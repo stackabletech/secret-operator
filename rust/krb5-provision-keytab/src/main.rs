@@ -1,7 +1,7 @@
 use std::{
     ffi::{CString, NulError},
     fmt::Display,
-    io::{stdin, BufReader},
+    io::{BufReader, stdin},
 };
 
 use krb5::{Keyblock, Keytab};

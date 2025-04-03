@@ -7,7 +7,7 @@ use std::{
 use byteorder::{LittleEndian, WriteBytesExt};
 use krb5::{Keyblock, Keytab, KrbContext, Principal, PrincipalUnparseOptions};
 use ldap3::{Ldap, LdapConnAsync, LdapConnSettings, Scope, SearchEntry};
-use rand::{seq::IndexedRandom, CryptoRng};
+use rand::{CryptoRng, seq::IndexedRandom};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_krb5_provision_keytab::ActiveDirectorySamAccountNameRules;
 use stackable_operator::{
@@ -399,12 +399,9 @@ async fn get_user_kvno(
 
     // Perform search with KVNO attribute
     let (search_results, _) = ldap
-        .search(
-            distinguished_name,
-            Scope::Base,
-            "(objectClass=user)",
-            vec!["msDS-KeyVersionNumber"],
-        )
+        .search(distinguished_name, Scope::Base, "(objectClass=user)", vec![
+            "msDS-KeyVersionNumber",
+        ])
         .await
         .context(SearchLdapSnafu)?
         .success()

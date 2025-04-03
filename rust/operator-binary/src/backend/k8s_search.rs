@@ -6,16 +6,16 @@ use async_trait::async_trait;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{
-        api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector, ByteString,
+        ByteString, api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
     kube::api::ListParams,
     kvp::{LabelError, LabelSelectorExt, Labels},
 };
 
 use super::{
+    SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
     pod_info::{PodInfo, SchedulingPodInfo},
     scope::SecretScope,
-    SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
 };
 use crate::{crd::SearchNamespace, format::SecretData, utils::Unloggable};
 
