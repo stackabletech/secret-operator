@@ -1,7 +1,7 @@
 use futures::{TryFuture, TryFutureExt};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    k8s_openapi::{api::core::v1::Secret, ByteString},
+    k8s_openapi::{ByteString, api::core::v1::Secret},
     kube::{
         self,
         api::{Patch, PatchParams},

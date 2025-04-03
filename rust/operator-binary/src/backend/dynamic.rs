@@ -10,9 +10,10 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::kube::runtime::reflector::ObjectRef;
 
 use super::{
+    SecretBackend, SecretBackendError, SecretVolumeSelector,
     kerberos_keytab::{self, KerberosProfile},
     pod_info::{PodInfo, SchedulingPodInfo},
-    tls, SecretBackend, SecretBackendError, SecretVolumeSelector,
+    tls,
 };
 use crate::{
     crd::{self, SecretClass},

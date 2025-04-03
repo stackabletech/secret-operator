@@ -11,21 +11,21 @@ use openssl::{
     pkey::{PKey, Private},
     rsa::Rsa,
     x509::{
+        X509, X509Builder, X509NameBuilder,
         extension::{AuthorityKeyIdentifier, BasicConstraints, KeyUsage, SubjectKeyIdentifier},
-        X509Builder, X509NameBuilder, X509,
     },
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{
-        api::core::v1::{ConfigMap, Secret},
         ByteString,
+        api::core::v1::{ConfigMap, Secret},
     },
     kube::{
         self,
         api::{
-            entry::{self, Entry},
             DynamicObject, PostParams,
+            entry::{self, Entry},
         },
         runtime::reflector::ObjectRef,
     },
@@ -38,7 +38,7 @@ use tracing::{info, info_span, warn};
 use crate::{
     backend::SecretBackendError,
     crd::{AdditionalTrustRoot, CertificateKeyGeneration},
-    utils::{asn1time_to_offsetdatetime, Asn1TimeParseError, Unloggable},
+    utils::{Asn1TimeParseError, Unloggable, asn1time_to_offsetdatetime},
 };
 
 /// v1 format: support a single cert/pkey pair
@@ -86,7 +86,9 @@ pub enum Error {
         object: ObjectRef<DynamicObject>,
     },
 
-    #[snafu(display("unsupported certificate format in key {key:?} of {object}; supported extensions: .crt, .der"))]
+    #[snafu(display(
+        "unsupported certificate format in key {key:?} of {object}; supported extensions: .crt, .der"
+    ))]
     UnsupportedCertificateFormat {
         key: String,
         object: ObjectRef<DynamicObject>,

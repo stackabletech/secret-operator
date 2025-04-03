@@ -4,9 +4,9 @@ use clap::crate_version;
 use tonic::{Request, Response, Status};
 
 use crate::grpc::csi::v1::{
-    identity_server::Identity, plugin_capability, GetPluginCapabilitiesRequest,
-    GetPluginCapabilitiesResponse, GetPluginInfoRequest, GetPluginInfoResponse, PluginCapability,
-    ProbeRequest, ProbeResponse,
+    GetPluginCapabilitiesRequest, GetPluginCapabilitiesResponse, GetPluginInfoRequest,
+    GetPluginInfoResponse, PluginCapability, ProbeRequest, ProbeResponse,
+    identity_server::Identity, plugin_capability,
 };
 
 pub struct SecretProvisionerIdentity;

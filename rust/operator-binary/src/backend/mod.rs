@@ -16,7 +16,7 @@ pub use k8s_search::K8sSearch;
 pub use kerberos_keytab::KerberosKeytab;
 use pod_info::Address;
 use scope::SecretScope;
-use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de::Unexpected};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{DateTime, FixedOffset},
@@ -26,8 +26,8 @@ pub use tls::TlsGenerate;
 
 use self::pod_info::SchedulingPodInfo;
 use crate::format::{
-    well_known::{CompatibilityOptions, NamingOptions},
     SecretData, SecretFormat,
+    well_known::{CompatibilityOptions, NamingOptions},
 };
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
@@ -302,7 +302,7 @@ impl SecretBackendError for Infallible {
 mod tests {
     use std::collections::HashMap;
 
-    use serde::de::{value::MapDeserializer, IntoDeserializer};
+    use serde::de::{IntoDeserializer, value::MapDeserializer};
 
     use super::*;
 

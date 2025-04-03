@@ -1,6 +1,6 @@
 use std::ffi::CStr;
 
-use krb5::{kadm5, Keytab, Principal};
+use krb5::{Keytab, Principal, kadm5};
 use snafu::{ResultExt, Snafu};
 
 #[derive(Debug, Snafu)]
