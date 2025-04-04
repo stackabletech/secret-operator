@@ -11,6 +11,8 @@ publish = false
 [dependencies]
 stackable-krb5-provision-keytab = { path = "../krb5-provision-keytab" }
 stackable-secret-operator-crd-utils = { path = "../crd-utils" }
+stackable-operator.workspace = true
+stackable-telemetry.workspace = true
 
 anyhow.workspace = true
 async-trait.workspace = true
@@ -27,7 +29,6 @@ serde_json.workspace = true
 serde.workspace = true
 snafu.workspace = true
 socket2.workspace = true
-stackable-operator.workspace = true
 strum.workspace = true
 sys-mount.workspace = true
 tempfile.workspace = true

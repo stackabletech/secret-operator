@@ -18,24 +18,29 @@ mod owner;
 mod resources;
 mod tolerations;
 
+use std::ops::Deref as _;
+
 use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use stackable_operator::{
-    cli::Command,
+    cli::{Command, RollingPeriod, TelemetryArguments},
     client,
     k8s_openapi::api::{apps::v1::Deployment, rbac::v1::ClusterRole},
-    kube,
     kube::{
+        self,
         api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
         core::GroupVersionKind,
         discovery::{ApiResource, Discovery, Scope},
     },
-    logging,
     utils::cluster_info::KubernetesClusterInfoOpts,
 };
+use stackable_telemetry::{Tracing, tracing::settings::Settings};
+use tracing::level_filters::LevelFilter;
 
 pub const APP_NAME: &str = "stkbl-secret-olm-deployer";
-pub const ENV_VAR_LOGGING: &str = "STKBL_SECRET_OLM_DEPLOYER_LOG";
+
+// TODO (@NickLarsenNZ): Change the variable to `CONSOLE_LOG`
+pub const ENV_VAR_CONSOLE_LOG: &str = "STKBL_SECRET_OLM_DEPLOYER_LOG";
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -63,13 +68,16 @@ struct OlmDeployerRun {
         help = "Name of ClusterServiceVersion object that owns this Deployment."
     )]
     csv: String,
+
     #[arg(long, short, help = "Namespace of the ClusterServiceVersion object.")]
     namespace: String,
+
     #[arg(long, short, help = "Directory with manifests to patch and apply.")]
     dir: std::path::PathBuf,
-    /// Tracing log collector system
-    #[arg(long, env, default_value_t, value_enum)]
-    pub tracing_target: logging::TracingTarget,
+
+    #[command(flatten)]
+    pub telemetry_arguments: TelemetryArguments,
+
     #[command(flatten)]
     pub cluster_info_opts: KubernetesClusterInfoOpts,
 }
@@ -82,11 +90,48 @@ async fn main() -> Result<()> {
         csv,
         namespace,
         dir,
-        tracing_target,
+        telemetry_arguments,
         cluster_info_opts,
     }) = opts.cmd
     {
-        logging::initialize_logging(ENV_VAR_LOGGING, APP_NAME, tracing_target);
+        let _tracing_guard = Tracing::builder()
+            .service_name("secret-operator-olm-deployer")
+            .with_console_output((
+                ENV_VAR_CONSOLE_LOG,
+                LevelFilter::INFO,
+                !telemetry_arguments.no_console_output,
+            ))
+            // NOTE (@NickLarsenNZ): Before stackable-telemetry was used, the log directory was
+            // set via an env: `STKBL_SECRET_OLM_DEPLOYER_LOG_DIRECTORY`.
+            // See: https://github.com/stackabletech/operator-rs/blob/f035997fca85a54238c8de895389cc50b4d421e2/crates/stackable-operator/src/logging/mod.rs#L40
+            // Now it will be `ROLLING_LOGS` (or via `--rolling-logs <DIRECTORY>`).
+            .with_file_output(telemetry_arguments.rolling_logs.map(|log_directory| {
+                let rotation_period = telemetry_arguments
+                    .rolling_logs_period
+                    .unwrap_or(RollingPeriod::Never)
+                    .deref()
+                    .clone();
+
+                Settings::builder()
+                    .with_environment_variable(ENV_VAR_CONSOLE_LOG)
+                    .with_default_level(LevelFilter::INFO)
+                    .file_log_settings_builder(log_directory, "tracing-rs.log")
+                    .with_rotation_period(rotation_period)
+                    .build()
+            }))
+            .with_otlp_log_exporter((
+                "OTLP_LOG",
+                LevelFilter::DEBUG,
+                telemetry_arguments.otlp_logs,
+            ))
+            .with_otlp_log_exporter((
+                "OTLP_TRACE",
+                LevelFilter::DEBUG,
+                telemetry_arguments.otlp_logs,
+            ))
+            .build()
+            .init()?;
+
         tracing::info!(
             built_info.pkg_version = built_info::PKG_VERSION,
             built_info.git_version = built_info::GIT_VERSION,
