@@ -18,9 +18,9 @@ All notable changes to this project will be documented in this file.
 
 - Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#581]).
   - BREAKING: operator-binary: The file log directory was set by `SECRET_PROVISIONER_LOG_DIRECTORY`,
-    and is now set by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
+    and is now set by `ROLLING_LOGS` (or via `--rolling-logs <DIRECTORY>`).
   - BREAKING: olm-deployer: The file log directory was set by `STKBL_SECRET_OLM_DEPLOYER_LOG_DIRECTORY`,
-    and is now set by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
+    and is now set by `ROLLING_LOGS` (or via `--rolling-logs <DIRECTORY>`).
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 
 [#572]: https://github.com/stackabletech/secret-operator/pull/572
