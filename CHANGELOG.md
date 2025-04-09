@@ -23,8 +23,13 @@ All notable changes to this project will be documented in this file.
     and is now set by `ROLLING_LOGS` (or via `--rolling-logs <DIRECTORY>`).
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 
+### Fixed
+
+- Use `json` file extension for log files ([#586]).
+
 [#572]: https://github.com/stackabletech/secret-operator/pull/572
 [#581]: https://github.com/stackabletech/secret-operator/pull/581
+[#586]: https://github.com/stackabletech/secret-operator/pull/586
 
 ## [25.3.0] - 2025-03-21
 
