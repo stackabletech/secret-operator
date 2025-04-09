@@ -12,7 +12,6 @@ publish = false
 stackable-krb5-provision-keytab = { path = "../krb5-provision-keytab" }
 stackable-secret-operator-crd-utils = { path = "../crd-utils" }
 stackable-operator.workspace = true
-stackable-telemetry.workspace = true
 
 anyhow.workspace = true
 async-trait.workspace = true

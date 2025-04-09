@@ -58,16 +58,6 @@ rec {
       # File a bug if you depend on any for non-debug work!
       debug = internal.debugCrate { inherit packageId; };
     };
-    "olm-deployer" = rec {
-      packageId = "olm-deployer";
-      build = internal.buildRustCrateWithFeatures {
-        packageId = "olm-deployer";
-      };
-
-      # Debug support which might change between releases.
-      # File a bug if you depend on any for non-debug work!
-      debug = internal.debugCrate { inherit packageId; };
-    };
     "stackable-krb5-provision-keytab" = rec {
       packageId = "stackable-krb5-provision-keytab";
       build = internal.buildRustCrateWithFeatures {
@@ -92,6 +82,16 @@ rec {
       packageId = "stackable-secret-operator-crd-utils";
       build = internal.buildRustCrateWithFeatures {
         packageId = "stackable-secret-operator-crd-utils";
+      };
+
+      # Debug support which might change between releases.
+      # File a bug if you depend on any for non-debug work!
+      debug = internal.debugCrate { inherit packageId; };
+    };
+    "stackable-secret-operator-olm-deployer" = rec {
+      packageId = "stackable-secret-operator-olm-deployer";
+      build = internal.buildRustCrateWithFeatures {
+        packageId = "stackable-secret-operator-olm-deployer";
       };
 
       # Debug support which might change between releases.
@@ -1834,6 +1834,25 @@ rec {
           "syn" = [ "dep:syn" ];
         };
         resolvedDefaultFeatures = [ "default" ];
+      };
+      "convert_case" = rec {
+        crateName = "convert_case";
+        version = "0.8.0";
+        edition = "2021";
+        sha256 = "17zqy79xlr1n7nc0n1mlnw5qpp8l2nbxrk13jixrhlavrbna1ams";
+        authors = [
+          "rutrum <dave@rutrum.net>"
+        ];
+        dependencies = [
+          {
+            name = "unicode-segmentation";
+            packageId = "unicode-segmentation";
+          }
+        ];
+        features = {
+          "rand" = [ "dep:rand" ];
+          "random" = [ "rand" ];
+        };
       };
       "core-foundation 0.10.0" = rec {
         crateName = "core-foundation";
@@ -5113,6 +5132,40 @@ rec {
         };
         resolvedDefaultFeatures = [ "schemars" "v1_32" ];
       };
+      "k8s-version" = rec {
+        crateName = "k8s-version";
+        version = "0.1.2";
+        edition = "2024";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14";
+          sha256 = "11zqwlwvfigca7lfsdch1wqd3vl694hff1avf6rhiawpnassj2cw";
+        };
+        libName = "k8s_version";
+        authors = [
+          "Stackable GmbH <info@stackable.de>"
+        ];
+        dependencies = [
+          {
+            name = "darling";
+            packageId = "darling";
+            optional = true;
+          }
+          {
+            name = "regex";
+            packageId = "regex";
+          }
+          {
+            name = "snafu";
+            packageId = "snafu 0.8.5";
+          }
+        ];
+        features = {
+          "darling" = [ "dep:darling" ];
+        };
+        resolvedDefaultFeatures = [ "darling" ];
+      };
       "krb5" = rec {
         crateName = "krb5";
         version = "0.0.0-dev";
@@ -6516,75 +6569,6 @@ rec {
           "write_std" = [ "write_core" "std" "indexmap?/std" "crc32fast?/std" ];
         };
         resolvedDefaultFeatures = [ "archive" "coff" "elf" "macho" "pe" "read_core" "unaligned" "xcoff" ];
-      };
-      "olm-deployer" = rec {
-        crateName = "olm-deployer";
-        version = "0.0.0-dev";
-        edition = "2021";
-        crateBin = [
-          {
-            name = "olm-deployer";
-            path = "src/main.rs";
-            requiredFeatures = [ ];
-          }
-        ];
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/olm-deployer; };
-        authors = [
-          "Stackable GmbH <info@stackable.tech>"
-        ];
-        dependencies = [
-          {
-            name = "anyhow";
-            packageId = "anyhow";
-          }
-          {
-            name = "clap";
-            packageId = "clap";
-          }
-          {
-            name = "serde";
-            packageId = "serde";
-            features = [ "derive" ];
-          }
-          {
-            name = "serde_json";
-            packageId = "serde_json";
-          }
-          {
-            name = "serde_yaml";
-            packageId = "serde_yaml";
-          }
-          {
-            name = "stackable-operator";
-            packageId = "stackable-operator";
-            features = [ "time" ];
-          }
-          {
-            name = "stackable-telemetry";
-            packageId = "stackable-telemetry";
-          }
-          {
-            name = "tokio";
-            packageId = "tokio";
-            features = [ "full" ];
-          }
-          {
-            name = "tracing";
-            packageId = "tracing";
-          }
-          {
-            name = "walkdir";
-            packageId = "walkdir";
-          }
-        ];
-        buildDependencies = [
-          {
-            name = "built";
-            packageId = "built";
-            features = [ "chrono" "git2" ];
-          }
-        ];
-
       };
       "once_cell" = rec {
         crateName = "once_cell";
@@ -10017,7 +10001,7 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "time" ];
+            features = [ "time" "telemetry" ];
           }
           {
             name = "stackable-secret-operator-crd-utils";
@@ -10041,13 +10025,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.89.1";
+        version = "0.91.1";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "cd73728af410c52972b9a9a3ba1302bcdb574d04";
-          sha256 = "1hrxrybc6197ibx0m2wfxlg5pdg4hanf6xvslzrhsp77a04pb0y9";
+          rev = "0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14";
+          sha256 = "11zqwlwvfigca7lfsdch1wqd3vl694hff1avf6rhiawpnassj2cw";
         };
         libName = "stackable_operator";
         authors = [
@@ -10153,6 +10137,16 @@ rec {
             packageId = "stackable-shared";
           }
           {
+            name = "stackable-telemetry";
+            packageId = "stackable-telemetry";
+            features = [ "clap" ];
+          }
+          {
+            name = "stackable-versioned";
+            packageId = "stackable-versioned";
+            features = [ "k8s" ];
+          }
+          {
             name = "strum";
             packageId = "strum";
             features = [ "derive" ];
@@ -10187,9 +10181,11 @@ rec {
           }
         ];
         features = {
+          "default" = [ "telemetry" "versioned" ];
+          "full" = [ "time" "telemetry" "versioned" ];
           "time" = [ "dep:time" ];
         };
-        resolvedDefaultFeatures = [ "time" ];
+        resolvedDefaultFeatures = [ "default" "telemetry" "time" "versioned" ];
       };
       "stackable-operator-derive" = rec {
         crateName = "stackable-operator-derive";
@@ -10198,8 +10194,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "cd73728af410c52972b9a9a3ba1302bcdb574d04";
-          sha256 = "1hrxrybc6197ibx0m2wfxlg5pdg4hanf6xvslzrhsp77a04pb0y9";
+          rev = "0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14";
+          sha256 = "11zqwlwvfigca7lfsdch1wqd3vl694hff1avf6rhiawpnassj2cw";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -10316,15 +10312,11 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "time" ];
+            features = [ "time" "telemetry" ];
           }
           {
             name = "stackable-secret-operator-crd-utils";
             packageId = "stackable-secret-operator-crd-utils";
-          }
-          {
-            name = "stackable-telemetry";
-            packageId = "stackable-telemetry";
           }
           {
             name = "strum";
@@ -10414,7 +10406,72 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "time" ];
+            features = [ "time" "telemetry" ];
+          }
+        ];
+
+      };
+      "stackable-secret-operator-olm-deployer" = rec {
+        crateName = "stackable-secret-operator-olm-deployer";
+        version = "0.0.0-dev";
+        edition = "2021";
+        crateBin = [
+          {
+            name = "stackable-secret-operator-olm-deployer";
+            path = "src/main.rs";
+            requiredFeatures = [ ];
+          }
+        ];
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/olm-deployer; };
+        authors = [
+          "Stackable GmbH <info@stackable.tech>"
+        ];
+        dependencies = [
+          {
+            name = "anyhow";
+            packageId = "anyhow";
+          }
+          {
+            name = "clap";
+            packageId = "clap";
+          }
+          {
+            name = "serde";
+            packageId = "serde";
+            features = [ "derive" ];
+          }
+          {
+            name = "serde_json";
+            packageId = "serde_json";
+          }
+          {
+            name = "serde_yaml";
+            packageId = "serde_yaml";
+          }
+          {
+            name = "stackable-operator";
+            packageId = "stackable-operator";
+            features = [ "time" "telemetry" ];
+          }
+          {
+            name = "tokio";
+            packageId = "tokio";
+            features = [ "full" ];
+          }
+          {
+            name = "tracing";
+            packageId = "tracing";
+          }
+          {
+            name = "walkdir";
+            packageId = "walkdir";
+          }
+        ];
+        buildDependencies = [
+          {
+            name = "built";
+            packageId = "built";
+            features = [ "chrono" "git2" ];
           }
         ];
 
@@ -10426,8 +10483,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "cd73728af410c52972b9a9a3ba1302bcdb574d04";
-          sha256 = "1hrxrybc6197ibx0m2wfxlg5pdg4hanf6xvslzrhsp77a04pb0y9";
+          rev = "0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14";
+          sha256 = "11zqwlwvfigca7lfsdch1wqd3vl694hff1avf6rhiawpnassj2cw";
         };
         libName = "stackable_shared";
         authors = [
@@ -10462,13 +10519,13 @@ rec {
       };
       "stackable-telemetry" = rec {
         crateName = "stackable-telemetry";
-        version = "0.4.0";
+        version = "0.5.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "52bdee5749e217005025d07f33c7020931c31d91";
-          sha256 = "0hcm64fb2ngyalq8rci5lrr881prg023pq9cd1sfr79iynbr6a26";
+          rev = "0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14";
+          sha256 = "11zqwlwvfigca7lfsdch1wqd3vl694hff1avf6rhiawpnassj2cw";
         };
         libName = "stackable_telemetry";
         authors = [
@@ -10478,6 +10535,12 @@ rec {
           {
             name = "axum";
             packageId = "axum 0.8.3";
+          }
+          {
+            name = "clap";
+            packageId = "clap";
+            optional = true;
+            features = [ "derive" "cargo" "env" ];
           }
           {
             name = "futures-util";
@@ -10509,6 +10572,11 @@ rec {
           {
             name = "snafu";
             packageId = "snafu 0.8.5";
+          }
+          {
+            name = "strum";
+            packageId = "strum";
+            features = [ "derive" ];
           }
           {
             name = "tokio";
@@ -10549,7 +10617,110 @@ rec {
             packageId = "tracing-opentelemetry";
           }
         ];
-
+        features = {
+          "clap" = [ "dep:clap" ];
+        };
+        resolvedDefaultFeatures = [ "clap" ];
+      };
+      "stackable-versioned" = rec {
+        crateName = "stackable-versioned";
+        version = "0.7.1";
+        edition = "2024";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14";
+          sha256 = "11zqwlwvfigca7lfsdch1wqd3vl694hff1avf6rhiawpnassj2cw";
+        };
+        libName = "stackable_versioned";
+        authors = [
+          "Stackable GmbH <info@stackable.de>"
+        ];
+        dependencies = [
+          {
+            name = "stackable-versioned-macros";
+            packageId = "stackable-versioned-macros";
+          }
+        ];
+        features = {
+          "full" = [ "k8s" ];
+          "k8s" = [ "stackable-versioned-macros/k8s" ];
+        };
+        resolvedDefaultFeatures = [ "k8s" ];
+      };
+      "stackable-versioned-macros" = rec {
+        crateName = "stackable-versioned-macros";
+        version = "0.7.1";
+        edition = "2024";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14";
+          sha256 = "11zqwlwvfigca7lfsdch1wqd3vl694hff1avf6rhiawpnassj2cw";
+        };
+        procMacro = true;
+        libName = "stackable_versioned_macros";
+        authors = [
+          "Stackable GmbH <info@stackable.de>"
+        ];
+        dependencies = [
+          {
+            name = "convert_case";
+            packageId = "convert_case";
+          }
+          {
+            name = "darling";
+            packageId = "darling";
+          }
+          {
+            name = "itertools";
+            packageId = "itertools 0.14.0";
+          }
+          {
+            name = "k8s-openapi";
+            packageId = "k8s-openapi";
+            optional = true;
+            usesDefaultFeatures = false;
+            features = [ "schemars" "v1_32" ];
+          }
+          {
+            name = "k8s-version";
+            packageId = "k8s-version";
+            features = [ "darling" ];
+          }
+          {
+            name = "kube";
+            packageId = "kube";
+            optional = true;
+            usesDefaultFeatures = false;
+            features = [ "client" "jsonpatch" "runtime" "derive" "rustls-tls" "ring" ];
+          }
+          {
+            name = "proc-macro2";
+            packageId = "proc-macro2";
+          }
+          {
+            name = "quote";
+            packageId = "quote";
+          }
+          {
+            name = "syn";
+            packageId = "syn 2.0.99";
+          }
+        ];
+        devDependencies = [
+          {
+            name = "k8s-openapi";
+            packageId = "k8s-openapi";
+            usesDefaultFeatures = false;
+            features = [ "schemars" "v1_32" ];
+          }
+        ];
+        features = {
+          "full" = [ "k8s" ];
+          "k8s" = [ "dep:kube" "dep:k8s-openapi" ];
+        };
+        resolvedDefaultFeatures = [ "k8s" ];
       };
       "strsim" = rec {
         crateName = "strsim";
@@ -12486,6 +12657,19 @@ rec {
           "David Tolnay <dtolnay@gmail.com>"
         ];
 
+      };
+      "unicode-segmentation" = rec {
+        crateName = "unicode-segmentation";
+        version = "1.12.0";
+        edition = "2018";
+        sha256 = "14qla2jfx74yyb9ds3d2mpwpa4l4lzb9z57c6d2ba511458z5k7n";
+        libName = "unicode_segmentation";
+        authors = [
+          "kwantam <kwantam@gmail.com>"
+          "Manish Goregaokar <manishsmail@gmail.com>"
+        ];
+        features = {
+        };
       };
       "unicode-xid" = rec {
         crateName = "unicode-xid";

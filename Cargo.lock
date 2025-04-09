@@ -544,6 +544,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "convert_case"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baaaa0ecca5b51987b9423ccdc971514dd8b0bb7b4060b983d3664dad3f1f89f"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1612,6 +1621,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "k8s-version"
+version = "0.1.2"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.91.1#0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14"
+dependencies = [
+ "darling",
+ "regex",
+ "snafu 0.8.5",
+]
+
+[[package]]
 name = "krb5"
 version = "0.0.0-dev"
 dependencies = [
@@ -2005,23 +2024,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62948e14d923ea95ea2c7c86c71013138b66525b86bdc08d2dcc262bdb497b87"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "olm-deployer"
-version = "0.0.0-dev"
-dependencies = [
- "anyhow",
- "built",
- "clap",
- "serde",
- "serde_json",
- "serde_yaml",
- "stackable-operator",
- "stackable-telemetry",
- "tokio",
- "tracing",
- "walkdir",
 ]
 
 [[package]]
@@ -3065,8 +3067,8 @@ dependencies = [
 
 [[package]]
 name = "stackable-operator"
-version = "0.89.1"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.89.1#cd73728af410c52972b9a9a3ba1302bcdb574d04"
+version = "0.91.1"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.91.1#0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14"
 dependencies = [
  "chrono",
  "clap",
@@ -3090,6 +3092,8 @@ dependencies = [
  "snafu 0.8.5",
  "stackable-operator-derive",
  "stackable-shared",
+ "stackable-telemetry",
+ "stackable-versioned",
  "strum",
  "time",
  "tokio",
@@ -3102,7 +3106,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator-derive"
 version = "0.3.1"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.89.1#cd73728af410c52972b9a9a3ba1302bcdb574d04"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.91.1#0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -3135,7 +3139,6 @@ dependencies = [
  "stackable-krb5-provision-keytab",
  "stackable-operator",
  "stackable-secret-operator-crd-utils",
- "stackable-telemetry",
  "strum",
  "sys-mount",
  "tempfile",
@@ -3159,9 +3162,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "stackable-secret-operator-olm-deployer"
+version = "0.0.0-dev"
+dependencies = [
+ "anyhow",
+ "built",
+ "clap",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "stackable-operator",
+ "tokio",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
 name = "stackable-shared"
 version = "0.0.1"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.89.1#cd73728af410c52972b9a9a3ba1302bcdb574d04"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.91.1#0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14"
 dependencies = [
  "kube",
  "semver",
@@ -3172,10 +3191,11 @@ dependencies = [
 
 [[package]]
 name = "stackable-telemetry"
-version = "0.4.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-telemetry-0.4.0#52bdee5749e217005025d07f33c7020931c31d91"
+version = "0.5.0"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.91.1#0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14"
 dependencies = [
  "axum 0.8.3",
+ "clap",
  "futures-util",
  "opentelemetry",
  "opentelemetry-appender-tracing",
@@ -3183,12 +3203,37 @@ dependencies = [
  "opentelemetry_sdk",
  "pin-project",
  "snafu 0.8.5",
+ "strum",
  "tokio",
  "tower 0.5.2",
  "tracing",
  "tracing-appender",
  "tracing-opentelemetry",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "stackable-versioned"
+version = "0.7.1"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.91.1#0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14"
+dependencies = [
+ "stackable-versioned-macros",
+]
+
+[[package]]
+name = "stackable-versioned-macros"
+version = "0.7.1"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.91.1#0f9b6f9669051e9c4f29e6e882acf3eff3ac3f14"
+dependencies = [
+ "convert_case",
+ "darling",
+ "itertools 0.14.0",
+ "k8s-openapi",
+ "k8s-version",
+ "kube",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.99",
 ]
 
 [[package]]
@@ -3712,6 +3757,12 @@ name = "unicode-ident"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5f39404a5da50712a4c1eecf25e90dd62b613502b7e925fd4e4d19b5c96512"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
 
 [[package]]
 name = "unicode-xid"

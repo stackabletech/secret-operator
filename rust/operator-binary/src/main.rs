@@ -1,4 +1,4 @@
-use std::{ops::Deref, os::unix::prelude::FileTypeExt, path::PathBuf};
+use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
 
 use anyhow::Context;
 use clap::Parser;
@@ -12,14 +12,12 @@ use grpc::csi::v1::{
 };
 use stackable_operator::{
     CustomResourceExt,
-    cli::{RollingPeriod, TelemetryArguments},
+    telemetry::{Tracing, tracing::TelemetryOptions},
     utils::cluster_info::KubernetesClusterInfoOpts,
 };
-use stackable_telemetry::{Tracing, tracing::settings::Settings};
 use tokio::signal::unix::{SignalKind, signal};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
-use tracing::level_filters::LevelFilter;
 use utils::{TonicUnixStream, uds_bind_private};
 
 mod backend;
@@ -30,11 +28,7 @@ mod format;
 mod grpc;
 mod utils;
 
-pub const APP_NAME: &str = "secret";
 pub const OPERATOR_NAME: &str = "secrets.stackable.tech";
-
-// TODO (@NickLarsenNZ): Change the variable to `CONSOLE_LOG`
-pub const ENV_VAR_CONSOLE_LOG: &str = "SECRET_PROVISIONER_LOG";
 
 #[derive(clap::Parser)]
 #[clap(author, version)]
@@ -61,7 +55,7 @@ struct SecretOperatorRun {
     privileged: bool,
 
     #[command(flatten)]
-    pub telemetry_arguments: TelemetryArguments,
+    pub telemetry_arguments: TelemetryOptions,
 
     #[command(flatten)]
     pub cluster_info_opts: KubernetesClusterInfoOpts,
@@ -85,43 +79,12 @@ async fn main() -> anyhow::Result<()> {
             privileged,
             cluster_info_opts,
         }) => {
-            let _tracing_guard = Tracing::builder()
-                .service_name("secret-operator")
-                .with_console_output((
-                    ENV_VAR_CONSOLE_LOG,
-                    LevelFilter::INFO,
-                    !telemetry_arguments.no_console_output,
-                ))
-                // NOTE (@NickLarsenNZ): Before stackable-telemetry was used, the log directory was
-                // set via an env: `SECRET_PROVISIONER_LOG_DIRECTORY`.
-                // See: https://github.com/stackabletech/operator-rs/blob/f035997fca85a54238c8de895389cc50b4d421e2/crates/stackable-operator/src/logging/mod.rs#L40
-                // Now it will be `ROLLING_LOGS` (or via `--rolling-logs <DIRECTORY>`).
-                .with_file_output(telemetry_arguments.rolling_logs.map(|log_directory| {
-                    let rotation_period = telemetry_arguments
-                        .rolling_logs_period
-                        .unwrap_or(RollingPeriod::Hourly)
-                        .deref()
-                        .clone();
-
-                    Settings::builder()
-                        .with_environment_variable(ENV_VAR_CONSOLE_LOG)
-                        .with_default_level(LevelFilter::INFO)
-                        .file_log_settings_builder(log_directory, "tracing-rs.json")
-                        .with_rotation_period(rotation_period)
-                        .build()
-                }))
-                .with_otlp_log_exporter((
-                    "OTLP_LOG",
-                    LevelFilter::DEBUG,
-                    telemetry_arguments.otlp_logs,
-                ))
-                .with_otlp_trace_exporter((
-                    "OTLP_TRACE",
-                    LevelFilter::DEBUG,
-                    telemetry_arguments.otlp_traces,
-                ))
-                .build()
-                .init()?;
+            // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
+            // - The console log level was set by `SECRET_PROVISIONER_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
+            // - The file log level was set by `SECRET_PROVISIONER_LOG`, and is now set via `FILE_LOG` (when using Tracing::pre_configured).
+            // - The file log directory was set by `SECRET_PROVISIONER_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
+            let _tracing_guard =
+                Tracing::pre_configured(built_info::PKG_NAME, telemetry_arguments).init()?;
 
             tracing::info!(
                 built_info.pkg_version = built_info::PKG_VERSION,
