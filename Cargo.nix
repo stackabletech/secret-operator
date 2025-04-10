@@ -9530,6 +9530,10 @@ rec {
             packageId = "clap";
           }
           {
+            name = "const_format";
+            packageId = "const_format";
+          }
+          {
             name = "futures";
             packageId = "futures 0.3.31";
             features = [ "compat" ];

@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use const_format::concatcp;
 use futures::StreamExt;
 use kube_runtime::{
     events::{Recorder, Reporter},
@@ -36,7 +37,7 @@ use crate::{
 };
 
 const CONTROLLER_NAME: &str = "truststore";
-const FULL_CONTROLLER_NAME: &str = "truststore.secrets.stackable.tech";
+const FULL_CONTROLLER_NAME: &str = concatcp!(CONTROLLER_NAME, ".", OPERATOR_NAME);
 
 pub async fn start(client: &stackable_operator::client::Client, watch_namespace: &WatchNamespace) {
     let (secretclasses, secretclasses_writer) = reflector::store();
@@ -108,12 +109,7 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
         .for_each_concurrent(16, move |res| {
             let event_recorder = event_recorder.clone();
             async move {
-                report_controller_reconciled(
-                    &event_recorder,
-                    &format!("{CONTROLLER_NAME}.{OPERATOR_NAME}"),
-                    &res,
-                )
-                .await
+                report_controller_reconciled(&event_recorder, FULL_CONTROLLER_NAME, &res).await
             }
         })
         .await;
