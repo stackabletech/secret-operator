@@ -71,6 +71,18 @@ impl SecretBackendError for Error {
             Error::GetTrustStore { .. } => tonic::Code::Internal,
         }
     }
+
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        match self {
+            Error::SecretSelector { .. } => None,
+            Error::SecretQuery { .. } => None,
+            Error::NoSecret { .. } => None,
+            Error::NoListener { .. } => None,
+            Error::BuildLabel { .. } => None,
+            Error::NoTrustStore => None,
+            Error::GetTrustStore { configmap, .. } => Some(configmap.clone().erase()),
+        }
+    }
 }
 
 #[derive(Debug)]

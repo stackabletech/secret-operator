@@ -4,6 +4,7 @@ use const_format::concatcp;
 use futures::StreamExt;
 use kube_runtime::{
     events::{Recorder, Reporter},
+    reflector::Lookup,
     WatchStreamExt as _,
 };
 use snafu::{OptionExt as _, ResultExt as _, Snafu};
@@ -29,7 +30,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    backend::{self, TrustSelector},
+    backend::{self, SecretBackendError, TrustSelector},
     crd::{SearchNamespaceMatchCondition, SecretClass, TrustStore},
     format::{self, well_known::CompatibilityOptions},
     utils::Flattened,
@@ -170,14 +171,16 @@ pub enum Error {
         source: error_boundary::InvalidObject,
     },
 
-    #[snafu(display("failed to get SecretClass for TrustStore"))]
+    #[snafu(display("failed to get {secret_class} for TrustStore"))]
     GetSecretClass {
         source: stackable_operator::client::Error,
+        secret_class: ObjectRef<SecretClass>,
     },
 
-    #[snafu(display("failed to initialize SecretClass backend"))]
+    #[snafu(display("failed to initialize SecretClass backend for {secret_class}"))]
     InitBackend {
         source: backend::dynamic::FromClassError,
+        secret_class: ObjectRef<SecretClass>,
     },
 
     #[snafu(display("failed to get trust data from backend"))]
@@ -187,16 +190,20 @@ pub enum Error {
     NoTrustStoreNamespace,
 
     #[snafu(display("failed to convert trust data into desired format"))]
-    FormatData { source: format::IntoFilesError },
+    FormatData {
+        source: format::IntoFilesError,
+        secret_class: ObjectRef<SecretClass>,
+    },
 
     #[snafu(display("failed to build owner reference to the TrustStore"))]
     BuildOwnerReference {
         source: stackable_operator::builder::meta::Error,
     },
 
-    #[snafu(display("failed to apply ConfigMap for the TrustStore"))]
+    #[snafu(display("failed to apply target {config_map} for the TrustStore"))]
     ApplyTrustStoreConfigMap {
         source: stackable_operator::client::Error,
+        config_map: ObjectRef<ConfigMap>,
     },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -206,8 +213,16 @@ impl ReconcilerError for Error {
     }
 
     fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
-        // TODO
-        None
+        match self {
+            Error::InvalidTrustStore { .. } => None,
+            Error::GetSecretClass { secret_class, .. } => Some(secret_class.clone().erase()),
+            Error::InitBackend { secret_class, .. } => Some(secret_class.clone().erase()),
+            Error::BackendGetTrustData { source } => source.secondary_object(),
+            Error::NoTrustStoreNamespace => None,
+            Error::FormatData { secret_class, .. } => Some(secret_class.clone().erase()),
+            Error::BuildOwnerReference { .. } => None,
+            Error::ApplyTrustStoreConfigMap { config_map, .. } => Some(config_map.clone().erase()),
+        }
     }
 }
 
@@ -224,14 +239,20 @@ async fn reconcile(
         .as_ref()
         .map_err(error_boundary::InvalidObject::clone)
         .context(InvalidTrustStoreSnafu)?;
+    let secret_class_name = &truststore.spec.secret_class_name;
     let secret_class = ctx
         .client
-        .get::<SecretClass>(&truststore.spec.secret_class_name, &())
+        .get::<SecretClass>(secret_class_name, &())
         .await
-        .context(GetSecretClassSnafu)?;
+        .context(GetSecretClassSnafu {
+            secret_class: ObjectRef::<SecretClass>::new(secret_class_name),
+        })?;
+    let secret_class_ref = secret_class.to_object_ref(());
     let backend = backend::dynamic::from_class(&ctx.client, secret_class)
         .await
-        .context(InitBackendSnafu)?;
+        .with_context(|_| InitBackendSnafu {
+            secret_class: secret_class_ref.clone(),
+        })?;
     let selector = TrustSelector {
         namespace: truststore
             .metadata
@@ -246,7 +267,9 @@ async fn reconcile(
     let (Flattened(string_data), Flattened(binary_data)) = trust_data
         .data
         .into_files(truststore.spec.format, &CompatibilityOptions::default())
-        .context(FormatDataSnafu)?
+        .context(FormatDataSnafu {
+            secret_class: secret_class_ref,
+        })?
         .into_iter()
         // Try to put valid UTF-8 data into `data`, but fall back to `binary_data` otherwise
         .map(|(k, v)| match String::from_utf8(v) {
@@ -267,7 +290,9 @@ async fn reconcile(
     ctx.client
         .apply_patch(CONTROLLER_NAME, &trust_cm, &trust_cm)
         .await
-        .context(ApplyTrustStoreConfigMapSnafu)?;
+        .context(ApplyTrustStoreConfigMapSnafu {
+            config_map: &trust_cm,
+        })?;
     Ok(controller::Action::await_change())
 }
 

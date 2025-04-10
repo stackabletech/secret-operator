@@ -76,6 +76,21 @@ impl SecretBackendError for Error {
             Error::TrustExportUnsupported => tonic::Code::FailedPrecondition,
         }
     }
+
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        match self {
+            Error::NoPvcName => None,
+            Error::ScopeAddresses { source, .. } => source.secondary_object(),
+            Error::GetSecret { secret, .. } => Some(secret.clone().erase()),
+            Error::ApplyCertManagerCertificate { certificate, .. } => {
+                Some(certificate.clone().erase())
+            }
+            Error::GetCertManagerCertificate { certificate, .. } => {
+                Some(certificate.clone().erase())
+            }
+            Error::TrustExportUnsupported => None,
+        }
+    }
 }
 
 #[derive(Debug)]

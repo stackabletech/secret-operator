@@ -2,6 +2,7 @@
 
 use std::{collections::BTreeMap, fmt::Display};
 
+use kube_runtime::reflector::Lookup;
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},
     bn::{BigNum, MsbOption},
@@ -116,19 +117,43 @@ impl SecretBackendError for Error {
             Error::SaveRequestedButForbidden { .. } => tonic::Code::FailedPrecondition,
         }
     }
+
+    fn secondary_object(&self) -> Option<ObjectRef<kube::api::DynamicObject>> {
+        match self {
+            Error::GenerateKey { .. } => None,
+            Error::FindCa { secret, .. } => Some(secret.clone().erase()),
+            Error::CaNotFoundAndGenDisabled { secret } => Some(secret.clone().erase()),
+            Error::MissingCertificate { secret, .. } => Some(secret.clone().erase()),
+            Error::LoadCertificate { secret, .. } => Some(secret.clone().erase()),
+            Error::ParseLifetime { secret, .. } => Some(secret.clone().erase()),
+            Error::BuildCertificate { .. } => None,
+            Error::SerializeCertificate { .. } => None,
+            Error::SaveCaCertificate { secret, .. } => Some(secret.clone().erase()),
+            Error::SaveRequestedButForbidden => None,
+        }
+    }
 }
 
 #[derive(Debug, Snafu)]
 #[snafu(module)]
 pub enum GetCaError {
-    #[snafu(display("No CA will live until at least {cutoff}"))]
-    NoCaLivesLongEnough { cutoff: OffsetDateTime },
+    #[snafu(display("no CA in {secret} will live until at least {cutoff}"))]
+    NoCaLivesLongEnough {
+        cutoff: OffsetDateTime,
+        secret: ObjectRef<Secret>,
+    },
 }
 
 impl SecretBackendError for GetCaError {
     fn grpc_code(&self) -> tonic::Code {
         match self {
             GetCaError::NoCaLivesLongEnough { .. } => tonic::Code::FailedPrecondition,
+        }
+    }
+
+    fn secondary_object(&self) -> Option<ObjectRef<kube::api::DynamicObject>> {
+        match self {
+            GetCaError::NoCaLivesLongEnough { secret, .. } => Some(secret.clone().erase()),
         }
     }
 }
@@ -293,6 +318,7 @@ impl CertificateAuthority {
 /// Manages multiple [`CertificateAuthorities`](`CertificateAuthority`), rotating them as needed.
 #[derive(Debug)]
 pub struct Manager {
+    source_secret: ObjectRef<Secret>,
     certificate_authorities: Vec<CertificateAuthority>,
 }
 
@@ -304,7 +330,7 @@ impl Manager {
     ) -> Result<Self> {
         // Use entry API rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
         let secrets_api = &client.get_api::<Secret>(&secret_ref.namespace);
-        let ca_secret = secrets_api
+        let mut ca_secret = secrets_api
             .entry(&secret_ref.name)
             .await
             .with_context(|_| FindCaSnafu { secret: secret_ref })?;
@@ -405,8 +431,8 @@ impl Manager {
                 info!(secret = %secret_ref, "CA has been modified, saving");
                 // Sort CAs by age to avoid spurious writes
                 certificate_authorities.sort_by_key(|ca| ca.not_after);
-                let mut ca_secret = ca_secret.or_insert(Secret::default);
-                ca_secret.get_mut().data = Some(
+                let mut occupied_ca_secret = ca_secret.or_insert(Secret::default);
+                occupied_ca_secret.get_mut().data = Some(
                     certificate_authorities
                         .iter()
                         .enumerate()
@@ -434,16 +460,21 @@ impl Manager {
                         })
                         .collect::<Result<_>>()?,
                 );
-                ca_secret
+                occupied_ca_secret
                     .commit(&PostParams::default())
                     .await
                     .context(SaveCaCertificateSnafu { secret: secret_ref })?;
+                ca_secret = Entry::Occupied(occupied_ca_secret);
             } else {
                 return SaveRequestedButForbiddenSnafu.fail();
             }
         }
         Ok(Self {
             certificate_authorities,
+            source_secret: ca_secret
+                .get()
+                .map(|secret| secret.to_object_ref(()))
+                .unwrap_or_else(|| secret_ref.into()),
         })
     }
 
@@ -458,8 +489,9 @@ impl Manager {
             .filter(|ca| ca.not_after > valid_until_at_least)
             // pick the oldest valid CA, since it will be trusted by the most peers
             .min_by_key(|ca| ca.not_after)
-            .context(NoCaLivesLongEnoughSnafu {
+            .with_context(|| NoCaLivesLongEnoughSnafu {
                 cutoff: valid_until_at_least,
+                secret: self.source_secret.clone(),
             })
     }
 

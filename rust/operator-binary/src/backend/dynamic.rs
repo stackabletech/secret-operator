@@ -41,6 +41,9 @@ impl SecretBackendError for DynError {
     fn grpc_code(&self) -> tonic::Code {
         self.0.grpc_code()
     }
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        self.0.secondary_object()
+    }
 }
 
 pub struct DynamicAdapter<B>(B);
@@ -111,6 +114,12 @@ impl SecretBackendError for FromClassError {
         match self {
             FromClassError::Tls { source } => source.grpc_code(),
             FromClassError::KerberosKeytab { source } => source.grpc_code(),
+        }
+    }
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        match self {
+            FromClassError::Tls { source } => source.secondary_object(),
+            FromClassError::KerberosKeytab { source } => source.secondary_object(),
         }
     }
 }
@@ -186,6 +195,15 @@ impl SecretBackendError for FromSelectorError {
         match self {
             FromSelectorError::GetSecretClass { .. } => tonic::Code::Unavailable,
             FromSelectorError::FromClass { source, .. } => source.grpc_code(),
+        }
+    }
+
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        match self {
+            FromSelectorError::GetSecretClass { class, .. } => Some(class.clone().erase()),
+            FromSelectorError::FromClass { source, class } => source
+                .secondary_object()
+                .or_else(|| Some(class.clone().erase())),
         }
     }
 }

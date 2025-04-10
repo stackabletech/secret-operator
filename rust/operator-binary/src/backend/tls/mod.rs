@@ -125,6 +125,23 @@ impl SecretBackendError for Error {
             Error::JitterOutOfRange { .. } => tonic::Code::InvalidArgument,
         }
     }
+
+    fn secondary_object(
+        &self,
+    ) -> Option<kube_runtime::reflector::ObjectRef<stackable_operator::kube::api::DynamicObject>>
+    {
+        match self {
+            Error::ScopeAddresses { source, .. } => source.secondary_object(),
+            Error::GenerateKey { .. } => None,
+            Error::LoadCa { source } => source.secondary_object(),
+            Error::PickCa { source } => source.secondary_object(),
+            Error::BuildCertificate { .. } => None,
+            Error::SerializeCertificate { .. } => None,
+            Error::InvalidCertLifetime { .. } => None,
+            Error::TooShortCertLifetimeRequiresTimeTravel { .. } => None,
+            Error::JitterOutOfRange { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug)]
