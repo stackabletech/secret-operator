@@ -10,9 +10,10 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::kube::runtime::reflector::ObjectRef;
 
 use super::{
+    SecretBackend, SecretBackendError, SecretVolumeSelector,
     kerberos_keytab::{self, KerberosProfile},
     pod_info::{PodInfo, SchedulingPodInfo},
-    tls, SecretBackend, SecretBackendError, SecretVolumeSelector,
+    tls,
 };
 use crate::{
     crd::{self, SecretClass},
@@ -41,6 +42,7 @@ impl SecretBackendError for DynError {
     fn grpc_code(&self) -> tonic::Code {
         self.0.grpc_code()
     }
+
     fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
         self.0.secondary_object()
     }
@@ -116,6 +118,7 @@ impl SecretBackendError for FromClassError {
             FromClassError::KerberosKeytab { source } => source.grpc_code(),
         }
     }
+
     fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
         match self {
             FromClassError::Tls { source } => source.secondary_object(),
@@ -139,11 +142,13 @@ pub async fn from_class(
         }),
         crd::SecretClassBackend::AutoTls(crd::AutoTlsBackend {
             ca,
+            additional_trust_roots,
             max_certificate_lifetime,
         }) => from(
             super::TlsGenerate::get_or_create_k8s_certificate(
                 client,
                 &ca,
+                &additional_trust_roots,
                 max_certificate_lifetime,
             )
             .await?,

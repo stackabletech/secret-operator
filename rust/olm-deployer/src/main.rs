@@ -18,24 +18,23 @@ mod owner;
 mod resources;
 mod tolerations;
 
-use anyhow::{anyhow, bail, Context, Result};
-use clap::{crate_description, crate_version, Parser};
+use anyhow::{Context, Result, anyhow, bail};
+use clap::Parser;
 use stackable_operator::{
     cli::Command,
     client,
     k8s_openapi::api::{apps::v1::Deployment, rbac::v1::ClusterRole},
-    kube,
     kube::{
+        self,
         api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
         core::GroupVersionKind,
         discovery::{ApiResource, Discovery, Scope},
     },
-    logging, utils,
+    telemetry::{Tracing, tracing::TelemetryOptions},
     utils::cluster_info::KubernetesClusterInfoOpts,
 };
 
 pub const APP_NAME: &str = "stkbl-secret-olm-deployer";
-pub const ENV_VAR_LOGGING: &str = "STKBL_SECRET_OLM_DEPLOYER_LOG";
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -63,13 +62,16 @@ struct OlmDeployerRun {
         help = "Name of ClusterServiceVersion object that owns this Deployment."
     )]
     csv: String,
+
     #[arg(long, short, help = "Namespace of the ClusterServiceVersion object.")]
     namespace: String,
+
     #[arg(long, short, help = "Directory with manifests to patch and apply.")]
     dir: std::path::PathBuf,
-    /// Tracing log collector system
-    #[arg(long, env, default_value_t, value_enum)]
-    pub tracing_target: logging::TracingTarget,
+
+    #[command(flatten)]
+    pub telemetry_arguments: TelemetryOptions,
+
     #[command(flatten)]
     pub cluster_info_opts: KubernetesClusterInfoOpts,
 }
@@ -82,18 +84,25 @@ async fn main() -> Result<()> {
         csv,
         namespace,
         dir,
-        tracing_target,
+        telemetry_arguments,
         cluster_info_opts,
     }) = opts.cmd
     {
-        logging::initialize_logging(ENV_VAR_LOGGING, APP_NAME, tracing_target);
-        utils::print_startup_string(
-            crate_description!(),
-            crate_version!(),
-            built_info::GIT_VERSION,
-            built_info::TARGET,
-            built_info::BUILT_TIME_UTC,
-            built_info::RUSTC_VERSION,
+        // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
+        // - The console log level was set by `STKBL_SECRET_OLM_DEPLOYER_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
+        // - The file log level was set by `STKBL_SECRET_OLM_DEPLOYER_LOG`, and is now set via `FILE_LOG` (when using Tracing::pre_configured).
+        // - The file log directory was set by `STKBL_SECRET_OLM_DEPLOYER_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
+        let _tracing_guard =
+            Tracing::pre_configured(built_info::PKG_NAME, telemetry_arguments).init()?;
+
+        tracing::info!(
+            built_info.pkg_version = built_info::PKG_VERSION,
+            built_info.git_version = built_info::GIT_VERSION,
+            built_info.target = built_info::TARGET,
+            built_info.built_time_utc = built_info::BUILT_TIME_UTC,
+            built_info.rustc_version = built_info::RUSTC_VERSION,
+            "Starting {description}",
+            description = built_info::PKG_DESCRIPTION
         );
 
         let client =

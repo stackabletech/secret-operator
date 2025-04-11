@@ -7,18 +7,18 @@ use kube_runtime::reflector::ObjectRef;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{
+        ByteString,
         api::core::v1::{ConfigMap, Secret},
         apimachinery::pkg::apis::meta::v1::LabelSelector,
-        ByteString,
     },
     kube::api::ListParams,
     kvp::{LabelError, LabelSelectorExt, Labels},
 };
 
 use super::{
+    SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector, TrustSelector,
     pod_info::{PodInfo, SchedulingPodInfo},
     scope::SecretScope,
-    SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector, TrustSelector,
 };
 use crate::{crd::SearchNamespace, format::SecretData, utils::Unloggable};
 

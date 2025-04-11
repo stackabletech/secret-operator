@@ -79,6 +79,7 @@ rules:
   - apiGroups:
       - ""
     resources:
+      - configmaps
       - nodes
       - persistentvolumeclaims
     verbs:

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use serde::{de::IntoDeserializer, Deserialize};
+use serde::{Deserialize, de::IntoDeserializer};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::api::core::v1::{PersistentVolumeClaim, Pod},
@@ -11,16 +11,15 @@ use uuid::Uuid;
 
 use crate::{
     backend::{
-        self,
+        self, InternalSecretVolumeSelectorParams, SecretBackendError, SecretVolumeSelector,
         pod_info::{self, SchedulingPodInfo},
-        InternalSecretVolumeSelectorParams, SecretBackendError, SecretVolumeSelector,
     },
     grpc::csi::{
         self,
         v1::{
-            controller_server::Controller, controller_service_capability,
             ControllerGetCapabilitiesResponse, ControllerServiceCapability, CreateVolumeResponse,
-            DeleteVolumeResponse, Topology, Volume,
+            DeleteVolumeResponse, Topology, Volume, controller_server::Controller,
+            controller_service_capability,
         },
     },
     utils::error_full_message,

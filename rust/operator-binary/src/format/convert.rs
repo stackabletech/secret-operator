@@ -3,20 +3,20 @@ use openssl::{
     pkcs12::Pkcs12,
     pkey::PKey,
     stack::Stack,
-    x509::{X509Ref, X509},
+    x509::{X509, X509Ref},
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 
 use super::{
-    well_known::{CompatibilityOptions, TlsPem, TlsPkcs12},
     SecretFormat, WellKnownSecretData,
+    well_known::{CompatibilityOptions, TlsPem, TlsPkcs12},
 };
 use crate::format::utils::split_pem_certificates;
 
 pub fn convert(
     from: WellKnownSecretData,
     to: SecretFormat,
-    compat: &CompatibilityOptions,
+    compat: CompatibilityOptions,
 ) -> Result<WellKnownSecretData, ConvertError> {
     match (from, to) {
         // Converting into the current format is always a no-op

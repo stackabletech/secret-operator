@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Add format-specific annotations to override secret file names ([#572]). The following new
+  annotations are available:
+  - `secrets.stackable.tech/format.tls-pkcs12.keystore-name`
+  - `secrets.stackable.tech/format.tls-pkcs12.truststore-name`
+  - `secrets.stackable.tech/format.tls-pem.cert-name`
+  - `secrets.stackable.tech/format.tls-pem.key-name`
+  - `secrets.stackable.tech/format.tls-pem.ca-name`
+- Added TrustStore CRD for requesting CA certificate information ([#557]).
+
+### Changed
+
+- BREAKING: Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#581], [#587]).
+  - operator-binary:
+    - The console log level was set by `SECRET_PROVISIONER_LOG`, and is now set by `CONSOLE_LOG`.
+    - The file log level was set by `SECRET_PROVISIONER_LOG`, and is now set by `FILE_LOG`.
+    - The file log directory was set by `SECRET_PROVISIONER_LOG_DIRECTORY`, and is now set
+      by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
+  - olm-deployer:
+    - The console log level was set by `STKBL_SECRET_OLM_DEPLOYER_LOG`, and is now set by `CONSOLE_LOG`.
+    - The file log level was set by `STKBL_SECRET_OLM_DEPLOYER_LOG`, and is now set by `FILE_LOG`.
+    - The file log directory was set by `STKBL_SECRET_OLM_DEPLOYER_LOG_DIRECTORY`, and is now set
+      by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
+  - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
+
+### Fixed
+
+- Use `json` file extension for log files ([#586]).
+
+[#557]: https://github.com/stackabletech/secret-operator/pull/557
+[#572]: https://github.com/stackabletech/secret-operator/pull/572
+[#581]: https://github.com/stackabletech/secret-operator/pull/581
+[#586]: https://github.com/stackabletech/secret-operator/pull/586
+[#587]: https://github.com/stackabletech/secret-operator/pull/587
+
+## [25.3.0] - 2025-03-21
+
 ### Removed
 
 - Removed CA secret migration job ([#548]).
@@ -14,7 +52,7 @@ All notable changes to this project will be documented in this file.
 - Made RSA key length configurable for certificates issued by cert-manager ([#528]).
 - Kerberos principal backends now also provision principals for IP address, not just DNS hostnames ([#552]).
 - OLM deployment helper ([#546]).
-- Added TrustStore CRD for requesting CA certificate information ([#557]).
+- Allow the specification of additional trust roots in autoTls SecretClasses ([#573]).
 
 ### Changed
 
@@ -34,12 +72,12 @@ All notable changes to this project will be documented in this file.
 [#546]: https://github.com/stackabletech/secret-operator/pull/546
 [#548]: https://github.com/stackabletech/secret-operator/pull/548
 [#552]: https://github.com/stackabletech/secret-operator/pull/552
-[#557]: https://github.com/stackabletech/secret-operator/pull/557
 [#563]: https://github.com/stackabletech/secret-operator/pull/563
 [#564]: https://github.com/stackabletech/secret-operator/pull/564
 [#566]: https://github.com/stackabletech/secret-operator/pull/566
 [#569]: https://github.com/stackabletech/secret-operator/pull/569
 [#571]: https://github.com/stackabletech/secret-operator/pull/571
+[#573]: https://github.com/stackabletech/secret-operator/pull/573
 
 ## [24.11.1] - 2025-01-10
 

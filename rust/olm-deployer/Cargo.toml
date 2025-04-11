@@ -1,5 +1,5 @@
 [package]
-name = "olm-deployer"
+name = "stackable-secret-operator-olm-deployer"
 description = "OLM deployment helper."
 version.workspace = true
 authors.workspace = true
@@ -9,11 +9,12 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+stackable-operator.workspace = true
+
 anyhow.workspace = true
 clap.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-stackable-operator.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

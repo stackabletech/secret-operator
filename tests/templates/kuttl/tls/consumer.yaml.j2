@@ -15,14 +15,22 @@ spec:
           args:
             - -c
             - |
+{% if test_scenario['values']['custom-secret-names'] %}
+              CERT_NAME=custom-tls.crt
+              CA_NAME=custom-ca.crt
+{% else %}
+              CERT_NAME=tls.crt
+              CA_NAME=ca.crt
+{% endif %}
+            - |
               set -euo pipefail
               ls -la /stackable/tls-3d
               ls -la /stackable/tls-42h
 
-              cat /stackable/tls-3d/tls.crt | openssl x509 -noout -text
-              cat /stackable/tls-42h/tls.crt | openssl x509 -noout -text
+              cat "/stackable/tls-3d/$CERT_NAME" | openssl x509 -noout -text
+              cat "/stackable/tls-42h/$CERT_NAME" | openssl x509 -noout -text
 
-              notAfter=`cat /stackable/tls-3d/tls.crt | openssl x509 -noout -enddate| sed -e 's#notAfter=##'`
+              notAfter=$(cat /stackable/tls-3d/$CERT_NAME | openssl x509 -noout -enddate| sed -e 's#notAfter=##')
               notAfterDate=`date -d "${notAfter}" '+%s'`
               nowDate=`date '+%s'`
               diff="$((${notAfterDate}-${nowDate}))"
@@ -30,7 +38,7 @@ spec:
               if test "${diff}" -lt "$((57*3600))"; then echo "Cert had a lifetime of less than 57 hours!" && exit 1; fi
               if test "${diff}" -gt "$((72*3600))"; then echo "Cert had a lifetime of greater than 72 hours!" && exit 1; fi
 
-              notAfter=`cat /stackable/tls-42h/tls.crt | openssl x509 -noout -enddate| sed -e 's#notAfter=##'`
+              notAfter=$(cat /stackable/tls-42h/$CERT_NAME | openssl x509 -noout -enddate| sed -e 's#notAfter=##')
               notAfterDate=`date -d "${notAfter}" '+%s'`
               nowDate=`date '+%s'`
               diff="$((${notAfterDate}-${nowDate}))"
@@ -38,8 +46,27 @@ spec:
               if test "${diff}" -lt "$((33*3600))"; then echo "Cert had a lifetime of less than 33 hours!" && exit 1; fi
               if test "${diff}" -gt "$((42*3600))"; then echo "Cert had a lifetime of greater than 42 hours!" && exit 1; fi
 
-              cat /stackable/tls-3d/tls.crt | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
-              cat /stackable/tls-42h/tls.crt | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
+              cat "/stackable/tls-3d/$CERT_NAME" | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
+              cat "/stackable/tls-42h/$CERT_NAME" | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
+
+
+              function assert_trusted_roots_contain {
+                  subject=$1
+
+                  while openssl x509 -subject -noout; do :; done \
+                      < "/stackable/tls-3d/$CA_NAME" \
+                      | grep --line-regexp "subject=CN *= *$subject"
+              }
+
+              assert_trusted_roots_contain "secret-operator self-signed"
+              assert_trusted_roots_contain "cert 1"
+              assert_trusted_roots_contain "cert 2"
+              assert_trusted_roots_contain "cert 3a"
+              assert_trusted_roots_contain "cert 3b"
+              assert_trusted_roots_contain "cert 4a"
+              assert_trusted_roots_contain "cert 4b"
+              assert_trusted_roots_contain "cert 5"
+              assert_trusted_roots_contain "cert 6"
           volumeMounts:
             - mountPath: /stackable/tls-3d
               name: tls-3d
@@ -54,6 +81,10 @@ spec:
                   secrets.stackable.tech/class: tls-$NAMESPACE
                   secrets.stackable.tech/scope: node,pod,service=my-tls-service
                   secrets.stackable.tech/backend.autotls.cert.lifetime: 3d
+{% if test_scenario['values']['custom-secret-names'] %}
+                  secrets.stackable.tech/format.tls-pem.cert-name: custom-tls.crt
+                  secrets.stackable.tech/format.tls-pem.ca-name: custom-ca.crt
+{% endif %}
               spec:
                 storageClassName: secrets.stackable.tech
                 accessModes:
@@ -69,6 +100,10 @@ spec:
                   secrets.stackable.tech/class: tls-$NAMESPACE-42h
                   secrets.stackable.tech/scope: node,pod,service=my-tls-service
                   secrets.stackable.tech/backend.autotls.cert.lifetime: 31d
+{% if test_scenario['values']['custom-secret-names'] %}
+                  secrets.stackable.tech/format.tls-pem.cert-name: custom-tls.crt
+                  secrets.stackable.tech/format.tls-pem.ca-name: custom-ca.crt
+{% endif %}
               spec:
                 storageClassName: secrets.stackable.tech
                 accessModes:

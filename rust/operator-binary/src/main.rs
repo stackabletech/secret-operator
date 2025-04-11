@@ -1,7 +1,7 @@
 use std::{os::unix::prelude::FileTypeExt, path::PathBuf, pin::pin};
 
 use anyhow::Context;
-use clap::{crate_description, crate_version, Parser};
+use clap::Parser;
 use csi_server::{
     controller::SecretProvisionerController, identity::SecretProvisionerIdentity,
     node::SecretProvisionerNode,
@@ -10,11 +10,11 @@ use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
-use stackable_operator::{cli::ProductOperatorRun, CustomResourceExt};
-use tokio::signal::unix::{signal, SignalKind};
+use stackable_operator::{CustomResourceExt, cli::ProductOperatorRun, telemetry::Tracing};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
-use utils::{uds_bind_private, TonicUnixStream};
+use utils::{TonicUnixStream, uds_bind_private};
 
 mod backend;
 mod crd;
@@ -25,7 +25,6 @@ mod grpc;
 mod truststore_controller;
 mod utils;
 
-pub const APP_NAME: &str = "secret";
 pub const OPERATOR_NAME: &str = "secrets.stackable.tech";
 
 #[derive(clap::Parser)]
@@ -76,22 +75,25 @@ async fn main() -> anyhow::Result<()> {
                 ProductOperatorRun {
                     product_config: _,
                     watch_namespace,
-                    tracing_target,
+                    telemetry_arguments,
                     cluster_info_opts,
                 },
         }) => {
-            stackable_operator::logging::initialize_logging(
-                "SECRET_PROVISIONER_LOG",
-                APP_NAME,
-                tracing_target,
-            );
-            stackable_operator::utils::print_startup_string(
-                crate_description!(),
-                crate_version!(),
-                built_info::GIT_VERSION,
-                built_info::TARGET,
-                built_info::BUILT_TIME_UTC,
-                built_info::RUSTC_VERSION,
+            // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
+            // - The console log level was set by `SECRET_PROVISIONER_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
+            // - The file log level was set by `SECRET_PROVISIONER_LOG`, and is now set via `FILE_LOG` (when using Tracing::pre_configured).
+            // - The file log directory was set by `SECRET_PROVISIONER_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
+            let _tracing_guard =
+                Tracing::pre_configured(built_info::PKG_NAME, telemetry_arguments).init()?;
+
+            tracing::info!(
+                built_info.pkg_version = built_info::PKG_VERSION,
+                built_info.git_version = built_info::GIT_VERSION,
+                built_info.target = built_info::TARGET,
+                built_info.built_time_utc = built_info::BUILT_TIME_UTC,
+                built_info.rustc_version = built_info::RUSTC_VERSION,
+                "Starting {description}",
+                description = built_info::PKG_DESCRIPTION
             );
 
             let client = stackable_operator::client::initialize_operator(
@@ -106,29 +108,32 @@ async fn main() -> anyhow::Result<()> {
                 let _ = std::fs::remove_file(&csi_endpoint);
             }
             let mut sigterm = signal(SignalKind::terminate())?;
-            let csi_server = pin!(Server::builder()
-                .add_service(
-                    tonic_reflection::server::Builder::configure()
-                        .include_reflection_service(true)
-                        .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
-                        .build_v1()?,
-                )
-                .add_service(IdentityServer::new(SecretProvisionerIdentity))
-                .add_service(ControllerServer::new(SecretProvisionerController {
-                    client: client.clone(),
-                }))
-                .add_service(NodeServer::new(SecretProvisionerNode {
-                    client: client.clone(),
-                    node_name,
-                    privileged,
-                }))
-                .serve_with_incoming_shutdown(
-                    UnixListenerStream::new(
-                        uds_bind_private(csi_endpoint).context("failed to bind CSI listener")?,
+            let csi_server = pin!(
+                Server::builder()
+                    .add_service(
+                        tonic_reflection::server::Builder::configure()
+                            .include_reflection_service(true)
+                            .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
+                            .build_v1()?,
                     )
-                    .map_ok(TonicUnixStream),
-                    sigterm.recv().map(|_| ()),
-                ));
+                    .add_service(IdentityServer::new(SecretProvisionerIdentity))
+                    .add_service(ControllerServer::new(SecretProvisionerController {
+                        client: client.clone(),
+                    }))
+                    .add_service(NodeServer::new(SecretProvisionerNode {
+                        client: client.clone(),
+                        node_name,
+                        privileged,
+                    }))
+                    .serve_with_incoming_shutdown(
+                        UnixListenerStream::new(
+                            uds_bind_private(csi_endpoint)
+                                .context("failed to bind CSI listener")?,
+                        )
+                        .map_ok(TonicUnixStream),
+                        sigterm.recv().map(|_| ()),
+                    )
+            );
             let truststore_controller =
                 pin!(truststore_controller::start(&client, &watch_namespace).map(Ok));
             futures::future::select(csi_server, truststore_controller)

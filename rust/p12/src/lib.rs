@@ -7,7 +7,7 @@ use getrandom::getrandom;
 use hmac::{Hmac, Mac};
 use lazy_static::lazy_static;
 use sha1::{Digest, Sha1};
-use yasna::{models::ObjectIdentifier, ASN1Error, ASN1ErrorKind, BERReader, DERWriter, Tag};
+use yasna::{ASN1Error, ASN1ErrorKind, BERReader, DERWriter, Tag, models::ObjectIdentifier};
 
 type HmacSha1 = Hmac<Sha1>;
 
@@ -132,15 +132,18 @@ impl EncryptedData {
             })
         })
     }
+
     pub fn data(&self, password: &[u8]) -> Option<Vec<u8>> {
         self.encrypted_content_info.data(password)
     }
+
     pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| {
             w.next().write_u8(0);
             self.encrypted_content_info.write(w.next());
         })
     }
+
     pub fn from_safe_bags(
         safe_bags: &[SafeBag],
         password: &[u8],
@@ -189,6 +192,7 @@ impl ContentInfo {
             }))
         })
     }
+
     pub fn data(&self, password: &[u8]) -> Option<Vec<u8>> {
         match self {
             ContentInfo::Data(data) => Some(data.to_owned()),
@@ -196,6 +200,7 @@ impl ContentInfo {
             ContentInfo::OtherContext(_) => None,
         }
     }
+
     pub fn oid(&self) -> ObjectIdentifier {
         match self {
             ContentInfo::Data(_) => OID_DATA_CONTENT_TYPE.clone(),
@@ -203,6 +208,7 @@ impl ContentInfo {
             ContentInfo::OtherContext(other) => other.content_type.clone(),
         }
     }
+
     pub fn write(&self, w: DERWriter) {
         match self {
             ContentInfo::Data(data) => w.write_sequence(|w| {
@@ -222,6 +228,7 @@ impl ContentInfo {
             }),
         }
     }
+
     pub fn to_der(&self) -> Vec<u8> {
         yasna::construct_der(|w| self.write(w))
     }
@@ -245,6 +252,7 @@ impl Pkcs12PbeParams {
             Ok(Pkcs12PbeParams { salt, iterations })
         })
     }
+
     pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| {
             w.next().write_bytes(&self.salt);
@@ -290,6 +298,7 @@ impl AlgorithmIdentifier {
             }))
         })
     }
+
     pub fn decrypt_pbe(&self, ciphertext: &[u8], password: &[u8]) -> Option<Vec<u8>> {
         match self {
             AlgorithmIdentifier::Sha1 => None,
@@ -307,6 +316,7 @@ impl AlgorithmIdentifier {
             AlgorithmIdentifier::OtherAlg(_) => None,
         }
     }
+
     pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| match self {
             AlgorithmIdentifier::Sha1 => {
@@ -348,6 +358,7 @@ impl DigestInfo {
             })
         })
     }
+
     pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| {
             self.digest_algorithm.write(w.next());
@@ -449,6 +460,7 @@ impl PFX {
         }
         Self::new_with_cas(cert_der, key_der, &cas, password, name, rng)
     }
+
     pub fn new_with_cas(
         cert_der: &[u8],
         key_der: &[u8],
@@ -539,6 +551,7 @@ impl PFX {
     pub fn to_der(&self) -> Vec<u8> {
         yasna::construct_der(|w| self.write(w))
     }
+
     pub fn bags(&self, password: &str) -> Result<Vec<SafeBag>, ASN1Error> {
         let password = bmp_string(password);
 
@@ -563,10 +576,12 @@ impl PFX {
         }
         Ok(result)
     }
+
     //DER-encoded X.509 certificate
     pub fn cert_bags(&self, password: &str) -> Result<Vec<Vec<u8>>, ASN1Error> {
         self.cert_x509_bags(password)
     }
+
     //DER-encoded X.509 certificate
     pub fn cert_x509_bags(&self, password: &str) -> Result<Vec<Vec<u8>>, ASN1Error> {
         let mut result = vec![];
@@ -577,6 +592,7 @@ impl PFX {
         }
         Ok(result)
     }
+
     pub fn cert_sdsi_bags(&self, password: &str) -> Result<Vec<String>, ASN1Error> {
         let mut result = vec![];
         for safe_bag in self.bags(password)? {
@@ -586,6 +602,7 @@ impl PFX {
         }
         Ok(result)
     }
+
     pub fn key_bags(&self, password: &str) -> Result<Vec<Vec<u8>>, ASN1Error> {
         let bmp_password = bmp_string(password);
         let mut result = vec![];
@@ -665,8 +682,8 @@ fn pbe_with_sha1_and40_bit_rc2_cbc(
     iterations: u64,
 ) -> Option<Vec<u8>> {
     use cbc::{
-        cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit},
         Decryptor,
+        cipher::{BlockDecryptMut, KeyIvInit, block_padding::Pkcs7},
     };
     use rc2::Rc2;
     type Rc2Cbc = Decryptor<Rc2>;
@@ -685,8 +702,8 @@ fn pbe_with_sha1_and40_bit_rc2_cbc_encrypt(
     iterations: u64,
 ) -> Option<Vec<u8>> {
     use cbc::{
-        cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit},
         Encryptor,
+        cipher::{BlockEncryptMut, KeyIvInit, block_padding::Pkcs7},
     };
     use rc2::Rc2;
     type Rc2Cbc = Encryptor<Rc2>;
@@ -705,8 +722,8 @@ fn pbe_with_sha_and3_key_triple_des_cbc(
     iterations: u64,
 ) -> Option<Vec<u8>> {
     use cbc::{
-        cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit},
         Decryptor,
+        cipher::{BlockDecryptMut, KeyIvInit, block_padding::Pkcs7},
     };
     use des::TdesEde3;
     type TDesCbc = Decryptor<TdesEde3>;
@@ -725,8 +742,8 @@ fn pbe_with_sha_and3_key_triple_des_cbc_encrypt(
     iterations: u64,
 ) -> Option<Vec<u8>> {
     use cbc::{
-        cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit},
         Encryptor,
+        cipher::{BlockEncryptMut, KeyIvInit, block_padding::Pkcs7},
     };
     use des::TdesEde3;
     type TDesCbc = Encryptor<TdesEde3>;
@@ -774,6 +791,7 @@ impl CertBag {
             Err(ASN1Error::new(ASN1ErrorKind::Invalid))
         })
     }
+
     pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| match self {
             CertBag::X509(x509) => {
@@ -809,12 +827,14 @@ impl EncryptedPrivateKeyInfo {
             })
         })
     }
+
     pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| {
             self.encryption_algorithm.write(w.next());
             w.next().write_bytes(&self.encrypted_data);
         })
     }
+
     pub fn decrypt(&self, password: &[u8]) -> Option<Vec<u8>> {
         self.encryption_algorithm
             .decrypt_pbe(&self.encrypted_data, password)
@@ -864,6 +884,7 @@ impl SafeBagKind {
         let bag_value = r.read_der()?;
         Ok(SafeBagKind::OtherBagKind(OtherBag { bag_id, bag_value }))
     }
+
     pub fn write(&self, w: DERWriter) {
         match self {
             SafeBagKind::Pkcs8ShroudedKeyBag(epk) => epk.write(w),
@@ -871,6 +892,7 @@ impl SafeBagKind {
             SafeBagKind::OtherBagKind(other) => w.write_der(&other.bag_value),
         }
     }
+
     pub fn oid(&self) -> ObjectIdentifier {
         match self {
             SafeBagKind::Pkcs8ShroudedKeyBag(_) => OID_PKCS8_SHROUDED_KEY_BAG.clone(),
@@ -878,6 +900,7 @@ impl SafeBagKind {
             SafeBagKind::OtherBagKind(other) => other.bag_id.clone(),
         }
     }
+
     pub fn get_x509_cert(&self) -> Option<Vec<u8>> {
         if let SafeBagKind::CertBag(CertBag::X509(x509)) = self {
             return Some(x509.to_owned());
@@ -939,6 +962,7 @@ impl PKCS12Attribute {
             Ok(PKCS12Attribute::Other(other))
         })
     }
+
     pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| match self {
             PKCS12Attribute::FriendlyName(name) => {
@@ -984,6 +1008,7 @@ impl SafeBag {
             Ok(SafeBag { bag, attributes })
         })
     }
+
     pub fn write(&self, w: DERWriter) {
         w.write_sequence(|w| {
             w.next().write_oid(&self.bag.oid());
@@ -998,6 +1023,7 @@ impl SafeBag {
             }
         })
     }
+
     pub fn friendly_name(&self) -> Option<String> {
         for attr in self.attributes.iter() {
             if let PKCS12Attribute::FriendlyName(name) = attr {
@@ -1006,6 +1032,7 @@ impl SafeBag {
         }
         None
     }
+
     pub fn local_key_id(&self) -> Option<Vec<u8>> {
         for attr in self.attributes.iter() {
             if let PKCS12Attribute::LocalKeyId(id) = attr {
@@ -1082,7 +1109,9 @@ fn test_bmp_string() {
     let value = bmp_string("Beavis");
     assert!(
         value
-            == [0x00, 0x42, 0x00, 0x65, 0x00, 0x61, 0x00, 0x76, 0x00, 0x69, 0x00, 0x73, 0x00, 0x00]
+            == [
+                0x00, 0x42, 0x00, 0x65, 0x00, 0x61, 0x00, 0x76, 0x00, 0x69, 0x00, 0x73, 0x00, 0x00
+            ]
     )
 }
 

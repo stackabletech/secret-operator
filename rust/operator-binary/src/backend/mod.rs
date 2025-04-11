@@ -17,7 +17,7 @@ pub use kerberos_keytab::KerberosKeytab;
 use kube_runtime::reflector::ObjectRef;
 use pod_info::Address;
 use scope::SecretScope;
-use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de::Unexpected};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     commons::listener::PodListeners,
@@ -30,7 +30,10 @@ pub use tls::TlsGenerate;
 use self::pod_info::SchedulingPodInfo;
 #[cfg(doc)]
 use crate::crd::TrustStore;
-use crate::format::{SecretData, SecretFormat};
+use crate::format::{
+    SecretData, SecretFormat,
+    well_known::{CompatibilityOptions, NamingOptions},
+};
 
 /// Configuration provided by the `Volume` selecting what secret data should be provided
 ///
@@ -90,16 +93,13 @@ pub struct SecretVolumeSelector {
     )]
     pub kerberos_service_names: Vec<String>,
 
-    /// The password used to encrypt the TLS PKCS#12 keystore
-    ///
-    /// Required for some applications that misbehave with blank keystore passwords (such as Hadoop).
-    /// Has no effect if `format` is not `tls-pkcs12`.
-    #[serde(
-        rename = "secrets.stackable.tech/format.compatibility.tls-pkcs12.password",
-        deserialize_with = "SecretVolumeSelector::deserialize_some",
-        default
-    )]
-    pub compat_tls_pkcs12_password: Option<String>,
+    /// Compatibility options used by (legacy) applications.
+    #[serde(flatten)]
+    pub compat: CompatibilityOptions,
+
+    /// The (custom) filenames used by secrets.
+    #[serde(flatten)]
+    pub names: NamingOptions,
 
     /// The TLS cert lifetime (when using the [`tls`] backend).
     /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
@@ -307,7 +307,7 @@ pub trait SecretBackend: Debug + Send + Sync {
     ) -> Result<SecretContents, Self::Error>;
 
     async fn get_trust_data(&self, selector: &TrustSelector)
-        -> Result<SecretContents, Self::Error>;
+    -> Result<SecretContents, Self::Error>;
 
     /// Try to predict which nodes would be able to provision this secret.
     ///
@@ -334,7 +334,60 @@ impl SecretBackendError for Infallible {
     fn grpc_code(&self) -> tonic::Code {
         match *self {}
     }
+
     fn secondary_object(&self) -> Option<ObjectRef<DynamicObject>> {
         match *self {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use serde::de::{IntoDeserializer, value::MapDeserializer};
+
+    use super::*;
+
+    fn required_fields_map() -> HashMap<String, String> {
+        HashMap::from([
+            (
+                "secrets.stackable.tech/class".to_owned(),
+                "my-class".to_owned(),
+            ),
+            (
+                "csi.storage.k8s.io/pod.name".to_owned(),
+                "my-pod".to_owned(),
+            ),
+            (
+                "csi.storage.k8s.io/pod.namespace".to_owned(),
+                "my-namespace".to_owned(),
+            ),
+        ])
+    }
+
+    #[test]
+    fn deserialize_selector() {
+        let map = required_fields_map();
+
+        let _ =
+            SecretVolumeSelector::deserialize::<MapDeserializer<'_, _, serde::de::value::Error>>(
+                map.into_deserializer(),
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn deserialize_selector_compat() {
+        let mut map = required_fields_map();
+        map.insert(
+            "secrets.stackable.tech/format.compatibility.tls-pkcs12.password".to_owned(),
+            "supersecret".to_owned(),
+        );
+
+        let _ =
+            SecretVolumeSelector::deserialize::<MapDeserializer<'_, _, serde::de::value::Error>>(
+                map.into_deserializer(),
+            )
+            .unwrap();
     }
 }

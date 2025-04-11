@@ -1,8 +1,8 @@
 use stackable_operator::{
     k8s_openapi::api::{apps::v1::Deployment, core::v1::ResourceRequirements},
     kube::{
-        api::{DynamicObject, GroupVersionKind},
         ResourceExt,
+        api::{DynamicObject, GroupVersionKind},
     },
 };
 

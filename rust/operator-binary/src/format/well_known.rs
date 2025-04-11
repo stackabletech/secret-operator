@@ -3,7 +3,7 @@ use snafu::{OptionExt, Snafu};
 use stackable_operator::schemars::{self, JsonSchema};
 use strum::EnumDiscriminants;
 
-use super::{convert, ConvertError, SecretFiles};
+use super::{ConvertError, SecretFiles, convert};
 
 const FILE_PEM_CERT_CERT: &str = "tls.crt";
 const FILE_PEM_CERT_KEY: &str = "tls.key";
@@ -47,16 +47,16 @@ pub enum WellKnownSecretData {
 }
 
 impl WellKnownSecretData {
-    pub fn into_files(self) -> SecretFiles {
+    pub fn into_files(self, names: NamingOptions) -> SecretFiles {
         match self {
             WellKnownSecretData::TlsPem(TlsPem {
                 certificate_pem,
                 key_pem,
                 ca_pem,
             }) => [
-                Some(FILE_PEM_CERT_CERT.to_string()).zip(certificate_pem),
-                Some(FILE_PEM_CERT_KEY.to_string()).zip(key_pem),
-                Some((FILE_PEM_CERT_CA.to_string(), ca_pem)),
+                Some(names.tls_pem_cert_name).zip(certificate_pem),
+                Some(names.tls_pem_key_name).zip(key_pem),
+                Some((names.tls_pem_ca_name, ca_pem)),
             ]
             .into_iter()
             .flatten()
@@ -65,8 +65,8 @@ impl WellKnownSecretData {
                 keystore,
                 truststore,
             }) => [
-                Some(FILE_PKCS12_CERT_KEYSTORE.to_string()).zip(keystore),
-                Some((FILE_PKCS12_CERT_TRUSTSTORE.to_string(), truststore)),
+                Some(names.tls_pkcs12_keystore_name).zip(keystore),
+                Some((names.tls_pkcs12_truststore_name, truststore)),
             ]
             .into_iter()
             .flatten()
@@ -114,7 +114,7 @@ impl WellKnownSecretData {
     pub fn convert_to(
         self,
         to: SecretFormat,
-        compat: &CompatibilityOptions,
+        compat: CompatibilityOptions,
     ) -> Result<Self, ConvertError> {
         convert::convert(self, to, compat)
     }
@@ -123,9 +123,101 @@ impl WellKnownSecretData {
 /// Options that some (legacy) applications require to ensure compatibility.
 ///
 /// The expectation is that this will be unset the vast majority of the time.
-#[derive(Default)]
+#[derive(Debug, Default, Deserialize)]
 pub struct CompatibilityOptions {
+    /// The password used to encrypt the TLS PKCS#12 keystore
+    ///
+    /// Required for some applications that misbehave with blank keystore passwords (such as Hadoop).
+    /// Has no effect if `format` is not `tls-pkcs12`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.compatibility.tls-pkcs12.password",
+        default
+    )]
     pub tls_pkcs12_password: Option<String>,
+}
+
+/// Options to customize the well-known format file names.
+///
+/// The fields will either contain the default value or the custom user-provided one. This is also
+/// the reason why the fields are not wrapped in [`Option`].
+#[derive(Debug, Deserialize)]
+pub struct NamingOptions {
+    /// An alternative name used for the TLS PKCS#12 keystore file.
+    ///
+    /// Has no effect if the `format` is not `tls-pkcs12`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pkcs12.keystore-name",
+        default = "default_pkcs12_keystore_name"
+    )]
+    pub tls_pkcs12_keystore_name: String,
+
+    /// An alternative name used for the TLS PKCS#12 keystore file.
+    ///
+    /// Has no effect if the `format` is not `tls-pkcs12`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pkcs12.truststore-name",
+        default = "default_pkcs12_truststore_name"
+    )]
+    pub tls_pkcs12_truststore_name: String,
+
+    /// An alternative name used for the TLS PEM certificate.
+    ///
+    /// Has no effect if the `format` is not `tls-pem`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pem.cert-name",
+        default = "default_tls_pem_cert_name"
+    )]
+    pub tls_pem_cert_name: String,
+
+    /// An alternative name used for the TLS PEM certificate key.
+    ///
+    /// Has no effect if the `format` is not `tls-pem`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pem.key-name",
+        default = "default_tls_pem_key_name"
+    )]
+    pub tls_pem_key_name: String,
+
+    /// An alternative name used for the TLS PEM certificate authority.
+    ///
+    /// Has no effect if the `format` is not `tls-pem`.
+    #[serde(
+        rename = "secrets.stackable.tech/format.tls-pem.ca-name",
+        default = "default_tls_pem_ca_name"
+    )]
+    pub tls_pem_ca_name: String,
+}
+
+impl Default for NamingOptions {
+    fn default() -> Self {
+        Self {
+            tls_pkcs12_keystore_name: default_pkcs12_keystore_name(),
+            tls_pkcs12_truststore_name: default_pkcs12_truststore_name(),
+            tls_pem_cert_name: default_tls_pem_cert_name(),
+            tls_pem_key_name: default_tls_pem_key_name(),
+            tls_pem_ca_name: default_tls_pem_ca_name(),
+        }
+    }
+}
+
+fn default_pkcs12_keystore_name() -> String {
+    FILE_PKCS12_CERT_KEYSTORE.to_owned()
+}
+
+fn default_pkcs12_truststore_name() -> String {
+    FILE_PKCS12_CERT_TRUSTSTORE.to_owned()
+}
+
+fn default_tls_pem_cert_name() -> String {
+    FILE_PEM_CERT_CERT.to_owned()
+}
+
+fn default_tls_pem_key_name() -> String {
+    FILE_PEM_CERT_KEY.to_owned()
+}
+
+fn default_tls_pem_ca_name() -> String {
+    FILE_PEM_CERT_CA.to_owned()
 }
 
 #[derive(Snafu, Debug)]

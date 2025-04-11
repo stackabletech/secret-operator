@@ -3,38 +3,41 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use const_format::concatcp;
 use futures::StreamExt;
 use kube_runtime::{
+    WatchStreamExt as _,
     events::{Recorder, Reporter},
     reflector::Lookup,
-    WatchStreamExt as _,
 };
 use snafu::{OptionExt as _, ResultExt as _, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::{
-        api::core::v1::{ConfigMap, Secret},
         ByteString,
+        api::core::v1::{ConfigMap, Secret},
     },
     kube::{
-        api::PartialObjectMeta,
-        core::{error_boundary, DeserializeGuard},
-        runtime::{
-            controller,
-            reflector::{self, ObjectRef},
-            watcher, Controller,
-        },
         Resource,
+        api::PartialObjectMeta,
+        core::{DeserializeGuard, error_boundary},
+        runtime::{
+            Controller, controller,
+            reflector::{self, ObjectRef},
+            watcher,
+        },
     },
-    logging::controller::{report_controller_reconciled, ReconcilerError},
+    logging::controller::{ReconcilerError, report_controller_reconciled},
     namespace::WatchNamespace,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
+    OPERATOR_NAME,
     backend::{self, SecretBackendError, TrustSelector},
     crd::{SearchNamespaceMatchCondition, SecretClass, TrustStore},
-    format::{self, well_known::CompatibilityOptions},
+    format::{
+        self,
+        well_known::{CompatibilityOptions, NamingOptions},
+    },
     utils::Flattened,
-    OPERATOR_NAME,
 };
 
 const CONTROLLER_NAME: &str = "truststore";
@@ -266,7 +269,11 @@ async fn reconcile(
         .context(BackendGetTrustDataSnafu)?;
     let (Flattened(string_data), Flattened(binary_data)) = trust_data
         .data
-        .into_files(truststore.spec.format, &CompatibilityOptions::default())
+        .into_files(
+            truststore.spec.format,
+            NamingOptions::default(),
+            CompatibilityOptions::default(),
+        )
         .context(FormatDataSnafu {
             secret_class: secret_class_ref,
         })?

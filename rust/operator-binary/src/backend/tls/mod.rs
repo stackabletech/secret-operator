@@ -12,11 +12,11 @@ use openssl::{
     pkey::PKey,
     rsa::Rsa,
     x509::{
+        X509Builder, X509NameBuilder,
         extension::{
             AuthorityKeyIdentifier, BasicConstraints, ExtendedKeyUsage, KeyUsage,
             SubjectAlternativeName, SubjectKeyIdentifier,
         },
-        X509Builder, X509NameBuilder,
     },
 };
 use rand::Rng;
@@ -28,13 +28,13 @@ use stackable_operator::{
 use time::OffsetDateTime;
 
 use super::{
+    ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents,
     pod_info::{Address, PodInfo},
     scope::SecretScope,
-    ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents,
 };
 use crate::{
-    crd::{self, CertificateKeyGeneration},
-    format::{well_known, SecretData, WellKnownSecretData},
+    crd::{self, AdditionalTrustRoot, CertificateKeyGeneration},
+    format::{SecretData, WellKnownSecretData, well_known},
     utils::iterator_try_concat_bytes,
 };
 
@@ -94,7 +94,9 @@ pub enum Error {
     #[snafu(display("invalid certificate lifetime"))]
     InvalidCertLifetime { source: DateTimeOutOfBoundsError },
 
-    #[snafu(display("certificate expiring at {expires_at} would schedule the pod to be restarted at {restart_at}, which is in the past (and we don't have a time machine (yet))"))]
+    #[snafu(display(
+        "certificate expiring at {expires_at} would schedule the pod to be restarted at {restart_at}, which is in the past (and we don't have a time machine (yet))"
+    ))]
     TooShortCertLifetimeRequiresTimeTravel {
         expires_at: OffsetDateTime,
         restart_at: OffsetDateTime,
@@ -166,12 +168,14 @@ impl TlsGenerate {
             ca_certificate_lifetime,
             key_generation,
         }: &crd::AutoTlsCa,
+        additional_trust_roots: &[AdditionalTrustRoot],
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
         Ok(Self {
             ca_manager: ca::Manager::load_or_create(
                 client,
                 ca_secret,
+                additional_trust_roots,
                 &ca::Config {
                     manage_ca: *auto_generate_ca,
                     ca_certificate_lifetime: *ca_certificate_lifetime,
