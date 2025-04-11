@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
   - `secrets.stackable.tech/format.tls-pem.cert-name`
   - `secrets.stackable.tech/format.tls-pem.key-name`
   - `secrets.stackable.tech/format.tls-pem.ca-name`
+- Added TrustStore CRD for requesting CA certificate information ([#557]).
 
 ### Changed
 
@@ -33,6 +34,7 @@ All notable changes to this project will be documented in this file.
 
 - Use `json` file extension for log files ([#586]).
 
+[#557]: https://github.com/stackabletech/secret-operator/pull/557
 [#572]: https://github.com/stackabletech/secret-operator/pull/572
 [#581]: https://github.com/stackabletech/secret-operator/pull/581
 [#586]: https://github.com/stackabletech/secret-operator/pull/586

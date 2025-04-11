@@ -58,6 +58,16 @@ rules:
   - apiGroups:
       - ""
     resources:
+      - configmaps
+    verbs:
+      - create
+      - patch
+      - get
+      - watch
+      - list
+  - apiGroups:
+      - ""
+    resources:
       - persistentvolumes
     verbs:
       - get
@@ -96,8 +106,11 @@ rules:
       - secrets.stackable.tech
     resources:
       - secretclasses
+      - truststores
     verbs:
       - get
+      - watch
+      - list
   - apiGroups:
       - listeners.stackable.tech
     resources:
@@ -114,6 +127,13 @@ rules:
       - get
       - patch
       - create
+  - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
   - apiGroups:
       - security.openshift.io

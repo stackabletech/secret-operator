@@ -1,0 +1,24 @@
+# $NAMESPACE will be replaced with the namespace of the test case.
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: TrustStore
+metadata:
+  name: truststore-pem
+spec:
+  secretClassName: tls-$NAMESPACE
+  format: tls-pem
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: TrustStore
+metadata:
+  name: truststore-pkcs12
+spec:
+  secretClassName: tls-$NAMESPACE
+  format: tls-pkcs12
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: TrustStore
+metadata:
+  name: truststore-k8ssearch
+spec:
+  secretClassName: k8ssearch-$NAMESPACE

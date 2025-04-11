@@ -53,8 +53,14 @@ pub fn convert_tls_to_pkcs12(
     p12_password: &str,
 ) -> Result<TlsPkcs12, TlsToPkcs12Error> {
     use tls_to_pkcs12_error::*;
-    let cert = X509::from_pem(&pem.certificate_pem).context(LoadCertSnafu)?;
-    let key = PKey::private_key_from_pem(&pem.key_pem).context(LoadKeySnafu)?;
+    let cert = pem
+        .certificate_pem
+        .map(|cert| X509::from_pem(&cert).context(LoadCertSnafu))
+        .transpose()?;
+    let key = pem
+        .key_pem
+        .map(|key| PKey::private_key_from_pem(&key).context(LoadKeySnafu))
+        .transpose()?;
 
     let mut ca_stack = Stack::<X509>::new().context(LoadCaSnafu)?;
     for ca in split_pem_certificates(&pem.ca_pem) {
@@ -65,13 +71,18 @@ pub fn convert_tls_to_pkcs12(
 
     Ok(TlsPkcs12 {
         truststore: pkcs12_truststore(&ca_stack, p12_password)?,
-        keystore: Pkcs12::builder()
-            .ca(ca_stack)
-            .cert(&cert)
-            .pkey(&key)
-            .build2(p12_password)
-            .and_then(|store| store.to_der())
-            .context(BuildKeystoreSnafu)?,
+        keystore: cert
+            .zip(key)
+            .map(|(cert, key)| {
+                Pkcs12::builder()
+                    .ca(ca_stack)
+                    .cert(&cert)
+                    .pkey(&key)
+                    .build2(p12_password)
+                    .and_then(|store| store.to_der())
+                    .context(BuildKeystoreSnafu)
+            })
+            .transpose()?,
     })
 }
 
@@ -97,6 +108,16 @@ fn pkcs12_truststore<'a>(
     let java_oracle_trusted_key_usage_oid =
         yasna::models::ObjectIdentifier::from_slice(&[2, 16, 840, 1, 113894, 746875, 1, 1]);
 
+    // We don't care about actually encrypting the truststore securely, but if we use a random salt then the pkcs#12 bundle will be different for every write
+    // (=> TrustStore controller will get stuck reconciling indefinitely.)
+    // So let's just use a fixed salt instead.
+    struct DummyRng;
+    impl p12::Rng for DummyRng {
+        fn generate_salt(&mut self) -> Option<[u8; 8]> {
+            Some([0; 8])
+        }
+    }
+
     let mut truststore_bags = Vec::new();
     for ca in ca_list {
         truststore_bags.push(p12::SafeBag {
@@ -112,8 +133,12 @@ fn pkcs12_truststore<'a>(
     }
     let password_as_bmp_string = bmp_string(p12_password);
     let encrypted_data = p12::ContentInfo::EncryptedData(
-        p12::EncryptedData::from_safe_bags(&truststore_bags[..], &password_as_bmp_string)
-            .context(tls_to_pkcs12_error::EncryptDataForTruststoreSnafu)?,
+        p12::EncryptedData::from_safe_bags(
+            &truststore_bags[..],
+            &password_as_bmp_string,
+            &mut DummyRng,
+        )
+        .context(tls_to_pkcs12_error::EncryptDataForTruststoreSnafu)?,
     );
     let truststore_data = yasna::construct_der(|w| {
         w.write_sequence_of(|w| {
@@ -122,7 +147,11 @@ fn pkcs12_truststore<'a>(
     });
     Ok(p12::PFX {
         version: 3,
-        mac_data: Some(p12::MacData::new(&truststore_data, &password_as_bmp_string)),
+        mac_data: Some(p12::MacData::new(
+            &truststore_data,
+            &password_as_bmp_string,
+            &mut DummyRng,
+        )),
         auth_safe: p12::ContentInfo::Data(truststore_data),
     }
     .to_der())
@@ -148,4 +177,27 @@ pub enum TlsToPkcs12Error {
 
     #[snafu(display("failed to encrypt data for truststore"))]
     EncryptDataForTruststore,
+}
+
+#[cfg(test)]
+mod tests {
+    use openssl::{hash::MessageDigest, pkey::PKey, rsa::Rsa, x509::X509};
+
+    use crate::format::convert::pkcs12_truststore;
+
+    #[test]
+    fn pkcs12_truststore_should_be_deterministic() -> anyhow::Result<()> {
+        let pkey = PKey::try_from(Rsa::generate(2048)?)?;
+        let mut x509 = X509::builder()?;
+        x509.set_pubkey(&pkey)?;
+        x509.set_version(3 - 1)?;
+        x509.sign(&pkey, MessageDigest::sha256())?;
+        let cert = x509.build();
+        let password = "";
+        assert_eq!(
+            pkcs12_truststore([cert.as_ref()], password)?,
+            pkcs12_truststore([cert.as_ref()], password)?,
+        );
+        Ok(())
+    }
 }

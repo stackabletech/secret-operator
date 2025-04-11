@@ -14,6 +14,7 @@ use stackable_operator::{
 
 use super::{
     ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
+    TrustSelector,
     k8s_search::LABEL_SCOPE_NODE,
     pod_info::{Address, PodInfo, SchedulingPodInfo},
     scope::SecretScope,
@@ -61,6 +62,9 @@ pub enum Error {
         source: stackable_operator::client::Error,
         certificate: ObjectRef<external_crd::cert_manager::Certificate>,
     },
+
+    #[snafu(display("the certManager backend does not currently support TrustStore exports"))]
+    TrustExportUnsupported,
 }
 
 impl SecretBackendError for Error {
@@ -71,6 +75,22 @@ impl SecretBackendError for Error {
             Error::GetSecret { .. } => tonic::Code::Unavailable,
             Error::GetCertManagerCertificate { .. } => tonic::Code::Unavailable,
             Error::ApplyCertManagerCertificate { .. } => tonic::Code::Unavailable,
+            Error::TrustExportUnsupported => tonic::Code::FailedPrecondition,
+        }
+    }
+
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        match self {
+            Error::NoPvcName => None,
+            Error::ScopeAddresses { source, .. } => source.secondary_object(),
+            Error::GetSecret { secret, .. } => Some(secret.clone().erase()),
+            Error::ApplyCertManagerCertificate { certificate, .. } => {
+                Some(certificate.clone().erase())
+            }
+            Error::GetCertManagerCertificate { certificate, .. } => {
+                Some(certificate.clone().erase())
+            }
+            Error::TrustExportUnsupported => None,
         }
     }
 }
@@ -172,6 +192,13 @@ impl SecretBackend for CertManager {
                 .map(|(k, ByteString(v))| (k, v))
                 .collect(),
         )))
+    }
+
+    async fn get_trust_data(
+        &self,
+        _selector: &TrustSelector,
+    ) -> Result<SecretContents, Self::Error> {
+        TrustExportUnsupportedSnafu.fail()
     }
 
     async fn get_qualified_node_names(

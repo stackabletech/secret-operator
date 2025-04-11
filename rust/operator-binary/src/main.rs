@@ -1,4 +1,4 @@
-use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
+use std::{os::unix::prelude::FileTypeExt, path::PathBuf, pin::pin};
 
 use anyhow::Context;
 use clap::Parser;
@@ -10,11 +10,7 @@ use futures::{FutureExt, TryStreamExt};
 use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
-use stackable_operator::{
-    CustomResourceExt,
-    telemetry::{Tracing, tracing::TelemetryOptions},
-    utils::cluster_info::KubernetesClusterInfoOpts,
-};
+use stackable_operator::{CustomResourceExt, cli::ProductOperatorRun, telemetry::Tracing};
 use tokio::signal::unix::{SignalKind, signal};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
@@ -26,6 +22,7 @@ mod csi_server;
 mod external_crd;
 mod format;
 mod grpc;
+mod truststore_controller;
 mod utils;
 
 pub const OPERATOR_NAME: &str = "secrets.stackable.tech";
@@ -54,11 +51,8 @@ struct SecretOperatorRun {
     #[clap(long, env)]
     privileged: bool,
 
-    #[command(flatten)]
-    pub telemetry_arguments: TelemetryOptions,
-
-    #[command(flatten)]
-    pub cluster_info_opts: KubernetesClusterInfoOpts,
+    #[clap(flatten)]
+    common: ProductOperatorRun,
 }
 
 mod built_info {
@@ -71,13 +65,19 @@ async fn main() -> anyhow::Result<()> {
     match opts.cmd {
         stackable_operator::cli::Command::Crd => {
             crd::SecretClass::print_yaml_schema(built_info::PKG_VERSION)?;
+            crd::TrustStore::print_yaml_schema(built_info::PKG_VERSION)?;
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun {
             csi_endpoint,
             node_name,
-            telemetry_arguments,
             privileged,
-            cluster_info_opts,
+            common:
+                ProductOperatorRun {
+                    product_config: _,
+                    watch_namespace,
+                    telemetry_arguments,
+                    cluster_info_opts,
+                },
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
             // - The console log level was set by `SECRET_PROVISIONER_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
@@ -108,30 +108,38 @@ async fn main() -> anyhow::Result<()> {
                 let _ = std::fs::remove_file(&csi_endpoint);
             }
             let mut sigterm = signal(SignalKind::terminate())?;
-            Server::builder()
-                .add_service(
-                    tonic_reflection::server::Builder::configure()
-                        .include_reflection_service(true)
-                        .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
-                        .build_v1()?,
-                )
-                .add_service(IdentityServer::new(SecretProvisionerIdentity))
-                .add_service(ControllerServer::new(SecretProvisionerController {
-                    client: client.clone(),
-                }))
-                .add_service(NodeServer::new(SecretProvisionerNode {
-                    client,
-                    node_name,
-                    privileged,
-                }))
-                .serve_with_incoming_shutdown(
-                    UnixListenerStream::new(
-                        uds_bind_private(csi_endpoint).context("failed to bind CSI listener")?,
+            let csi_server = pin!(
+                Server::builder()
+                    .add_service(
+                        tonic_reflection::server::Builder::configure()
+                            .include_reflection_service(true)
+                            .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
+                            .build_v1()?,
                     )
-                    .map_ok(TonicUnixStream),
-                    sigterm.recv().map(|_| ()),
-                )
-                .await?;
+                    .add_service(IdentityServer::new(SecretProvisionerIdentity))
+                    .add_service(ControllerServer::new(SecretProvisionerController {
+                        client: client.clone(),
+                    }))
+                    .add_service(NodeServer::new(SecretProvisionerNode {
+                        client: client.clone(),
+                        node_name,
+                        privileged,
+                    }))
+                    .serve_with_incoming_shutdown(
+                        UnixListenerStream::new(
+                            uds_bind_private(csi_endpoint)
+                                .context("failed to bind CSI listener")?,
+                        )
+                        .map_ok(TonicUnixStream),
+                        sigterm.recv().map(|_| ()),
+                    )
+            );
+            let truststore_controller =
+                pin!(truststore_controller::start(&client, &watch_namespace).map(Ok));
+            futures::future::select(csi_server, truststore_controller)
+                .await
+                .factor_first()
+                .0?;
         }
     }
     Ok(())

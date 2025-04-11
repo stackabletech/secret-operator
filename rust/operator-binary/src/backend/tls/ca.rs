@@ -2,6 +2,7 @@
 
 use std::{collections::BTreeMap, ffi::OsStr, fmt::Display, path::Path};
 
+use kube_runtime::reflector::Lookup;
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},
     bn::{BigNum, MsbOption},
@@ -58,16 +59,16 @@ pub enum Error {
     #[snafu(display("failed to generate certificate key"))]
     GenerateKey { source: openssl::error::ErrorStack },
 
-    #[snafu(display("failed to load {config_map}"))]
-    FindConfigMap {
-        source: kube::Error,
-        config_map: ObjectRef<ConfigMap>,
-    },
-
-    #[snafu(display("failed to load {secret}"))]
-    FindSecret {
+    #[snafu(display("failed to load CA from {secret}"))]
+    FindCertificateAuthority {
         source: kube::Error,
         secret: ObjectRef<Secret>,
+    },
+
+    #[snafu(display("failed to load extra trust root from {object}"))]
+    FindExtraTrustRoot {
+        source: stackable_operator::client::Error,
+        object: ObjectRef<DynamicObject>,
     },
 
     #[snafu(display("CA {secret} does not exist, and autoGenerate is false"))]
@@ -123,8 +124,8 @@ impl SecretBackendError for Error {
         match self {
             Error::GenerateKey { .. } => tonic::Code::Internal,
             Error::MissingCertificate { .. } => tonic::Code::FailedPrecondition,
-            Error::FindConfigMap { .. } => tonic::Code::Unavailable,
-            Error::FindSecret { .. } => tonic::Code::Unavailable,
+            Error::FindCertificateAuthority { .. } => tonic::Code::Unavailable,
+            Error::FindExtraTrustRoot { .. } => tonic::Code::Unavailable,
             Error::CaNotFoundAndGenDisabled { .. } => tonic::Code::FailedPrecondition,
             Error::LoadCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::UnsupportedCertificateFormat { .. } => tonic::Code::InvalidArgument,
@@ -135,19 +136,45 @@ impl SecretBackendError for Error {
             Error::SaveRequestedButForbidden { .. } => tonic::Code::FailedPrecondition,
         }
     }
+
+    fn secondary_object(&self) -> Option<ObjectRef<kube::api::DynamicObject>> {
+        match self {
+            Error::GenerateKey { .. } => None,
+            Error::FindCertificateAuthority { secret, .. } => Some(secret.clone().erase()),
+            Error::FindExtraTrustRoot { object, .. } => Some(object.clone()),
+            Error::CaNotFoundAndGenDisabled { secret } => Some(secret.clone().erase()),
+            Error::MissingCertificate { secret, .. } => Some(secret.clone().erase()),
+            Error::LoadCertificate { object, .. } => Some(object.clone()),
+            Error::UnsupportedCertificateFormat { object, .. } => Some(object.clone()),
+            Error::ParseLifetime { secret, .. } => Some(secret.clone().erase()),
+            Error::BuildCertificate { .. } => None,
+            Error::SerializeCertificate { .. } => None,
+            Error::SaveCaCertificate { secret, .. } => Some(secret.clone().erase()),
+            Error::SaveRequestedButForbidden => None,
+        }
+    }
 }
 
 #[derive(Debug, Snafu)]
 #[snafu(module)]
 pub enum GetCaError {
-    #[snafu(display("No CA will live until at least {cutoff}"))]
-    NoCaLivesLongEnough { cutoff: OffsetDateTime },
+    #[snafu(display("no CA in {secret} will live until at least {cutoff}"))]
+    NoCaLivesLongEnough {
+        cutoff: OffsetDateTime,
+        secret: ObjectRef<Secret>,
+    },
 }
 
 impl SecretBackendError for GetCaError {
     fn grpc_code(&self) -> tonic::Code {
         match self {
             GetCaError::NoCaLivesLongEnough { .. } => tonic::Code::FailedPrecondition,
+        }
+    }
+
+    fn secondary_object(&self) -> Option<ObjectRef<kube::api::DynamicObject>> {
+        match self {
+            GetCaError::NoCaLivesLongEnough { secret, .. } => Some(secret.clone().erase()),
         }
     }
 }
@@ -210,7 +237,8 @@ impl CertificateAuthority {
         let now = OffsetDateTime::now_utc();
         let not_before = now - Duration::from_minutes_unchecked(5);
         let not_after = now + config.ca_certificate_lifetime;
-        let conf = Conf::new(ConfMethod::default()).unwrap();
+        let conf =
+            Conf::new(ConfMethod::default()).expect("failed to initialize OpenSSL configuration");
 
         let private_key_length = match config.key_generation {
             CertificateKeyGeneration::Rsa { length } => length,
@@ -311,6 +339,7 @@ impl CertificateAuthority {
 /// Manages multiple [`CertificateAuthorities`](`CertificateAuthority`), rotating them as needed.
 #[derive(Debug)]
 pub struct Manager {
+    source_secret: ObjectRef<Secret>,
     certificate_authorities: Vec<CertificateAuthority>,
     additional_trusted_certificates: Vec<X509>,
 }
@@ -324,10 +353,10 @@ impl Manager {
     ) -> Result<Self> {
         // Use entry API rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
         let secrets_api = &client.get_api::<Secret>(&secret_ref.namespace);
-        let ca_secret = secrets_api
+        let mut ca_secret = secrets_api
             .entry(&secret_ref.name)
             .await
-            .with_context(|_| FindSecretSnafu { secret: secret_ref })?;
+            .with_context(|_| FindCertificateAuthoritySnafu { secret: secret_ref })?;
         let mut update_ca_secret = false;
         let mut certificate_authorities = match &ca_secret {
             Entry::Occupied(ca_secret) => {
@@ -425,8 +454,8 @@ impl Manager {
                 info!(secret = %secret_ref, "CA has been modified, saving");
                 // Sort CAs by age to avoid spurious writes
                 certificate_authorities.sort_by_key(|ca| ca.not_after);
-                let mut ca_secret = ca_secret.or_insert(Secret::default);
-                ca_secret.get_mut().data = Some(
+                let mut occupied_ca_secret = ca_secret.or_insert(Secret::default);
+                occupied_ca_secret.get_mut().data = Some(
                     certificate_authorities
                         .iter()
                         .enumerate()
@@ -454,10 +483,11 @@ impl Manager {
                         })
                         .collect::<Result<_>>()?,
                 );
-                ca_secret
+                occupied_ca_secret
                     .commit(&PostParams::default())
                     .await
                     .context(SaveCaCertificateSnafu { secret: secret_ref })?;
+                ca_secret = Entry::Occupied(occupied_ca_secret);
             } else {
                 return SaveRequestedButForbiddenSnafu.fail();
             }
@@ -467,10 +497,10 @@ impl Manager {
         for entry in additional_trust_roots {
             let certs = match entry {
                 AdditionalTrustRoot::ConfigMap(config_map) => {
-                    Self::read_certificates_from_config_map(client, config_map).await?
+                    Self::read_extra_trust_roots_from_config_map(client, config_map).await?
                 }
                 AdditionalTrustRoot::Secret(secret) => {
-                    Self::read_certificates_from_secret(client, secret).await?
+                    Self::read_extra_trust_roots_from_secret(client, secret).await?
                 }
             };
             additional_trusted_certificates.extend(certs);
@@ -479,6 +509,10 @@ impl Manager {
         Ok(Self {
             certificate_authorities,
             additional_trusted_certificates,
+            source_secret: ca_secret
+                .get()
+                .map(|secret| secret.to_object_ref(()))
+                .unwrap_or_else(|| secret_ref.into()),
         })
     }
 
@@ -486,18 +520,17 @@ impl Manager {
     ///
     /// The keys are assumed to be filenames and their extensions denote the expected format of the
     /// certificate.
-    async fn read_certificates_from_config_map(
+    async fn read_extra_trust_roots_from_config_map(
         client: &stackable_operator::client::Client,
         config_map_ref: &ConfigMapReference,
     ) -> Result<Vec<X509>> {
         let mut certificates = vec![];
 
-        let config_map_api = &client.get_api::<ConfigMap>(&config_map_ref.namespace);
-        let config_map = config_map_api
-            .get(&config_map_ref.name)
+        let config_map = client
+            .get::<ConfigMap>(&config_map_ref.name, &config_map_ref.namespace)
             .await
-            .with_context(|_| FindConfigMapSnafu {
-                config_map: config_map_ref,
+            .context(FindExtraTrustRootSnafu {
+                object: config_map_ref,
             })?;
 
         let config_map_data = config_map.data.unwrap_or_default();
@@ -511,7 +544,7 @@ impl Manager {
                     .map(|(key, ByteString(value))| (key, value.as_ref())),
             );
         for (key, value) in data {
-            let certs = Self::deserialize_certificate(key, value, config_map_ref.into())?;
+            let certs = Self::deserialize_certificate(key, value, config_map_ref)?;
             info!(
                 ?certs,
                 %config_map_ref,
@@ -528,21 +561,20 @@ impl Manager {
     ///
     /// The keys are assumed to be filenames and their extensions denote the expected format of the
     /// certificate.
-    async fn read_certificates_from_secret(
+    async fn read_extra_trust_roots_from_secret(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
     ) -> Result<Vec<X509>> {
         let mut certificates = vec![];
 
-        let secrets_api = &client.get_api::<Secret>(&secret_ref.namespace);
-        let secret = secrets_api
-            .get(&secret_ref.name)
+        let secret = client
+            .get::<Secret>(&secret_ref.name, &secret_ref.namespace)
             .await
-            .with_context(|_| FindSecretSnafu { secret: secret_ref })?;
+            .context(FindExtraTrustRootSnafu { object: secret_ref })?;
 
         let secret_data = secret.data.unwrap_or_default();
         for (key, ByteString(value)) in &secret_data {
-            let certs = Self::deserialize_certificate(key, value, secret_ref.into())?;
+            let certs = Self::deserialize_certificate(key, value, secret_ref)?;
             info!(
                 ?certs,
                 %secret_ref,
@@ -560,7 +592,7 @@ impl Manager {
     fn deserialize_certificate(
         key: &str,
         value: &[u8],
-        object_ref: ObjectRef<DynamicObject>,
+        object_ref: impl Into<ObjectRef<DynamicObject>>,
     ) -> Result<Vec<X509>> {
         let extension = Path::new(key).extension().and_then(OsStr::to_str);
 
@@ -592,8 +624,9 @@ impl Manager {
             .filter(|ca| ca.not_after > valid_until_at_least)
             // pick the oldest valid CA, since it will be trusted by the most peers
             .min_by_key(|ca| ca.not_after)
-            .context(NoCaLivesLongEnoughSnafu {
+            .with_context(|| NoCaLivesLongEnoughSnafu {
                 cutoff: valid_until_at_least,
+                secret: self.source_secret.clone(),
             })
     }
 

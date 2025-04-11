@@ -1141,6 +1141,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "hex-literal"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
+
+[[package]]
 name = "hmac"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2187,14 +2193,13 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "p12"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4873306de53fe82e7e484df31e1e947d61514b6ea2ed6cd7b45d63006fd9224"
+version = "0.0.0-dev"
 dependencies = [
  "cbc",
  "cipher",
  "des",
  "getrandom 0.2.15",
+ "hex-literal",
  "hmac",
  "lazy_static",
  "rc2",
@@ -3122,8 +3127,10 @@ dependencies = [
  "async-trait",
  "built",
  "clap",
+ "const_format",
  "futures 0.3.31",
  "h2",
+ "kube-runtime",
  "libc",
  "openssl",
  "p12",

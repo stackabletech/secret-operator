@@ -14,17 +14,22 @@ use async_trait::async_trait;
 pub use cert_manager::CertManager;
 pub use k8s_search::K8sSearch;
 pub use kerberos_keytab::KerberosKeytab;
+use kube_runtime::reflector::ObjectRef;
 use pod_info::Address;
 use scope::SecretScope;
 use serde::{Deserialize, Deserializer, Serialize, de::Unexpected};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
+    commons::listener::PodListeners,
     k8s_openapi::chrono::{DateTime, FixedOffset},
+    kube::api::DynamicObject,
     time::Duration,
 };
 pub use tls::TlsGenerate;
 
 use self::pod_info::SchedulingPodInfo;
+#[cfg(doc)]
+use crate::crd::TrustStore;
 use crate::format::{
     SecretData, SecretFormat,
     well_known::{CompatibilityOptions, NamingOptions},
@@ -135,6 +140,12 @@ pub struct SecretVolumeSelector {
     pub cert_manager_cert_lifetime: Option<Duration>,
 }
 
+/// Configuration provided by the [`TrustStore`] selecting what trust data should be provided.
+pub struct TrustSelector {
+    /// The name of the [`TrustStore`]'s `Namespace`.
+    pub namespace: String,
+}
+
 /// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself.
 // These are optional even if they are set unconditionally, because otherwise we will
 // fail to restore volumes (after Node reboots etc) from before they were added during upgrades.
@@ -167,8 +178,25 @@ fn default_cert_jitter_factor() -> f64 {
 #[derive(Snafu, Debug)]
 #[snafu(module)]
 pub enum ScopeAddressesError {
-    #[snafu(display("no addresses found for listener {listener}"))]
-    NoListenerAddresses { listener: String },
+    #[snafu(display(
+        "listener addresses were not fetched (this is likely a bug in secret-operator)"
+    ))]
+    ListenerAddressesNotFetched,
+
+    #[snafu(display("no addresses found for listener {listener} on {pod_listeners}"))]
+    NoListenerAddresses {
+        listener: String,
+        pod_listeners: ObjectRef<PodListeners>,
+    },
+}
+
+impl ScopeAddressesError {
+    pub fn secondary_object(&self) -> Option<ObjectRef<DynamicObject>> {
+        match self {
+            Self::ListenerAddressesNotFetched => None,
+            Self::NoListenerAddresses { pod_listeners, .. } => Some(pod_listeners.clone().erase()),
+        }
+    }
 }
 
 impl SecretVolumeSelector {
@@ -204,11 +232,17 @@ impl SecretVolumeSelector {
             scope::SecretScope::Service { name } => vec![Address::Dns(format!(
                 "{name}.{namespace}.svc.{cluster_domain}",
             ))],
-            scope::SecretScope::ListenerVolume { name } => pod_info
-                .listener_addresses
-                .get(name)
-                .context(NoListenerAddressesSnafu { listener: name })?
-                .to_vec(),
+            scope::SecretScope::ListenerVolume { name } => match &pod_info.listener_addresses {
+                Some(listener_addresses) => listener_addresses
+                    .by_listener_volume_name
+                    .get(name)
+                    .with_context(|| NoListenerAddressesSnafu {
+                        listener: name,
+                        pod_listeners: listener_addresses.source.clone(),
+                    })?
+                    .to_vec(),
+                None => return ListenerAddressesNotFetchedSnafu.fail(),
+            },
         })
     }
 
@@ -272,6 +306,9 @@ pub trait SecretBackend: Debug + Send + Sync {
         pod_info: pod_info::PodInfo,
     ) -> Result<SecretContents, Self::Error>;
 
+    async fn get_trust_data(&self, selector: &TrustSelector)
+    -> Result<SecretContents, Self::Error>;
+
     /// Try to predict which nodes would be able to provision this secret.
     ///
     /// Should return `None` if no constraints apply, `Some(HashSet::new())` is interpreted as "no nodes match the given constraints".
@@ -290,10 +327,15 @@ pub trait SecretBackend: Debug + Send + Sync {
 
 pub trait SecretBackendError: std::error::Error + Send + Sync + 'static {
     fn grpc_code(&self) -> tonic::Code;
+    fn secondary_object(&self) -> Option<ObjectRef<DynamicObject>>;
 }
 
 impl SecretBackendError for Infallible {
     fn grpc_code(&self) -> tonic::Code {
+        match *self {}
+    }
+
+    fn secondary_object(&self) -> Option<ObjectRef<DynamicObject>> {
         match *self {}
     }
 }
