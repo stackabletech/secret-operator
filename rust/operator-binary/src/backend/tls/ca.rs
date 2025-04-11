@@ -544,7 +544,7 @@ impl Manager {
                     .map(|(key, ByteString(value))| (key, value.as_ref())),
             );
         for (key, value) in data {
-            let certs = Self::deserialize_certificate(key, value, config_map_ref.into())?;
+            let certs = Self::deserialize_certificate(key, value, config_map_ref)?;
             info!(
                 ?certs,
                 %config_map_ref,
@@ -574,7 +574,7 @@ impl Manager {
 
         let secret_data = secret.data.unwrap_or_default();
         for (key, ByteString(value)) in &secret_data {
-            let certs = Self::deserialize_certificate(key, value, secret_ref.into())?;
+            let certs = Self::deserialize_certificate(key, value, secret_ref)?;
             info!(
                 ?certs,
                 %secret_ref,
@@ -592,7 +592,7 @@ impl Manager {
     fn deserialize_certificate(
         key: &str,
         value: &[u8],
-        object_ref: ObjectRef<DynamicObject>,
+        object_ref: impl Into<ObjectRef<DynamicObject>>,
     ) -> Result<Vec<X509>> {
         let extension = Path::new(key).extension().and_then(OsStr::to_str);
 
