@@ -399,12 +399,9 @@ async fn get_user_kvno(
 
     // Perform search with KVNO attribute
     let (search_results, _) = ldap
-        .search(
-            distinguished_name,
-            Scope::Base,
-            "(objectClass=user)",
-            vec!["msDS-KeyVersionNumber"],
-        )
+        .search(distinguished_name, Scope::Base, "(objectClass=user)", vec![
+            "msDS-KeyVersionNumber",
+        ])
         .await
         .context(SearchLdapSnafu)?
         .success()
