@@ -59,16 +59,16 @@ pub enum Error {
     #[snafu(display("failed to generate certificate key"))]
     GenerateKey { source: openssl::error::ErrorStack },
 
-    #[snafu(display("failed to load {config_map}"))]
-    FindConfigMap {
-        source: kube::Error,
-        config_map: ObjectRef<ConfigMap>,
-    },
-
-    #[snafu(display("failed to load {secret}"))]
-    FindSecret {
+    #[snafu(display("failed to load CA from {secret}"))]
+    FindCertificateAuthority {
         source: kube::Error,
         secret: ObjectRef<Secret>,
+    },
+
+    #[snafu(display("failed to load extra trust root from {object}"))]
+    FindExtraTrustRoot {
+        source: stackable_operator::client::Error,
+        object: ObjectRef<DynamicObject>,
     },
 
     #[snafu(display("CA {secret} does not exist, and autoGenerate is false"))]
@@ -124,8 +124,8 @@ impl SecretBackendError for Error {
         match self {
             Error::GenerateKey { .. } => tonic::Code::Internal,
             Error::MissingCertificate { .. } => tonic::Code::FailedPrecondition,
-            Error::FindConfigMap { .. } => tonic::Code::Unavailable,
-            Error::FindSecret { .. } => tonic::Code::Unavailable,
+            Error::FindCertificateAuthority { .. } => tonic::Code::Unavailable,
+            Error::FindExtraTrustRoot { .. } => tonic::Code::Unavailable,
             Error::CaNotFoundAndGenDisabled { .. } => tonic::Code::FailedPrecondition,
             Error::LoadCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::UnsupportedCertificateFormat { .. } => tonic::Code::InvalidArgument,
@@ -140,12 +140,12 @@ impl SecretBackendError for Error {
     fn secondary_object(&self) -> Option<ObjectRef<kube::api::DynamicObject>> {
         match self {
             Error::GenerateKey { .. } => None,
-            Error::FindConfigMap { config_map, .. } => Some(config_map.clone().erase()),
-            Error::FindSecret { secret, .. } => Some(secret.clone().erase()),
+            Error::FindCertificateAuthority { secret, .. } => Some(secret.clone().erase()),
+            Error::FindExtraTrustRoot { object, .. } => Some(object.clone()),
             Error::CaNotFoundAndGenDisabled { secret } => Some(secret.clone().erase()),
             Error::MissingCertificate { secret, .. } => Some(secret.clone().erase()),
-            Error::LoadCertificate { object, .. } => Some(object.clone().erase()),
-            Error::UnsupportedCertificateFormat { object, .. } => Some(object.clone().erase()),
+            Error::LoadCertificate { object, .. } => Some(object.clone()),
+            Error::UnsupportedCertificateFormat { object, .. } => Some(object.clone()),
             Error::ParseLifetime { secret, .. } => Some(secret.clone().erase()),
             Error::BuildCertificate { .. } => None,
             Error::SerializeCertificate { .. } => None,
@@ -356,7 +356,7 @@ impl Manager {
         let mut ca_secret = secrets_api
             .entry(&secret_ref.name)
             .await
-            .with_context(|_| FindSecretSnafu { secret: secret_ref })?;
+            .with_context(|_| FindCertificateAuthoritySnafu { secret: secret_ref })?;
         let mut update_ca_secret = false;
         let mut certificate_authorities = match &ca_secret {
             Entry::Occupied(ca_secret) => {
@@ -497,10 +497,10 @@ impl Manager {
         for entry in additional_trust_roots {
             let certs = match entry {
                 AdditionalTrustRoot::ConfigMap(config_map) => {
-                    Self::read_certificates_from_config_map(client, config_map).await?
+                    Self::read_extra_trust_roots_from_config_map(client, config_map).await?
                 }
                 AdditionalTrustRoot::Secret(secret) => {
-                    Self::read_certificates_from_secret(client, secret).await?
+                    Self::read_extra_trust_roots_from_secret(client, secret).await?
                 }
             };
             additional_trusted_certificates.extend(certs);
@@ -520,18 +520,17 @@ impl Manager {
     ///
     /// The keys are assumed to be filenames and their extensions denote the expected format of the
     /// certificate.
-    async fn read_certificates_from_config_map(
+    async fn read_extra_trust_roots_from_config_map(
         client: &stackable_operator::client::Client,
         config_map_ref: &ConfigMapReference,
     ) -> Result<Vec<X509>> {
         let mut certificates = vec![];
 
-        let config_map_api = &client.get_api::<ConfigMap>(&config_map_ref.namespace);
-        let config_map = config_map_api
-            .get(&config_map_ref.name)
+        let config_map = client
+            .get::<ConfigMap>(&config_map_ref.name, &config_map_ref.namespace)
             .await
-            .with_context(|_| FindConfigMapSnafu {
-                config_map: config_map_ref,
+            .context(FindExtraTrustRootSnafu {
+                object: config_map_ref,
             })?;
 
         let config_map_data = config_map.data.unwrap_or_default();
@@ -562,17 +561,16 @@ impl Manager {
     ///
     /// The keys are assumed to be filenames and their extensions denote the expected format of the
     /// certificate.
-    async fn read_certificates_from_secret(
+    async fn read_extra_trust_roots_from_secret(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
     ) -> Result<Vec<X509>> {
         let mut certificates = vec![];
 
-        let secrets_api = &client.get_api::<Secret>(&secret_ref.namespace);
-        let secret = secrets_api
-            .get(&secret_ref.name)
+        let secret = client
+            .get::<Secret>(&secret_ref.name, &secret_ref.namespace)
             .await
-            .with_context(|_| FindSecretSnafu { secret: secret_ref })?;
+            .context(FindExtraTrustRootSnafu { object: secret_ref })?;
 
         let secret_data = secret.data.unwrap_or_default();
         for (key, ByteString(value)) in &secret_data {
