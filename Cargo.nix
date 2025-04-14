@@ -2039,9 +2039,9 @@ rec {
       };
       "crossbeam-channel" = rec {
         crateName = "crossbeam-channel";
-        version = "0.5.14";
+        version = "0.5.15";
         edition = "2021";
-        sha256 = "0wa41qybq5w8s70anb472myh4fid4aw6v65vws6wn528w9l6vfh6";
+        sha256 = "1cicd9ins0fkpfgvz9vhz3m9rpkh6n8d3437c3wnfsdkd3wgif42";
         libName = "crossbeam_channel";
         dependencies = [
           {
@@ -6614,9 +6614,9 @@ rec {
       };
       "openssl" = rec {
         crateName = "openssl";
-        version = "0.10.71";
+        version = "0.10.72";
         edition = "2021";
-        sha256 = "1kgvk6wi57bacn6b5z6b57vkyd2j85s6vyxhvj7jbkcqd861652y";
+        sha256 = "1np54pm6hw512rmfjv3kc54h8yvf51mdlm8a8cc33xx1b1yympzy";
         authors = [
           "Steven Fackler <sfackler@gmail.com>"
         ];
@@ -6652,6 +6652,7 @@ rec {
           }
         ];
         features = {
+          "aws-lc" = [ "ffi/aws-lc" ];
           "bindgen" = [ "ffi/bindgen" ];
           "unstable_boringssl" = [ "ffi/unstable_boringssl" ];
           "vendored" = [ "ffi/vendored" ];
@@ -6695,10 +6696,10 @@ rec {
       };
       "openssl-sys" = rec {
         crateName = "openssl-sys";
-        version = "0.9.106";
+        version = "0.9.107";
         edition = "2021";
         links = "openssl";
-        sha256 = "1pbwfy5x8znchsbqf7rnkdbdhw1fis5hpx3940y9xhqwh6lixdlb";
+        sha256 = "01yydv8yaagdnapvair8b6rggf225lwb854h99s9qx44rnd9g242";
         build = "build/main.rs";
         libName = "openssl_sys";
         authors = [
@@ -6726,6 +6727,7 @@ rec {
           }
         ];
         features = {
+          "aws-lc" = [ "dep:aws-lc-sys" ];
           "bindgen" = [ "dep:bindgen" ];
           "bssl-sys" = [ "dep:bssl-sys" ];
           "openssl-src" = [ "dep:openssl-src" ];
@@ -11307,9 +11309,9 @@ rec {
       };
       "tokio" = rec {
         crateName = "tokio";
-        version = "1.43.0";
+        version = "1.44.2";
         edition = "2021";
-        sha256 = "17pdm49ihlhfw3rpxix3kdh2ppl1yv7nwp1kxazi5r1xz97zlq9x";
+        sha256 = "0j4w3qvlcqzgbxlnap0czvspqj6x461vyk1sbqcf97g4rci8if76";
         authors = [
           "Tokio Contributors <team@tokio.rs>"
         ];
