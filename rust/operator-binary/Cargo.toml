@@ -41,7 +41,7 @@ tracing.workspace = true
 uuid.workspace = true
 yasna.workspace = true
 rand.workspace = true
-const_format = "0.2.34"
+const_format.workspace = true
 
 [dev-dependencies]
 serde_yaml.workspace = true
