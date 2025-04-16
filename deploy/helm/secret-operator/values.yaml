@@ -94,3 +94,17 @@ secretClasses:
     # The namespace that the TLS Certificate Authority is installed into.
     # Defaults to the namespace where secret-op is installed.
     caSecretNamespace: null
+
+# See all available options and detailed explanations about the concept here:
+# https://docs.stackable.tech/home/stable/concepts/telemetry/
+telemetry:
+  consoleLog:
+    enabled: true
+  fileLog:
+    enabled: false
+    rotationPeriod: hourly
+    maxFiles: 6
+  otelLogExporter:
+    enabled: false
+  otelTraceExporter:
+    enabled: false
