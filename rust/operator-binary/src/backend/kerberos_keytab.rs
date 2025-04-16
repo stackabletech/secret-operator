@@ -64,8 +64,11 @@ pub enum Error {
     #[snafu(display("generated invalid Kerberos principal for pod"))]
     PodPrincipal { source: InvalidKerberosPrincipal },
 
-    #[snafu(display("failed to read keytab"))]
-    ReadKeytab { source: std::io::Error },
+    #[snafu(display("failed to read the provisioned keytab"))]
+    ReadProvisionedKeytab { source: std::io::Error },
+
+    #[snafu(display("the kerberosKeytab backend does not currently support TrustStore exports"))]
+    TrustExportUnsupported,
 }
 impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
@@ -77,8 +80,24 @@ impl SecretBackendError for Error {
             Error::WriteAdminKeytab { .. } => tonic::Code::Unavailable,
             Error::ProvisionKeytab { .. } => tonic::Code::Unavailable,
             Error::PodPrincipal { .. } => tonic::Code::FailedPrecondition,
-            Error::ReadKeytab { .. } => tonic::Code::Unavailable,
+            Error::ReadProvisionedKeytab { .. } => tonic::Code::Unavailable,
             Error::ScopeAddresses { .. } => tonic::Code::Unavailable,
+            Error::TrustExportUnsupported => tonic::Code::FailedPrecondition,
+        }
+    }
+
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        match self {
+            Error::ScopeAddresses { source, .. } => source.secondary_object(),
+            Error::LoadAdminKeytab { secret, .. } => Some(secret.clone().erase()),
+            Error::NoAdminKeytabKeyInSecret { secret } => Some(secret.clone().erase()),
+            Error::TempSetup { .. } => None,
+            Error::WriteConfig { .. } => None,
+            Error::WriteAdminKeytab { .. } => None,
+            Error::ProvisionKeytab { .. } => None,
+            Error::PodPrincipal { .. } => None,
+            Error::ReadProvisionedKeytab { .. } => None,
+            Error::TrustExportUnsupported => None,
         }
     }
 }
@@ -271,16 +290,23 @@ cluster.local = {realm_name}
         let mut keytab_data = Vec::new();
         let mut keytab_file = File::open(keytab_file_path)
             .await
-            .context(ReadKeytabSnafu)?;
+            .context(ReadProvisionedKeytabSnafu)?;
         keytab_file
             .read_to_end(&mut keytab_data)
             .await
-            .context(ReadKeytabSnafu)?;
+            .context(ReadProvisionedKeytabSnafu)?;
         Ok(SecretContents::new(SecretData::WellKnown(
             WellKnownSecretData::Kerberos(well_known::Kerberos {
                 keytab: keytab_data,
                 krb5_conf: profile.into_bytes(),
             }),
         )))
+    }
+
+    async fn get_trust_data(
+        &self,
+        _selector: &super::TrustSelector,
+    ) -> Result<SecretContents, Self::Error> {
+        TrustExportUnsupportedSnafu.fail()
     }
 }

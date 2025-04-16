@@ -4,13 +4,14 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use stackable_operator::{
     commons::networking::{HostName, KerberosRealmName},
-    kube::CustomResource,
+    k8s_openapi::api::core::v1::{ConfigMap, Secret},
+    kube::{CustomResource, api::PartialObjectMeta},
     schemars::{self, JsonSchema, schema::Schema},
     time::Duration,
 };
 use stackable_secret_operator_crd_utils::{ConfigMapReference, SecretReference};
 
-use crate::backend;
+use crate::{backend, format::SecretFormat};
 
 /// A [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass) is a cluster-global Kubernetes resource
 /// that defines a category of secrets that the Secret Operator knows how to provision.
@@ -64,14 +65,66 @@ pub enum SecretClassBackend {
     KerberosKeytab(KerberosKeytabBackend),
 }
 
+impl SecretClassBackend {
+    // Currently no `refers_to_*` method actually returns more than one element,
+    // but returning `Iterator` instead of `Option` to ensure that all consumers are ready
+    // for adding more conditions.
+
+    // The matcher methods are on the CRD type rather than the initialized `Backend` impls
+    // to avoid having to initialize the backend for each watch event.
+
+    /// Returns the conditions where the backend refers to `config_map`.
+    pub fn refers_to_config_map(
+        &self,
+        config_map: &PartialObjectMeta<ConfigMap>,
+    ) -> impl Iterator<Item = SearchNamespaceMatchCondition> {
+        let cm_namespace = config_map.metadata.namespace.as_deref();
+        match self {
+            Self::K8sSearch(backend) => {
+                let name_matches = backend.trust_store_config_map_name == config_map.metadata.name;
+                cm_namespace
+                    .filter(|_| name_matches)
+                    .and_then(|cm_ns| backend.search_namespace.matches_namespace(cm_ns))
+            }
+            Self::AutoTls(_) => None,
+            Self::CertManager(_) => None,
+            Self::KerberosKeytab(_) => None,
+        }
+        .into_iter()
+    }
+
+    /// Returns the conditions where the backend refers to `secret`.
+    pub fn refers_to_secret(
+        &self,
+        secret: &PartialObjectMeta<Secret>,
+    ) -> impl Iterator<Item = SearchNamespaceMatchCondition> {
+        match self {
+            Self::AutoTls(backend) => {
+                (backend.ca.secret == *secret).then_some(SearchNamespaceMatchCondition::True)
+            }
+            Self::K8sSearch(_) => None,
+            Self::CertManager(_) => None,
+            Self::KerberosKeytab(_) => None,
+        }
+        .into_iter()
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct K8sSearchBackend {
     /// Configures the namespace searched for Secret objects.
     pub search_namespace: SearchNamespace,
+
+    /// Name of a ConfigMap that contains the information required to validate against this SecretClass.
+    ///
+    /// Resolved relative to `search_namespace`.
+    ///
+    /// Required to request a TrustStore for this SecretClass.
+    pub trust_store_config_map_name: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum SearchNamespace {
     /// The Secret objects are located in the same namespace as the Pod object.
@@ -81,6 +134,55 @@ pub enum SearchNamespace {
     /// The Secret objects are located in a single global namespace.
     /// Should be used for secrets that are provisioned by the cluster administrator.
     Name(String),
+}
+
+impl SearchNamespace {
+    pub fn resolve<'a>(&'a self, pod_namespace: &'a str) -> &'a str {
+        match self {
+            SearchNamespace::Pod {} => pod_namespace,
+            SearchNamespace::Name(ns) => ns,
+        }
+    }
+
+    /// Returns [`Some`] if this `SearchNamespace` could possibly match an object in the namespace
+    /// `object_namespace`, otherwise [`None`].
+    ///
+    /// This is optimistic, you then need to call [`SearchNamespaceMatchCondition::matches_pod_namespace`]
+    /// to evaluate the match for a specific pod's namespace.
+    pub fn matches_namespace(
+        &self,
+        object_namespace: &str,
+    ) -> Option<SearchNamespaceMatchCondition> {
+        match self {
+            SearchNamespace::Pod {} => Some(SearchNamespaceMatchCondition::IfPodIsInNamespace {
+                namespace: object_namespace.to_string(),
+            }),
+            SearchNamespace::Name(ns) => {
+                (ns == object_namespace).then_some(SearchNamespaceMatchCondition::True)
+            }
+        }
+    }
+}
+
+/// A partially evaluated match returned by [`SearchNamespace::matches_namespace`].
+/// Use [`Self::matches_pod_namespace`] to evaluate fully.
+#[derive(Debug)]
+pub enum SearchNamespaceMatchCondition {
+    /// The target object matches the search namespace.
+    True,
+
+    /// The target object only matches the search namespace if mounted into a pod in
+    /// `namespace`.
+    IfPodIsInNamespace { namespace: String },
+}
+
+impl SearchNamespaceMatchCondition {
+    pub fn matches_pod_namespace(&self, pod_ns: &str) -> bool {
+        match self {
+            Self::True => true,
+            Self::IfPodIsInNamespace { namespace } => namespace == pod_ns,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -393,6 +495,31 @@ impl Deref for KerberosPrincipal {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
+}
+
+/// A [TrustStore](DOCS_BASE_URL_PLACEHOLDER/secret-operator/truststore) requests information about how to
+/// validate secrets issued by a [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass).
+///
+/// The requested information is written to a ConfigMap with the same name as the TrustStore.
+#[derive(CustomResource, Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[kube(
+    group = "secrets.stackable.tech",
+    version = "v1alpha1",
+    kind = "TrustStore",
+    namespaced,
+    crates(
+        kube_core = "stackable_operator::kube::core",
+        k8s_openapi = "stackable_operator::k8s_openapi",
+        schemars = "stackable_operator::schemars"
+    )
+)]
+#[serde(rename_all = "camelCase")]
+pub struct TrustStoreSpec {
+    /// The name of the SecretClass that the request concerns.
+    pub secret_class_name: String,
+
+    /// The [format](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#format) that the data should be converted into.
+    pub format: Option<SecretFormat>,
 }
 
 #[cfg(test)]

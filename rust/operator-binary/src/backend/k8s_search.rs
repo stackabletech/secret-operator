@@ -3,17 +3,20 @@
 use std::collections::{BTreeMap, HashSet};
 
 use async_trait::async_trait;
+use kube_runtime::reflector::ObjectRef;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{
-        ByteString, api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::LabelSelector,
+        ByteString,
+        api::core::v1::{ConfigMap, Secret},
+        apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
     kube::api::ListParams,
     kvp::{LabelError, LabelSelectorExt, Labels},
 };
 
 use super::{
-    SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector,
+    SecretBackend, SecretBackendError, SecretContents, SecretVolumeSelector, TrustSelector,
     pod_info::{PodInfo, SchedulingPodInfo},
     scope::SecretScope,
 };
@@ -45,6 +48,15 @@ pub enum Error {
 
     #[snafu(display("failed to build label"))]
     BuildLabel { source: LabelError },
+
+    #[snafu(display("no trust store ConfigMap is configured for this backend"))]
+    NoTrustStore,
+
+    #[snafu(display("failed to query for trust store source {configmap}"))]
+    GetTrustStore {
+        source: stackable_operator::client::Error,
+        configmap: ObjectRef<ConfigMap>,
+    },
 }
 
 impl SecretBackendError for Error {
@@ -55,6 +67,20 @@ impl SecretBackendError for Error {
             Error::NoSecret { .. } => tonic::Code::FailedPrecondition,
             Error::NoListener { .. } => tonic::Code::FailedPrecondition,
             Error::BuildLabel { .. } => tonic::Code::FailedPrecondition,
+            Error::NoTrustStore => tonic::Code::FailedPrecondition,
+            Error::GetTrustStore { .. } => tonic::Code::Internal,
+        }
+    }
+
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        match self {
+            Error::SecretSelector { .. } => None,
+            Error::SecretQuery { .. } => None,
+            Error::NoSecret { .. } => None,
+            Error::NoListener { .. } => None,
+            Error::BuildLabel { .. } => None,
+            Error::NoTrustStore => None,
+            Error::GetTrustStore { configmap, .. } => Some(configmap.clone().erase()),
         }
     }
 }
@@ -64,15 +90,7 @@ pub struct K8sSearch {
     // Not secret per se, but isn't Debug: https://github.com/stackabletech/secret-operator/issues/411
     pub client: Unloggable<stackable_operator::client::Client>,
     pub search_namespace: SearchNamespace,
-}
-
-impl K8sSearch {
-    fn search_ns_for_pod<'a>(&'a self, selector: &'a SecretVolumeSelector) -> &'a str {
-        match &self.search_namespace {
-            SearchNamespace::Pod {} => &selector.namespace,
-            SearchNamespace::Name(ns) => ns,
-        }
-    }
+    pub trust_store_config_map_name: Option<String>,
 }
 
 #[async_trait]
@@ -89,7 +107,7 @@ impl SecretBackend for K8sSearch {
         let secret = self
             .client
             .list::<Secret>(
-                self.search_ns_for_pod(selector),
+                self.search_namespace.resolve(&selector.namespace),
                 &ListParams::default().labels(&label_selector),
             )
             .await
@@ -107,6 +125,37 @@ impl SecretBackend for K8sSearch {
         )))
     }
 
+    async fn get_trust_data(
+        &self,
+        selector: &TrustSelector,
+    ) -> Result<SecretContents, Self::Error> {
+        let cm_name = self
+            .trust_store_config_map_name
+            .as_deref()
+            .context(NoTrustStoreSnafu)?;
+        let cm_ns = self.search_namespace.resolve(&selector.namespace);
+        let cm = self
+            .client
+            .get::<ConfigMap>(cm_name, cm_ns)
+            .await
+            .with_context(|_| GetTrustStoreSnafu {
+                configmap: ObjectRef::<ConfigMap>::new(cm_name).within(cm_ns),
+            })?;
+        let binary_data = cm
+            .binary_data
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, ByteString(v))| (k, v));
+        let str_data = cm
+            .data
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| (k, v.into_bytes()));
+        Ok(SecretContents::new(SecretData::Unknown(
+            binary_data.chain(str_data).collect(),
+        )))
+    }
+
     async fn get_qualified_node_names(
         &self,
         selector: &SecretVolumeSelector,
@@ -118,7 +167,7 @@ impl SecretBackend for K8sSearch {
             Ok(Some(
                 self.client
                     .list::<Secret>(
-                        self.search_ns_for_pod(selector),
+                        self.search_namespace.resolve(&selector.namespace),
                         &ListParams::default().labels(&label_selector),
                     )
                     .await

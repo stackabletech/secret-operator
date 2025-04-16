@@ -19,13 +19,14 @@ bindgen = "0.71"
 built = { version = "0.7", features = ["chrono", "git2"] }
 byteorder = "1.5"
 clap = "4.5"
+const_format = "0.2.34"
 futures = { version = "0.3", features = ["compat"] }
 h2 = "0.4"
+kube-runtime = { version = "0.99", features = ["unstable-runtime-stream-control"] }
 ldap3 = { version = "0.11", default-features = false, features = ["gssapi", "tls"] }
 libc = "0.2"
 native-tls = "0.2"
 openssl = "0.10"
-p12 = "0.6"
 pin-project = "1.1"
 pkg-config = "0.3"
 prost = "0.13"

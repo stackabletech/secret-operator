@@ -127,6 +127,23 @@ impl SecretBackendError for Error {
             Error::JitterOutOfRange { .. } => tonic::Code::InvalidArgument,
         }
     }
+
+    fn secondary_object(
+        &self,
+    ) -> Option<kube_runtime::reflector::ObjectRef<stackable_operator::kube::api::DynamicObject>>
+    {
+        match self {
+            Error::ScopeAddresses { source, .. } => source.secondary_object(),
+            Error::GenerateKey { .. } => None,
+            Error::LoadCa { source } => source.secondary_object(),
+            Error::PickCa { source } => source.secondary_object(),
+            Error::BuildCertificate { .. } => None,
+            Error::SerializeCertificate { .. } => None,
+            Error::InvalidCertLifetime { .. } => None,
+            Error::TooShortCertLifetimeRequiresTimeTravel { .. } => None,
+            Error::JitterOutOfRange { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -239,7 +256,8 @@ impl SecretBackend for TlsGenerate {
             .fail()?;
         }
 
-        let conf = Conf::new(ConfMethod::default()).unwrap();
+        let conf =
+            Conf::new(ConfMethod::default()).expect("failed to initialize OpenSSL configuration");
 
         let pod_key_length = match self.key_generation {
             CertificateKeyGeneration::Rsa { length } => length,
@@ -334,18 +352,40 @@ impl SecretBackend for TlsGenerate {
                                 .context(SerializeCertificateSnafu { tpe: CertType::Ca })
                         }),
                     )?,
-                    certificate_pem: pod_cert
-                        .to_pem()
-                        .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
-                    key_pem: pod_key
-                        .private_key_to_pem_pkcs8()
-                        .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
+                    certificate_pem: Some(
+                        pod_cert
+                            .to_pem()
+                            .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
+                    ),
+                    key_pem: Some(
+                        pod_key
+                            .private_key_to_pem_pkcs8()
+                            .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
+                    ),
                 },
             )))
             .expires_after(
                 time_datetime_to_chrono(expire_pod_after).context(InvalidCertLifetimeSnafu)?,
             ),
         )
+    }
+
+    async fn get_trust_data(
+        &self,
+        _selector: &super::TrustSelector,
+    ) -> Result<SecretContents, Self::Error> {
+        Ok(SecretContents::new(SecretData::WellKnown(
+            WellKnownSecretData::TlsPem(well_known::TlsPem {
+                ca_pem: iterator_try_concat_bytes(self.ca_manager.trust_roots().into_iter().map(
+                    |ca| {
+                        ca.to_pem()
+                            .context(SerializeCertificateSnafu { tpe: CertType::Ca })
+                    },
+                ))?,
+                certificate_pem: None,
+                key_pem: None,
+            }),
+        )))
     }
 }
 

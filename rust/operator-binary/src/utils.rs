@@ -201,6 +201,34 @@ impl<T> DerefMut for Unloggable<T> {
     }
 }
 
+/// Wrapper type for [`Iterator::collect`] that flattens the incoming [`Iterator`].
+///
+/// This isn't super useful for "regular" collects (just call [`Iterator::flatten`]!),
+/// but it can be composed with the [`FromIterator`] impl on [`tuple`]s to partition
+/// an incoming iterator while giving each branch a unique type.
+#[derive(Default, Debug, PartialEq, Eq)]
+pub struct Flattened<T>(pub T);
+
+impl<T, E> Extend<E> for Flattened<T>
+where
+    E: IntoIterator,
+    T: Extend<E::Item>,
+{
+    fn extend<I2: IntoIterator<Item = E>>(&mut self, iter: I2) {
+        self.0.extend(iter.into_iter().flatten());
+    }
+}
+
+impl<I, T> FromIterator<I> for Flattened<T>
+where
+    I: IntoIterator,
+    T: FromIterator<I::Item>,
+{
+    fn from_iter<I2: IntoIterator<Item = I>>(iter: I2) -> Self {
+        Self(iter.into_iter().flatten().collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use futures::StreamExt;
@@ -208,7 +236,7 @@ mod tests {
     use time::OffsetDateTime;
 
     use super::{asn1time_to_offsetdatetime, iterator_try_concat_bytes};
-    use crate::utils::{FmtByteSlice, error_full_message, trystream_any};
+    use crate::utils::{Flattened, FmtByteSlice, error_full_message, trystream_any};
 
     #[test]
     fn fmt_hex_byte_slice() {
@@ -294,5 +322,28 @@ mod tests {
             )
             .unwrap()
         );
+    }
+
+    #[test]
+    fn flattened_collect_single() {
+        let Flattened(small @ Vec::<u8> { .. }) = [2, 10, 1000, 5, 2000]
+            .into_iter()
+            .map(|x| u8::try_from(x).ok())
+            .collect();
+        assert_eq!(small, vec![2, 10, 5]);
+    }
+
+    #[test]
+    fn flattened_collect_split() {
+        let (Flattened(small @ Vec::<u8> { .. }), Flattened(big @ Vec::<u16> { .. })) =
+            [2, 10, 1000, 5, 2000]
+                .into_iter()
+                .map(|x| match u8::try_from(x) {
+                    Ok(x) => (Some(x), None),
+                    Err(_) => (None, Some(x)),
+                })
+                .collect();
+        assert_eq!(small, vec![2, 10, 5]);
+        assert_eq!(big, vec![1000, 2000]);
     }
 }

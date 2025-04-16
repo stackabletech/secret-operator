@@ -11,16 +11,16 @@ publish = false
 [dependencies]
 stackable-krb5-provision-keytab = { path = "../krb5-provision-keytab" }
 stackable-secret-operator-crd-utils = { path = "../crd-utils" }
-stackable-operator.workspace = true
+p12 = { path = "../p12" }
 
 anyhow.workspace = true
 async-trait.workspace = true
 clap.workspace = true
 futures.workspace = true
 h2.workspace = true
+kube-runtime.workspace = true
 libc.workspace = true
 openssl.workspace = true
-p12.workspace = true
 pin-project.workspace = true
 prost-types.workspace = true
 prost.workspace = true
@@ -28,6 +28,7 @@ serde_json.workspace = true
 serde.workspace = true
 snafu.workspace = true
 socket2.workspace = true
+stackable-operator.workspace = true
 strum.workspace = true
 sys-mount.workspace = true
 tempfile.workspace = true
@@ -40,6 +41,7 @@ tracing.workspace = true
 uuid.workspace = true
 yasna.workspace = true
 rand.workspace = true
+const_format.workspace = true
 
 [dev-dependencies]
 serde_yaml.workspace = true

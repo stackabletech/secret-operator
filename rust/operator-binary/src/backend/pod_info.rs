@@ -6,6 +6,7 @@ use std::{
 };
 
 use futures::{StreamExt, TryStreamExt};
+use kube_runtime::reflector::Lookup;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::{
@@ -109,7 +110,7 @@ pub struct PodInfo {
     pub service_name: Option<String>,
     pub node_name: String,
     pub node_ips: Vec<IpAddr>,
-    pub listener_addresses: HashMap<String, Vec<Address>>,
+    pub listener_addresses: Option<ListenerAddresses>,
     pub kubernetes_cluster_domain: DomainName,
     pub scheduling: SchedulingPodInfo,
 }
@@ -134,10 +135,10 @@ impl PodInfo {
             })?;
         let scheduling = SchedulingPodInfo::from_pod(client, &pod, scopes).await?;
         let listener_addresses = if !scheduling.volume_listener_names.is_empty() {
-            pod_listener_addresses(client, &pod, &scheduling, scopes).await?
+            Some(ListenerAddresses::fetch_for_pod(client, &pod, &scheduling, scopes).await?)
         } else {
             // We don't care about the listener addresses if there is no listener scope, so we can save the API call
-            HashMap::new()
+            None
         };
         Ok(Self {
             // This will generally be empty, since Kubernetes assigns pod IPs *after* CSI plugins are successful
@@ -335,55 +336,66 @@ async fn listener_pvc_is_node_scoped(
     Ok(listener_class.spec.service_type == ServiceType::NodePort)
 }
 
-async fn pod_listener_addresses(
-    client: &stackable_operator::client::Client,
-    pod: &Pod,
-    pod_info: &SchedulingPodInfo,
-    scopes: &[SecretScope],
-) -> Result<HashMap<String, Vec<Address>>, FromPodError> {
-    use from_pod_error::*;
-    let pod_listeners_name = format!(
-        "pod-{}",
-        pod.metadata.uid.as_deref().context(NoPodUidSnafu)?
-    );
-    let listeners = client
-        .get::<PodListeners>(&pod_listeners_name, &pod_info.namespace)
-        .await
-        .context(GetPodListenersSnafu {
-            pod_listeners: ObjectRef::<PodListeners>::new(&pod_listeners_name)
-                .within(&pod_info.namespace),
-            pod: ObjectRef::from_obj(pod),
-        })?;
-    let listeners_ref = ObjectRef::from_obj(&listeners);
-    scopes
-        .iter()
-        .filter_map(|scope| match scope {
-            SecretScope::ListenerVolume { name } => Some(name),
-            _ => None,
+#[derive(Debug)]
+pub struct ListenerAddresses {
+    pub source: ObjectRef<PodListeners>,
+    pub by_listener_volume_name: HashMap<String, Vec<Address>>,
+}
+
+impl ListenerAddresses {
+    async fn fetch_for_pod(
+        client: &stackable_operator::client::Client,
+        pod: &Pod,
+        pod_info: &SchedulingPodInfo,
+        scopes: &[SecretScope],
+    ) -> Result<ListenerAddresses, FromPodError> {
+        use from_pod_error::*;
+        let pod_listeners_name = format!(
+            "pod-{}",
+            pod.metadata.uid.as_deref().context(NoPodUidSnafu)?
+        );
+        let pod_listeners = client
+            .get::<PodListeners>(&pod_listeners_name, &pod_info.namespace)
+            .await
+            .context(GetPodListenersSnafu {
+                pod_listeners: ObjectRef::<PodListeners>::new(&pod_listeners_name)
+                    .within(&pod_info.namespace),
+                pod: ObjectRef::from_obj(pod),
+            })?;
+        let listeners_ref = ObjectRef::from_obj(&pod_listeners);
+        Ok(ListenerAddresses {
+            source: pod_listeners.to_object_ref(()),
+            by_listener_volume_name: scopes
+                .iter()
+                .filter_map(|scope| match scope {
+                    SecretScope::ListenerVolume { name } => Some(name),
+                    _ => None,
+                })
+                .map(|listener| {
+                    let addresses = pod_listeners
+                        .spec
+                        .listeners
+                        .get(listener)
+                        .and_then(|ingresses| ingresses.ingress_addresses.as_ref())
+                        .context(NoPodListenerAddressesSnafu {
+                            pod_listeners: listeners_ref.clone(),
+                            listener,
+                        })?;
+                    Ok((
+                        listener.clone(),
+                        addresses
+                            .iter()
+                            .map(|ingr| {
+                                (ingr.address_type, &*ingr.address).try_into().context(
+                                    IllegalAddressSnafu {
+                                        address: &ingr.address,
+                                    },
+                                )
+                            })
+                            .collect::<Result<Vec<_>, FromPodError>>()?,
+                    ))
+                })
+                .collect::<Result<HashMap<_, _>, FromPodError>>()?,
         })
-        .map(|listener| {
-            let addresses = listeners
-                .spec
-                .listeners
-                .get(listener)
-                .and_then(|ingresses| ingresses.ingress_addresses.as_ref())
-                .context(NoPodListenerAddressesSnafu {
-                    pod_listeners: listeners_ref.clone(),
-                    listener,
-                })?;
-            Ok((
-                listener.clone(),
-                addresses
-                    .iter()
-                    .map(|ingr| {
-                        (ingr.address_type, &*ingr.address).try_into().context(
-                            IllegalAddressSnafu {
-                                address: &ingr.address,
-                            },
-                        )
-                    })
-                    .collect::<Result<Vec<_>, FromPodError>>()?,
-            ))
-        })
-        .collect::<Result<HashMap<_, _>, FromPodError>>()
+    }
 }
