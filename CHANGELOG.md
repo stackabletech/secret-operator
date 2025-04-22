@@ -15,7 +15,7 @@ All notable changes to this project will be documented in this file.
   - `secrets.stackable.tech/format.tls-pem.ca-name`
 - Adds new telemetry CLI arguments and environment variables ([#591]).
   - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
-  - The file log rotation period is now configurable via `FILE_LOG_ROTATION_PERIOD`.
+  - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
 
 ### Changed
