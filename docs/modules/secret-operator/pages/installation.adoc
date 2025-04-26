@@ -19,18 +19,15 @@ Resource sizing depends on cluster type(s), usage and scope, but as a starting p
 * 256MB RAM
 
 == Helm
-Helm allows you to download and deploy Stackable operators on Kubernetes and is by far the easiest installation method. First ensure that you have installed the Stackable Operators Helm repository:
+Helm allows you to download and deploy Stackable operators on Kubernetes and is by far the easiest installation method.
+
+NOTE: `helm repo` subcommands are not supported for OCI registries. The operators are installed directly, without adding the Helm Chart repository first.
+
+Install the Stackable Secret Operator
 
 [source,console]
 ----
-$ helm repo add stackable https://repo.stackable.tech/repository/helm-stable/
-----
-
-Then install the Stackable Secret Operator
-
-[source,console]
-----
-$ helm install secret-operator stackable/secret-operator
+$ helm install secret-operator oci://oci.stackable.tech/sdp-charts/secret-operator
 ----
 
 Helm will deploy the operator in Kubernetes containers and apply the CRDs. You're now ready to deploy secrets!
