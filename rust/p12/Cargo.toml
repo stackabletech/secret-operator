@@ -1,0 +1,37 @@
+[package]
+name = "p12"
+version.workspace = true
+authors = ["hjiayz <hjiayz@gmail.com>", "Marc-Antoine Perennou <Marc-Antoine@Perennou.com>"]
+edition = "2021"
+keywords = ["pkcs12", "pkcs"]
+description = "pure rust pkcs12 tool (Stackable fork)"
+homepage = "https://github.com/hjiayz/p12"
+repository = "https://github.com/hjiayz/p12"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+rust-version = "1.56.0"
+
+# Dependencies are tracked inline for now, to minimize divergence from upstream
+
+[dependencies]
+des = "^0.8"
+getrandom = "^0.2"
+hmac = "^0.12"
+lazy_static = "^1.4"
+rc2 = "^0.8"
+sha1 = "^0.10"
+
+[dependencies.cbc]
+version = "^0.1"
+features = ["block-padding"]
+
+[dependencies.cipher]
+version = "^0.4.2"
+features = ["alloc", "block-padding"]
+
+[dependencies.yasna]
+version = "^0.5"
+features = ["std"]
+
+[dev-dependencies]
+hex-literal = "^0.3.1"

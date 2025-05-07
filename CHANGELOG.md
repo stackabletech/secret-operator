@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
   - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
+- Added TrustStore CRD for requesting CA certificate information ([#557]).
 
 ### Changed
 
@@ -38,6 +39,7 @@ All notable changes to this project will be documented in this file.
 
 - Use `json` file extension for log files ([#586]).
 
+[#557]: https://github.com/stackabletech/secret-operator/pull/557
 [#572]: https://github.com/stackabletech/secret-operator/pull/572
 [#581]: https://github.com/stackabletech/secret-operator/pull/581
 [#586]: https://github.com/stackabletech/secret-operator/pull/586

@@ -37,6 +37,9 @@ tests:
       - custom-secret-names
       - rsa-key-length
       - openshift
+  - name: tls-truststore
+    dimensions:
+      - openshift
   - name: cert-manager-tls
     dimensions:
       - openshift

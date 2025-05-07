@@ -42,6 +42,10 @@ impl SecretBackendError for DynError {
     fn grpc_code(&self) -> tonic::Code {
         self.0.grpc_code()
     }
+
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        self.0.secondary_object()
+    }
 }
 
 pub struct DynamicAdapter<B>(B);
@@ -63,6 +67,16 @@ impl<B: SecretBackend + Send + Sync> SecretBackend for DynamicAdapter<B> {
     ) -> Result<super::SecretContents, Self::Error> {
         self.0
             .get_secret_data(selector, pod_info)
+            .await
+            .map_err(|err| DynError(Box::new(err)))
+    }
+
+    async fn get_trust_data(
+        &self,
+        selector: &super::TrustSelector,
+    ) -> Result<super::SecretContents, Self::Error> {
+        self.0
+            .get_trust_data(selector)
             .await
             .map_err(|err| DynError(Box::new(err)))
     }
@@ -104,6 +118,13 @@ impl SecretBackendError for FromClassError {
             FromClassError::KerberosKeytab { source } => source.grpc_code(),
         }
     }
+
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        match self {
+            FromClassError::Tls { source } => source.secondary_object(),
+            FromClassError::KerberosKeytab { source } => source.secondary_object(),
+        }
+    }
 }
 
 pub async fn from_class(
@@ -111,12 +132,14 @@ pub async fn from_class(
     class: SecretClass,
 ) -> Result<Box<Dynamic>, FromClassError> {
     Ok(match class.spec.backend {
-        crd::SecretClassBackend::K8sSearch(crd::K8sSearchBackend { search_namespace }) => {
-            from(super::K8sSearch {
-                client: Unloggable(client.clone()),
-                search_namespace,
-            })
-        }
+        crd::SecretClassBackend::K8sSearch(crd::K8sSearchBackend {
+            search_namespace,
+            trust_store_config_map_name,
+        }) => from(super::K8sSearch {
+            client: Unloggable(client.clone()),
+            search_namespace,
+            trust_store_config_map_name,
+        }),
         crd::SecretClassBackend::AutoTls(crd::AutoTlsBackend {
             ca,
             additional_trust_roots,
@@ -177,6 +200,15 @@ impl SecretBackendError for FromSelectorError {
         match self {
             FromSelectorError::GetSecretClass { .. } => tonic::Code::Unavailable,
             FromSelectorError::FromClass { source, .. } => source.grpc_code(),
+        }
+    }
+
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
+        match self {
+            FromSelectorError::GetSecretClass { class, .. } => Some(class.clone().erase()),
+            FromSelectorError::FromClass { source, class } => source
+                .secondary_object()
+                .or_else(|| Some(class.clone().erase())),
         }
     }
 }
