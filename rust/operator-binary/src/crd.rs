@@ -518,8 +518,26 @@ pub struct TrustStoreSpec {
     /// The name of the SecretClass that the request concerns.
     pub secret_class_name: String,
 
+    /// Which Kubernetes resource should be used to output the requested information to.
+    ///
+    /// The trust information (such as a `ca.crt`) can be considered public information, so we put
+    /// it in a `ConfigMap` by default. However, some tools (such as OpenShift routes) require it
+    /// to be placed in a `Secret`, so we also support that.
+    ///
+    /// Can be either `ConfigMap` or `Secret`, defaults to `ConfigMap`.
+    #[serde(default)]
+    pub output_resource: TrustStoreOutputType,
+
     /// The [format](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#format) that the data should be converted into.
     pub format: Option<SecretFormat>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, JsonSchema, Serialize, Deserialize)]
+pub enum TrustStoreOutputType {
+    Secret,
+
+    #[default]
+    ConfigMap,
 }
 
 #[cfg(test)]
