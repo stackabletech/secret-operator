@@ -1629,7 +1629,7 @@ dependencies = [
 [[package]]
 name = "k8s-version"
 version = "0.1.2"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.92.0#5fdc47a10de685e4eea49fd0a3f6c3a15a4966c1"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=main#dddd78fdc1bffb766caa30d5891bccad40073990"
 dependencies = [
  "darling",
  "regex",
@@ -2084,9 +2084,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry"
-version = "0.28.0"
+version = "0.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "236e667b670a5cdf90c258f5a55794ec5ac5027e960c224bff8367a59e1e6426"
+checksum = "9e87237e2775f74896f9ad219d26a2081751187eb7c9f5c58dde20a23b95d16c"
 dependencies = [
  "futures-core",
  "futures-sink",
@@ -2098,9 +2098,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-appender-tracing"
-version = "0.28.1"
+version = "0.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c513c7af3bec30113f3d4620134ff923295f1e9c580fda2b8abe0831f925ddc0"
+checksum = "e716f864eb23007bdd9dc4aec381e188a1cee28eecf22066772b5fd822b9727d"
 dependencies = [
  "opentelemetry",
  "tracing",
@@ -2110,9 +2110,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-http"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8863faf2910030d139fb48715ad5ff2f35029fc5f244f6d5f689ddcf4d26253"
+checksum = "46d7ab32b827b5b495bd90fa95a6cb65ccc293555dcc3199ae2937d2d237c8ed"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2124,11 +2124,10 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-otlp"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bef114c6d41bea83d6dc60eb41720eedd0261a67af57b66dd2b84ac46c01d91"
+checksum = "d899720fe06916ccba71c01d04ecd77312734e2de3467fd30d9d580c8ce85656"
 dependencies = [
- "async-trait",
  "futures-core",
  "http",
  "opentelemetry",
@@ -2145,9 +2144,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-proto"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56f8870d3024727e99212eb3bb1762ec16e255e3e6f58eeb3dc8db1aa226746d"
+checksum = "8c40da242381435e18570d5b9d50aca2a4f4f4d8e146231adb4e7768023309b3"
 dependencies = [
  "opentelemetry",
  "opentelemetry_sdk",
@@ -2157,18 +2156,17 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry_sdk"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84dfad6042089c7fc1f6118b7040dc2eb4ab520abbf410b79dc481032af39570"
+checksum = "afdefb21d1d47394abc1ba6c57363ab141be19e27cc70d0e422b7f303e4d290b"
 dependencies = [
- "async-trait",
  "futures-channel",
  "futures-executor",
  "futures-util",
  "glob",
  "opentelemetry",
  "percent-encoding",
- "rand 0.8.5",
+ "rand 0.9.0",
  "serde_json",
  "thiserror 2.0.12",
  "tokio",
@@ -3073,7 +3071,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator"
 version = "0.92.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.92.0#5fdc47a10de685e4eea49fd0a3f6c3a15a4966c1"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=main#dddd78fdc1bffb766caa30d5891bccad40073990"
 dependencies = [
  "chrono",
  "clap",
@@ -3111,7 +3109,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator-derive"
 version = "0.3.1"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.92.0#5fdc47a10de685e4eea49fd0a3f6c3a15a4966c1"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=main#dddd78fdc1bffb766caa30d5891bccad40073990"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -3187,7 +3185,7 @@ dependencies = [
 [[package]]
 name = "stackable-shared"
 version = "0.0.1"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.92.0#5fdc47a10de685e4eea49fd0a3f6c3a15a4966c1"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=main#dddd78fdc1bffb766caa30d5891bccad40073990"
 dependencies = [
  "kube",
  "semver",
@@ -3199,7 +3197,7 @@ dependencies = [
 [[package]]
 name = "stackable-telemetry"
 version = "0.6.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.92.0#5fdc47a10de685e4eea49fd0a3f6c3a15a4966c1"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=main#dddd78fdc1bffb766caa30d5891bccad40073990"
 dependencies = [
  "axum 0.8.3",
  "clap",
@@ -3222,7 +3220,7 @@ dependencies = [
 [[package]]
 name = "stackable-versioned"
 version = "0.7.1"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.92.0#5fdc47a10de685e4eea49fd0a3f6c3a15a4966c1"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=main#dddd78fdc1bffb766caa30d5891bccad40073990"
 dependencies = [
  "stackable-versioned-macros",
 ]
@@ -3230,7 +3228,7 @@ dependencies = [
 [[package]]
 name = "stackable-versioned-macros"
 version = "0.7.1"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.92.0#5fdc47a10de685e4eea49fd0a3f6c3a15a4966c1"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=main#dddd78fdc1bffb766caa30d5891bccad40073990"
 dependencies = [
  "convert_case",
  "darling",
@@ -3694,9 +3692,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-opentelemetry"
-version = "0.29.0"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "721f2d2569dce9f3dfbbddee5906941e953bfcdf736a62da3377f5751650cc36"
+checksum = "fd8e764bd6f5813fd8bebc3117875190c5b0415be8f7f8059bffb6ecd979c444"
 dependencies = [
  "js-sys",
  "once_cell",

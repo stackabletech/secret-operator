@@ -20,7 +20,7 @@ use scope::SecretScope;
 use serde::{Deserialize, Deserializer, Serialize, de::Unexpected};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
-    commons::listener::PodListeners,
+    crd::listener::v1alpha1,
     k8s_openapi::chrono::{DateTime, FixedOffset},
     kube::api::DynamicObject,
     time::Duration,
@@ -186,7 +186,7 @@ pub enum ScopeAddressesError {
     #[snafu(display("no addresses found for listener {listener} on {pod_listeners}"))]
     NoListenerAddresses {
         listener: String,
-        pod_listeners: ObjectRef<PodListeners>,
+        pod_listeners: ObjectRef<v1alpha1::PodListeners>,
     },
 }
 
