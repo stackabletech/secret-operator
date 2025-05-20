@@ -34,6 +34,7 @@ All notable changes to this project will be documented in this file.
       by `FILE_LOG_DIRECTORY` (or via `--file-log-directory <DIRECTORY>`).
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 - Upgrade csi-provisioner to 5.2.0 ([#594]).
+- Use versioned common structs ([e5224ab]).
 
 ### Fixed
 
@@ -46,6 +47,7 @@ All notable changes to this project will be documented in this file.
 [#587]: https://github.com/stackabletech/secret-operator/pull/587
 [#591]: https://github.com/stackabletech/secret-operator/pull/591
 [#594]: https://github.com/stackabletech/secret-operator/pull/594
+[e5224ab]: https://github.com/stackabletech/secret-operator/commit/e5224ab480e219e434ddc695c9361a16a56a43ed
 
 ## [25.3.0] - 2025-03-21
 
