@@ -73,6 +73,8 @@ pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<
     let mut child = Command::new("stackable-krb5-provision-keytab")
         // make sure the process is killed if we error out of this fn somewhere due to
         // an error when writing to stdin or getting stdout
+        // Usually we'd expect the process to terminate on its own, this is a fail safe to ensure
+        // it gets killed in case it hangs for some reason.
         .kill_on_drop(true)
         .env("KRB5_CONFIG", krb5_config_path)
         // ldap3 uses the default client keytab to authenticate to the LDAP server
