@@ -6,7 +6,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_secret_operator_crd_utils::SecretReference;
 use tokio::{io::AsyncWriteExt, process::Command};
 
@@ -62,6 +62,9 @@ pub enum Error {
 
     #[snafu(display("failed to write request"))]
     WriteRequest { source: std::io::Error },
+
+    #[snafu(display("failed to obtain stdin for child process"))]
+    ChildStdin,
 }
 
 /// Provisions a Kerberos Keytab based on the [`Request`].
@@ -93,7 +96,7 @@ pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<
     // Get a `ChildStdin` object for the spawned process and write the serialized request
     // for a Principal into it in order for the child process to deserialize it and
     // process the request
-    let mut stdin = child.stdin.take().unwrap();
+    let mut stdin = child.stdin.take().context(ChildStdinSnafu)?;
     stdin.write_all(&req_str).await.context(WriteRequestSnafu)?;
     stdin.flush().await.context(WriteRequestSnafu)?;
     drop(stdin);
