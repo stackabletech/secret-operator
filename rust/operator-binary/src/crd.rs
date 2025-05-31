@@ -551,23 +551,26 @@ mod test {
         let deserializer = serde_yaml::Deserializer::from_str(input);
         let secret_class: SecretClass =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
-        assert_eq!(secret_class.spec, SecretClassSpec {
-            backend: crate::crd::SecretClassBackend::AutoTls(AutoTlsBackend {
-                ca: crate::crd::AutoTlsCa {
-                    secret: SecretReference {
-                        name: "secret-provisioner-tls-ca".to_string(),
-                        namespace: "default".to_string(),
+        assert_eq!(
+            secret_class.spec,
+            SecretClassSpec {
+                backend: crate::crd::SecretClassBackend::AutoTls(AutoTlsBackend {
+                    ca: crate::crd::AutoTlsCa {
+                        secret: SecretReference {
+                            name: "secret-provisioner-tls-ca".to_string(),
+                            namespace: "default".to_string(),
+                        },
+                        auto_generate: false,
+                        ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
+                        key_generation: CertificateKeyGeneration::Rsa {
+                            length: CertificateKeyGeneration::RSA_KEY_LENGTH_3072
+                        }
                     },
-                    auto_generate: false,
-                    ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
-                    key_generation: CertificateKeyGeneration::Rsa {
-                        length: CertificateKeyGeneration::RSA_KEY_LENGTH_3072
-                    }
-                },
-                additional_trust_roots: vec![],
-                max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
-            })
-        });
+                    additional_trust_roots: vec![],
+                    max_certificate_lifetime: DEFAULT_MAX_CERT_LIFETIME,
+                })
+            }
+        );
 
         let input: &str = r#"
         apiVersion: secrets.stackable.tech/v1alpha1
@@ -595,29 +598,32 @@ mod test {
         let deserializer = serde_yaml::Deserializer::from_str(input);
         let secret_class: SecretClass =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
-        assert_eq!(secret_class.spec, SecretClassSpec {
-            backend: crate::crd::SecretClassBackend::AutoTls(AutoTlsBackend {
-                ca: crate::crd::AutoTlsCa {
-                    secret: SecretReference {
-                        name: "secret-provisioner-tls-ca".to_string(),
-                        namespace: "default".to_string(),
+        assert_eq!(
+            secret_class.spec,
+            SecretClassSpec {
+                backend: crate::crd::SecretClassBackend::AutoTls(AutoTlsBackend {
+                    ca: crate::crd::AutoTlsCa {
+                        secret: SecretReference {
+                            name: "secret-provisioner-tls-ca".to_string(),
+                            namespace: "default".to_string(),
+                        },
+                        auto_generate: true,
+                        ca_certificate_lifetime: Duration::from_days_unchecked(100),
+                        key_generation: CertificateKeyGeneration::default()
                     },
-                    auto_generate: true,
-                    ca_certificate_lifetime: Duration::from_days_unchecked(100),
-                    key_generation: CertificateKeyGeneration::default()
-                },
-                additional_trust_roots: vec![
-                    AdditionalTrustRoot::ConfigMap(ConfigMapReference {
-                        name: "tls-root-ca-config-map".to_string(),
-                        namespace: "default".to_string(),
-                    }),
-                    AdditionalTrustRoot::Secret(SecretReference {
-                        name: "tls-root-ca-secret".to_string(),
-                        namespace: "default".to_string(),
-                    })
-                ],
-                max_certificate_lifetime: Duration::from_days_unchecked(31),
-            })
-        });
+                    additional_trust_roots: vec![
+                        AdditionalTrustRoot::ConfigMap(ConfigMapReference {
+                            name: "tls-root-ca-config-map".to_string(),
+                            namespace: "default".to_string(),
+                        }),
+                        AdditionalTrustRoot::Secret(SecretReference {
+                            name: "tls-root-ca-secret".to_string(),
+                            namespace: "default".to_string(),
+                        })
+                    ],
+                    max_certificate_lifetime: Duration::from_days_unchecked(31),
+                })
+            }
+        );
     }
 }
