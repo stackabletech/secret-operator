@@ -50,10 +50,13 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
         watcher::Config::default(),
     );
     let truststores = controller.store();
-    let event_recorder = Arc::new(Recorder::new(client.as_kube_client(), Reporter {
-        controller: FULL_CONTROLLER_NAME.to_string(),
-        instance: None,
-    }));
+    let event_recorder = Arc::new(Recorder::new(
+        client.as_kube_client(),
+        Reporter {
+            controller: FULL_CONTROLLER_NAME.to_string(),
+            instance: None,
+        },
+    ));
     controller
         .watches_stream(
             watcher(

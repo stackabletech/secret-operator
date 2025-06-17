@@ -9,10 +9,8 @@ use futures::{StreamExt, TryStreamExt};
 use kube_runtime::reflector::Lookup;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    commons::{
-        listener::{AddressType, Listener, ListenerClass, PodListeners, ServiceType},
-        networking::DomainName,
-    },
+    commons::networking::DomainName,
+    crd::listener,
     k8s_openapi::api::core::v1::{Node, PersistentVolumeClaim, Pod},
     kube::runtime::reflector::ObjectRef,
 };
@@ -65,20 +63,20 @@ pub enum FromPodError {
     GetListener {
         source: stackable_operator::client::Error,
         listener_volume: String,
-        listener: ObjectRef<Listener>,
+        listener: ObjectRef<listener::v1alpha1::Listener>,
     },
 
     #[snafu(display("failed to get {listener_class} for volume {listener_volume}"))]
     GetListenerClass {
         source: stackable_operator::client::Error,
         listener_volume: String,
-        listener_class: ObjectRef<ListenerClass>,
+        listener_class: ObjectRef<listener::v1alpha1::ListenerClass>,
     },
 
     #[snafu(display("{listener} has no class for volume {listener_volume}"))]
     ListenerHasNoClass {
         listener_volume: String,
-        listener: ObjectRef<Listener>,
+        listener: ObjectRef<listener::v1alpha1::Listener>,
     },
 
     #[snafu(display(
@@ -92,13 +90,13 @@ pub enum FromPodError {
     #[snafu(display("failed to get {pod_listeners} for {pod}"))]
     GetPodListeners {
         source: stackable_operator::client::Error,
-        pod_listeners: ObjectRef<PodListeners>,
+        pod_listeners: ObjectRef<listener::v1alpha1::PodListeners>,
         pod: ObjectRef<Pod>,
     },
 
     #[snafu(display("{pod_listeners} has no addresses for listener {listener} yet"))]
     NoPodListenerAddresses {
-        pod_listeners: ObjectRef<PodListeners>,
+        pod_listeners: ObjectRef<listener::v1alpha1::PodListeners>,
         listener: String,
     },
 }
@@ -181,13 +179,15 @@ pub enum Address {
     Dns(String),
     Ip(IpAddr),
 }
-impl TryFrom<(AddressType, &str)> for Address {
+impl TryFrom<(listener::v1alpha1::AddressType, &str)> for Address {
     type Error = AddrParseError;
 
-    fn try_from((ty, address): (AddressType, &str)) -> Result<Self, Self::Error> {
+    fn try_from(
+        (ty, address): (listener::v1alpha1::AddressType, &str),
+    ) -> Result<Self, Self::Error> {
         Ok(match ty {
-            AddressType::Hostname => Address::Dns(address.to_string()),
-            AddressType::Ip => Address::Ip(address.parse()?),
+            listener::v1alpha1::AddressType::Hostname => Address::Dns(address.to_string()),
+            listener::v1alpha1::AddressType::Ip => Address::Ip(address.parse()?),
         })
     }
 }
@@ -298,18 +298,19 @@ async fn listener_pvc_is_node_scoped(
     use from_pod_error::*;
     let empty = BTreeMap::new();
     let pvc_annotations = pvc.metadata.annotations.as_ref().unwrap_or(&empty);
-    let listener: Listener;
+    let listener: listener::v1alpha1::Listener;
     let listener_class_name = if let Some(cn) =
         pvc_annotations.get(LISTENER_PVC_ANNOTATION_LISTENER_CLASS)
     {
         cn
     } else if let Some(listener_name) = pvc_annotations.get(LISTENER_PVC_ANNOTATION_LISTENER_NAME) {
         listener = client
-            .get::<Listener>(listener_name, namespace)
+            .get::<listener::v1alpha1::Listener>(listener_name, namespace)
             .await
             .context(GetListenerSnafu {
                 listener_volume,
-                listener: ObjectRef::<Listener>::new(listener_name).within(namespace),
+                listener: ObjectRef::<listener::v1alpha1::Listener>::new(listener_name)
+                    .within(namespace),
             })?;
         listener
             .spec
@@ -327,18 +328,20 @@ async fn listener_pvc_is_node_scoped(
         .fail();
     };
     let listener_class = client
-        .get::<ListenerClass>(listener_class_name, &())
+        .get::<listener::v1alpha1::ListenerClass>(listener_class_name, &())
         .await
         .context(GetListenerClassSnafu {
             listener_volume,
-            listener_class: ObjectRef::<ListenerClass>::new(listener_class_name),
+            listener_class: ObjectRef::<listener::v1alpha1::ListenerClass>::new(
+                listener_class_name,
+            ),
         })?;
-    Ok(listener_class.spec.service_type == ServiceType::NodePort)
+    Ok(listener_class.spec.service_type == listener::v1alpha1::ServiceType::NodePort)
 }
 
 #[derive(Debug)]
 pub struct ListenerAddresses {
-    pub source: ObjectRef<PodListeners>,
+    pub source: ObjectRef<listener::v1alpha1::PodListeners>,
     pub by_listener_volume_name: HashMap<String, Vec<Address>>,
 }
 
@@ -355,11 +358,13 @@ impl ListenerAddresses {
             pod.metadata.uid.as_deref().context(NoPodUidSnafu)?
         );
         let pod_listeners = client
-            .get::<PodListeners>(&pod_listeners_name, &pod_info.namespace)
+            .get::<listener::v1alpha1::PodListeners>(&pod_listeners_name, &pod_info.namespace)
             .await
             .context(GetPodListenersSnafu {
-                pod_listeners: ObjectRef::<PodListeners>::new(&pod_listeners_name)
-                    .within(&pod_info.namespace),
+                pod_listeners: ObjectRef::<listener::v1alpha1::PodListeners>::new(
+                    &pod_listeners_name,
+                )
+                .within(&pod_info.namespace),
                 pod: ObjectRef::from_obj(pod),
             })?;
         let listeners_ref = ObjectRef::from_obj(&pod_listeners);

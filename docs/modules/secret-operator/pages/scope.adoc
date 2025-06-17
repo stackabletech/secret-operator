@@ -42,7 +42,7 @@ This allows the secret to differentiate between StatefulSet replicas.
 The `node` scope is resolved to the name of the Kubernetes Node object that the Pod is running on.
 This will typically be the DNS name of the node.
 
-NOTE: Consider using the xrerf:#listener-volume[] scope instead, which also allows the scope to automatically adjust to how the Pod is exposed.
+NOTE: Consider using the xref:#listener-volume[] scope instead, which also allows the scope to automatically adjust to how the Pod is exposed.
 
 [#service]
 === `service`
