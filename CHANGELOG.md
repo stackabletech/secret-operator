@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
 - Added TrustStore CRD for requesting CA certificate information ([#557]).
+  - Support exporting the CA certificate information to Secrets or ConfigMaps ([#597]).
 
 ### Changed
 
@@ -47,6 +48,7 @@ All notable changes to this project will be documented in this file.
 [#587]: https://github.com/stackabletech/secret-operator/pull/587
 [#591]: https://github.com/stackabletech/secret-operator/pull/591
 [#594]: https://github.com/stackabletech/secret-operator/pull/594
+[#597]: https://github.com/stackabletech/secret-operator/pull/597
 [e5224ab]: https://github.com/stackabletech/secret-operator/commit/e5224ab480e219e434ddc695c9361a16a56a43ed
 
 ## [25.3.0] - 2025-03-21
