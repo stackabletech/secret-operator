@@ -36,6 +36,10 @@ All notable changes to this project will be documented in this file.
 - Upgrade csi-provisioner to 5.2.0 ([#594]).
 - Use versioned common structs ([e5224ab]).
 
+### Removed
+
+- Remove CSI registration path migration job ([#610]).
+
 ### Fixed
 
 - Use `json` file extension for log files ([#586]).
@@ -48,6 +52,7 @@ All notable changes to this project will be documented in this file.
 [#591]: https://github.com/stackabletech/secret-operator/pull/591
 [#594]: https://github.com/stackabletech/secret-operator/pull/594
 [e5224ab]: https://github.com/stackabletech/secret-operator/commit/e5224ab480e219e434ddc695c9361a16a56a43ed
+[#610]: https://github.com/stackabletech/secret-operator/pull/610
 
 ## [25.3.0] - 2025-03-21
 
