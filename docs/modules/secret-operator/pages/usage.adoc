@@ -1,6 +1,6 @@
 = Usage
 
-The operator injects secret data into xref:volume.adoc[] mounts that declare a CSI volume with `driver: secrets.stackable.tech`.
+The operator injects secret data into xref:volume.adoc[] mounts that declare an ephemeral volume with `storageClassName: secrets.stackable.tech`.
 
 A minimal secret-consuming Pod looks like this:
 
