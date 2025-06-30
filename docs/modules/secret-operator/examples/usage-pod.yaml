@@ -10,7 +10,7 @@ spec:
         volumeClaimTemplate:
           metadata:
             annotations:
-              secrets.stackable.tech/class: secret
+              secrets.stackable.tech/class: tls
               secrets.stackable.tech/scope: node,pod,service=secret-consumer-nginx
           spec:
             storageClassName: secrets.stackable.tech
