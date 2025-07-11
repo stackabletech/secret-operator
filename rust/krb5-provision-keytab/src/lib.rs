@@ -62,9 +62,6 @@ pub enum Error {
 
     #[snafu(display("failed to write request"))]
     WriteRequest { source: std::io::Error },
-
-    #[snafu(display("failed to obtain stdin for child process"))]
-    ChildStdin,
 }
 
 /// Provisions a Kerberos Keytab based on the [`Request`].
@@ -86,7 +83,7 @@ pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<
         // TGT that is obtained for the operation in the memory of the short lives process
         // spawned by `Command::new` above - this way it'll be wiped from memory once this exits
         // With any shared or persistent ticket cache this might stick around and potentially be
-        // reused by later runs
+        // reused by other volumes (which could cause privilege escalations and similar fun issues)
         .env("KRB5CCNAME", "MEMORY:")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -96,7 +93,10 @@ pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<
     // Get a `ChildStdin` object for the spawned process and write the serialized request
     // for a Principal into it in order for the child process to deserialize it and
     // process the request
-    let mut stdin = child.stdin.take().context(ChildStdinSnafu)?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .expect("Failed to read from stdin of stackable-krb5-provision-keytab script! ");
     stdin.write_all(&req_str).await.context(WriteRequestSnafu)?;
     stdin.flush().await.context(WriteRequestSnafu)?;
     drop(stdin);
@@ -110,11 +110,21 @@ pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<
         .await
         .context(WaitProvisionerSnafu)?;
 
-    // Check for success of the operation by deserializing stdout of the process to a `Response`
-    // struct - since `Response` is an empty struct with no fields this effectively means that
-    // any output will fail to deserialize and cause an `Error::RunProvisioner` to be propagated
-    // with the output of the child process
-    serde_json::from_slice::<Result<Response, String>>(&output.stdout)
-        .context(DeserializeResponseSnafu)?
-        .map_err(|msg| Error::RunProvisioner { msg })
+    // Check if the spawned command returned 0 as return code
+    if output.status.success() {
+        // Check for success of the operation by deserializing stdout of the process to a `Response`
+        // struct - since `Response` is an empty struct with no fields this effectively means that
+        // any output will fail to deserialize and cause an `Error::RunProvisioner` to be propagated
+        // with the output of the child process
+        serde_json::from_slice::<Result<Response, String>>(&output.stdout)
+            .context(DeserializeResponseSnafu)?
+            .map_err(|msg| Error::RunProvisioner { msg })
+    } else {
+        Err(Error::RunProvisioner {
+            msg: format!(
+                "Got non zero return code from stackable-krb5-provision-keytab: [{:?}]",
+                output.status.code()
+            ),
+        })
+    }
 }
