@@ -39,7 +39,9 @@ All notable changes to this project will be documented in this file.
 - BREAKING: Bump stackable-operator to 0.94.0 and update other dependencies ([#619]).
   - The default Kubernetes cluster domain name is now fetched from the kubelet API unless explicitly configured.
   - This requires operators to have the RBAC permission to get nodes/proxy in the apiGroup "". The helm-chart takes care of this.
-  - The CLI argument `--kubernetes-node-name` or env variable `KUBERNETES_NODE_NAME` needs to be set. The helm-chart takes care of this.
+  - The CLI argument `--kubernetes-node-name` or env variable `KUBERNETES_NODE_NAME` needs to be set.
+    It supersedes the old argument/env variable `NODE_NAME`.
+    The helm-chart takes care of this.
 
 ### Fixed
 

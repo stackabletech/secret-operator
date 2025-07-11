@@ -36,24 +36,21 @@ spec:
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: spec.nodeName
             - name: PRIVILEGED
               value: {{ .Values.securityContext.privileged | quote }}
-            {{- if .Values.kubernetesClusterDomain }}
-            - name: KUBERNETES_CLUSTER_DOMAIN
-              value: {{ .Values.kubernetesClusterDomain | quote }}
-            {{- end }}
-            {{- include "telemetry.envVars" . | nindent 12 }}
+
             # Operators need to know the node name they are running on, to e.g. discover the
             # Kubernetes domain name from the kubelet API.
             - name: KUBERNETES_NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+
+            {{- if .Values.kubernetesClusterDomain }}
+            - name: KUBERNETES_CLUSTER_DOMAIN
+              value: {{ .Values.kubernetesClusterDomain | quote }}
+            {{- end }}
+            {{- include "telemetry.envVars" . | nindent 12 }}
           volumeMounts:
             - name: csi
               mountPath: /csi

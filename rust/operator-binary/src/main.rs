@@ -39,9 +39,6 @@ struct SecretOperatorRun {
     #[clap(long, env)]
     csi_endpoint: PathBuf,
 
-    #[clap(long, env)]
-    node_name: String,
-
     /// Unprivileged mode disables any features that require running secret-operator in a privileged container.
     ///
     /// Currently, this means that:
@@ -69,7 +66,6 @@ async fn main() -> anyhow::Result<()> {
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun {
             csi_endpoint,
-            node_name,
             privileged,
             common:
                 ProductOperatorRun {
@@ -122,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
                     }))
                     .add_service(NodeServer::new(SecretProvisionerNode {
                         client: client.clone(),
-                        node_name,
+                        node_name: cluster_info_opts.kubernetes_node_name.to_owned(),
                         privileged,
                     }))
                     .serve_with_incoming_shutdown(
