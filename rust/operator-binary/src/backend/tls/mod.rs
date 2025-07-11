@@ -95,7 +95,7 @@ pub enum Error {
     InvalidCertLifetime { source: DateTimeOutOfBoundsError },
 
     #[snafu(display(
-        "certificate expiring at {expires_at} would schedule the pod to be restarted at {restart_at}, which is in the past (and we don't have a time machine (yet))"
+        "certificate expiring at {expires_at} would schedule the pod to be restarted at {restart_at}, which is in the past (and we don't have a time machine (yet and/or anymore))"
     ))]
     TooShortCertLifetimeRequiresTimeTravel {
         expires_at: OffsetDateTime,

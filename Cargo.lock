@@ -1611,7 +1611,8 @@ dependencies = [
 
 [[package]]
 name = "krb5"
-version = "0.0.0-dev"
+version = "0.1.0"
+source = "git+https://github.com/stackabletech/krb5-rs.git?tag=v0.1.0#cba32789257540e31f262647f9b59cb592e2e011"
 dependencies = [
  "krb5-sys",
  "snafu 0.8.5",
@@ -1619,7 +1620,8 @@ dependencies = [
 
 [[package]]
 name = "krb5-sys"
-version = "0.0.0-dev"
+version = "0.1.0"
+source = "git+https://github.com/stackabletech/krb5-rs.git?tag=v0.1.0#cba32789257540e31f262647f9b59cb592e2e011"
 dependencies = [
  "bindgen",
  "pkg-config",

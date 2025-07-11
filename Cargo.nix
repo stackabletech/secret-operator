@@ -38,26 +38,6 @@ rec {
   # You can override the features with
   # workspaceMembers."${crateName}".build.override { features = [ "default" "feature1" ... ]; }.
   workspaceMembers = {
-    "krb5" = rec {
-      packageId = "krb5";
-      build = internal.buildRustCrateWithFeatures {
-        packageId = "krb5";
-      };
-
-      # Debug support which might change between releases.
-      # File a bug if you depend on any for non-debug work!
-      debug = internal.debugCrate { inherit packageId; };
-    };
-    "krb5-sys" = rec {
-      packageId = "krb5-sys";
-      build = internal.buildRustCrateWithFeatures {
-        packageId = "krb5-sys";
-      };
-
-      # Debug support which might change between releases.
-      # File a bug if you depend on any for non-debug work!
-      debug = internal.debugCrate { inherit packageId; };
-    };
     "p12" = rec {
       packageId = "p12";
       build = internal.buildRustCrateWithFeatures {
@@ -5096,9 +5076,14 @@ rec {
       };
       "krb5" = rec {
         crateName = "krb5";
-        version = "0.0.0-dev";
+        version = "0.1.0";
         edition = "2021";
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/krb5; };
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/krb5-rs.git";
+          rev = "cba32789257540e31f262647f9b59cb592e2e011";
+          sha256 = "148zr0q04163hpirkrff5q7cbxqgwzzxh0091zr4g23x7l64jh39";
+        };
         authors = [
           "Stackable GmbH <info@stackable.tech>"
         ];
@@ -5116,9 +5101,14 @@ rec {
       };
       "krb5-sys" = rec {
         crateName = "krb5-sys";
-        version = "0.0.0-dev";
+        version = "0.1.0";
         edition = "2021";
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/krb5-sys; };
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/krb5-rs.git";
+          rev = "cba32789257540e31f262647f9b59cb592e2e011";
+          sha256 = "148zr0q04163hpirkrff5q7cbxqgwzzxh0091zr4g23x7l64jh39";
+        };
         libName = "krb5_sys";
         authors = [
           "Stackable GmbH <info@stackable.tech>"

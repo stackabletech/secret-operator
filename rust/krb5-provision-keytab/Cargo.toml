@@ -9,8 +9,8 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-krb5 = { path = "../krb5" }
 stackable-secret-operator-crd-utils = { path = "../crd-utils" }
+krb5.workspace = true
 
 byteorder.workspace = true
 futures.workspace = true
