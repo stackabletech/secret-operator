@@ -190,7 +190,8 @@ pub enum FromSelectorError {
 
     #[snafu(display("failed to initialize backend for {class}"))]
     FromClass {
-        source: FromClassError,
+        #[snafu(source(from(FromClassError, Box::new)))]
+        source: Box<FromClassError>,
         class: ObjectRef<SecretClass>,
     },
 }
