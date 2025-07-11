@@ -6,7 +6,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_secret_operator_crd_utils::SecretReference;
 use tokio::{io::AsyncWriteExt, process::Command};
 
