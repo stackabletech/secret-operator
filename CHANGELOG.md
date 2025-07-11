@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
 - Added TrustStore CRD for requesting CA certificate information ([#557]).
+- Add RBAC rule to helm template for automatic cluster domain detection ([#619]).
 
 ### Changed
 
@@ -35,14 +36,22 @@ All notable changes to this project will be documented in this file.
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 - Upgrade csi-provisioner to 5.2.0 ([#594]).
 - Use versioned common structs ([e5224ab]).
-
-### Removed
-
-- Remove CSI registration path migration job ([#610]).
+- BREAKING: Bump stackable-operator to 0.94.0 and update other dependencies ([#619]).
+  - The default Kubernetes cluster domain name is now fetched from the kubelet API unless explicitly configured.
+  - This requires operators to have the RBAC permission to get nodes/proxy in the apiGroup "". The helm-chart takes care of this.
+  - The CLI argument `--kubernetes-node-name` or env variable `KUBERNETES_NODE_NAME` needs to be set.
+    It supersedes the old argument/env variable `NODE_NAME`.
+    The helm-chart takes care of this.
 
 ### Fixed
 
 - Use `json` file extension for log files ([#586]).
+- Allow uppercase characters in domain names ([#619]).
+
+### Removed
+
+- Remove CSI registration path migration job ([#610]).
+- Remove role binding to legacy service accounts ([#619]).
 
 [#557]: https://github.com/stackabletech/secret-operator/pull/557
 [#572]: https://github.com/stackabletech/secret-operator/pull/572
@@ -53,6 +62,7 @@ All notable changes to this project will be documented in this file.
 [#594]: https://github.com/stackabletech/secret-operator/pull/594
 [e5224ab]: https://github.com/stackabletech/secret-operator/commit/e5224ab480e219e434ddc695c9361a16a56a43ed
 [#610]: https://github.com/stackabletech/secret-operator/pull/610
+[#619]: https://github.com/stackabletech/secret-operator/pull/619
 
 ## [25.3.0] - 2025-03-21
 

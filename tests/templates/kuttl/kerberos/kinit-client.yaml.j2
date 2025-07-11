@@ -20,7 +20,7 @@ spec:
               echo listing keytab contents
               klist -k /stackable/krb/keytab -teKC
               echo kiniting node
-              kinit -kt /stackable/krb/keytab -p HTTP/$NODE_NAME
+              kinit -kt /stackable/krb/keytab -p HTTP/$KUBERNETES_NODE_NAME
               echo kiniting node ip
               NODE_IP="$(cat /stackable/listener/nodeport-ip/default-address/address)"
               echo node ip is "$NODE_IP"
@@ -36,7 +36,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: NODE_NAME
+            - name: KUBERNETES_NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
