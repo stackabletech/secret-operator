@@ -19,6 +19,10 @@ dimensions:
     values:
       - false
       - true
+  - name: truststore-output-resource
+    values:
+      - ConfigMap
+      - Secret
 tests:
   - name: kerberos
     dimensions:
@@ -40,6 +44,7 @@ tests:
   - name: tls-truststore
     dimensions:
       - openshift
+      - truststore-output-resource
   - name: cert-manager-tls
     dimensions:
       - openshift
