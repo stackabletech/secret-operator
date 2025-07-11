@@ -21,7 +21,7 @@ spec:
               echo listing keytab contents
               klist -k /stackable/krb/keytab -teKC
               echo kiniting node
-              kinit -kt /stackable/krb/keytab -p HTTP/$NODE_NAME
+              kinit -kt /stackable/krb/keytab -p HTTP/$KUBERNETES_NODE_NAME
               echo kiniting service
               kinit -kt /stackable/krb/keytab -p HTTP/krb5-client.$NAMESPACE.svc.cluster.local
               echo kiniting pod
@@ -33,7 +33,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: NODE_NAME
+            - name: KUBERNETES_NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
