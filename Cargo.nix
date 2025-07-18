@@ -7036,7 +7036,7 @@ rec {
       };
       "p12" = rec {
         crateName = "p12";
-        version = "0.0.0-dev";
+        version = "25.7.0-rc1";
         edition = "2021";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/p12; };
         authors = [
@@ -9748,7 +9748,7 @@ rec {
       };
       "stackable-krb5-provision-keytab" = rec {
         crateName = "stackable-krb5-provision-keytab";
-        version = "0.0.0-dev";
+        version = "25.7.0-rc1";
         edition = "2021";
         crateBin = [
           {
@@ -10032,7 +10032,7 @@ rec {
       };
       "stackable-secret-operator" = rec {
         crateName = "stackable-secret-operator";
-        version = "0.0.0-dev";
+        version = "25.7.0-rc1";
         edition = "2021";
         crateBin = [
           {
@@ -10207,7 +10207,7 @@ rec {
       };
       "stackable-secret-operator-crd-utils" = rec {
         crateName = "stackable-secret-operator-crd-utils";
-        version = "0.0.0-dev";
+        version = "25.7.0-rc1";
         edition = "2021";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/crd-utils; };
         libName = "stackable_secret_operator_crd_utils";
@@ -10230,7 +10230,7 @@ rec {
       };
       "stackable-secret-operator-olm-deployer" = rec {
         crateName = "stackable-secret-operator-olm-deployer";
-        version = "0.0.0-dev";
+        version = "25.7.0-rc1";
         edition = "2021";
         crateBin = [
           {
