@@ -12,7 +12,7 @@ include::example$usage-pod.yaml[]
 ----
 
 xref:secretclass.adoc[] defines where the secrets come from.
-For example, the following SecretClass issues TLS certificates, storing its CA certificate in the Kubernetes Secret object named secret-provisioner-tls-ca`:
+For example, the following SecretClass issues TLS certificates, storing its CA certificate in the Kubernetes Secret object named `secret-provisioner-tls-ca`:
 
 [source,yaml]
 ----
