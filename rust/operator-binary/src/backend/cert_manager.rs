@@ -70,7 +70,7 @@ pub enum Error {
 impl SecretBackendError for Error {
     fn grpc_code(&self) -> tonic::Code {
         match self {
-            Error::NoPvcName { .. } => tonic::Code::FailedPrecondition,
+            Error::NoPvcName => tonic::Code::FailedPrecondition,
             Error::ScopeAddresses { .. } => tonic::Code::Unavailable,
             Error::GetSecret { .. } => tonic::Code::Unavailable,
             Error::GetCertManagerCertificate { .. } => tonic::Code::Unavailable,

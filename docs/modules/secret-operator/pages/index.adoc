@@ -7,11 +7,12 @@
 * {github}[GitHub {external-link-icon}^]
 * {crd}[CRD documentation {external-link-icon}^]
 
-This is an operator for Kubernetes that provisions and injects secrets into Kubernetes Pods.
+This is an operator for Kubernetes that provisions and injects credentials (such as TLS certificates and Kerberos keytabs) into Kubernetes Pods, so that they can authenticate each others' identities.
 
-Kubernetes Secret objects contain sensitive payloads such as passwords, tokens or keys.
+Kubernetes Secrets contain sensitive payloads such as passwords, tokens or keys.
 These objects are usually self-contained and static in the sense that their contents remain unchanged as long as their owners do not update them.
+Kubernetes also has little-to-no built-in support for dealing with Secrets that have to vary depending on details of the target Pod, such as its assigned Node or the individual Pod identity (when created from a template controller, such as a Deployment or StatefulSet).
 
-The Stackable Secret Operator enhances the functionality of Kubernetes Secrets by introducing the concept of a SecretClass.
-A SecretClass represents a reference to a source of sensitive data.
-In addition to Kubernetes Secret objects, the operator can provision Pods with TLS Certificates, Kerberos keytabs or authentication tokens from external services.
+The Stackable Secret Operator introduces a new mechanism to mount secrets depending on different xref:scope.adoc[aspects] of the target Pod.
+It also allows administrators to dictate cluster-wide xref:secretclass.adoc[policies] for how these credentials are provisioned.
+For example, TLS certificates can be provisioned xref:secretclass.adoc#backend-k8ssearch[manually] (but with the ability to _select_ the correct certificate automatically), xref:secretclass.adoc#backend-autotls[by a built-in certificate authority], or by delegating to xref:secretclass.adoc#backend-certmanager[cert-manager].

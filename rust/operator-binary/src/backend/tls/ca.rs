@@ -133,7 +133,7 @@ impl SecretBackendError for Error {
             Error::BuildCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SaveCaCertificate { .. } => tonic::Code::Unavailable,
-            Error::SaveRequestedButForbidden { .. } => tonic::Code::FailedPrecondition,
+            Error::SaveRequestedButForbidden => tonic::Code::FailedPrecondition,
         }
     }
 

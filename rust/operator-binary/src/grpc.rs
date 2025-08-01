@@ -6,6 +6,8 @@
 pub static FILE_DESCRIPTOR_SET_BYTES: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/file_descriptor_set.bin"));
 
+// The prost-generated code breaks many clippy lints. Just disable them since there's nothing we can do about it.
+#[allow(clippy::all)]
 pub mod csi {
     pub mod v1 {
         tonic::include_proto!("csi.v1");

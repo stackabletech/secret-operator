@@ -1,6 +1,8 @@
 = Usage
 
-The operator injects secret data into xref:volume.adoc[] mounts that declare a CSI volume with `driver: secrets.stackable.tech`.
+The operator injects secret data into xref:volume.adoc[] mounts that declare an ephemeral volume with `storageClassName: secrets.stackable.tech`.
+
+NOTE: This page is only relevant for developers deploying their own Pods. Users deploying a Stackable Data Platform xref:concepts:stacklet.adoc[stacklet] should use the stacklet's secret class field instead.
 
 A minimal secret-consuming Pod looks like this:
 
@@ -10,7 +12,7 @@ include::example$usage-pod.yaml[]
 ----
 
 xref:secretclass.adoc[] defines where the secrets come from.
-For example, the following SecretClass issues TLS certificates, storing its CA certificate in the Kubernetes Secret object named secret-provisioner-tls-ca`:
+For example, the following SecretClass issues TLS certificates, storing its CA certificate in the Kubernetes Secret object named `secret-provisioner-tls-ca`:
 
 [source,yaml]
 ----

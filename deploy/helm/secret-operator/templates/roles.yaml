@@ -86,6 +86,13 @@ rules:
       - get
       - list
       - watch
+  # For automatic cluster domain detection
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/proxy
+    verbs:
+      - get
   - apiGroups:
       - storage.k8s.io
     resources:
