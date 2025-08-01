@@ -32,7 +32,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     OPERATOR_NAME,
     backend::{self, SecretBackendError, TrustSelector},
-    crd::{SearchNamespaceMatchCondition, SecretClass, TrustStore},
+    crd::{SearchNamespaceMatchCondition, SecretClass, TrustStore, TrustStoreOutputType},
     format::{
         self,
         well_known::{CompatibilityOptions, NamingOptions},
@@ -83,6 +83,11 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
         // TODO: merge this into the other ConfigMap watch
         .owns(
             watch_namespace.get_api::<PartialObjectMeta<ConfigMap>>(client),
+            watcher::Config::default(),
+        )
+        // TODO: merge this into the other Secret watch
+        .owns(
+            watch_namespace.get_api::<PartialObjectMeta<Secret>>(client),
             watcher::Config::default(),
         )
         .watches(
@@ -208,7 +213,14 @@ pub enum Error {
         source: stackable_operator::client::Error,
         config_map: ObjectRef<ConfigMap>,
     },
+
+    #[snafu(display("failed to apply target {secret} for the TrustStore"))]
+    ApplyTrustStoreSecret {
+        source: stackable_operator::client::Error,
+        secret: ObjectRef<Secret>,
+    },
 }
+
 type Result<T, E = Error> = std::result::Result<T, E>;
 impl ReconcilerError for Error {
     fn category(&self) -> &'static str {
@@ -225,6 +237,7 @@ impl ReconcilerError for Error {
             Error::FormatData { secret_class, .. } => Some(secret_class.clone().erase()),
             Error::BuildOwnerReference { .. } => None,
             Error::ApplyTrustStoreConfigMap { config_map, .. } => Some(config_map.clone().erase()),
+            Error::ApplyTrustStoreSecret { secret, .. } => Some(secret.clone().erase()),
         }
     }
 }
@@ -267,7 +280,7 @@ async fn reconcile(
         .get_trust_data(&selector)
         .await
         .context(BackendGetTrustDataSnafu)?;
-    let (Flattened(string_data), Flattened(binary_data)) = trust_data
+    let trust_file_contents = trust_data
         .data
         .into_files(
             truststore.spec.format,
@@ -276,30 +289,53 @@ async fn reconcile(
         )
         .context(FormatDataSnafu {
             secret_class: secret_class_ref,
-        })?
+        })?;
+    let (Flattened(string_data), Flattened(binary_data)) = trust_file_contents
         .into_iter()
-        // Try to put valid UTF-8 data into `data`, but fall back to `binary_data` otherwise
+        // Try to put valid UTF-8 data into `string_data`, but fall back to `binary_data` otherwise
         .map(|(k, v)| match String::from_utf8(v) {
             Ok(v) => (Some((k, v)), None),
             Err(v) => (None, Some((k, ByteString(v.into_bytes())))),
         })
         .collect();
-    let trust_cm = ConfigMap {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(truststore)
-            .ownerreference_from_resource(truststore, None, Some(true))
-            .context(BuildOwnerReferenceSnafu)?
-            .build(),
-        data: Some(string_data),
-        binary_data: Some(binary_data),
-        ..Default::default()
-    };
-    ctx.client
-        .apply_patch(CONTROLLER_NAME, &trust_cm, &trust_cm)
-        .await
-        .context(ApplyTrustStoreConfigMapSnafu {
-            config_map: &trust_cm,
-        })?;
+
+    let trust_metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(truststore)
+        .ownerreference_from_resource(truststore, None, Some(true))
+        .context(BuildOwnerReferenceSnafu)?
+        .build();
+
+    match truststore.spec.output_resource {
+        TrustStoreOutputType::ConfigMap => {
+            let trust_cm = ConfigMap {
+                metadata: trust_metadata,
+                data: Some(string_data),
+                binary_data: Some(binary_data),
+                ..Default::default()
+            };
+            ctx.client
+                .apply_patch(CONTROLLER_NAME, &trust_cm, &trust_cm)
+                .await
+                .context(ApplyTrustStoreConfigMapSnafu {
+                    config_map: &trust_cm,
+                })?;
+        }
+        TrustStoreOutputType::Secret => {
+            let trust_secret = Secret {
+                metadata: trust_metadata,
+                string_data: Some(string_data),
+                data: Some(binary_data),
+                ..Default::default()
+            };
+            ctx.client
+                .apply_patch(CONTROLLER_NAME, &trust_secret, &trust_secret)
+                .await
+                .context(ApplyTrustStoreSecretSnafu {
+                    secret: &trust_secret,
+                })?;
+        }
+    }
+
     Ok(controller::Action::await_change())
 }
 
