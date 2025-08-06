@@ -398,9 +398,9 @@ spec:
                 targetKind:
                   default: ConfigMap
                   description: |-
-                    Which Kubernetes resource should be used to output the requested information to.
+                    Which Kubernetes kind should be used to output the requested information to.
 
-                    The trust information (such as a `ca.crt`) can be considered public information, so we put it in a `ConfigMap` by default. However, some tools (such as OpenShift routes) require it to be placed in a `Secret`, so we also support that.
+                    The trust information (such as a `ca.crt`) can be considered public information, so we put it in a `ConfigMap` by default. However, some tools might require it to be placed in a `Secret`, so we also support that.
 
                     Can be either `ConfigMap` or `Secret`, defaults to `ConfigMap`.
                   enum:
