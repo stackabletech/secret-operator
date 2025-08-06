@@ -392,7 +392,10 @@ spec:
                     - kerberos
                   nullable: true
                   type: string
-                outputResource:
+                secretClassName:
+                  description: The name of the SecretClass that the request concerns.
+                  type: string
+                targetKind:
                   default: ConfigMap
                   description: |-
                     Which Kubernetes resource should be used to output the requested information to.
@@ -403,9 +406,6 @@ spec:
                   enum:
                     - Secret
                     - ConfigMap
-                  type: string
-                secretClassName:
-                  description: The name of the SecretClass that the request concerns.
                   type: string
               required:
                 - secretClassName

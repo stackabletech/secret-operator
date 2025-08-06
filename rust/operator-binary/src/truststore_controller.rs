@@ -305,7 +305,7 @@ async fn reconcile(
         .context(BuildOwnerReferenceSnafu)?
         .build();
 
-    match truststore.spec.output_resource {
+    match truststore.spec.target_kind {
         TrustStoreOutputType::ConfigMap => {
             let trust_cm = ConfigMap {
                 metadata: trust_metadata,

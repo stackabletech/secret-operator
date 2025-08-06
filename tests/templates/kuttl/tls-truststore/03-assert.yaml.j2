@@ -4,7 +4,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 10
 commands:
-{% if test_scenario['values']['truststore-output-resource'] == 'ConfigMap' %}
+{% if test_scenario['values']['truststore-target-kind'] == 'ConfigMap' %}
   - script: kubectl --namespace=$NAMESPACE get configmap/truststore-pem --output=jsonpath='{.data.ca\.crt}' | openssl x509 -noout
   - script: kubectl --namespace=$NAMESPACE get configmap/truststore-pkcs12 --output=jsonpath='{.binaryData.truststore\.p12}' | base64 --decode | openssl pkcs12 -noout -passin 'pass:' -legacy
 {% else %}

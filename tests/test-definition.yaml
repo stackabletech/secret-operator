@@ -19,7 +19,7 @@ dimensions:
     values:
       - false
       - true
-  - name: truststore-output-resource
+  - name: truststore-target-kind
     values:
       - ConfigMap
       - Secret
@@ -44,7 +44,7 @@ tests:
   - name: tls-truststore
     dimensions:
       - openshift
-      - truststore-output-resource
+      - truststore-target-kind
   - name: cert-manager-tls
     dimensions:
       - openshift

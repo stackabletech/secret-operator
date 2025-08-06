@@ -526,7 +526,7 @@ pub struct TrustStoreSpec {
     ///
     /// Can be either `ConfigMap` or `Secret`, defaults to `ConfigMap`.
     #[serde(default)]
-    pub output_resource: TrustStoreOutputType,
+    pub target_kind: TrustStoreOutputType,
 
     /// The [format](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#format) that the data should be converted into.
     pub format: Option<SecretFormat>,
