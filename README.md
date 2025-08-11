@@ -45,7 +45,7 @@ If you have a question about the Stackable Data Platform, contact us via our [ho
 
 The Secret Operator provisions and mounts secrets, but unlike the default Kubernetes Secret mechanism, Secrets can be created and mounted dynamically based on Pod properties. The Operator supports:
 
-- Generating TLS certificates on demand and mounting them
+* Generating TLS certificates on demand and mounting them
 
 ## How it works
 
