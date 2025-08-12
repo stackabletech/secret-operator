@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Support exporting the TrustStore CA certificate information to Secrets or ConfigMaps ([#597]).
+
+[#597]: https://github.com/stackabletech/secret-operator/pull/597
+
 ## [25.7.0] - 2025-07-23
 
 ## [25.7.0-rc1] - 2025-07-18
