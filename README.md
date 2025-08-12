@@ -45,7 +45,7 @@ If you have a question about the Stackable Data Platform, contact us via our [ho
 
 The Secret Operator provisions and mounts secrets, but unlike the default Kubernetes Secret mechanism, Secrets can be created and mounted dynamically based on Pod properties. The Operator supports:
 
-- Generating TLS certificates on demand and mounting them
+* Generating TLS certificates on demand and mounting them
 
 ## How it works
 
@@ -94,6 +94,7 @@ These are the operators that are currently part of the Stackable Data Platform:
 * [Stackable Operator for Apache Hive](https://github.com/stackabletech/hive-operator)
 * [Stackable Operator for Apache Kafka](https://github.com/stackabletech/kafka-operator)
 * [Stackable Operator for Apache NiFi](https://github.com/stackabletech/nifi-operator)
+* [Stackable Operator for OpenSearch](https://github.com/stackabletech/opensearch-operator)
 * [Stackable Operator for Apache Spark](https://github.com/stackabletech/spark-k8s-operator)
 * [Stackable Operator for Apache Superset](https://github.com/stackabletech/superset-operator)
 * [Stackable Operator for Trino](https://github.com/stackabletech/trino-operator)
