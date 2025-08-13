@@ -520,6 +520,12 @@ pub struct TrustStoreSpec {
 
     /// The [format](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#format) that the data should be converted into.
     pub format: Option<SecretFormat>,
+
+    /// The minimum remaining lifetime that a CA must have to be considered valid for
+    /// publishing in the TrustStore.
+    /// If not specified, all CAs (including expired ones) will be published.
+    #[serde(default)]
+    pub ca_expiry_threshold: Option<Duration>,
 }
 
 #[cfg(test)]

@@ -14,6 +14,7 @@ include::example$truststore-tls.yaml[]
 <1> Also used to name the created ConfigMap
 <2> The name of the xref:secretclass.adoc[]
 <3> The requested xref:secretclass.adoc#format[format]
+<4> Optional threshold to filter out CAs that are about to expire. If not specified, all CAs (including expired ones) will be included.
 
 This will create a ConfigMap named `truststore-pem` containing a `ca.crt` with the trust root certificates.
 It can then either be mounted into a Pod or retrieved and used from outside of Kubernetes.

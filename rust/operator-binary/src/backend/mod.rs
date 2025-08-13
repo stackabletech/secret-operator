@@ -120,6 +120,19 @@ pub struct SecretVolumeSelector {
     )]
     pub autotls_cert_restart_buffer: Duration,
 
+    /// The minimum remaining lifetime that a CA must have to be considered valid for
+    /// publishing and signing certificates.
+    /// A CA will only be published if it remains valid for at least this duration,
+    /// and it may only sign if it outlives the issued certificate by at least this duration.
+    /// If not specified, all CAs (including expired ones) will be published.
+    /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
+    #[serde(
+        rename = "secrets.stackable.tech/backend.autotls.ca.expiry-threshold",
+        deserialize_with = "SecretVolumeSelector::deserialize_some",
+        default
+    )]
+    pub autotls_ca_expiry_threshold: Option<Duration>,
+
     /// The part of the certificate's lifetime that may be removed for jittering.
     /// Must be within 0.0 and 1.0.
     #[serde(
@@ -144,6 +157,10 @@ pub struct SecretVolumeSelector {
 pub struct TrustSelector {
     /// The name of the [`TrustStore`]'s `Namespace`.
     pub namespace: String,
+    /// Optional CA expiry threshold for filtering out CAs that are about to expire.
+    /// If specified, only CAs that are valid for at least this duration will be published.
+    /// If not specified, all CAs (including expired ones) will be published.
+    pub ca_expiry_threshold: Option<Duration>,
 }
 
 /// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself.
