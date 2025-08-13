@@ -262,6 +262,7 @@ async fn reconcile(
             .namespace
             .clone()
             .context(NoTrustStoreNamespaceSnafu)?,
+        ca_expiry_threshold: truststore.spec.ca_expiry_threshold,
     };
     let trust_data = backend
         .get_trust_data(&selector)

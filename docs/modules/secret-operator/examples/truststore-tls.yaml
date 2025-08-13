@@ -6,3 +6,4 @@ metadata:
 spec:
   secretClassName: tls # <2>
   format: tls-pem # <3>
+  caExpiryThreshold: 1h # <4>

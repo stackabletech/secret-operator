@@ -208,6 +208,7 @@ impl SecretBackend for TlsGenerate {
         // Extract and convert consumer input from the Volume annotations.
         let cert_lifetime = selector.autotls_cert_lifetime;
         let cert_restart_buffer = selector.autotls_cert_restart_buffer;
+        let ca_expiry_threshold = selector.autotls_ca_expiry_threshold;
 
         // We need to check that the cert lifetime it is not longer than allowed,
         // by capping it to the maximum configured at the SecretClass.
@@ -284,7 +285,7 @@ impl SecretBackend for TlsGenerate {
         }
         let ca = self
             .ca_manager
-            .find_certificate_authority_for_signing(not_after)
+            .find_certificate_authority_for_signing(not_after, ca_expiry_threshold)
             .context(PickCaSnafu)?;
         let pod_cert = X509Builder::new()
             .and_then(|mut x509| {
@@ -347,10 +348,13 @@ impl SecretBackend for TlsGenerate {
             SecretContents::new(SecretData::WellKnown(WellKnownSecretData::TlsPem(
                 well_known::TlsPem {
                     ca_pem: iterator_try_concat_bytes(
-                        self.ca_manager.trust_roots().into_iter().map(|ca| {
-                            ca.to_pem()
-                                .context(SerializeCertificateSnafu { tpe: CertType::Ca })
-                        }),
+                        self.ca_manager
+                            .trust_roots(ca_expiry_threshold)
+                            .into_iter()
+                            .map(|ca| {
+                                ca.to_pem()
+                                    .context(SerializeCertificateSnafu { tpe: CertType::Ca })
+                            }),
                     )?,
                     certificate_pem: Some(
                         pod_cert
@@ -372,16 +376,19 @@ impl SecretBackend for TlsGenerate {
 
     async fn get_trust_data(
         &self,
-        _selector: &super::TrustSelector,
+        selector: &super::TrustSelector,
     ) -> Result<SecretContents, Self::Error> {
         Ok(SecretContents::new(SecretData::WellKnown(
             WellKnownSecretData::TlsPem(well_known::TlsPem {
-                ca_pem: iterator_try_concat_bytes(self.ca_manager.trust_roots().into_iter().map(
-                    |ca| {
-                        ca.to_pem()
-                            .context(SerializeCertificateSnafu { tpe: CertType::Ca })
-                    },
-                ))?,
+                ca_pem: iterator_try_concat_bytes(
+                    self.ca_manager
+                        .trust_roots(selector.ca_expiry_threshold)
+                        .into_iter()
+                        .map(|ca| {
+                            ca.to_pem()
+                                .context(SerializeCertificateSnafu { tpe: CertType::Ca })
+                        }),
+                )?,
                 certificate_pem: None,
                 key_pem: None,
             }),
