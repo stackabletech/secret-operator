@@ -1,0 +1,46 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ca-expiry-invalid-consumer
+spec:
+  template:
+    spec:
+      containers:
+        - name: invalid-consumer
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - bash
+          args:
+            - -c
+            - |
+              set -euo pipefail
+              echo "I should not be running"
+              exit 0
+
+          volumeMounts:
+            - mountPath: /stackable/tls-short-with-threshold
+              name: tls-short-with-threshold
+      volumes:
+        - name: tls-short-with-threshold
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls-short-ca
+                  secrets.stackable.tech/scope: node,pod
+                  secrets.stackable.tech/backend.autotls.ca.expiry-threshold: 10m
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 0
+      serviceAccount: integration-tests-sa

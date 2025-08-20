@@ -1,0 +1,229 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ca-expiry-consumer
+spec:
+  template:
+    spec:
+      containers:
+        - name: consumer
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - bash
+          args:
+            - -c
+            - |
+              set -euo pipefail
+
+              echo ""
+              echo "Testing volume with short threshold (should filter out expired CA)..."
+              if [ -f "/stackable/tls-short-with-threshold/ca.crt" ]; then
+                CA_COUNT_WITH_THRESHOLD=$(grep -c "BEGIN CERTIFICATE" /stackable/tls-short-with-threshold/ca.crt)
+                echo "Number of CAs in volume with threshold: $CA_COUNT_WITH_THRESHOLD"
+
+                if [ "$CA_COUNT_WITH_THRESHOLD" -ne 1 ]; then
+                  echo "ERROR: Expected exactly one CA in volume with threshold!"
+                  exit 1
+                fi
+
+                # Check that CA is valid for at least 1 minute
+                if cat /stackable/tls-short-with-threshold/ca.crt | openssl x509 -noout -checkend 60; then
+                  echo "CA in volume with threshold is valid as expected"
+                else
+                  echo "ERROR: CA in volume with threshold should be valid for at least 1 minute!"
+                  exit 1
+                fi
+              else
+                echo "ERROR: No ca.crt file found in volume with threshold!"
+                exit 1
+              fi
+
+              # Check that the cert was signed by the CA and is valid
+              if [ -f "/stackable/tls-short-with-threshold/tls.crt" ]; then
+                if openssl verify -CAfile /stackable/tls-short-with-threshold/ca.crt /stackable/tls-short-with-threshold/tls.crt; then
+                  echo "TLS certificate is valid and signed by the CA"
+                else
+                  echo "ERROR: TLS certificate verification failed!"
+                  exit 1
+                fi
+              else
+                echo "ERROR: No tls.crt file found in volume with threshold!"
+                exit 1
+              fi
+
+              echo ""
+              echo "Testing volume without threshold (should contain CA even if expired)..."
+              if [ -f "/stackable/tls-short-without-threshold/ca.crt" ]; then
+                CA_COUNT_WITHOUT_THRESHOLD=$(grep -c "BEGIN CERTIFICATE" /stackable/tls-short-without-threshold/ca.crt)
+                echo "Number of CAs in volume without threshold: $CA_COUNT_WITHOUT_THRESHOLD"
+
+                if [ "$CA_COUNT_WITHOUT_THRESHOLD" -lt 2 ]; then
+                  echo "ERROR: Expected at least two CAs in volume without threshold!"
+                  exit 1
+                fi
+              else
+                echo "ERROR: No ca.crt file found in volume without threshold!"
+                exit 1
+              fi
+
+              echo ""
+              echo "Testing normal CA volume with threshold (should contain valid CA)..."
+              if [ -f "/stackable/tls-normal-with-threshold/ca.crt" ]; then
+                CA_COUNT_NORMAL=$(grep -c "BEGIN CERTIFICATE" /stackable/tls-normal-with-threshold/ca.crt)
+                echo "Number of CAs in normal volume: $CA_COUNT_NORMAL"
+
+                if [ "$CA_COUNT_NORMAL" -lt 1 ]; then
+                  echo "ERROR: Expected at least one CA in normal volume!"
+                  exit 1
+                fi
+
+                # Check that CA is valid for well beyond 1 hour
+                cat /stackable/tls-normal-with-threshold/ca.crt | openssl x509 -noout -checkend 86400 || {
+                  echo "ERROR: Normal CA should be valid for at least 24 hours!"
+                  exit 1
+                }
+
+                echo "Normal CA is valid and passes threshold check"
+              else
+                echo "ERROR: No ca.crt file found in normal volume!"
+                exit 1
+              fi
+
+              echo ""
+              echo "Testing TrustStore ConfigMaps content..."
+
+              # Test TrustStore without threshold (should contain expired CA)
+              echo "Testing truststore-all-cas ConfigMap (should contain expired CA)..."
+              TRUSTSTORE_ALL_DATA=$(kubectl get configmap truststore-all-cas -o jsonpath='{.data.ca\.crt}')
+              if [ -z "$TRUSTSTORE_ALL_DATA" ]; then
+                echo "ERROR: truststore-all-cas ConfigMap has no ca.crt data!"
+                exit 1
+              fi
+
+              TRUSTSTORE_ALL_COUNT=$(echo "$TRUSTSTORE_ALL_DATA" | grep -c "BEGIN CERTIFICATE")
+              echo "Number of CAs in truststore-all-cas: $TRUSTSTORE_ALL_COUNT"
+
+              if [ "$TRUSTSTORE_ALL_COUNT" -lt 1 ]; then
+                echo "ERROR: Expected at least one CA in truststore-all-cas!"
+                exit 1
+              fi
+
+              # Check if at least one CA is expired (it should be)
+              if ! echo "$TRUSTSTORE_ALL_DATA" | openssl x509 -noout -checkend 0; then
+                echo "At least one CA in truststore-all-cas is expired, as expected"
+              else
+                echo "ERROR: At least one CA in truststore-all-cas should be expired!"
+                exit 1
+              fi
+
+              # Test TrustStore with threshold (should contain only valid CAs)
+              echo ""
+              echo "Testing truststore-filtered-cas ConfigMap (should filter out expired CA)..."
+              TRUSTSTORE_FILTERED_DATA=$(kubectl get configmap truststore-filtered-cas -o jsonpath='{.data.ca\.crt}' || echo "")
+
+              if [ -z "$TRUSTSTORE_FILTERED_DATA" ]; then
+                echo "truststore-filtered-cas ConfigMap has no ca.crt data (expected - expired CA was filtered)"
+              else
+                TRUSTSTORE_FILTERED_COUNT=$(echo "$TRUSTSTORE_FILTERED_DATA" | grep -c "BEGIN CERTIFICATE" || echo "0")
+                echo "Number of CAs in truststore-filtered-cas: $TRUSTSTORE_FILTERED_COUNT"
+
+                # If there are any CAs, they should be valid
+                if [ "$TRUSTSTORE_FILTERED_COUNT" -gt 0 ]; then
+                  if echo "$TRUSTSTORE_FILTERED_DATA" | openssl x509 -noout -checkend 3600; then
+                    echo "CA in truststore-filtered-cas is valid"
+                  else
+                    echo "ERROR: CA in truststore-filtered-cas should be valid if present!"
+                    exit 1
+                  fi
+                fi
+              fi
+
+              # Test TrustStore with normal CA (should contain valid CA)
+              echo ""
+              echo "Testing truststore-normal-cas ConfigMap (should contain valid CA)..."
+              TRUSTSTORE_NORMAL_DATA=$(kubectl get configmap truststore-normal-cas -o jsonpath='{.data.ca\.crt}')
+              if [ -z "$TRUSTSTORE_NORMAL_DATA" ]; then
+                echo "ERROR: truststore-normal-cas ConfigMap has no ca.crt data!"
+                exit 1
+              fi
+
+              TRUSTSTORE_NORMAL_COUNT=$(echo "$TRUSTSTORE_NORMAL_DATA" | grep -c "BEGIN CERTIFICATE")
+              echo "Number of CAs in truststore-normal-cas: $TRUSTSTORE_NORMAL_COUNT"
+
+              if [ "$TRUSTSTORE_NORMAL_COUNT" -lt 1 ]; then
+                echo "ERROR: Expected at least one CA in truststore-normal-cas!"
+                exit 1
+              fi
+
+              # Check that the CA is valid for well beyond the threshold
+              if echo "$TRUSTSTORE_NORMAL_DATA" | openssl x509 -noout -checkend 86400; then
+                echo "CA in truststore-normal-cas is valid and passes threshold check"
+              else
+                echo "ERROR: CA in truststore-normal-cas should be valid for at least 24 hours!"
+                exit 1
+              fi
+
+          volumeMounts:
+            - mountPath: /stackable/tls-short-with-threshold
+              name: tls-short-with-threshold
+            - mountPath: /stackable/tls-short-without-threshold
+              name: tls-short-without-threshold
+            - mountPath: /stackable/tls-normal-with-threshold
+              name: tls-normal-with-threshold
+      volumes:
+        - name: tls-short-with-threshold
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls-short-ca
+                  secrets.stackable.tech/scope: node,pod
+                  secrets.stackable.tech/backend.autotls.ca.expiry-threshold: 1m
+                  secrets.stackable.tech/backend.autotls.cert.restart-buffer: 1s
+                  secrets.stackable.tech/backend.autotls.cert.lifetime: 1m
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+        - name: tls-short-without-threshold
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls-short-ca
+                  secrets.stackable.tech/scope: node,pod
+                  secrets.stackable.tech/backend.autotls.cert.restart-buffer: 1s
+                  secrets.stackable.tech/backend.autotls.cert.lifetime: 1m
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+        - name: tls-normal-with-threshold
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls-normal-ca
+                  secrets.stackable.tech/scope: node,pod
+                  secrets.stackable.tech/backend.autotls.ca.expiry-threshold: 1d
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 0
+      serviceAccount: integration-tests-sa

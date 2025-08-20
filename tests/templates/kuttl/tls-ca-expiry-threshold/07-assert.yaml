@@ -1,0 +1,15 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 60
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ca-expiry-consumer
+status:
+  conditions:
+    - type: SuccessCriteriaMet
+      status: "True"
+    - type: Complete
+      status: "True"

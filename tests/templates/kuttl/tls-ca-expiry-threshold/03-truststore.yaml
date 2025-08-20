@@ -1,0 +1,29 @@
+---
+# TrustStore without caExpiryThreshold - should include all CAs even if expired
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: TrustStore
+metadata:
+  name: truststore-all-cas
+spec:
+  secretClassName: tls-short-ca
+  format: tls-pem
+---
+# TrustStore with caExpiryThreshold - should filter out CAs close to expiry
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: TrustStore
+metadata:
+  name: truststore-filtered-cas
+spec:
+  secretClassName: tls-short-ca
+  format: tls-pem
+  caExpiryThreshold: 1h
+---
+# TrustStore with normal CA lifetime for comparison
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: TrustStore
+metadata:
+  name: truststore-normal-cas
+spec:
+  secretClassName: tls-normal-ca
+  format: tls-pem
+  caExpiryThreshold: 1d
