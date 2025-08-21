@@ -34,10 +34,35 @@ spec:
           resources:
             {{ .Values.node.driver.resources | toYaml | nindent 12 }}
           env:
+            # The following env vars are passed as clap (think CLI) arguments to the operator.
+            # They are picked up by clap using the structs defied in the operator.
+            # (which is turn pulls in https://github.com/stackabletech/operator-rs/blob/main/crates/stackable-operator/src/cli.rs)
+            # You can read there about the expected values and purposes.
+
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
             - name: PRIVILEGED
               value: {{ .Values.securityContext.privileged | quote }}
+
+            # Sometimes products need to know the operator image, e.g. the opa-bundle-builder OPA
+            # sidecar uses the operator image.
+            - name: OPERATOR_IMAGE
+              # Tilt can use annotations as image paths, but not env variables
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['internal.stackable.tech/image']
+
+            # Namespace the operator Pod is running in, e.g. used to construct the conversion
+            # webhook endpoint.
+            - name: OPERATOR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+
+            # The name of the Kubernetes Service that point to the operator Pod, e.g. used to
+            # construct the conversion webhook endpoint.
+            - name: OPERATOR_SERVICE_NAME
+              value: {{ include "operator.fullname" . }}
 
             # Operators need to know the node name they are running on, to e.g. discover the
             # Kubernetes domain name from the kubelet API.

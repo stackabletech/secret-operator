@@ -9,7 +9,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{ByteString, api::core::v1::Secret},
     kube::{api::ObjectMeta, runtime::reflector::ObjectRef},
-    time::Duration,
+    shared::time::Duration,
 };
 
 use super::{

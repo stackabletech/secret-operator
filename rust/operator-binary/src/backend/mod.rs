@@ -23,7 +23,7 @@ use stackable_operator::{
     crd::listener,
     k8s_openapi::chrono::{DateTime, FixedOffset},
     kube::api::DynamicObject,
-    time::Duration,
+    shared::time::Duration,
 };
 pub use tls::TlsGenerate;
 
