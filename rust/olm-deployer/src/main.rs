@@ -31,7 +31,7 @@ use stackable_operator::{
         discovery::{ApiResource, Discovery, Scope},
     },
     telemetry::{Tracing, tracing::TelemetryOptions},
-    utils::cluster_info::KubernetesClusterInfoOpts,
+    utils::cluster_info::KubernetesClusterInfoOptions,
 };
 
 pub const APP_NAME: &str = "stkbl-secret-olm-deployer";
@@ -70,10 +70,10 @@ struct OlmDeployerRun {
     dir: std::path::PathBuf,
 
     #[command(flatten)]
-    pub telemetry_arguments: TelemetryOptions,
+    pub telemetry: TelemetryOptions,
 
     #[command(flatten)]
-    pub cluster_info_opts: KubernetesClusterInfoOpts,
+    pub cluster_info: KubernetesClusterInfoOptions,
 }
 
 #[tokio::main]
@@ -84,16 +84,15 @@ async fn main() -> Result<()> {
         csv,
         namespace,
         dir,
-        telemetry_arguments,
-        cluster_info_opts,
+        telemetry,
+        cluster_info,
     }) = opts.cmd
     {
         // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
         // - The console log level was set by `STKBL_SECRET_OLM_DEPLOYER_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
         // - The file log level was set by `STKBL_SECRET_OLM_DEPLOYER_LOG`, and is now set via `FILE_LOG` (when using Tracing::pre_configured).
         // - The file log directory was set by `STKBL_SECRET_OLM_DEPLOYER_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
-        let _tracing_guard =
-            Tracing::pre_configured(built_info::PKG_NAME, telemetry_arguments).init()?;
+        let _tracing_guard = Tracing::pre_configured(built_info::PKG_NAME, telemetry).init()?;
 
         tracing::info!(
             built_info.pkg_version = built_info::PKG_VERSION,
@@ -105,8 +104,7 @@ async fn main() -> Result<()> {
             description = built_info::PKG_DESCRIPTION
         );
 
-        let client =
-            client::initialize_operator(Some(APP_NAME.to_string()), &cluster_info_opts).await?;
+        let client = client::initialize_operator(Some(APP_NAME.to_string()), &cluster_info).await?;
 
         let deployment = get_deployment(&csv, &namespace, &client).await?;
         let cluster_role = get_cluster_role(&csv, &client).await?;
