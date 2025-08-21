@@ -96,7 +96,7 @@ pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<
     let mut stdin = child
         .stdin
         .take()
-        .expect("Failed to read from stdin of stackable-krb5-provision-keytab script! ");
+        .expect("Failed to read from stdin of stackable-krb5-provision-keytab command! ");
     stdin.write_all(&req_str).await.context(WriteRequestSnafu)?;
     stdin.flush().await.context(WriteRequestSnafu)?;
     drop(stdin);
