@@ -30,7 +30,7 @@ use stackable_operator::{
         },
         runtime::reflector::ObjectRef,
     },
-    time::Duration,
+    shared::time::Duration,
 };
 use stackable_secret_operator_crd_utils::{ConfigMapReference, SecretReference};
 use time::OffsetDateTime;

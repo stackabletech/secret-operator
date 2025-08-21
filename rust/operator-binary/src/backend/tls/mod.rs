@@ -23,7 +23,7 @@ use rand::Rng;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::chrono::{self, FixedOffset, TimeZone},
-    time::Duration,
+    shared::time::Duration,
 };
 use time::OffsetDateTime;
 

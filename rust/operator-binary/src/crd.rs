@@ -7,7 +7,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::{ConfigMap, Secret},
     kube::{CustomResource, api::PartialObjectMeta},
     schemars::{self, JsonSchema, schema::Schema},
-    time::Duration,
+    shared::time::Duration,
 };
 use stackable_secret_operator_crd_utils::{ConfigMapReference, SecretReference};
 
