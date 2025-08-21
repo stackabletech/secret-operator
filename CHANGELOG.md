@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added CA expiry threshold support for filtering out CAs that are about to expire ([#633]).
+  - New `caExpiryThreshold` field in TrustStore CRD to filter out CAs close to expiry when publishing trust roots.
+  - New `secrets.stackable.tech/backend.autotls.ca.expiry-threshold` annotation for volume-level CA expiry filtering.
+  - If no threshold is specified, all CAs (including expired ones) are published for backwards compatibility.
+
 ## [25.7.0] - 2025-07-23
 
 ## [25.7.0-rc1] - 2025-07-18
