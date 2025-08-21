@@ -533,6 +533,7 @@ pub struct TrustStoreSpec {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, JsonSchema, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub enum TrustStoreOutputType {
     Secret,
 
