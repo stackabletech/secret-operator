@@ -100,7 +100,9 @@ pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<
         // a failure here has some fundamental reason like us taking ownership of the pipe
         // earlier, which is most probably more a coding than a runtime error - this is
         // why this error is not handled here, but we panic instead
-        .expect("Failed to take ownership of stdin pipe of stackable-krb5-provision-keytab command! ");
+        .expect(
+            "Failed to take ownership of stdin pipe of stackable-krb5-provision-keytab command! ",
+        );
     stdin.write_all(&req_str).await.context(WriteRequestSnafu)?;
     stdin.flush().await.context(WriteRequestSnafu)?;
     drop(stdin);
