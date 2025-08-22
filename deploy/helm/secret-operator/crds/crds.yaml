@@ -384,6 +384,10 @@ spec:
 
                 The requested information is written to a ConfigMap with the same name as the TrustStore.
               properties:
+                caExpiryThreshold:
+                  description: The minimum remaining lifetime that a CA must have to be considered valid for publishing in the TrustStore. If not specified, all CAs (including expired ones) will be published.
+                  nullable: true
+                  type: string
                 format:
                   description: The [format](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#format) that the data should be converted into.
                   enum:

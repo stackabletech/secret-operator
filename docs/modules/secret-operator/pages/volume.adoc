@@ -133,6 +133,25 @@ It can take some hours until all Pods are restarted in a rolling fashion.
 
 The format is documented in xref:concepts:duration.adoc[].
 
+=== `secrets.stackable.tech/backend.autotls.ca.expiry-threshold`
+
+*Required*: false
+
+*Default value*: Not set (all CAs including expired ones are published)
+
+*Backends*: xref:secretclass.adoc#backend-autotls[]
+
+The minimum remaining lifetime that a CA must have to be considered valid.
+
+- A CA is only published if its remaining lifetime is greater than or equal to this threshold.
+- A CA may only sign a certificate if it outlives the certificate by at least this threshold.
+
+If not specified, all CAs (including expired ones) will be published. Of course, only the CAs that are still valid will be used to sign certificates.
+
+Use this to avoid publishing almost-expired CA certificates that might expire during pod startup.
+
+The format is documented in xref:concepts:duration.adoc[].
+
 === `secrets.stackable.tech/backend.autotls.cert.jitter-factor`
 
 *Required*: false
