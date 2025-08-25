@@ -128,8 +128,9 @@ pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<
     } else {
         Err(Error::RunProvisioner {
             msg: format!(
-                "Got non zero return code from stackable-krb5-provision-keytab: [{:?}]",
-                output.status.code()
+                "Got non zero return code {:?} from stackable-krb5-provision-keytab. STDERR output was: {}",
+                output.status.code(),
+                String::from_utf8(output.stderr).unwrap_or_else(|_| "<invalid utf-8>".to_owned()),
             ),
         })
     }
