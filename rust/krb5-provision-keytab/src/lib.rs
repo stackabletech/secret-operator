@@ -34,6 +34,7 @@ pub enum AdminBackend {
         generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
     },
 }
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ActiveDirectorySamAccountNameRules {
     pub prefix: String,
@@ -71,25 +72,65 @@ pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<
     let req_str = serde_json::to_vec(&req).context(SerializeRequestSnafu)?;
 
     let mut child = Command::new("stackable-krb5-provision-keytab")
+        // make sure the process is killed if we error out of this fn somewhere due to
+        // an error when writing to stdin or getting stdout
+        // Usually we'd expect the process to terminate on its own, this is a fail safe to ensure
+        // it gets killed in case it hangs for some reason.
         .kill_on_drop(true)
         .env("KRB5_CONFIG", krb5_config_path)
         // ldap3 uses the default client keytab to authenticate to the LDAP server
         .env("KRB5_CLIENT_KTNAME", &req.admin_keytab_path)
-        // avoid leaking credentials between secret volumes/secretclasses
+        // avoid leaking credentials between secret volumes/secretclasses by only storing the
+        // TGT that is obtained for the operation in the memory of the short lives process
+        // spawned by `Command::new` above - this way it'll be wiped from memory once this exits
+        // With any shared or persistent ticket cache this might stick around and potentially be
+        // reused by other volumes (which could cause privilege escalations and similar fun issues)
         .env("KRB5CCNAME", "MEMORY:")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
         .context(SpawnProvisionerSnafu)?;
-    let mut stdin = child.stdin.take().unwrap();
+
+    // Get a `ChildStdin` object for the spawned process and write the serialized request
+    // for a Principal into it in order for the child process to deserialize it and
+    // process the request
+    let mut stdin = child
+        .stdin
+        .take()
+        // a failure here has some fundamental reason like us taking ownership of the pipe
+        // earlier, which is most probably more a coding than a runtime error - this is
+        // why this error is not handled here, but we panic instead
+        .expect(
+            "Failed to take ownership of stdin pipe of stackable-krb5-provision-keytab command! ",
+        );
     stdin.write_all(&req_str).await.context(WriteRequestSnafu)?;
     stdin.flush().await.context(WriteRequestSnafu)?;
     drop(stdin);
+
+    // Wait for the process to finish and capture output
+    // This will always return Ok(...) regardless of exit code or output of the child process
+    // Failure here means that something went wrong with connecting to the process or obtaining
+    // exit code or output
     let output = child
         .wait_with_output()
         .await
         .context(WaitProvisionerSnafu)?;
-    serde_json::from_slice::<Result<Response, String>>(&output.stdout)
-        .context(DeserializeResponseSnafu)?
-        .map_err(|msg| Error::RunProvisioner { msg })
+
+    // Check if the spawned command returned 0 as return code
+    if output.status.success() {
+        // Check for success of the operation by deserializing stdout of the process to a `Response`
+        // struct - since `Response` is an empty struct with no fields this effectively means that
+        // any output will fail to deserialize and cause an `Error::RunProvisioner` to be propagated
+        // with the output of the child process
+        serde_json::from_slice::<Result<Response, String>>(&output.stdout)
+            .context(DeserializeResponseSnafu)?
+            .map_err(|msg| Error::RunProvisioner { msg })
+    } else {
+        Err(Error::RunProvisioner {
+            msg: format!(
+                "Got non zero return code from stackable-krb5-provision-keytab: [{:?}]",
+                output.status.code()
+            ),
+        })
+    }
 }
