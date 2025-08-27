@@ -40,6 +40,9 @@ tests:
   - name: tls-truststore
     dimensions:
       - openshift
+  - name: tls-ca-expiry-threshold
+    dimensions:
+      - openshift
   - name: cert-manager-tls
     dimensions:
       - openshift

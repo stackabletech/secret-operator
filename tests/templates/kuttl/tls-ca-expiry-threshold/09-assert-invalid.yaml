@@ -1,0 +1,16 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 300
+---
+# Assert that the invalid consumer job exists but cannot complete successfully
+# due to the CA expiry threshold preventing volume mount
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ca-expiry-invalid-consumer
+status:
+  # Job should be trying but not succeeding
+  ready: 0
+  terminating: 0
+  active: 1

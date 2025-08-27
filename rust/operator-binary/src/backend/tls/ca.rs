@@ -614,27 +614,49 @@ impl Manager {
     }
 
     /// Get an appropriate [`CertificateAuthority`] for signing a given certificate.
+    ///
+    /// The selected CA must outlive the certificate by at least `min_remaining_lifetime`.
+    /// If `min_remaining_lifetime` is None, any CA that outlives the certificate will be acceptable.
     pub fn find_certificate_authority_for_signing(
         &self,
         valid_until_at_least: OffsetDateTime,
+        min_remaining_lifetime: Option<Duration>,
     ) -> Result<&CertificateAuthority, GetCaError> {
         use get_ca_error::*;
+
+        let cutoff = match min_remaining_lifetime {
+            Some(min_lifetime) => valid_until_at_least + min_lifetime,
+            None => valid_until_at_least,
+        };
+
         self.certificate_authorities
             .iter()
-            .filter(|ca| ca.not_after > valid_until_at_least)
+            .filter(|ca| ca.not_after > cutoff)
             // pick the oldest valid CA, since it will be trusted by the most peers
             .min_by_key(|ca| ca.not_after)
             .with_context(|| NoCaLivesLongEnoughSnafu {
-                cutoff: valid_until_at_least,
+                cutoff,
                 secret: self.source_secret.clone(),
             })
     }
 
     /// Get all active trust root certificates.
-    pub fn trust_roots(&self) -> impl IntoIterator<Item = &X509> + '_ {
+    /// If `min_remaining_lifetime` is specified, only CAs that will stay valid for at least that long
+    /// will be returned. Otherwise all CAs (including expired ones) will be returned.
+    pub fn trust_roots(&self, min_remaining_lifetime: Option<Duration>) -> Vec<&X509> {
+        let cutoff =
+            min_remaining_lifetime.map(|min_lifetime| OffsetDateTime::now_utc() + min_lifetime);
+
         self.certificate_authorities
             .iter()
+            .filter(|ca| cutoff.is_none_or(|cutoff| ca.not_after >= cutoff))
             .map(|ca| &ca.certificate)
-            .chain(&self.additional_trusted_certificates)
+            .chain(self.additional_trusted_certificates.iter().filter(|cert| {
+                cutoff.is_none_or(|cutoff| {
+                    crate::utils::asn1time_to_offsetdatetime(cert.not_after())
+                        .is_ok_and(|not_after| not_after >= cutoff)
+                })
+            }))
+            .collect()
     }
 }
