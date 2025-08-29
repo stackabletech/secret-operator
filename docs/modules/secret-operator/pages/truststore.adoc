@@ -14,7 +14,7 @@ include::example$truststore-tls.yaml[]
 <1> Also used to name the created ConfigMap
 <2> Mandatory name of the xref:secretclass.adoc[]
 <3> Optional requested xref:secretclass.adoc#format[format]
-<4> Option Kubernetes resource, which should be used to output the requested information to.
+<4> Optional Kubernetes resource kind, which should be used to output the requested information to.
     Either `ConfigMap` or `Secret`, defaults to `ConfigMap`.
 
 This will create a ConfigMap (or `Secret` based on `targetKind`) named `truststore-pem` containing a `ca.crt` with the trust root certificates.
