@@ -32,7 +32,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     OPERATOR_NAME,
     backend::{self, SecretBackendError, TrustSelector},
-    crd::{SearchNamespaceMatchCondition, SecretClass, TrustStore, TrustStoreOutputType},
+    crd::v1alpha1,
     format::{
         self,
         well_known::{CompatibilityOptions, NamingOptions},
@@ -46,7 +46,7 @@ const FULL_CONTROLLER_NAME: &str = concatcp!(CONTROLLER_NAME, ".", OPERATOR_NAME
 pub async fn start(client: &stackable_operator::client::Client, watch_namespace: &WatchNamespace) {
     let (secretclasses, secretclasses_writer) = reflector::store();
     let controller = Controller::new(
-        watch_namespace.get_api::<DeserializeGuard<TrustStore>>(client),
+        watch_namespace.get_api::<DeserializeGuard<v1alpha1::TrustStore>>(client),
         watcher::Config::default(),
     );
     let truststores = controller.store();
@@ -60,7 +60,7 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
     controller
         .watches_stream(
             watcher(
-                client.get_api::<DeserializeGuard<SecretClass>>(&()),
+                client.get_api::<DeserializeGuard<v1alpha1::SecretClass>>(&()),
                 watcher::Config::default(),
             )
             .reflect(secretclasses_writer)
@@ -124,29 +124,33 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
         .await;
 }
 
-/// Resolves modifications to dependencies of [`SecretClass`] objects into
-/// a list of affected [`TrustStore`]s.
+/// Resolves modifications to dependencies of [`v1alpha1::SecretClass`] objects into
+/// a list of affected [`v1alpha1::TrustStore`]s.
 fn secretclass_dependency_watch_mapper<Dep: Resource, Conds>(
-    truststores: reflector::Store<DeserializeGuard<TrustStore>>,
-    secretclasses: reflector::Store<DeserializeGuard<SecretClass>>,
-    reference_conditions: impl Copy + Fn(&SecretClass, &Dep) -> Conds,
-) -> impl Fn(Dep) -> Vec<ObjectRef<DeserializeGuard<TrustStore>>>
+    truststores: reflector::Store<DeserializeGuard<v1alpha1::TrustStore>>,
+    secretclasses: reflector::Store<DeserializeGuard<v1alpha1::SecretClass>>,
+    reference_conditions: impl Copy + Fn(&v1alpha1::SecretClass, &Dep) -> Conds,
+) -> impl Fn(Dep) -> Vec<ObjectRef<DeserializeGuard<v1alpha1::TrustStore>>>
 where
-    Conds: IntoIterator<Item = SearchNamespaceMatchCondition>,
+    Conds: IntoIterator<Item = v1alpha1::SearchNamespaceMatchCondition>,
 {
     move |dep| {
-        let potentially_matching_secretclasses = secretclasses
-            .state()
-            .into_iter()
-            .filter_map(move |sc| {
-                sc.0.as_ref().ok().and_then(|sc| {
-                    let conditions = reference_conditions(sc, &dep)
-                        .into_iter()
-                        .collect::<Vec<_>>();
-                    (!conditions.is_empty()).then(|| (ObjectRef::from_obj(sc), conditions))
+        let potentially_matching_secretclasses =
+            secretclasses
+                .state()
+                .into_iter()
+                .filter_map(move |sc| {
+                    sc.0.as_ref().ok().and_then(|sc| {
+                        let conditions = reference_conditions(sc, &dep)
+                            .into_iter()
+                            .collect::<Vec<_>>();
+                        (!conditions.is_empty()).then(|| (ObjectRef::from_obj(sc), conditions))
+                    })
                 })
-            })
-            .collect::<HashMap<ObjectRef<SecretClass>, Vec<SearchNamespaceMatchCondition>>>();
+                .collect::<HashMap<
+                    ObjectRef<v1alpha1::SecretClass>,
+                    Vec<v1alpha1::SearchNamespaceMatchCondition>,
+                >>();
         truststores
             .state()
             .into_iter()
@@ -156,7 +160,7 @@ where
                         return false;
                     };
                     let secret_class_ref =
-                        ObjectRef::<SecretClass>::new(&ts.spec.secret_class_name);
+                        ObjectRef::<v1alpha1::SecretClass>::new(&ts.spec.secret_class_name);
                     potentially_matching_secretclasses
                         .get(&secret_class_ref)
                         .is_some_and(|conds| {
@@ -182,13 +186,13 @@ pub enum Error {
     #[snafu(display("failed to get {secret_class} for TrustStore"))]
     GetSecretClass {
         source: stackable_operator::client::Error,
-        secret_class: ObjectRef<SecretClass>,
+        secret_class: ObjectRef<v1alpha1::SecretClass>,
     },
 
     #[snafu(display("failed to initialize SecretClass backend for {secret_class}"))]
     InitBackend {
         source: backend::dynamic::FromClassError,
-        secret_class: ObjectRef<SecretClass>,
+        secret_class: ObjectRef<v1alpha1::SecretClass>,
     },
 
     #[snafu(display("failed to get trust data from backend"))]
@@ -200,7 +204,7 @@ pub enum Error {
     #[snafu(display("failed to convert trust data into desired format"))]
     FormatData {
         source: format::IntoFilesError,
-        secret_class: ObjectRef<SecretClass>,
+        secret_class: ObjectRef<v1alpha1::SecretClass>,
     },
 
     #[snafu(display("failed to build owner reference to the TrustStore"))]
@@ -247,7 +251,7 @@ struct Ctx {
 }
 
 async fn reconcile(
-    truststore: Arc<DeserializeGuard<TrustStore>>,
+    truststore: Arc<DeserializeGuard<v1alpha1::TrustStore>>,
     ctx: Arc<Ctx>,
 ) -> Result<controller::Action> {
     let truststore = truststore
@@ -258,10 +262,10 @@ async fn reconcile(
     let secret_class_name = &truststore.spec.secret_class_name;
     let secret_class = ctx
         .client
-        .get::<SecretClass>(secret_class_name, &())
+        .get::<v1alpha1::SecretClass>(secret_class_name, &())
         .await
         .context(GetSecretClassSnafu {
-            secret_class: ObjectRef::<SecretClass>::new(secret_class_name),
+            secret_class: ObjectRef::<v1alpha1::SecretClass>::new(secret_class_name),
         })?;
     let secret_class_ref = secret_class.to_object_ref(());
     let backend = backend::dynamic::from_class(&ctx.client, secret_class)
@@ -306,7 +310,7 @@ async fn reconcile(
         .build();
 
     match truststore.spec.target_kind {
-        TrustStoreOutputType::ConfigMap => {
+        v1alpha1::TrustStoreOutputType::ConfigMap => {
             let trust_cm = ConfigMap {
                 metadata: trust_metadata,
                 data: Some(string_data),
@@ -320,7 +324,7 @@ async fn reconcile(
                     config_map: &trust_cm,
                 })?;
         }
-        TrustStoreOutputType::Secret => {
+        v1alpha1::TrustStoreOutputType::Secret => {
             let trust_secret = Secret {
                 metadata: trust_metadata,
                 string_data: Some(string_data),
@@ -340,7 +344,7 @@ async fn reconcile(
 }
 
 fn error_policy(
-    _obj: Arc<DeserializeGuard<TrustStore>>,
+    _obj: Arc<DeserializeGuard<v1alpha1::TrustStore>>,
     _error: &Error,
     _ctx: Arc<Ctx>,
 ) -> controller::Action {
