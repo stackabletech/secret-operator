@@ -4,10 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Support exporting the TrustStore CA certificate information to Secrets or ConfigMaps ([#597]).
+
 ### Changed
 
 - Version CRD structs and enums as v1alpha1 ([#636]).
 
+[#597]: https://github.com/stackabletech/secret-operator/pull/597
 [#636]: https://github.com/stackabletech/secret-operator/pull/636
 
 ## [25.7.0] - 2025-07-23

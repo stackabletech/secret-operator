@@ -12,10 +12,12 @@ A TrustStore looks like this:
 include::example$truststore-tls.yaml[]
 ----
 <1> Also used to name the created ConfigMap
-<2> The name of the xref:secretclass.adoc[]
-<3> The requested xref:secretclass.adoc#format[format]
+<2> Mandatory name of the xref:secretclass.adoc[]
+<3> Optional requested xref:secretclass.adoc#format[format]
+<4> Optional Kubernetes resource kind, which should be used to output the requested information to.
+    Either `ConfigMap` or `Secret`, defaults to `ConfigMap`.
 
-This will create a ConfigMap named `truststore-pem` containing a `ca.crt` with the trust root certificates.
+This will create a ConfigMap (or `Secret` based on `targetKind`) named `truststore-pem` containing a `ca.crt` with the trust root certificates.
 It can then either be mounted into a Pod or retrieved and used from outside of Kubernetes.
 
 NOTE: Make sure to have a procedure for updating the retrieved certificates.
