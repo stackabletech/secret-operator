@@ -22,10 +22,7 @@ use super::{
     scope::SecretScope,
 };
 use crate::{
-    crd::{
-        ActiveDirectorySamAccountNameRules, InvalidKerberosPrincipal, KerberosKeytabBackendAdmin,
-        KerberosPrincipal,
-    },
+    crd::{KerberosPrincipal, v1alpha1},
     format::{SecretData, WellKnownSecretData, well_known},
     utils::Unloggable,
 };
@@ -62,7 +59,9 @@ pub enum Error {
     },
 
     #[snafu(display("generated invalid Kerberos principal for pod"))]
-    PodPrincipal { source: InvalidKerberosPrincipal },
+    PodPrincipal {
+        source: v1alpha1::InvalidKerberosPrincipal,
+    },
 
     #[snafu(display("failed to read the provisioned keytab"))]
     ReadProvisionedKeytab { source: std::io::Error },
@@ -106,7 +105,7 @@ impl SecretBackendError for Error {
 pub struct KerberosProfile {
     pub realm_name: KerberosRealmName,
     pub kdc: HostName,
-    pub admin: KerberosKeytabBackendAdmin,
+    pub admin: v1alpha1::KerberosKeytabBackendAdmin,
 }
 
 #[derive(Debug)]
@@ -169,10 +168,10 @@ impl SecretBackend for KerberosKeytab {
         } = self;
 
         let admin_server_clause = match admin {
-            KerberosKeytabBackendAdmin::Mit { kadmin_server } => {
+            v1alpha1::KerberosKeytabBackendAdmin::Mit { kadmin_server } => {
                 format!("  admin_server = {kadmin_server}")
             }
-            KerberosKeytabBackendAdmin::ActiveDirectory { .. } => String::new(),
+            v1alpha1::KerberosKeytabBackendAdmin::ActiveDirectory { .. } => String::new(),
         };
 
         let tmp = tempdir().context(TempSetupSnafu)?;
@@ -254,10 +253,10 @@ cluster.local = {realm_name}
                     })
                     .collect(),
                 admin_backend: match admin {
-                    KerberosKeytabBackendAdmin::Mit { .. } => {
+                    v1alpha1::KerberosKeytabBackendAdmin::Mit { .. } => {
                         stackable_krb5_provision_keytab::AdminBackend::Mit
                     }
-                    KerberosKeytabBackendAdmin::ActiveDirectory {
+                    v1alpha1::KerberosKeytabBackendAdmin::ActiveDirectory {
                         ldap_server,
                         ldap_tls_ca_secret,
                         password_cache_secret,
@@ -271,7 +270,7 @@ cluster.local = {realm_name}
                         user_distinguished_name: user_distinguished_name.clone(),
                         schema_distinguished_name: schema_distinguished_name.clone(),
                         generate_sam_account_name: generate_sam_account_name.clone().map(
-                            |ActiveDirectorySamAccountNameRules {
+                            |v1alpha1::ActiveDirectorySamAccountNameRules {
                                  prefix,
                                  total_length,
                              }| {
