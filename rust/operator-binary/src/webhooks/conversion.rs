@@ -10,17 +10,24 @@ use stackable_operator::{
     },
 };
 
-use crate::OPERATOR_NAME;
+use crate::{
+    OPERATOR_NAME,
+    crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion},
+};
 
 pub async fn conversion_webhook(
     client: Client,
     operator_environment: OperatorEnvironmentOptions,
 ) -> anyhow::Result<ConversionWebhookServer> {
     let crds_and_handlers = [
-        // (
-        //     SecretClass::merged_crd(SecretClassVersion::V1Alpha1)?,
-        //     SecretClass::try_convert as fn(_) -> _,
-        // ),
+        (
+            SecretClass::merged_crd(SecretClassVersion::V1Alpha1)?,
+            SecretClass::try_convert as fn(_) -> _,
+        ),
+        (
+            TrustStore::merged_crd(TrustStoreVersion::V1Alpha1)?,
+            TrustStore::try_convert as fn(_) -> _,
+        ),
         (
             Person::merged_crd(PersonVersion::V1Alpha1)?,
             Person::try_convert as fn(_) -> _,
