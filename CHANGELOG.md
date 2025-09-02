@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Version CRD structs and enums as v1alpha1 ([#636]).
+
+[#636]: https://github.com/stackabletech/secret-operator/pull/636
+
 ## [25.7.0] - 2025-07-23
 
 ## [25.7.0-rc1] - 2025-07-18

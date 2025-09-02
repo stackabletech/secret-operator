@@ -6,24 +6,27 @@ use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
 
 use anyhow::{Context, anyhow};
 use clap::Parser;
+use csi_server::{
+    controller::SecretProvisionerController, identity::SecretProvisionerIdentity,
+    node::SecretProvisionerNode,
+};
 use futures::{FutureExt, TryFutureExt, TryStreamExt, future::try_join};
-use stackable_operator::{CustomResourceExt, cli::ProductOperatorRun, telemetry::Tracing};
+use grpc::csi::v1::{
+    controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
+};
+use stackable_operator::{
+    YamlSchema,
+    cli::{CommonOptions, ProductOperatorRun},
+    shared::yaml::SerializeOptions,
+    telemetry::Tracing,
+};
 use tokio::signal::unix::{SignalKind, signal};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
+use utils::{TonicUnixStream, uds_bind_private};
+use webhooks::conversion::conversion_webhook;
 
-use crate::{
-    csi_server::{
-        controller::SecretProvisionerController, identity::SecretProvisionerIdentity,
-        node::SecretProvisionerNode,
-    },
-    grpc::csi::v1::{
-        controller_server::ControllerServer, identity_server::IdentityServer,
-        node_server::NodeServer,
-    },
-    utils::{TonicUnixStream, uds_bind_private},
-    webhooks::conversion::conversion_webhook,
-};
+use crate::crd::{SecretClass, TrustStore};
 
 mod backend;
 mod crd;
@@ -71,19 +74,24 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         stackable_operator::cli::Command::Crd => {
-            crd::SecretClass::print_yaml_schema(built_info::PKG_VERSION)?;
-            crd::TrustStore::print_yaml_schema(built_info::PKG_VERSION)?;
+            SecretClass::merged_crd(crd::SecretClassVersion::V1Alpha1)?
+                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
+            TrustStore::merged_crd(crd::TrustStoreVersion::V1Alpha1)?
+                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun {
             csi_endpoint,
             privileged,
             common:
                 ProductOperatorRun {
+                    common:
+                        CommonOptions {
+                            telemetry,
+                            cluster_info,
+                        },
                     product_config: _,
                     watch_namespace,
                     operator_environment,
-                    telemetry,
-                    cluster_info,
                 },
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
