@@ -9,7 +9,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-stackable-secret-operator-crd-utils = { path = "../crd-utils" }
+stackable-secret-operator-utils = { path = "../utils", features = ["crd"] }
 krb5.workspace = true
 
 byteorder.workspace = true

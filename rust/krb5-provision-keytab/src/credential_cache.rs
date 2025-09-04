@@ -8,7 +8,7 @@ use stackable_operator::{
         runtime::reflector::ObjectRef,
     },
 };
-use stackable_secret_operator_crd_utils::SecretReference;
+use stackable_secret_operator_utils::crd::SecretReference;
 
 const OPERATOR_NAME: &str = "secrets.stackable.tech";
 const FIELD_MANAGER_SCOPE: &str = "krb5-provision-keytab";

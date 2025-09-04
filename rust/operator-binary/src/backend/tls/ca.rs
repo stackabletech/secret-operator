@@ -32,7 +32,7 @@ use stackable_operator::{
     },
     shared::time::Duration,
 };
-use stackable_secret_operator_crd_utils::{ConfigMapReference, SecretReference};
+use stackable_secret_operator_utils::crd::{ConfigMapReference, SecretReference};
 use time::OffsetDateTime;
 use tracing::{info, info_span, warn};
 

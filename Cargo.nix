@@ -68,20 +68,30 @@ rec {
       # File a bug if you depend on any for non-debug work!
       debug = internal.debugCrate { inherit packageId; };
     };
-    "stackable-secret-operator-crd-utils" = rec {
-      packageId = "stackable-secret-operator-crd-utils";
+    "stackable-secret-operator-olm-deployer" = rec {
+      packageId = "stackable-secret-operator-olm-deployer";
       build = internal.buildRustCrateWithFeatures {
-        packageId = "stackable-secret-operator-crd-utils";
+        packageId = "stackable-secret-operator-olm-deployer";
       };
 
       # Debug support which might change between releases.
       # File a bug if you depend on any for non-debug work!
       debug = internal.debugCrate { inherit packageId; };
     };
-    "stackable-secret-operator-olm-deployer" = rec {
-      packageId = "stackable-secret-operator-olm-deployer";
+    "stackable-secret-operator-utils" = rec {
+      packageId = "stackable-secret-operator-utils";
       build = internal.buildRustCrateWithFeatures {
-        packageId = "stackable-secret-operator-olm-deployer";
+        packageId = "stackable-secret-operator-utils";
+      };
+
+      # Debug support which might change between releases.
+      # File a bug if you depend on any for non-debug work!
+      debug = internal.debugCrate { inherit packageId; };
+    };
+    "stackable-truststore-merger" = rec {
+      packageId = "stackable-truststore-merger";
+      build = internal.buildRustCrateWithFeatures {
+        packageId = "stackable-truststore-merger";
       };
 
       # Debug support which might change between releases.
@@ -10009,11 +10019,12 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "time" "telemetry" ];
+            features = [ "time" "telemetry" "versioned" ];
           }
           {
-            name = "stackable-secret-operator-crd-utils";
-            packageId = "stackable-secret-operator-crd-utils";
+            name = "stackable-secret-operator-utils";
+            packageId = "stackable-secret-operator-utils";
+            features = [ "crd" ];
           }
           {
             name = "tokio";
@@ -10333,11 +10344,12 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "time" "telemetry" ];
+            features = [ "time" "telemetry" "versioned" ];
           }
           {
-            name = "stackable-secret-operator-crd-utils";
-            packageId = "stackable-secret-operator-crd-utils";
+            name = "stackable-secret-operator-utils";
+            packageId = "stackable-secret-operator-utils";
+            features = [ "crd" ];
           }
           {
             name = "strum";
@@ -10389,10 +10401,6 @@ rec {
             packageId = "uuid";
             features = [ "v4" ];
           }
-          {
-            name = "yasna";
-            packageId = "yasna";
-          }
         ];
         buildDependencies = [
           {
@@ -10409,29 +10417,6 @@ rec {
           {
             name = "serde_yaml";
             packageId = "serde_yaml";
-          }
-        ];
-
-      };
-      "stackable-secret-operator-crd-utils" = rec {
-        crateName = "stackable-secret-operator-crd-utils";
-        version = "0.0.0-dev";
-        edition = "2021";
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/crd-utils; };
-        libName = "stackable_secret_operator_crd_utils";
-        authors = [
-          "Stackable GmbH <info@stackable.tech>"
-        ];
-        dependencies = [
-          {
-            name = "serde";
-            packageId = "serde";
-            features = [ "derive" ];
-          }
-          {
-            name = "stackable-operator";
-            packageId = "stackable-operator";
-            features = [ "time" "telemetry" ];
           }
         ];
 
@@ -10476,7 +10461,7 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "time" "telemetry" ];
+            features = [ "time" "telemetry" "versioned" ];
           }
           {
             name = "tokio";
@@ -10500,6 +10485,56 @@ rec {
           }
         ];
 
+      };
+      "stackable-secret-operator-utils" = rec {
+        crateName = "stackable-secret-operator-utils";
+        version = "0.0.0-dev";
+        edition = "2021";
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/utils; };
+        libName = "stackable_secret_operator_utils";
+        authors = [
+          "Stackable GmbH <info@stackable.tech>"
+        ];
+        dependencies = [
+          {
+            name = "openssl";
+            packageId = "openssl";
+          }
+          {
+            name = "p12";
+            packageId = "p12";
+          }
+          {
+            name = "serde";
+            packageId = "serde";
+            optional = true;
+            features = [ "derive" ];
+          }
+          {
+            name = "snafu";
+            packageId = "snafu 0.8.7";
+          }
+          {
+            name = "stackable-operator";
+            packageId = "stackable-operator";
+            optional = true;
+            features = [ "time" "telemetry" "versioned" ];
+          }
+          {
+            name = "yasna";
+            packageId = "yasna";
+          }
+        ];
+        devDependencies = [
+          {
+            name = "anyhow";
+            packageId = "anyhow";
+          }
+        ];
+        features = {
+          "crd" = [ "dep:stackable-operator" "dep:serde" ];
+        };
+        resolvedDefaultFeatures = [ "crd" "default" ];
       };
       "stackable-shared" = rec {
         crateName = "stackable-shared";
@@ -10685,6 +10720,51 @@ rec {
           "clap" = [ "dep:clap" ];
         };
         resolvedDefaultFeatures = [ "clap" ];
+      };
+      "stackable-truststore-merger" = rec {
+        crateName = "stackable-truststore-merger";
+        version = "0.0.0-dev";
+        edition = "2021";
+        crateBin = [
+          {
+            name = "stackable-truststore-merger";
+            path = "src/main.rs";
+            requiredFeatures = [ ];
+          }
+        ];
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/truststore-merger; };
+        authors = [
+          "Stackable GmbH <info@stackable.tech>"
+        ];
+        dependencies = [
+          {
+            name = "anyhow";
+            packageId = "anyhow";
+          }
+          {
+            name = "clap";
+            packageId = "clap";
+            features = [ "derive" ];
+          }
+          {
+            name = "openssl";
+            packageId = "openssl";
+          }
+          {
+            name = "stackable-secret-operator-utils";
+            packageId = "stackable-secret-operator-utils";
+          }
+          {
+            name = "tracing";
+            packageId = "tracing";
+          }
+          {
+            name = "tracing-subscriber";
+            packageId = "tracing-subscriber";
+            features = [ "env-filter" ];
+          }
+        ];
+
       };
       "stackable-versioned" = rec {
         crateName = "stackable-versioned";

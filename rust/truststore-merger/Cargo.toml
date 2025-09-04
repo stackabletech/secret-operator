@@ -1,0 +1,18 @@
+[package]
+name = "stackable-truststore-merger"
+description = "A CLI tool to merge two pkcs12 truststores in such as way that they are accepted by the JVM"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+stackable-secret-operator-utils = { path = "../utils" }
+
+anyhow.workspace = true
+clap = { workspace = true, features = ["derive"] }
+openssl.workspace = true
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }

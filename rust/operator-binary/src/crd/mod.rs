@@ -6,7 +6,7 @@ use stackable_operator::{
     shared::time::Duration,
     versioned::versioned,
 };
-use stackable_secret_operator_crd_utils::{ConfigMapReference, SecretReference};
+use stackable_secret_operator_utils::crd::{ConfigMapReference, SecretReference};
 
 use crate::format::SecretFormat;
 

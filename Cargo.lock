@@ -3079,7 +3079,7 @@ dependencies = [
  "serde_json",
  "snafu 0.8.7",
  "stackable-operator",
- "stackable-secret-operator-crd-utils",
+ "stackable-secret-operator-utils",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -3160,7 +3160,7 @@ dependencies = [
  "socket2",
  "stackable-krb5-provision-keytab",
  "stackable-operator",
- "stackable-secret-operator-crd-utils",
+ "stackable-secret-operator-utils",
  "strum",
  "sys-mount",
  "tempfile",
@@ -3173,15 +3173,6 @@ dependencies = [
  "tonic-reflection",
  "tracing",
  "uuid",
- "yasna",
-]
-
-[[package]]
-name = "stackable-secret-operator-crd-utils"
-version = "0.0.0-dev"
-dependencies = [
- "serde",
- "stackable-operator",
 ]
 
 [[package]]
@@ -3198,6 +3189,19 @@ dependencies = [
  "tokio",
  "tracing",
  "walkdir",
+]
+
+[[package]]
+name = "stackable-secret-operator-utils"
+version = "0.0.0-dev"
+dependencies = [
+ "anyhow",
+ "openssl",
+ "p12",
+ "serde",
+ "snafu 0.8.7",
+ "stackable-operator",
+ "yasna",
 ]
 
 [[package]]
@@ -3237,6 +3241,18 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-opentelemetry",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "stackable-truststore-merger"
+version = "0.0.0-dev"
+dependencies = [
+ "anyhow",
+ "clap",
+ "openssl",
+ "stackable-secret-operator-utils",
+ "tracing",
  "tracing-subscriber",
 ]
 
