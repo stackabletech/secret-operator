@@ -10009,7 +10009,7 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "time" "telemetry" ];
+            features = [ "time" "telemetry" "versioned" ];
           }
           {
             name = "stackable-secret-operator-crd-utils";
@@ -10333,7 +10333,7 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "time" "telemetry" ];
+            features = [ "time" "telemetry" "versioned" ];
           }
           {
             name = "stackable-secret-operator-crd-utils";
@@ -10431,7 +10431,7 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "time" "telemetry" ];
+            features = [ "time" "telemetry" "versioned" ];
           }
         ];
 
@@ -10476,7 +10476,7 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "time" "telemetry" ];
+            features = [ "time" "telemetry" "versioned" ];
           }
           {
             name = "tokio";
