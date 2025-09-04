@@ -8,6 +8,7 @@ use stackable_secret_operator_utils::pkcs12::pkcs12_truststore;
 use tracing::{info, level_filters::LevelFilter, warn};
 
 mod cli_args;
+mod parsers;
 
 pub fn main() -> anyhow::Result<()> {
     let filter = tracing_subscriber::EnvFilter::builder()
@@ -71,11 +72,12 @@ pub fn main() -> anyhow::Result<()> {
         }
     }
 
-    let pkcs12_truststore_bytes = pkcs12_truststore(certificates.values().map(|c| &**c), "")
-        .context("failed to create pkcs12 truststore from certificates")?;
+    let pkcs12_truststore_bytes =
+        pkcs12_truststore(certificates.values().map(|c| &**c), &cli.out_password)
+            .context("failed to create PKCS12 truststore from certificates")?;
     fs::write(&cli.out, &pkcs12_truststore_bytes).with_context(|| {
         format!(
-            "failed to write to output pkcs12 truststore at {:?}",
+            "failed to write to output PKCS12 truststore at {:?}",
             cli.out
         )
     })?;
