@@ -3246,7 +3246,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-truststore-merger"
-version = "0.0.0-dev"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "clap",
