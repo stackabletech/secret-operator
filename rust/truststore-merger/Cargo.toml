@@ -1,5 +1,5 @@
 [package]
-name = "stackable-truststore-merger"
+name = "truststore-merger"
 description = "A CLI tool to merge two truststores in PEM or PKCS12 format in such as way that they are accepted by the JVM"
 version = "0.0.1"
 authors.workspace = true

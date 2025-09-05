@@ -3245,18 +3245,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "stackable-truststore-merger"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "clap",
- "openssl",
- "stackable-secret-operator-utils",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "stackable-versioned"
 version = "0.8.1"
 source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0#89f484ca4e86b565e083e9ad7573e21dbe29a3af"
@@ -3817,6 +3805,18 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "truststore-merger"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "openssl",
+ "stackable-secret-operator-utils",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
