@@ -19,11 +19,11 @@ pub async fn conversion_webhook(
 ) -> anyhow::Result<ConversionWebhookServer> {
     let crds_and_handlers = [
         (
-            SecretClass::merged_crd(SecretClassVersion::V1Alpha1)?,
+            SecretClass::merged_crd(SecretClassVersion::V1Alpha2)?,
             SecretClass::try_convert as fn(_) -> _,
         ),
         (
-            TrustStore::merged_crd(TrustStoreVersion::V1Alpha1)?,
+            TrustStore::merged_crd(TrustStoreVersion::V1Alpha2)?,
             TrustStore::try_convert as fn(_) -> _,
         ),
     ];

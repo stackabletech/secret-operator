@@ -38,7 +38,7 @@ use tracing::{info, info_span, warn};
 
 use crate::{
     backend::SecretBackendError,
-    crd::v1alpha1,
+    crd::v1alpha2,
     utils::{Asn1TimeParseError, Unloggable, asn1time_to_offsetdatetime},
 };
 
@@ -202,7 +202,7 @@ pub struct Config {
     pub rotate_if_ca_expires_before: Option<Duration>,
 
     /// Configuration how TLS private keys should be created.
-    pub key_generation: v1alpha1::CertificateKeyGeneration,
+    pub key_generation: v1alpha2::CertificateKeyGeneration,
 }
 
 /// A single certificate authority certificate.
@@ -241,7 +241,7 @@ impl CertificateAuthority {
             Conf::new(ConfMethod::default()).expect("failed to initialize OpenSSL configuration");
 
         let private_key_length = match config.key_generation {
-            v1alpha1::CertificateKeyGeneration::Rsa { length } => length,
+            v1alpha2::CertificateKeyGeneration::Rsa { length } => length,
         };
 
         let private_key = Rsa::generate(private_key_length)
@@ -348,7 +348,7 @@ impl Manager {
     pub async fn load_or_create(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
-        additional_trust_roots: &[v1alpha1::AdditionalTrustRoot],
+        additional_trust_roots: &[v1alpha2::AdditionalTrustRoot],
         config: &Config,
     ) -> Result<Self> {
         // Use entry API rather than apply so that we crash and retry on conflicts (to avoid creating spurious certs that we throw away immediately)
@@ -496,10 +496,10 @@ impl Manager {
         let mut additional_trusted_certificates = vec![];
         for entry in additional_trust_roots {
             let certs = match entry {
-                v1alpha1::AdditionalTrustRoot::ConfigMap(config_map) => {
+                v1alpha2::AdditionalTrustRoot::ConfigMap(config_map) => {
                     Self::read_extra_trust_roots_from_config_map(client, config_map).await?
                 }
-                v1alpha1::AdditionalTrustRoot::Secret(secret) => {
+                v1alpha2::AdditionalTrustRoot::Secret(secret) => {
                     Self::read_extra_trust_roots_from_secret(client, secret).await?
                 }
             };

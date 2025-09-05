@@ -1,4 +1,7 @@
+use std::{fmt::Display, ops::Deref};
+
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use stackable_operator::{
     commons::networking::{HostName, KerberosRealmName},
     kube::CustomResource,
@@ -11,26 +14,21 @@ use stackable_secret_operator_crd_utils::{ConfigMapReference, SecretReference};
 use crate::format::SecretFormat;
 
 mod v1alpha1_impl;
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(try_from = "String", into = "String")]
-pub struct KerberosPrincipal(String);
+mod v1alpha2_impl;
 
 #[versioned(
     version(name = "v1alpha1"),
+    version(name = "v1alpha2"),
     crates(
         kube_core = "stackable_operator::kube::core",
         kube_client = "stackable_operator::kube::client",
         k8s_openapi = "stackable_operator::k8s_openapi",
         schemars = "stackable_operator::schemars",
         versioned = "stackable_operator::versioned"
-    )
+    ),
+    options(k8s(enable_tracing))
 )]
 pub mod versioned {
-    pub mod v1alpha1 {
-        pub use v1alpha1_impl::*;
-    }
-
     /// A [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass) is a cluster-global Kubernetes resource
     /// that defines a category of secrets that the Secret Operator knows how to provision.
     #[versioned(crd(group = "secrets.stackable.tech"))]
@@ -112,6 +110,7 @@ pub mod versioned {
         IfPodIsInNamespace { namespace: String },
     }
 
+    // #[versioned(skip(from))]
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
     #[serde(rename_all = "camelCase")]
     pub struct AutoTlsBackend {
@@ -119,6 +118,7 @@ pub mod versioned {
         pub ca: AutoTlsCa,
 
         /// Additional trust roots which are added to the provided `ca.crt` file.
+        #[versioned(hint(vec))]
         #[serde(default)]
         pub additional_trust_roots: Vec<AdditionalTrustRoot>,
 
@@ -126,7 +126,7 @@ pub mod versioned {
         /// In case consumers request a longer lifetime than allowed by this setting,
         /// the lifetime will be the minimum of both, so this setting takes precedence.
         /// The default value is 15 days.
-        #[serde(default = "AutoTlsBackend::default_max_certificate_lifetime")]
+        #[serde(default = "v1alpha2::AutoTlsBackend::default_max_certificate_lifetime")]
         pub max_certificate_lifetime: Duration,
     }
 
@@ -149,7 +149,7 @@ pub mod versioned {
         ///
         /// If `autoGenerate: true` then the Secret Operator will prepare a new CA certificate the old CA approaches expiration.
         /// If `autoGenerate: false` then the Secret Operator will log a warning instead.
-        #[serde(default = "AutoTlsCa::default_ca_certificate_lifetime")]
+        #[serde(default = "v1alpha2::AutoTlsCa::default_ca_certificate_lifetime")]
         pub ca_certificate_lifetime: Duration,
 
         /// The algorithm used to generate a key pair and required configuration settings.
@@ -182,7 +182,7 @@ pub mod versioned {
         Rsa {
             /// The amount of bits used for generating the RSA keypair.
             /// Currently, `2048`, `3072` and `4096` are supported. Defaults to `2048` bits.
-            #[schemars(schema_with = "CertificateKeyGeneration::tls_key_length_schema")]
+            #[schemars(schema_with = "v1alpha2::CertificateKeyGeneration::tls_key_length_schema")]
             length: u32,
         },
     }
@@ -196,7 +196,7 @@ pub mod versioned {
         /// The default lifetime of certificates.
         ///
         /// Defaults to 1 day. This may need to be increased for external issuers that impose rate limits (such as Let's Encrypt).
-        #[serde(default = "CertManagerBackend::default_certificate_lifetime")]
+        #[serde(default = "v1alpha2::CertManagerBackend::default_certificate_lifetime")]
         pub default_certificate_lifetime: Duration,
 
         /// The algorithm used to generate a key pair and required configuration settings.
@@ -251,42 +251,54 @@ pub mod versioned {
     #[serde(rename_all = "camelCase")]
     pub enum KerberosKeytabBackendAdmin {
         /// Credentials should be provisioned in a MIT Kerberos Admin Server.
-        #[serde(rename_all = "camelCase")]
-        Mit {
-            /// The hostname of the Kerberos Admin Server.
-            /// This should be provided by the Kerberos administrator.
-            kadmin_server: HostName,
-        },
+        Mit(KerberosKeytabBackendMit),
 
         /// Credentials should be provisioned in a Microsoft Active Directory domain.
-        #[serde(rename_all = "camelCase")]
-        ActiveDirectory {
-            /// An AD LDAP server, such as the AD Domain Controller.
-            /// This must match the server’s FQDN, or GSSAPI authentication will fail.
-            ldap_server: HostName,
+        ActiveDirectory(KerberosKeytabBackendActiveDirectory),
+    }
 
-            /// Reference (name and namespace) to a Kubernetes Secret object containing
-            /// the TLS CA (in `ca.crt`) that the LDAP server’s certificate should be authenticated against.
-            ldap_tls_ca_secret: SecretReference,
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub struct KerberosKeytabBackendMit {
+        /// The hostname of the Kerberos Admin Server.
+        /// This should be provided by the Kerberos administrator.
+        kadmin_server: HostName,
+    }
 
-            /// Reference (name and namespace) to a Kubernetes Secret object where workload
-            /// passwords will be stored. This must not be accessible to end users.
-            password_cache_secret: SecretReference,
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub struct KerberosKeytabBackendActiveDirectory {
+        /// An AD LDAP server, such as the AD Domain Controller.
+        /// This must match the server’s FQDN, or GSSAPI authentication will fail.
+        ldap_server: HostName,
 
-            /// The root Distinguished Name (DN) where service accounts should be provisioned,
-            /// typically `CN=Users,{domain_dn}`.
-            user_distinguished_name: String,
+        /// Reference (name and namespace) to a Kubernetes Secret object containing
+        /// the TLS CA (in `ca.crt`) that the LDAP server’s certificate should be authenticated against.
+        ldap_tls_ca_secret: SecretReference,
 
-            /// The root Distinguished Name (DN) for AD-managed schemas,
-            /// typically `CN=Schema,CN=Configuration,{domain_dn}`.
-            schema_distinguished_name: String,
+        /// Reference (name and namespace) to a Kubernetes Secret object where workload
+        /// passwords will be stored. This must not be accessible to end users.
+        password_cache_secret: SecretReference,
 
-            /// Allows samAccountName generation for new accounts to be customized.
-            /// Note that setting this field (even if empty) makes the Secret Operator take
-            /// over the generation duty from the domain controller.
-            #[serde(rename = "experimentalGenerateSamAccountName")]
-            generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
-        },
+        /// The root Distinguished Name (DN) where service accounts should be provisioned,
+        /// typically `CN=Users,{domain_dn}`.
+        user_distinguished_name: String,
+
+        /// The root Distinguished Name (DN) for AD-managed schemas,
+        /// typically `CN=Schema,CN=Configuration,{domain_dn}`.
+        schema_distinguished_name: String,
+
+        /// Allows samAccountName generation for new accounts to be customized.
+        /// Note that setting this field (even if empty) makes the Secret Operator take
+        /// over the generation duty from the domain controller.
+        #[versioned(
+            changed(
+                since = "v1alpha2",
+                from_name = "experimental_generate_sam_account_name"
+            ),
+            hint(option)
+        )]
+        generate_sam_account_name: Option<ActiveDirectorySamAccountNameRules>,
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -299,7 +311,7 @@ pub mod versioned {
         /// Must be larger than the length of `prefix`, but at most `20`.
         ///
         /// Note that this should be as large as possible, to minimize the risk of collisions.
-        #[serde(default = "ActiveDirectorySamAccountNameRules::default_total_length")]
+        #[serde(default = "v1alpha2::ActiveDirectorySamAccountNameRules::default_total_length")]
         pub total_length: u8,
     }
 
@@ -319,12 +331,69 @@ pub mod versioned {
     }
 }
 
+#[derive(Debug, Snafu)]
+#[snafu(module)]
+pub enum InvalidKerberosPrincipal {
+    #[snafu(display(
+        "principal contains illegal characters (allowed: alphanumeric, /, @, -, _, and .)"
+    ))]
+    IllegalCharacter,
+
+    #[snafu(display("principal may not start with a dash"))]
+    StartWithDash,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(try_from = "String", into = "String")]
+pub struct KerberosPrincipal(String);
+
+impl TryFrom<String> for KerberosPrincipal {
+    type Error = InvalidKerberosPrincipal;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        if value.starts_with('-') {
+            invalid_kerberos_principal::StartWithDashSnafu.fail()
+        } else if value.contains(|chr: char| {
+            !chr.is_alphanumeric()
+                && chr != '/'
+                && chr != '@'
+                && chr != '.'
+                && chr != '-'
+                && chr != '_'
+        }) {
+            invalid_kerberos_principal::IllegalCharacterSnafu.fail()
+        } else {
+            Ok(KerberosPrincipal(value))
+        }
+    }
+}
+
+impl From<KerberosPrincipal> for String {
+    fn from(value: KerberosPrincipal) -> Self {
+        value.0
+    }
+}
+
+impl Display for KerberosPrincipal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl Deref for KerberosPrincipal {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::{
         backend::tls::{DEFAULT_CA_CERT_LIFETIME, DEFAULT_MAX_CERT_LIFETIME},
-        crd::v1alpha1::{
+        crd::v1alpha2::{
             AdditionalTrustRoot, AutoTlsBackend, AutoTlsCa, CertificateKeyGeneration, SecretClass,
             SecretClassBackend, SecretClassSpec,
         },

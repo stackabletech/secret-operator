@@ -2,10 +2,16 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::{ConfigMap, Secret},
     kube::api::PartialObjectMeta,
     schemars::{self, schema::Schema},
+    shared::time::Duration,
 };
 
-use crate::crd::v1alpha1::{
-    CertificateKeyGeneration, SearchNamespace, SearchNamespaceMatchCondition, SecretClassBackend,
+use crate::{
+    backend,
+    crd::v1alpha2::{
+        ActiveDirectorySamAccountNameRules, AutoTlsBackend, AutoTlsCa, CertManagerBackend,
+        CertificateKeyGeneration, SearchNamespace, SearchNamespaceMatchCondition,
+        SecretClassBackend,
+    },
 };
 
 impl SecretClassBackend {
@@ -90,6 +96,18 @@ impl SearchNamespaceMatchCondition {
     }
 }
 
+impl AutoTlsBackend {
+    pub(crate) fn default_max_certificate_lifetime() -> Duration {
+        backend::tls::DEFAULT_MAX_CERT_LIFETIME
+    }
+}
+
+impl AutoTlsCa {
+    pub(crate) fn default_ca_certificate_lifetime() -> Duration {
+        backend::tls::DEFAULT_CA_CERT_LIFETIME
+    }
+}
+
 impl CertificateKeyGeneration {
     pub const RSA_KEY_LENGTH_2048: u32 = 2048;
     pub const RSA_KEY_LENGTH_3072: u32 = 3072;
@@ -131,5 +149,18 @@ impl Default for CertificateKeyGeneration {
         Self::Rsa {
             length: Self::RSA_KEY_LENGTH_2048,
         }
+    }
+}
+
+impl CertManagerBackend {
+    pub(crate) fn default_certificate_lifetime() -> Duration {
+        backend::cert_manager::DEFAULT_CERT_LIFETIME
+    }
+}
+
+impl ActiveDirectorySamAccountNameRules {
+    pub(crate) fn default_total_length() -> u8 {
+        // Default AD samAccountName length limit
+        20
     }
 }

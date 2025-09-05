@@ -74,9 +74,9 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         stackable_operator::cli::Command::Crd => {
-            SecretClass::merged_crd(crd::SecretClassVersion::V1Alpha1)?
+            SecretClass::merged_crd(crd::SecretClassVersion::V1Alpha2)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
-            TrustStore::merged_crd(crd::TrustStoreVersion::V1Alpha1)?
+            TrustStore::merged_crd(crd::TrustStoreVersion::V1Alpha2)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun {
