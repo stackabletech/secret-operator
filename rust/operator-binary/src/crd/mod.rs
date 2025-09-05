@@ -110,7 +110,6 @@ pub mod versioned {
         IfPodIsInNamespace { namespace: String },
     }
 
-    // #[versioned(skip(from))]
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
     #[serde(rename_all = "camelCase")]
     pub struct AutoTlsBackend {
