@@ -15,6 +15,7 @@ use crate::{
 pub async fn conversion_webhook(
     client: Client,
     operator_environment: OperatorEnvironmentOptions,
+    disable_crd_management: bool,
 ) -> anyhow::Result<ConversionWebhookServer> {
     let crds_and_handlers = [
         (
@@ -34,6 +35,7 @@ pub async fn conversion_webhook(
         field_manager: OPERATOR_NAME.to_owned(),
         namespace: operator_environment.operator_namespace,
         service_name: operator_environment.operator_service_name,
+        maintain_crds: !disable_crd_management,
     };
 
     Ok(ConversionWebhookServer::new(crds_and_handlers, options, client).await?)

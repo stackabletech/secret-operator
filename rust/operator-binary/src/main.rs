@@ -92,6 +92,7 @@ async fn main() -> anyhow::Result<()> {
                     product_config: _,
                     watch_namespace,
                     operator_environment,
+                    disable_crd_maintenance,
                 },
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
@@ -150,10 +151,13 @@ async fn main() -> anyhow::Result<()> {
             let truststore_controller =
                 truststore_controller::start(&client, &watch_namespace).map(anyhow::Ok);
 
-            let conversion_webhook =
-                conversion_webhook(client.as_kube_client(), operator_environment)
-                    .await
-                    .context("failed to create conversion webhook")?;
+            let conversion_webhook = conversion_webhook(
+                client.as_kube_client(),
+                operator_environment,
+                disable_crd_maintenance,
+            )
+            .await
+            .context("failed to create conversion webhook")?;
             let conversion_webhook = conversion_webhook
                 .run()
                 .map_err(|err| anyhow!(err).context("failed to run conversion webhook"));
