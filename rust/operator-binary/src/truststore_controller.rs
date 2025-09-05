@@ -32,7 +32,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     OPERATOR_NAME,
     backend::{self, SecretBackendError, TrustSelector},
-    crd::v1alpha2,
+    crd::{v1alpha1, v1alpha2},
     format::{
         self,
         well_known::{CompatibilityOptions, NamingOptions},
@@ -46,7 +46,7 @@ const FULL_CONTROLLER_NAME: &str = concatcp!(CONTROLLER_NAME, ".", OPERATOR_NAME
 pub async fn start(client: &stackable_operator::client::Client, watch_namespace: &WatchNamespace) {
     let (secretclasses, secretclasses_writer) = reflector::store();
     let controller = Controller::new(
-        watch_namespace.get_api::<DeserializeGuard<v1alpha2::TrustStore>>(client),
+        watch_namespace.get_api::<DeserializeGuard<v1alpha1::TrustStore>>(client),
         watcher::Config::default(),
     );
     let truststores = controller.store();
@@ -122,10 +122,10 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
 /// Resolves modifications to dependencies of [`v1alpha2::SecretClass`] objects into
 /// a list of affected [`v1alpha2::TrustStore`]s.
 fn secretclass_dependency_watch_mapper<Dep: Resource, Conds>(
-    truststores: reflector::Store<DeserializeGuard<v1alpha2::TrustStore>>,
+    truststores: reflector::Store<DeserializeGuard<v1alpha1::TrustStore>>,
     secretclasses: reflector::Store<DeserializeGuard<v1alpha2::SecretClass>>,
     reference_conditions: impl Copy + Fn(&v1alpha2::SecretClass, &Dep) -> Conds,
-) -> impl Fn(Dep) -> Vec<ObjectRef<DeserializeGuard<v1alpha2::TrustStore>>>
+) -> impl Fn(Dep) -> Vec<ObjectRef<DeserializeGuard<v1alpha1::TrustStore>>>
 where
     Conds: IntoIterator<Item = v1alpha2::SearchNamespaceMatchCondition>,
 {
@@ -238,7 +238,7 @@ struct Ctx {
 }
 
 async fn reconcile(
-    truststore: Arc<DeserializeGuard<v1alpha2::TrustStore>>,
+    truststore: Arc<DeserializeGuard<v1alpha1::TrustStore>>,
     ctx: Arc<Ctx>,
 ) -> Result<controller::Action> {
     let truststore = truststore
@@ -308,7 +308,7 @@ async fn reconcile(
 }
 
 fn error_policy(
-    _obj: Arc<DeserializeGuard<v1alpha2::TrustStore>>,
+    _obj: Arc<DeserializeGuard<v1alpha1::TrustStore>>,
     _error: &Error,
     _ctx: Arc<Ctx>,
 ) -> controller::Action {

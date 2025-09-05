@@ -23,7 +23,7 @@ pub async fn conversion_webhook(
             SecretClass::try_convert as fn(_) -> _,
         ),
         (
-            TrustStore::merged_crd(TrustStoreVersion::V1Alpha2)?,
+            TrustStore::merged_crd(TrustStoreVersion::V1Alpha1)?,
             TrustStore::try_convert as fn(_) -> _,
         ),
     ];

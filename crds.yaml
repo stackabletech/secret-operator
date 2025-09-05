@@ -709,39 +709,6 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns: []
-    name: v1alpha2
-    schema:
-      openAPIV3Schema:
-        description: Auto-generated derived type for TrustStoreSpec via `CustomResource`
-        properties:
-          spec:
-            description: |-
-              A [TrustStore](https://docs.stackable.tech/home/nightly/secret-operator/truststore) requests information about how to validate secrets issued by a [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass).
-
-              The requested information is written to a ConfigMap with the same name as the TrustStore.
-            properties:
-              format:
-                description: The [format](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#format) that the data should be converted into.
-                enum:
-                - tls-pem
-                - tls-pkcs12
-                - kerberos
-                nullable: true
-                type: string
-              secretClassName:
-                description: The name of the SecretClass that the request concerns.
-                type: string
-            required:
-            - secretClassName
-            type: object
-        required:
-        - spec
-        title: TrustStore
-        type: object
-    served: true
-    storage: true
-    subresources: {}
-  - additionalPrinterColumns: []
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -772,5 +739,5 @@ spec:
         title: TrustStore
         type: object
     served: true
-    storage: false
+    storage: true
     subresources: {}

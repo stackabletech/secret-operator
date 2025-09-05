@@ -4,7 +4,7 @@ use stackable_operator::{
     schemars::{self, schema::Schema},
 };
 
-use crate::crd::v1alpha1::{
+use crate::crd::secret_class::v1alpha1::{
     CertificateKeyGeneration, SearchNamespace, SearchNamespaceMatchCondition, SecretClassBackend,
 };
 
