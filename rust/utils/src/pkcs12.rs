@@ -32,6 +32,7 @@ pub fn pkcs12_truststore<'a>(
     // OpenSSL's current master branch contains the `PKCS12_create_ex2` function
     // (https://www.openssl.org/docs/manmaster/man3/PKCS12_create_ex.html), but it is not currently in
     // OpenSSL 3.1 (as of 3.1.1), and it is not wrapped by rust-openssl.
+    // See https://github.com/sfackler/rust-openssl/blob/d21f42333698edeebd7327a4e25412b191757e31/openssl/src/pkcs12.rs#L225
 
     // Required for Java to trust the certificate, from
     // https://github.com/openjdk/jdk/blob/990e3a700dce3441bd9506ca571c1790e57849a9/src/java.base/share/classes/sun/security/util/KnownOIDs.java#L414-L415

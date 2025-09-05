@@ -42,6 +42,7 @@ pub fn parse_pem_contents(pem_bytes: &[u8]) -> anyhow::Result<Vec<X509>> {
 ///
 /// So I ditched that effort and we are now shelling out to the CLI. Sorry!
 /// The proper solution would be that secret-operator writes PKCS12 truststores using modern algorithms.
+/// For that we probably(?) drop the p12 crate?
 #[allow(unused)]
 pub fn parse_pkcs12_file(file_contents: &[u8], password: &str) -> anyhow::Result<Vec<X509>> {
     let parsed = Pkcs12::from_der(file_contents)
