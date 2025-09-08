@@ -45,6 +45,8 @@ pub fn main() -> anyhow::Result<()> {
 
     let mut certificates = HashMap::<Vec<u8>, X509>::new();
     for (source, certificates_list) in certificate_sources.into_iter() {
+        info!(?source, "Importing certificates");
+
         for certificate in certificates_list {
             let sha256 = certificate.sha256_digest()?;
 

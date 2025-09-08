@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use anyhow::Context;
+use anyhow::{Context, ensure};
 use clap::Parser;
 use openssl::x509::X509;
 
@@ -68,12 +68,21 @@ impl CertInput {
             fs::read(self.path()).with_context(|| format!("failed to read file from {self:?}"))?;
 
         match self {
-            CertInput::Pem(_) => parse_pem_contents(&file_contents).with_context(|| {
-                format!(
-                    "failed to parse PEM contents from {path:?}",
+            CertInput::Pem(_) => {
+                let certs = parse_pem_contents(&file_contents).with_context(|| {
+                    format!(
+                        "failed to parse PEM contents from {path:?}",
+                        path = self.path()
+                    )
+                })?;
+                ensure!(
+                    !certs.is_empty(),
+                    "The PEM file {path:?} contained no certificates",
                     path = self.path()
-                )
-            }),
+                );
+
+                Ok(certs)
+            }
             CertInput::Pkcs12(Pkcs12Source { password, .. }) => {
                 parse_pkcs12_file_workaround(&file_contents, password)
             }
