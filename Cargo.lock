@@ -3793,7 +3793,7 @@ dependencies = [
 
 [[package]]
 name = "truststore-merger"
-version = "0.0.1"
+version = "0.0.0-dev"
 dependencies = [
  "anyhow",
  "clap",

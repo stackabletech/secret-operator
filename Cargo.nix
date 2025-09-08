@@ -12797,7 +12797,7 @@ rec {
       };
       "truststore-merger" = rec {
         crateName = "truststore-merger";
-        version = "0.0.1";
+        version = "0.0.0-dev";
         edition = "2021";
         crateBin = [
           {
