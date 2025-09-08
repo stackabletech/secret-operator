@@ -1,12 +1,14 @@
 use std::{collections::HashMap, fs};
 
 use anyhow::{Context, ensure};
+use cert_ext::CertExt;
 use clap::Parser;
 use cli_args::Cli;
 use openssl::x509::X509;
 use stackable_secret_operator_utils::pkcs12::pkcs12_truststore;
 use tracing::{info, level_filters::LevelFilter, warn};
 
+mod cert_ext;
 mod cli_args;
 mod parsers;
 
@@ -44,30 +46,32 @@ pub fn main() -> anyhow::Result<()> {
     let mut certificates = HashMap::<Vec<u8>, X509>::new();
     for (source, certificates_list) in certificate_sources.into_iter() {
         for certificate in certificates_list {
-            let serial_bn = certificate
-                .serial_number()
-                .to_bn()
-                .context("failed to get certificate serial number as BigNumber")?;
-            let serial = serial_bn.to_vec();
-            if let Some(existing) = certificates.get(&serial) {
+            let sha256 = certificate.sha256_digest()?;
+
+            if let Some(existing) = certificates.get(&*sha256) {
                 warn!(
-                    serial = ?serial_bn.to_hex_str(),
                     ?source,
+                    sha25 = hex::encode(sha256),
+                    existing.not_before = ?existing.not_before(),
                     existing.not_after = ?existing.not_after(),
                     existing.subject = ?existing.subject_name(),
+                    existing.serial = ?existing.serial_as_hex()?,
+                    new.not_before = ?certificate.not_before(),
                     new.not_after = ?certificate.not_after(),
                     new.subject = ?certificate.subject_name(),
-                    "Skipped certificate as it was already added",
+                    new.serial = ?existing.serial_as_hex()?,
+                    "Skipped certificate as a cert with the same SHA256 hash was already added",
                 );
             } else {
                 info!(
-                    serial = ?serial_bn.to_hex_str(),
-                    not_after = ?certificate.not_after(),
                     subject = ?certificate.subject_name(),
+                    not_before = ?certificate.not_before(),
+                    not_after = ?certificate.not_after(),
+                    serial = ?certificate.serial_as_hex()?,
                     ?source,
                     "Added certificate"
                 );
-                certificates.insert(serial, certificate);
+                certificates.insert(sha256.to_vec(), certificate);
             }
         }
     }
