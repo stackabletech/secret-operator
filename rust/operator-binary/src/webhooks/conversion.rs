@@ -2,7 +2,7 @@ use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     kube::Client,
     webhook::{
-        constants::CONVERSION_WEBHOOK_HTTPS_PORT,
+        constants::DEFAULT_SOCKET_ADDRESS,
         servers::{ConversionWebhookOptions, ConversionWebhookServer},
     },
 };
@@ -29,9 +29,7 @@ pub async fn conversion_webhook(
     ];
 
     let options = ConversionWebhookOptions {
-        socket_addr: format!("0.0.0.0:{CONVERSION_WEBHOOK_HTTPS_PORT}")
-            .parse()
-            .expect("static address is always valid"),
+        socket_addr: DEFAULT_SOCKET_ADDRESS,
         field_manager: OPERATOR_NAME.to_owned(),
         namespace: operator_environment.operator_namespace,
         service_name: operator_environment.operator_service_name,
