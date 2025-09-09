@@ -10,7 +10,7 @@ use csi_server::{
     controller::SecretProvisionerController, identity::SecretProvisionerIdentity,
     node::SecretProvisionerNode,
 };
-use futures::{FutureExt, TryFutureExt, TryStreamExt, future::try_join};
+use futures::{FutureExt, TryFutureExt, TryStreamExt, try_join};
 use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
@@ -162,11 +162,7 @@ async fn main() -> anyhow::Result<()> {
                 .run()
                 .map_err(|err| anyhow!(err).context("failed to run conversion webhook"));
 
-            try_join(
-                csi_server,
-                try_join(truststore_controller, conversion_webhook),
-            )
-            .await?;
+            try_join!(csi_server, truststore_controller, conversion_webhook,)?;
         }
     }
     Ok(())
