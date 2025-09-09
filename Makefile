@@ -119,7 +119,8 @@ config:
 # We generate a crds.yaml, so that the effect of code changes are visible.
 # The operator will take care of the CRD rollout itself.
 crds:
-	cargo run --bin stackable-"${OPERATOR_NAME}" -- crd > crds.yaml
+	mkdir -p extra
+	cargo run --bin stackable-"${OPERATOR_NAME}" -- crd > extra/crds.yaml
 
 chart-lint: compile-chart
 	docker run -it -v $(shell pwd):/build/helm-charts -w /build/helm-charts quay.io/helmpack/chart-testing:v3.5.0  ct lint --config deploy/helm/ct.yaml
