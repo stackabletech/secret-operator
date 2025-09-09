@@ -125,7 +125,7 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
 }
 
 /// Resolves modifications to dependencies of [`v1alpha2::SecretClass`] objects into
-/// a list of affected [`v1alpha2::TrustStore`]s.
+/// a list of affected [`v1alpha1::TrustStore`]s.
 fn secretclass_dependency_watch_mapper<Dep: Resource, Conds>(
     truststores: reflector::Store<DeserializeGuard<v1alpha1::TrustStore>>,
     secretclasses: reflector::Store<DeserializeGuard<v1alpha2::SecretClass>>,
