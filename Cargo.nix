@@ -38,6 +38,16 @@ rec {
   # You can override the features with
   # workspaceMembers."${crateName}".build.override { features = [ "default" "feature1" ... ]; }.
   workspaceMembers = {
+    "cert-tool" = rec {
+      packageId = "cert-tool";
+      build = internal.buildRustCrateWithFeatures {
+        packageId = "cert-tool";
+      };
+
+      # Debug support which might change between releases.
+      # File a bug if you depend on any for non-debug work!
+      debug = internal.debugCrate { inherit packageId; };
+    };
     "p12" = rec {
       packageId = "p12";
       build = internal.buildRustCrateWithFeatures {
@@ -82,16 +92,6 @@ rec {
       packageId = "stackable-secret-operator-utils";
       build = internal.buildRustCrateWithFeatures {
         packageId = "stackable-secret-operator-utils";
-      };
-
-      # Debug support which might change between releases.
-      # File a bug if you depend on any for non-debug work!
-      debug = internal.debugCrate { inherit packageId; };
-    };
-    "truststore-merger" = rec {
-      packageId = "truststore-merger";
-      build = internal.buildRustCrateWithFeatures {
-        packageId = "truststore-merger";
       };
 
       # Debug support which might change between releases.
@@ -1228,6 +1228,55 @@ rec {
           "parallel" = [ "dep:libc" "dep:jobserver" ];
         };
         resolvedDefaultFeatures = [ "parallel" ];
+      };
+      "cert-tool" = rec {
+        crateName = "cert-tool";
+        version = "0.0.0-dev";
+        edition = "2021";
+        crateBin = [
+          {
+            name = "cert-tool";
+            path = "src/main.rs";
+            requiredFeatures = [ ];
+          }
+        ];
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/truststore-merger; };
+        authors = [
+          "Stackable GmbH <info@stackable.tech>"
+        ];
+        dependencies = [
+          {
+            name = "anyhow";
+            packageId = "anyhow";
+          }
+          {
+            name = "clap";
+            packageId = "clap";
+            features = [ "derive" ];
+          }
+          {
+            name = "hex";
+            packageId = "hex";
+          }
+          {
+            name = "openssl";
+            packageId = "openssl";
+          }
+          {
+            name = "stackable-secret-operator-utils";
+            packageId = "stackable-secret-operator-utils";
+          }
+          {
+            name = "tracing";
+            packageId = "tracing";
+          }
+          {
+            name = "tracing-subscriber";
+            packageId = "tracing-subscriber";
+            features = [ "env-filter" ];
+          }
+        ];
+
       };
       "cexpr" = rec {
         crateName = "cexpr";
@@ -12794,55 +12843,6 @@ rec {
           "valuable_crate" = [ "dep:valuable_crate" ];
         };
         resolvedDefaultFeatures = [ "alloc" "ansi" "default" "env-filter" "fmt" "json" "matchers" "nu-ansi-term" "once_cell" "registry" "serde" "serde_json" "sharded-slab" "smallvec" "std" "thread_local" "tracing" "tracing-log" "tracing-serde" ];
-      };
-      "truststore-merger" = rec {
-        crateName = "truststore-merger";
-        version = "0.0.0-dev";
-        edition = "2021";
-        crateBin = [
-          {
-            name = "truststore-merger";
-            path = "src/main.rs";
-            requiredFeatures = [ ];
-          }
-        ];
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/truststore-merger; };
-        authors = [
-          "Stackable GmbH <info@stackable.tech>"
-        ];
-        dependencies = [
-          {
-            name = "anyhow";
-            packageId = "anyhow";
-          }
-          {
-            name = "clap";
-            packageId = "clap";
-            features = [ "derive" ];
-          }
-          {
-            name = "hex";
-            packageId = "hex";
-          }
-          {
-            name = "openssl";
-            packageId = "openssl";
-          }
-          {
-            name = "stackable-secret-operator-utils";
-            packageId = "stackable-secret-operator-utils";
-          }
-          {
-            name = "tracing";
-            packageId = "tracing";
-          }
-          {
-            name = "tracing-subscriber";
-            packageId = "tracing-subscriber";
-            features = [ "env-filter" ];
-          }
-        ];
-
       };
       "try-lock" = rec {
         crateName = "try-lock";

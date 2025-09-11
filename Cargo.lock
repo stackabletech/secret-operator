@@ -367,6 +367,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cert-tool"
+version = "0.0.0-dev"
+dependencies = [
+ "anyhow",
+ "clap",
+ "hex",
+ "openssl",
+ "stackable-secret-operator-utils",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "cexpr"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3789,19 +3802,6 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
-]
-
-[[package]]
-name = "truststore-merger"
-version = "0.0.0-dev"
-dependencies = [
- "anyhow",
- "clap",
- "hex",
- "openssl",
- "stackable-secret-operator-utils",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
