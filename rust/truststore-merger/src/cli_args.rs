@@ -8,7 +8,13 @@ use crate::parsers::{parse_pem_contents, parse_pkcs12_file_workaround};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
-pub struct Cli {
+pub enum Cli {
+    /// Generate PKCS12 truststore files from PEM or PKCS12 files
+    GeneratePkcs12Truststore(GeneratePkcs12),
+}
+
+#[derive(Parser, Debug)]
+pub struct GeneratePkcs12 {
     /// The path to output the resulting PKCS12 to
     #[arg(long)]
     pub out: PathBuf,
@@ -54,7 +60,7 @@ fn parse_cli_pkcs12_source(cli_argument: &str) -> Result<Pkcs12Source, String> {
     })
 }
 
-impl Cli {
+impl GeneratePkcs12 {
     pub fn certificate_sources(&self) -> Vec<CertInput> {
         let pems = self.pems.iter().cloned().map(CertInput::Pem);
         let pkcs12s = self.pkcs12s.iter().cloned().map(CertInput::Pkcs12);

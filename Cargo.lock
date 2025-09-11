@@ -367,7 +367,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cert-tool"
+name = "cert-tools"
 version = "0.0.0-dev"
 dependencies = [
  "anyhow",

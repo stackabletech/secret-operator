@@ -38,10 +38,10 @@ rec {
   # You can override the features with
   # workspaceMembers."${crateName}".build.override { features = [ "default" "feature1" ... ]; }.
   workspaceMembers = {
-    "cert-tool" = rec {
-      packageId = "cert-tool";
+    "cert-tools" = rec {
+      packageId = "cert-tools";
       build = internal.buildRustCrateWithFeatures {
-        packageId = "cert-tool";
+        packageId = "cert-tools";
       };
 
       # Debug support which might change between releases.
@@ -1229,13 +1229,13 @@ rec {
         };
         resolvedDefaultFeatures = [ "parallel" ];
       };
-      "cert-tool" = rec {
-        crateName = "cert-tool";
+      "cert-tools" = rec {
+        crateName = "cert-tools";
         version = "0.0.0-dev";
         edition = "2021";
         crateBin = [
           {
-            name = "cert-tool";
+            name = "cert-tools";
             path = "src/main.rs";
             requiredFeatures = [ ];
           }

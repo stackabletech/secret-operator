@@ -3,7 +3,7 @@ use std::{collections::HashMap, fs};
 use anyhow::{Context, ensure};
 use cert_ext::CertExt;
 use clap::Parser;
-use cli_args::Cli;
+use cli_args::{Cli, GeneratePkcs12};
 use openssl::x509::X509;
 use stackable_secret_operator_utils::pkcs12::pkcs12_truststore;
 use tracing::{info, level_filters::LevelFilter, warn};
@@ -25,7 +25,15 @@ pub fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
-    let certificate_sources = cli.certificate_sources();
+    match cli {
+        Cli::GeneratePkcs12Truststore(cli_args) => generate_pkcs12_truststore(cli_args)?,
+    }
+
+    Ok(())
+}
+
+fn generate_pkcs12_truststore(cli_args: GeneratePkcs12) -> anyhow::Result<()> {
+    let certificate_sources = cli_args.certificate_sources();
     ensure!(
         !certificate_sources.is_empty(),
         "The list of certificate sources can not be empty. Please provide at least on --pem or --pkcs12."
@@ -79,12 +87,12 @@ pub fn main() -> anyhow::Result<()> {
     }
 
     let pkcs12_truststore_bytes =
-        pkcs12_truststore(certificates.values().map(|c| &**c), &cli.out_password)
+        pkcs12_truststore(certificates.values().map(|c| &**c), &cli_args.out_password)
             .context("failed to create PKCS12 truststore from certificates")?;
-    fs::write(&cli.out, &pkcs12_truststore_bytes).with_context(|| {
+    fs::write(&cli_args.out, &pkcs12_truststore_bytes).with_context(|| {
         format!(
             "failed to write to output PKCS12 truststore at {:?}",
-            cli.out
+            cli_args.out
         )
     })?;
 
