@@ -103,7 +103,7 @@ pub fn parse_pkcs12_file_workaround(
 
     parse_pem_contents(&output.stdout).with_whatever_context(|_| {
         format!(
-            "failed to parse openssl process output, which should be PEM. STDOUT: {stdout}?",
+            "failed to parse openssl process output, which should be PEM. STDOUT:\n{stdout}",
             stdout = String::from_utf8_lossy(&output.stdout)
         )
     })
