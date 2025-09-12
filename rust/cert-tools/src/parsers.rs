@@ -73,7 +73,7 @@ pub fn parse_pkcs12_file_workaround(
             "pkcs12",
             "-nokeys",
             "-password",
-            &format!("pass:{}", password),
+            &format!("pass:{password}"),
             // That's the important part!!!
             "-legacy",
         ])
