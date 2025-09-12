@@ -1,14 +1,24 @@
 use std::{fs, path::PathBuf};
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use openssl::x509::X509;
 use snafu::{ResultExt, ensure_whatever};
+use stackable_telemetry::tracing::TelemetryOptions;
 
 use crate::parsers::{parse_pem_contents, parse_pkcs12_file_workaround};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
-pub enum Cli {
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: CliCommand,
+
+    #[command(flatten, next_help_heading = "Tracing options")]
+    pub telemetry: TelemetryOptions,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum CliCommand {
     /// Generate PKCS12 truststore files from PEM or PKCS12 files
     GeneratePkcs12Truststore(GeneratePkcs12),
 }

@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 stackable-secret-operator-utils = { path = "../utils" }
+stackable-telemetry = { git = "https://github.com/stackabletech/operator-rs.git", features = ["clap"], tag = "stackable-telemetry-0.6.1" }
 
 clap = { workspace = true, features = ["derive"] }
 hex.workspace = true

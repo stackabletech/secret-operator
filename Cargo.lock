@@ -375,6 +375,7 @@ dependencies = [
  "openssl",
  "snafu 0.8.7",
  "stackable-secret-operator-utils",
+ "stackable-telemetry 0.6.1 (git+https://github.com/stackabletech/operator-rs.git?tag=stackable-telemetry-0.6.1)",
  "tracing",
  "tracing-subscriber",
 ]
@@ -3110,7 +3111,7 @@ dependencies = [
  "snafu 0.8.7",
  "stackable-operator-derive",
  "stackable-shared",
- "stackable-telemetry",
+ "stackable-telemetry 0.6.1 (git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0)",
  "stackable-versioned",
  "strum",
  "tokio",
@@ -3221,6 +3222,30 @@ dependencies = [
 name = "stackable-telemetry"
 version = "0.6.1"
 source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0#89f484ca4e86b565e083e9ad7573e21dbe29a3af"
+dependencies = [
+ "axum",
+ "clap",
+ "futures-util",
+ "opentelemetry",
+ "opentelemetry-appender-tracing",
+ "opentelemetry-otlp",
+ "opentelemetry-semantic-conventions",
+ "opentelemetry_sdk",
+ "pin-project",
+ "snafu 0.8.7",
+ "strum",
+ "tokio",
+ "tower",
+ "tracing",
+ "tracing-appender",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "stackable-telemetry"
+version = "0.6.1"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-telemetry-0.6.1#958f62f2befdd984ad9fcd272d0214055c3a7601"
 dependencies = [
  "axum",
  "clap",

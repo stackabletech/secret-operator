@@ -2,11 +2,12 @@ use std::{collections::HashMap, fs};
 
 use cert_ext::CertExt;
 use clap::Parser;
-use cli_args::{Cli, GeneratePkcs12};
+use cli_args::{Cli, CliCommand, GeneratePkcs12};
 use openssl::x509::X509;
 use snafu::{ResultExt, ensure_whatever};
 use stackable_secret_operator_utils::pkcs12::pkcs12_truststore;
-use tracing::{info, level_filters::LevelFilter, warn};
+use stackable_telemetry::Tracing;
+use tracing::{info, warn};
 
 mod cert_ext;
 mod cli_args;
@@ -14,21 +15,15 @@ mod parsers;
 
 #[snafu::report]
 pub fn main() -> Result<(), snafu::Whatever> {
-    let filter = tracing_subscriber::EnvFilter::builder()
-        .with_default_directive(LevelFilter::INFO.into())
-        .from_env()
-        .whatever_context("failed to create tracing subscriber EnvFilter")?;
-    tracing_subscriber::fmt()
-        // Short running tool does not need any complex output
-        .with_target(false)
-        .without_time()
-        .with_env_filter(filter)
-        .init();
-
     let cli = Cli::parse();
 
-    match cli {
-        Cli::GeneratePkcs12Truststore(cli_args) => generate_pkcs12_truststore(cli_args)?,
+    // Use `CONSOLE_LOG_LEVEL` to modify the console log level
+    let _tracing_guard = Tracing::pre_configured("cert-tools", cli.telemetry)
+        .init()
+        .whatever_context("failed to initialize tracing")?;
+
+    match cli.command {
+        CliCommand::GeneratePkcs12Truststore(cli_args) => generate_pkcs12_truststore(cli_args)?,
     }
 
     Ok(())
