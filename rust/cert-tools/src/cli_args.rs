@@ -91,7 +91,6 @@ impl CertInput {
                 let certs = parse_pem_contents(&file_contents).with_whatever_context(|_| {
                     format!(
                         "failed to parse PEM contents from {path:?}",
-                        path = self.path()
                     )
                 })?;
                 ensure_whatever!(
