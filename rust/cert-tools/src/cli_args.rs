@@ -80,10 +80,13 @@ impl GeneratePkcs12 {
 
 impl CertInput {
     pub fn read(&self) -> Result<Vec<X509>, snafu::Whatever> {
+        let read_file_fn = |path| {
+            fs::read(path).with_whatever_context(|_| format!("failed to read file from {self:?}"))
+        };
+
         match self {
             CertInput::Pem(path) => {
-                let file_contents = fs::read(path)
-                    .with_whatever_context(|_| format!("failed to read file from {self:?}"))?;
+                let file_contents = read_file_fn(path)?;
 
                 let certs = parse_pem_contents(&file_contents).with_whatever_context(|_| {
                     format!(
@@ -99,8 +102,7 @@ impl CertInput {
                 Ok(certs)
             }
             CertInput::Pkcs12(Pkcs12Source { path, password }) => {
-                let file_contents = fs::read(path)
-                    .with_whatever_context(|_| format!("failed to read file from {self:?}"))?;
+                let file_contents = read_file_fn(path)?;
 
                 parse_pkcs12_file_workaround(&file_contents, password)
             }
