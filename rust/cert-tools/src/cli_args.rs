@@ -81,7 +81,7 @@ impl GeneratePkcs12 {
 impl CertInput {
     pub fn read(&self) -> Result<Vec<X509>, snafu::Whatever> {
         let read_file_fn = |path| {
-            fs::read(path).with_whatever_context(|_| format!("failed to read file from {self:?}"))
+            fs::read(path).with_whatever_context(|_| format!("failed to read from file {self:?}"))
         };
 
         match self {
