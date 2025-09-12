@@ -55,23 +55,28 @@ fn generate_pkcs12_truststore(cli_args: GeneratePkcs12) -> Result<(), snafu::Wha
         for certificate in certificates_list {
             let sha256 = certificate.sha256_digest()?;
 
+            // Trying to stick to https://opentelemetry.io/docs/specs/semconv/registry/attributes/tls/#tls-attributes
+            // Converting `Asn1TimeRef` to a ISO 8601 timestamp really sucks, so we omitted that.
             if let Some(existing) = certificates.get(&*sha256) {
                 warn!(
                     ?source,
-                    sha25 = hex::encode(sha256),
+                    hash.sha256 = hex::encode(sha256).to_uppercase(),
                     existing.not_before = ?existing.not_before(),
                     existing.not_after = ?existing.not_after(),
                     existing.subject = ?existing.subject_name(),
+                    existing.issuer = ?existing.issuer_name(),
                     existing.serial = ?existing.serial_as_hex()?,
                     new.not_before = ?certificate.not_before(),
                     new.not_after = ?certificate.not_after(),
                     new.subject = ?certificate.subject_name(),
+                    new.issuer = ?certificate.issuer_name(),
                     new.serial = ?existing.serial_as_hex()?,
                     "Skipped certificate as a cert with the same SHA256 hash was already added",
                 );
             } else {
                 info!(
                     subject = ?certificate.subject_name(),
+                    issuer = ?certificate.issuer_name(),
                     not_before = ?certificate.not_before(),
                     not_after = ?certificate.not_after(),
                     serial = ?certificate.serial_as_hex()?,
