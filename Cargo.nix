@@ -1240,15 +1240,11 @@ rec {
             requiredFeatures = [ ];
           }
         ];
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/truststore-merger; };
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/cert-tools; };
         authors = [
           "Stackable GmbH <info@stackable.tech>"
         ];
         dependencies = [
-          {
-            name = "anyhow";
-            packageId = "anyhow";
-          }
           {
             name = "clap";
             packageId = "clap";
@@ -1261,6 +1257,10 @@ rec {
           {
             name = "openssl";
             packageId = "openssl";
+          }
+          {
+            name = "snafu";
+            packageId = "snafu 0.8.7";
           }
           {
             name = "stackable-secret-operator-utils";
