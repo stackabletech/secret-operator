@@ -80,18 +80,17 @@ impl GeneratePkcs12 {
 
 impl CertInput {
     pub fn read(&self) -> Result<Vec<X509>, snafu::Whatever> {
-        let file_contents = fs::read(self.path())
-            .with_whatever_context(|_| format!("failed to read file from {self:?}"))?;
-
         match self {
-            CertInput::Pem(_) => {
+            CertInput::Pem(path) => {
+                let file_contents = fs::read(path)
+                    .with_whatever_context(|_| format!("failed to read file from {self:?}"))?;
+
                 let certs = parse_pem_contents(&file_contents).with_whatever_context(|_| {
                     format!(
                         "failed to parse PEM contents from {path:?}",
                         path = self.path()
                     )
                 })?;
-                let path = self.path();
                 ensure_whatever!(
                     !certs.is_empty(),
                     "The PEM file at {path:?} contained no certificates",
@@ -99,7 +98,10 @@ impl CertInput {
 
                 Ok(certs)
             }
-            CertInput::Pkcs12(Pkcs12Source { password, .. }) => {
+            CertInput::Pkcs12(Pkcs12Source { path, password }) => {
+                let file_contents = fs::read(path)
+                    .with_whatever_context(|_| format!("failed to read file from {self:?}"))?;
+
                 parse_pkcs12_file_workaround(&file_contents, password)
             }
         }
