@@ -1,10 +1,10 @@
 use std::{collections::HashMap, fs};
 
-use anyhow::{Context, ensure};
 use cert_ext::CertExt;
 use clap::Parser;
 use cli_args::{Cli, GeneratePkcs12};
 use openssl::x509::X509;
+use snafu::{ResultExt, ensure_whatever};
 use stackable_secret_operator_utils::pkcs12::pkcs12_truststore;
 use tracing::{info, level_filters::LevelFilter, warn};
 
@@ -12,10 +12,12 @@ mod cert_ext;
 mod cli_args;
 mod parsers;
 
-pub fn main() -> anyhow::Result<()> {
+#[snafu::report]
+pub fn main() -> Result<(), snafu::Whatever> {
     let filter = tracing_subscriber::EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
-        .from_env()?;
+        .from_env()
+        .whatever_context("failed to create tracing subscriber EnvFilter")?;
     tracing_subscriber::fmt()
         // Short running tool does not need any complex output
         .with_target(false)
@@ -32,16 +34,16 @@ pub fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn generate_pkcs12_truststore(cli_args: GeneratePkcs12) -> anyhow::Result<()> {
+fn generate_pkcs12_truststore(cli_args: GeneratePkcs12) -> Result<(), snafu::Whatever> {
     let certificate_sources = cli_args.certificate_sources();
-    ensure!(
+    ensure_whatever!(
         !certificate_sources.is_empty(),
         "The list of certificate sources can not be empty. Please provide at least on --pem or --pkcs12."
     );
     let certificate_sources = certificate_sources
         .iter()
         .map(|source| {
-            let certificate = source.read().with_context(|| {
+            let certificate = source.read().with_whatever_context(|_| {
                 format!(
                     "failed to read certificate source {path:?}",
                     path = source.path()
@@ -49,7 +51,7 @@ fn generate_pkcs12_truststore(cli_args: GeneratePkcs12) -> anyhow::Result<()> {
             })?;
             Ok((source, certificate))
         })
-        .collect::<anyhow::Result<Vec<_>>>()?;
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut certificates = HashMap::<Vec<u8>, X509>::new();
     for (source, certificates_list) in certificate_sources.into_iter() {
@@ -88,8 +90,8 @@ fn generate_pkcs12_truststore(cli_args: GeneratePkcs12) -> anyhow::Result<()> {
 
     let pkcs12_truststore_bytes =
         pkcs12_truststore(certificates.values().map(|c| &**c), &cli_args.out_password)
-            .context("failed to create PKCS12 truststore from certificates")?;
-    fs::write(&cli_args.out, &pkcs12_truststore_bytes).with_context(|| {
+            .whatever_context("failed to create PKCS12 truststore from certificates")?;
+    fs::write(&cli_args.out, &pkcs12_truststore_bytes).with_whatever_context(|_| {
         format!(
             "failed to write to output PKCS12 truststore at {:?}",
             cli_args.out

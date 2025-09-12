@@ -3,14 +3,14 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::{Context, bail};
 use openssl::{pkcs12::Pkcs12, x509::X509};
+use snafu::{OptionExt, ResultExt, whatever};
 use stackable_secret_operator_utils::pem::split_pem_certificates;
 
-pub fn parse_pem_contents(pem_bytes: &[u8]) -> anyhow::Result<Vec<X509>> {
+pub fn parse_pem_contents(pem_bytes: &[u8]) -> Result<Vec<X509>, snafu::Whatever> {
     let pems = split_pem_certificates(pem_bytes);
     pems.into_iter()
-        .map(|pem| X509::from_pem(pem).context("failed to parse PEM encoded certificate"))
+        .map(|pem| X509::from_pem(pem).whatever_context("failed to parse PEM encoded certificate"))
         .collect()
 }
 
@@ -44,15 +44,18 @@ pub fn parse_pem_contents(pem_bytes: &[u8]) -> anyhow::Result<Vec<X509>> {
 /// The proper solution would be that secret-operator writes PKCS12 truststores using modern algorithms.
 /// For that we probably(?) drop the p12 crate?
 #[allow(unused)]
-pub fn parse_pkcs12_file(file_contents: &[u8], password: &str) -> anyhow::Result<Vec<X509>> {
+pub fn parse_pkcs12_file(
+    file_contents: &[u8],
+    password: &str,
+) -> Result<Vec<X509>, snafu::Whatever> {
     let parsed = Pkcs12::from_der(file_contents)
-        .context("failed to parse PKCS12 DER encoded file")?
+        .whatever_context("failed to parse PKCS12 DER encoded file")?
         .parse2(password)
-        .context("Failed to parse PKCS12 using the provided password")?;
+        .whatever_context("Failed to parse PKCS12 using the provided password")?;
 
     parsed
         .ca
-        .context("pkcs12 truststore did not contain a CA")?
+        .whatever_context("pkcs12 truststore did not contain a CA")?
         .into_iter()
         .map(Ok)
         .collect()
@@ -64,7 +67,7 @@ pub fn parse_pkcs12_file(file_contents: &[u8], password: &str) -> anyhow::Result
 pub fn parse_pkcs12_file_workaround(
     file_contents: &[u8],
     password: &str,
-) -> anyhow::Result<Vec<X509>> {
+) -> Result<Vec<X509>, snafu::Whatever> {
     let mut child = Command::new("openssl")
         .args(&[
             "pkcs12",
@@ -78,27 +81,27 @@ pub fn parse_pkcs12_file_workaround(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .context("Failed to spawn openssl process")?;
+        .whatever_context("Failed to spawn openssl process")?;
 
     {
         let stdin = child
             .stdin
             .as_mut()
-            .context("Failed to open openssl process stdin")?;
+            .whatever_context("Failed to open openssl process stdin")?;
         stdin
             .write_all(file_contents)
-            .context("Failed to write PKCS12 data to openssl process stdin")?;
+            .whatever_context("Failed to write PKCS12 data to openssl process stdin")?;
     }
 
     let output = child
         .wait_with_output()
-        .context("Failed to read openssl process output")?;
+        .whatever_context("Failed to read openssl process output")?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("openssl process failed with STDERR: {stderr:?}");
+        whatever!("openssl process failed with STDERR: {stderr:?}");
     }
 
-    parse_pem_contents(&output.stdout).with_context(|| {
+    parse_pem_contents(&output.stdout).with_whatever_context(|_| {
         format!(
             "failed to parse openssl process output, which should be PEM. STDOUT: {stdout}?",
             stdout = String::from_utf8_lossy(&output.stdout)

@@ -11,9 +11,9 @@ publish = false
 [dependencies]
 stackable-secret-operator-utils = { path = "../utils" }
 
-anyhow.workspace = true
 clap = { workspace = true, features = ["derive"] }
 hex.workspace = true
 openssl.workspace = true
+snafu.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

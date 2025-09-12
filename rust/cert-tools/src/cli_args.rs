@@ -1,8 +1,8 @@
 use std::{fs, path::PathBuf};
 
-use anyhow::{Context, ensure};
 use clap::Parser;
 use openssl::x509::X509;
+use snafu::{ResultExt, ensure_whatever};
 
 use crate::parsers::{parse_pem_contents, parse_pkcs12_file_workaround};
 
@@ -69,22 +69,22 @@ impl GeneratePkcs12 {
 }
 
 impl CertInput {
-    pub fn read(&self) -> anyhow::Result<Vec<X509>> {
-        let file_contents =
-            fs::read(self.path()).with_context(|| format!("failed to read file from {self:?}"))?;
+    pub fn read(&self) -> Result<Vec<X509>, snafu::Whatever> {
+        let file_contents = fs::read(self.path())
+            .with_whatever_context(|_| format!("failed to read file from {self:?}"))?;
 
         match self {
             CertInput::Pem(_) => {
-                let certs = parse_pem_contents(&file_contents).with_context(|| {
+                let certs = parse_pem_contents(&file_contents).with_whatever_context(|_| {
                     format!(
                         "failed to parse PEM contents from {path:?}",
                         path = self.path()
                     )
                 })?;
-                ensure!(
+                let path = self.path();
+                ensure_whatever!(
                     !certs.is_empty(),
-                    "The PEM file {path:?} contained no certificates",
-                    path = self.path()
+                    "The PEM file at {path:?} contained no certificates",
                 );
 
                 Ok(certs)

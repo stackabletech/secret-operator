@@ -370,10 +370,10 @@ dependencies = [
 name = "cert-tools"
 version = "0.0.0-dev"
 dependencies = [
- "anyhow",
  "clap",
  "hex",
  "openssl",
+ "snafu 0.8.7",
  "stackable-secret-operator-utils",
  "tracing",
  "tracing-subscriber",
