@@ -98,7 +98,7 @@ pub fn parse_pkcs12_file_workaround(
         .whatever_context("Failed to read openssl process output")?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        whatever!("openssl process failed with STDERR: {stderr:?}");
+        whatever!("openssl process failed with STDERR:\n{stderr}");
     }
 
     parse_pem_contents(&output.stdout).with_whatever_context(|_| {
