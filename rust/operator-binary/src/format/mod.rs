@@ -10,7 +10,6 @@ pub use self::{
 use crate::format::well_known::NamingOptions;
 
 mod convert;
-mod utils;
 pub mod well_known;
 
 pub type SecretFiles = HashMap<String, Vec<u8>>;

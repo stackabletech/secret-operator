@@ -38,6 +38,16 @@ rec {
   # You can override the features with
   # workspaceMembers."${crateName}".build.override { features = [ "default" "feature1" ... ]; }.
   workspaceMembers = {
+    "cert-tools" = rec {
+      packageId = "cert-tools";
+      build = internal.buildRustCrateWithFeatures {
+        packageId = "cert-tools";
+      };
+
+      # Debug support which might change between releases.
+      # File a bug if you depend on any for non-debug work!
+      debug = internal.debugCrate { inherit packageId; };
+    };
     "p12" = rec {
       packageId = "p12";
       build = internal.buildRustCrateWithFeatures {
@@ -68,20 +78,20 @@ rec {
       # File a bug if you depend on any for non-debug work!
       debug = internal.debugCrate { inherit packageId; };
     };
-    "stackable-secret-operator-crd-utils" = rec {
-      packageId = "stackable-secret-operator-crd-utils";
+    "stackable-secret-operator-olm-deployer" = rec {
+      packageId = "stackable-secret-operator-olm-deployer";
       build = internal.buildRustCrateWithFeatures {
-        packageId = "stackable-secret-operator-crd-utils";
+        packageId = "stackable-secret-operator-olm-deployer";
       };
 
       # Debug support which might change between releases.
       # File a bug if you depend on any for non-debug work!
       debug = internal.debugCrate { inherit packageId; };
     };
-    "stackable-secret-operator-olm-deployer" = rec {
-      packageId = "stackable-secret-operator-olm-deployer";
+    "stackable-secret-operator-utils" = rec {
+      packageId = "stackable-secret-operator-utils";
       build = internal.buildRustCrateWithFeatures {
-        packageId = "stackable-secret-operator-olm-deployer";
+        packageId = "stackable-secret-operator-utils";
       };
 
       # Debug support which might change between releases.
@@ -1218,6 +1228,60 @@ rec {
           "parallel" = [ "dep:libc" "dep:jobserver" ];
         };
         resolvedDefaultFeatures = [ "parallel" ];
+      };
+      "cert-tools" = rec {
+        crateName = "cert-tools";
+        version = "0.0.0-dev";
+        edition = "2021";
+        crateBin = [
+          {
+            name = "cert-tools";
+            path = "src/main.rs";
+            requiredFeatures = [ ];
+          }
+        ];
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/cert-tools; };
+        authors = [
+          "Stackable GmbH <info@stackable.tech>"
+        ];
+        dependencies = [
+          {
+            name = "clap";
+            packageId = "clap";
+            features = [ "derive" ];
+          }
+          {
+            name = "stackable-telemetry";
+            packageId = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-telemetry-0.6.1#stackable-telemetry@0.6.1";
+            features = [ "clap" ];
+          }
+          {
+            name = "hex";
+            packageId = "hex";
+          }
+          {
+            name = "openssl";
+            packageId = "openssl";
+          }
+          {
+            name = "snafu";
+            packageId = "snafu 0.8.7";
+          }
+          {
+            name = "stackable-secret-operator-utils";
+            packageId = "stackable-secret-operator-utils";
+          }
+          {
+            name = "tracing";
+            packageId = "tracing";
+          }
+          {
+            name = "tracing-subscriber";
+            packageId = "tracing-subscriber";
+            features = [ "env-filter" ];
+          }
+        ];
+
       };
       "cexpr" = rec {
         crateName = "cexpr";
@@ -3253,6 +3317,226 @@ rec {
         };
         resolvedDefaultFeatures = [ "read" "read-core" ];
       };
+      "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0#stackable-telemetry@0.6.1" = rec {
+        crateName = "stackable-telemetry";
+        version = "0.6.1";
+        edition = "2024";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "89f484ca4e86b565e083e9ad7573e21dbe29a3af";
+          sha256 = "05xhfz0bd09095ljkaj950r80bchdb202d8nka95cq356y4wha4c";
+        };
+        libName = "stackable_telemetry";
+        authors = [
+          "Stackable GmbH <info@stackable.de>"
+        ];
+        dependencies = [
+          {
+            name = "axum";
+            packageId = "axum";
+            features = [ "http2" ];
+          }
+          {
+            name = "clap";
+            packageId = "clap";
+            optional = true;
+            features = [ "derive" "cargo" "env" ];
+          }
+          {
+            name = "futures-util";
+            packageId = "futures-util";
+          }
+          {
+            name = "opentelemetry";
+            packageId = "opentelemetry";
+            features = [ "logs" ];
+          }
+          {
+            name = "opentelemetry-appender-tracing";
+            packageId = "opentelemetry-appender-tracing";
+          }
+          {
+            name = "opentelemetry-otlp";
+            packageId = "opentelemetry-otlp";
+            features = [ "grpc-tonic" "gzip-tonic" "logs" ];
+          }
+          {
+            name = "opentelemetry-semantic-conventions";
+            packageId = "opentelemetry-semantic-conventions";
+          }
+          {
+            name = "opentelemetry_sdk";
+            packageId = "opentelemetry_sdk";
+            features = [ "rt-tokio" "logs" "rt-tokio" "spec_unstable_logs_enabled" ];
+          }
+          {
+            name = "pin-project";
+            packageId = "pin-project";
+          }
+          {
+            name = "snafu";
+            packageId = "snafu 0.8.7";
+          }
+          {
+            name = "strum";
+            packageId = "strum";
+            features = [ "derive" ];
+          }
+          {
+            name = "tokio";
+            packageId = "tokio";
+            features = [ "macros" "rt-multi-thread" "fs" ];
+          }
+          {
+            name = "tower";
+            packageId = "tower";
+            features = [ "util" ];
+          }
+          {
+            name = "tracing";
+            packageId = "tracing";
+          }
+          {
+            name = "tracing-appender";
+            packageId = "tracing-appender";
+          }
+          {
+            name = "tracing-opentelemetry";
+            packageId = "tracing-opentelemetry";
+          }
+          {
+            name = "tracing-subscriber";
+            packageId = "tracing-subscriber";
+            features = [ "env-filter" "json" "env-filter" ];
+          }
+        ];
+        devDependencies = [
+          {
+            name = "tokio";
+            packageId = "tokio";
+            features = [ "macros" "rt-multi-thread" "fs" ];
+          }
+          {
+            name = "tracing-opentelemetry";
+            packageId = "tracing-opentelemetry";
+          }
+        ];
+        features = {
+          "clap" = [ "dep:clap" ];
+        };
+        resolvedDefaultFeatures = [ "clap" ];
+      };
+      "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-telemetry-0.6.1#stackable-telemetry@0.6.1" = rec {
+        crateName = "stackable-telemetry";
+        version = "0.6.1";
+        edition = "2024";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "958f62f2befdd984ad9fcd272d0214055c3a7601";
+          sha256 = "0hiymhr40ix4jv9dmvp5d009xs6v0frvllr2xkf5mw43rcg44mgd";
+        };
+        libName = "stackable_telemetry";
+        authors = [
+          "Stackable GmbH <info@stackable.de>"
+        ];
+        dependencies = [
+          {
+            name = "axum";
+            packageId = "axum";
+            features = [ "http2" ];
+          }
+          {
+            name = "clap";
+            packageId = "clap";
+            optional = true;
+            features = [ "derive" "cargo" "env" ];
+          }
+          {
+            name = "futures-util";
+            packageId = "futures-util";
+          }
+          {
+            name = "opentelemetry";
+            packageId = "opentelemetry";
+            features = [ "logs" ];
+          }
+          {
+            name = "opentelemetry-appender-tracing";
+            packageId = "opentelemetry-appender-tracing";
+          }
+          {
+            name = "opentelemetry-otlp";
+            packageId = "opentelemetry-otlp";
+            features = [ "grpc-tonic" "gzip-tonic" "logs" ];
+          }
+          {
+            name = "opentelemetry-semantic-conventions";
+            packageId = "opentelemetry-semantic-conventions";
+          }
+          {
+            name = "opentelemetry_sdk";
+            packageId = "opentelemetry_sdk";
+            features = [ "rt-tokio" "logs" "rt-tokio" "spec_unstable_logs_enabled" ];
+          }
+          {
+            name = "pin-project";
+            packageId = "pin-project";
+          }
+          {
+            name = "snafu";
+            packageId = "snafu 0.8.7";
+          }
+          {
+            name = "strum";
+            packageId = "strum";
+            features = [ "derive" ];
+          }
+          {
+            name = "tokio";
+            packageId = "tokio";
+            features = [ "macros" "rt-multi-thread" "fs" ];
+          }
+          {
+            name = "tower";
+            packageId = "tower";
+            features = [ "util" ];
+          }
+          {
+            name = "tracing";
+            packageId = "tracing";
+          }
+          {
+            name = "tracing-appender";
+            packageId = "tracing-appender";
+          }
+          {
+            name = "tracing-opentelemetry";
+            packageId = "tracing-opentelemetry";
+          }
+          {
+            name = "tracing-subscriber";
+            packageId = "tracing-subscriber";
+            features = [ "env-filter" "json" "env-filter" ];
+          }
+        ];
+        devDependencies = [
+          {
+            name = "tokio";
+            packageId = "tokio";
+            features = [ "macros" "rt-multi-thread" "fs" ];
+          }
+          {
+            name = "tracing-opentelemetry";
+            packageId = "tracing-opentelemetry";
+          }
+        ];
+        features = {
+          "clap" = [ "dep:clap" ];
+        };
+        resolvedDefaultFeatures = [ "clap" ];
+      };
       "git2" = rec {
         crateName = "git2";
         version = "0.20.2";
@@ -3520,6 +3804,21 @@ rec {
         edition = "2021";
         sha256 = "1sjmpsdl8czyh9ywl3qcsfsq9a307dg4ni2vnlwgnzzqhc4y0113";
 
+      };
+      "hex" = rec {
+        crateName = "hex";
+        version = "0.4.3";
+        edition = "2018";
+        sha256 = "0w1a4davm1lgzpamwnba907aysmlrnygbqmfis2mqjx5m552a93z";
+        authors = [
+          "KokaKiwi <kokakiwi@kokakiwi.net>"
+        ];
+        features = {
+          "default" = [ "std" ];
+          "serde" = [ "dep:serde" ];
+          "std" = [ "alloc" ];
+        };
+        resolvedDefaultFeatures = [ "alloc" "default" "std" ];
       };
       "hex-literal" = rec {
         crateName = "hex-literal";
@@ -9963,8 +10262,9 @@ rec {
             features = [ "time" "telemetry" "versioned" ];
           }
           {
-            name = "stackable-secret-operator-crd-utils";
-            packageId = "stackable-secret-operator-crd-utils";
+            name = "stackable-secret-operator-utils";
+            packageId = "stackable-secret-operator-utils";
+            features = [ "crd" ];
           }
           {
             name = "tokio";
@@ -10034,6 +10334,12 @@ rec {
             packageId = "futures 0.3.31";
           }
           {
+            name = "stackable-telemetry";
+            packageId = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0#stackable-telemetry@0.6.1";
+            optional = true;
+            features = [ "clap" ];
+          }
+          {
             name = "http";
             packageId = "http";
           }
@@ -10098,12 +10404,6 @@ rec {
           {
             name = "stackable-shared";
             packageId = "stackable-shared";
-          }
-          {
-            name = "stackable-telemetry";
-            packageId = "stackable-telemetry";
-            optional = true;
-            features = [ "clap" ];
           }
           {
             name = "stackable-versioned";
@@ -10287,8 +10587,9 @@ rec {
             features = [ "time" "telemetry" "versioned" ];
           }
           {
-            name = "stackable-secret-operator-crd-utils";
-            packageId = "stackable-secret-operator-crd-utils";
+            name = "stackable-secret-operator-utils";
+            packageId = "stackable-secret-operator-utils";
+            features = [ "crd" ];
           }
           {
             name = "strum";
@@ -10340,10 +10641,6 @@ rec {
             packageId = "uuid";
             features = [ "v4" ];
           }
-          {
-            name = "yasna";
-            packageId = "yasna";
-          }
         ];
         buildDependencies = [
           {
@@ -10360,29 +10657,6 @@ rec {
           {
             name = "serde_yaml";
             packageId = "serde_yaml";
-          }
-        ];
-
-      };
-      "stackable-secret-operator-crd-utils" = rec {
-        crateName = "stackable-secret-operator-crd-utils";
-        version = "0.0.0-dev";
-        edition = "2021";
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/crd-utils; };
-        libName = "stackable_secret_operator_crd_utils";
-        authors = [
-          "Stackable GmbH <info@stackable.tech>"
-        ];
-        dependencies = [
-          {
-            name = "serde";
-            packageId = "serde";
-            features = [ "derive" ];
-          }
-          {
-            name = "stackable-operator";
-            packageId = "stackable-operator";
-            features = [ "time" "telemetry" "versioned" ];
           }
         ];
 
@@ -10451,6 +10725,56 @@ rec {
           }
         ];
 
+      };
+      "stackable-secret-operator-utils" = rec {
+        crateName = "stackable-secret-operator-utils";
+        version = "0.0.0-dev";
+        edition = "2021";
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/utils; };
+        libName = "stackable_secret_operator_utils";
+        authors = [
+          "Stackable GmbH <info@stackable.tech>"
+        ];
+        dependencies = [
+          {
+            name = "openssl";
+            packageId = "openssl";
+          }
+          {
+            name = "p12";
+            packageId = "p12";
+          }
+          {
+            name = "serde";
+            packageId = "serde";
+            optional = true;
+            features = [ "derive" ];
+          }
+          {
+            name = "snafu";
+            packageId = "snafu 0.8.7";
+          }
+          {
+            name = "stackable-operator";
+            packageId = "stackable-operator";
+            optional = true;
+            features = [ "time" "telemetry" "versioned" ];
+          }
+          {
+            name = "yasna";
+            packageId = "yasna";
+          }
+        ];
+        devDependencies = [
+          {
+            name = "anyhow";
+            packageId = "anyhow";
+          }
+        ];
+        features = {
+          "crd" = [ "dep:stackable-operator" "dep:serde" ];
+        };
+        resolvedDefaultFeatures = [ "crd" "default" ];
       };
       "stackable-shared" = rec {
         crateName = "stackable-shared";
@@ -10526,116 +10850,6 @@ rec {
           "time" = [ "dep:time" ];
         };
         resolvedDefaultFeatures = [ "default" "time" ];
-      };
-      "stackable-telemetry" = rec {
-        crateName = "stackable-telemetry";
-        version = "0.6.1";
-        edition = "2024";
-        workspace_member = null;
-        src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "89f484ca4e86b565e083e9ad7573e21dbe29a3af";
-          sha256 = "05xhfz0bd09095ljkaj950r80bchdb202d8nka95cq356y4wha4c";
-        };
-        libName = "stackable_telemetry";
-        authors = [
-          "Stackable GmbH <info@stackable.de>"
-        ];
-        dependencies = [
-          {
-            name = "axum";
-            packageId = "axum";
-            features = [ "http2" ];
-          }
-          {
-            name = "clap";
-            packageId = "clap";
-            optional = true;
-            features = [ "derive" "cargo" "env" ];
-          }
-          {
-            name = "futures-util";
-            packageId = "futures-util";
-          }
-          {
-            name = "opentelemetry";
-            packageId = "opentelemetry";
-            features = [ "logs" ];
-          }
-          {
-            name = "opentelemetry-appender-tracing";
-            packageId = "opentelemetry-appender-tracing";
-          }
-          {
-            name = "opentelemetry-otlp";
-            packageId = "opentelemetry-otlp";
-            features = [ "grpc-tonic" "gzip-tonic" "logs" ];
-          }
-          {
-            name = "opentelemetry-semantic-conventions";
-            packageId = "opentelemetry-semantic-conventions";
-          }
-          {
-            name = "opentelemetry_sdk";
-            packageId = "opentelemetry_sdk";
-            features = [ "rt-tokio" "logs" "rt-tokio" "spec_unstable_logs_enabled" ];
-          }
-          {
-            name = "pin-project";
-            packageId = "pin-project";
-          }
-          {
-            name = "snafu";
-            packageId = "snafu 0.8.7";
-          }
-          {
-            name = "strum";
-            packageId = "strum";
-            features = [ "derive" ];
-          }
-          {
-            name = "tokio";
-            packageId = "tokio";
-            features = [ "macros" "rt-multi-thread" "fs" ];
-          }
-          {
-            name = "tower";
-            packageId = "tower";
-            features = [ "util" ];
-          }
-          {
-            name = "tracing";
-            packageId = "tracing";
-          }
-          {
-            name = "tracing-appender";
-            packageId = "tracing-appender";
-          }
-          {
-            name = "tracing-opentelemetry";
-            packageId = "tracing-opentelemetry";
-          }
-          {
-            name = "tracing-subscriber";
-            packageId = "tracing-subscriber";
-            features = [ "env-filter" "json" "env-filter" ];
-          }
-        ];
-        devDependencies = [
-          {
-            name = "tokio";
-            packageId = "tokio";
-            features = [ "macros" "rt-multi-thread" "fs" ];
-          }
-          {
-            name = "tracing-opentelemetry";
-            packageId = "tracing-opentelemetry";
-          }
-        ];
-        features = {
-          "clap" = [ "dep:clap" ];
-        };
-        resolvedDefaultFeatures = [ "clap" ];
       };
       "stackable-versioned" = rec {
         crateName = "stackable-versioned";
