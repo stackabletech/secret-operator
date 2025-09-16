@@ -2,15 +2,15 @@
 // This will need changes in our and upstream error types.
 #![allow(clippy::result_large_err)]
 
-use std::{os::unix::prelude::FileTypeExt, path::PathBuf, pin::pin};
+use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
 
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use clap::Parser;
 use csi_server::{
     controller::SecretProvisionerController, identity::SecretProvisionerIdentity,
     node::SecretProvisionerNode,
 };
-use futures::{FutureExt, TryStreamExt};
+use futures::{FutureExt, TryFutureExt, TryStreamExt, try_join};
 use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
@@ -24,6 +24,7 @@ use tokio::signal::unix::{SignalKind, signal};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use utils::{TonicUnixStream, uds_bind_private};
+use webhooks::conversion::conversion_webhook;
 
 use crate::crd::{SecretClass, TrustStore};
 
@@ -35,6 +36,7 @@ mod format;
 mod grpc;
 mod truststore_controller;
 mod utils;
+mod webhooks;
 
 pub const OPERATOR_NAME: &str = "secrets.stackable.tech";
 
@@ -72,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         stackable_operator::cli::Command::Crd => {
-            SecretClass::merged_crd(crd::SecretClassVersion::V1Alpha1)?
+            SecretClass::merged_crd(crd::SecretClassVersion::V1Alpha2)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
             TrustStore::merged_crd(crd::TrustStoreVersion::V1Alpha1)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
@@ -89,7 +91,8 @@ async fn main() -> anyhow::Result<()> {
                         },
                     product_config: _,
                     watch_namespace,
-                    operator_environment: _,
+                    operator_environment,
+                    disable_crd_maintenance,
                 },
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
@@ -120,38 +123,46 @@ async fn main() -> anyhow::Result<()> {
                 let _ = std::fs::remove_file(&csi_endpoint);
             }
             let mut sigterm = signal(SignalKind::terminate())?;
-            let csi_server = pin!(
-                Server::builder()
-                    .add_service(
-                        tonic_reflection::server::Builder::configure()
-                            .include_reflection_service(true)
-                            .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
-                            .build_v1()?,
+            let csi_server = Server::builder()
+                .add_service(
+                    tonic_reflection::server::Builder::configure()
+                        .include_reflection_service(true)
+                        .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
+                        .build_v1()?,
+                )
+                .add_service(IdentityServer::new(SecretProvisionerIdentity))
+                .add_service(ControllerServer::new(SecretProvisionerController {
+                    client: client.clone(),
+                }))
+                .add_service(NodeServer::new(SecretProvisionerNode {
+                    client: client.clone(),
+                    node_name: cluster_info.kubernetes_node_name.to_owned(),
+                    privileged,
+                }))
+                .serve_with_incoming_shutdown(
+                    UnixListenerStream::new(
+                        uds_bind_private(csi_endpoint).context("failed to bind CSI listener")?,
                     )
-                    .add_service(IdentityServer::new(SecretProvisionerIdentity))
-                    .add_service(ControllerServer::new(SecretProvisionerController {
-                        client: client.clone(),
-                    }))
-                    .add_service(NodeServer::new(SecretProvisionerNode {
-                        client: client.clone(),
-                        node_name: cluster_info.kubernetes_node_name.to_owned(),
-                        privileged,
-                    }))
-                    .serve_with_incoming_shutdown(
-                        UnixListenerStream::new(
-                            uds_bind_private(csi_endpoint)
-                                .context("failed to bind CSI listener")?,
-                        )
-                        .map_ok(TonicUnixStream),
-                        sigterm.recv().map(|_| ()),
-                    )
-            );
+                    .map_ok(TonicUnixStream),
+                    sigterm.recv().map(|_| ()),
+                )
+                .map_err(|err| anyhow!(err).context("failed to run csi server"));
+
             let truststore_controller =
-                pin!(truststore_controller::start(&client, &watch_namespace).map(Ok));
-            futures::future::select(csi_server, truststore_controller)
-                .await
-                .factor_first()
-                .0?;
+                truststore_controller::start(&client, &watch_namespace).map(anyhow::Ok);
+
+            let conversion_webhook = conversion_webhook(
+                client.as_kube_client(),
+                operator_environment,
+                disable_crd_maintenance,
+            )
+            .await
+            .context("failed to create conversion webhook")?;
+            let conversion_webhook = conversion_webhook
+                .run()
+                .map_err(|err| anyhow!(err).context("failed to run conversion webhook"));
+
+            try_join!(csi_server, truststore_controller, conversion_webhook,)?;
         }
     }
     Ok(())
