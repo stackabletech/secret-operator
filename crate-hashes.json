@@ -10,5 +10,6 @@
   "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.97.0#stackable-versioned-macros@0.8.2": "1ags7i3a0l5w5dcpfp6zzp4a172bp1jr9wkma0f1byjbk56q8bi0",
   "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.97.0#stackable-versioned@0.8.2": "1ags7i3a0l5w5dcpfp6zzp4a172bp1jr9wkma0f1byjbk56q8bi0",
   "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.97.0#stackable-webhook@0.6.0": "1ags7i3a0l5w5dcpfp6zzp4a172bp1jr9wkma0f1byjbk56q8bi0",
+  "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-telemetry-0.6.1#stackable-telemetry@0.6.1": "0hiymhr40ix4jv9dmvp5d009xs6v0frvllr2xkf5mw43rcg44mgd",
   "git+https://github.com/stackabletech/product-config.git?tag=0.7.0#product-config@0.7.0": "0gjsm80g6r75pm3824dcyiz4ysq1ka4c1if6k1mjm9cnd5ym0gny"
 }

@@ -6,7 +6,7 @@ use stackable_operator::{
     shared::time::Duration,
     versioned::versioned,
 };
-use stackable_secret_operator_crd_utils::{ConfigMapReference, SecretReference};
+use stackable_secret_operator_utils::crd::{ConfigMapReference, SecretReference};
 
 use crate::crd::KerberosPrincipal;
 
@@ -315,7 +315,7 @@ pub mod versioned {
 #[cfg(test)]
 mod test {
     use stackable_operator::shared::time::Duration;
-    use stackable_secret_operator_crd_utils::{ConfigMapReference, SecretReference};
+    use stackable_secret_operator_utils::crd::{ConfigMapReference, SecretReference};
 
     use crate::{
         backend::tls::{DEFAULT_CA_CERT_LIFETIME, DEFAULT_MAX_CERT_LIFETIME},

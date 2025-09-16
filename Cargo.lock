@@ -380,6 +380,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cert-tools"
+version = "0.0.0-dev"
+dependencies = [
+ "clap",
+ "hex",
+ "openssl",
+ "snafu 0.8.9",
+ "stackable-secret-operator-utils",
+ "stackable-telemetry 0.6.1 (git+https://github.com/stackabletech/operator-rs.git?tag=stackable-telemetry-0.6.1)",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "cexpr"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1258,6 +1272,12 @@ name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
+
+[[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hex-literal"
@@ -3414,7 +3434,7 @@ dependencies = [
  "serde_json",
  "snafu 0.8.9",
  "stackable-operator",
- "stackable-secret-operator-crd-utils",
+ "stackable-secret-operator-utils",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -3448,7 +3468,7 @@ dependencies = [
  "snafu 0.8.9",
  "stackable-operator-derive",
  "stackable-shared",
- "stackable-telemetry",
+ "stackable-telemetry 0.6.1 (git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.97.0)",
  "stackable-versioned",
  "stackable-webhook",
  "strum",
@@ -3496,7 +3516,7 @@ dependencies = [
  "socket2",
  "stackable-krb5-provision-keytab",
  "stackable-operator",
- "stackable-secret-operator-crd-utils",
+ "stackable-secret-operator-utils",
  "strum",
  "sys-mount",
  "tempfile",
@@ -3509,15 +3529,6 @@ dependencies = [
  "tonic-reflection",
  "tracing",
  "uuid",
- "yasna",
-]
-
-[[package]]
-name = "stackable-secret-operator-crd-utils"
-version = "0.0.0-dev"
-dependencies = [
- "serde",
- "stackable-operator",
 ]
 
 [[package]]
@@ -3534,6 +3545,19 @@ dependencies = [
  "tokio",
  "tracing",
  "walkdir",
+]
+
+[[package]]
+name = "stackable-secret-operator-utils"
+version = "0.0.0-dev"
+dependencies = [
+ "anyhow",
+ "openssl",
+ "p12",
+ "serde",
+ "snafu 0.8.9",
+ "stackable-operator",
+ "yasna",
 ]
 
 [[package]]
@@ -3556,6 +3580,30 @@ dependencies = [
 name = "stackable-telemetry"
 version = "0.6.1"
 source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.97.0#36e9fad31f07903a545010998fb99aae0188337d"
+dependencies = [
+ "axum",
+ "clap",
+ "futures-util",
+ "opentelemetry",
+ "opentelemetry-appender-tracing",
+ "opentelemetry-otlp",
+ "opentelemetry-semantic-conventions",
+ "opentelemetry_sdk",
+ "pin-project",
+ "snafu 0.8.9",
+ "strum",
+ "tokio",
+ "tower",
+ "tracing",
+ "tracing-appender",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "stackable-telemetry"
+version = "0.6.1"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-telemetry-0.6.1#958f62f2befdd984ad9fcd272d0214055c3a7601"
 dependencies = [
  "axum",
  "clap",
@@ -3625,7 +3673,7 @@ dependencies = [
  "snafu 0.8.9",
  "stackable-certs",
  "stackable-shared",
- "stackable-telemetry",
+ "stackable-telemetry 0.6.1 (git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.97.0)",
  "tokio",
  "tokio-rustls",
  "tower",

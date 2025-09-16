@@ -22,6 +22,7 @@ clap = "4.5"
 const_format = "0.2.34"
 futures = { version = "0.3", features = ["compat"] }
 h2 = "0.4"
+hex = "0.4"
 kube-runtime = { version = "1.0", features = ["unstable-runtime-stream-control"] }
 ldap3 = { version = "0.11", default-features = false, features = ["gssapi", "tls"] }
 libc = "0.2"

@@ -1,17 +1,14 @@
-use openssl::{
-    error::ErrorStack as OpensslError,
-    pkcs12::Pkcs12,
-    pkey::PKey,
-    stack::Stack,
-    x509::{X509, X509Ref},
+use openssl::{pkcs12::Pkcs12, pkey::PKey, stack::Stack, x509::X509};
+use snafu::{ResultExt, Snafu};
+use stackable_secret_operator_utils::{
+    pem::split_pem_certificates,
+    pkcs12::{TlsToPkcs12Error, pkcs12_truststore},
 };
-use snafu::{OptionExt, ResultExt, Snafu};
 
 use super::{
     SecretFormat, WellKnownSecretData,
     well_known::{CompatibilityOptions, TlsPem, TlsPkcs12},
 };
-use crate::format::utils::split_pem_certificates;
 
 pub fn convert(
     from: WellKnownSecretData,
@@ -52,7 +49,7 @@ pub fn convert_tls_to_pkcs12(
     pem: TlsPem,
     p12_password: &str,
 ) -> Result<TlsPkcs12, TlsToPkcs12Error> {
-    use tls_to_pkcs12_error::*;
+    use stackable_secret_operator_utils::pkcs12::tls_to_pkcs12_error::*;
     let cert = pem
         .certificate_pem
         .map(|cert| X509::from_pem(&cert).context(LoadCertSnafu))
@@ -84,120 +81,4 @@ pub fn convert_tls_to_pkcs12(
             })
             .transpose()?,
     })
-}
-
-fn bmp_string(s: &str) -> Vec<u8> {
-    s.encode_utf16()
-        .chain([0]) // null-termination character
-        .flat_map(u16::to_be_bytes)
-        .collect()
-}
-
-fn pkcs12_truststore<'a>(
-    ca_list: impl IntoIterator<Item = &'a X509Ref>,
-    p12_password: &str,
-) -> Result<Vec<u8>, TlsToPkcs12Error> {
-    // We can't use OpenSSL's `Pkcs12`, since it doesn't let us add new attributes to the SafeBags being created,
-    // and Java refuses to trust CA bags without the `java_trusted_ca_oid` attribute set.
-    // OpenSSL's current master branch contains the `PKCS12_create_ex2` function
-    // (https://www.openssl.org/docs/manmaster/man3/PKCS12_create_ex.html), but it is not currently in
-    // OpenSSL 3.1 (as of 3.1.1), and it is not wrapped by rust-openssl.
-
-    // Required for Java to trust the certificate, from
-    // https://github.com/openjdk/jdk/blob/990e3a700dce3441bd9506ca571c1790e57849a9/src/java.base/share/classes/sun/security/util/KnownOIDs.java#L414-L415
-    let java_oracle_trusted_key_usage_oid =
-        yasna::models::ObjectIdentifier::from_slice(&[2, 16, 840, 1, 113894, 746875, 1, 1]);
-
-    // We don't care about actually encrypting the truststore securely, but if we use a random salt then the pkcs#12 bundle will be different for every write
-    // (=> TrustStore controller will get stuck reconciling indefinitely.)
-    // So let's just use a fixed salt instead.
-    struct DummyRng;
-    impl p12::Rng for DummyRng {
-        fn generate_salt(&mut self) -> Option<[u8; 8]> {
-            Some([0; 8])
-        }
-    }
-
-    let mut truststore_bags = Vec::new();
-    for ca in ca_list {
-        truststore_bags.push(p12::SafeBag {
-            bag: p12::SafeBagKind::CertBag(p12::CertBag::X509(
-                ca.to_der()
-                    .context(tls_to_pkcs12_error::SerializeCaForTruststoreSnafu)?,
-            )),
-            attributes: vec![p12::PKCS12Attribute::Other(p12::OtherAttribute {
-                oid: java_oracle_trusted_key_usage_oid.clone(),
-                data: Vec::new(),
-            })],
-        });
-    }
-    let password_as_bmp_string = bmp_string(p12_password);
-    let encrypted_data = p12::ContentInfo::EncryptedData(
-        p12::EncryptedData::from_safe_bags(
-            &truststore_bags[..],
-            &password_as_bmp_string,
-            &mut DummyRng,
-        )
-        .context(tls_to_pkcs12_error::EncryptDataForTruststoreSnafu)?,
-    );
-    let truststore_data = yasna::construct_der(|w| {
-        w.write_sequence_of(|w| {
-            encrypted_data.write(w.next());
-        });
-    });
-    Ok(p12::PFX {
-        version: 3,
-        mac_data: Some(p12::MacData::new(
-            &truststore_data,
-            &password_as_bmp_string,
-            &mut DummyRng,
-        )),
-        auth_safe: p12::ContentInfo::Data(truststore_data),
-    }
-    .to_der())
-}
-
-#[derive(Snafu, Debug)]
-#[snafu(module)]
-pub enum TlsToPkcs12Error {
-    #[snafu(display("failed to load certificate"))]
-    LoadCert { source: OpensslError },
-
-    #[snafu(display("failed to load private key"))]
-    LoadKey { source: OpensslError },
-
-    #[snafu(display("failed to load CA certificate"))]
-    LoadCa { source: OpensslError },
-
-    #[snafu(display("failed to build keystore"))]
-    BuildKeystore { source: OpensslError },
-
-    #[snafu(display("failed to serialize CA certificate for truststore"))]
-    SerializeCaForTruststore { source: OpensslError },
-
-    #[snafu(display("failed to encrypt data for truststore"))]
-    EncryptDataForTruststore,
-}
-
-#[cfg(test)]
-mod tests {
-    use openssl::{hash::MessageDigest, pkey::PKey, rsa::Rsa, x509::X509};
-
-    use crate::format::convert::pkcs12_truststore;
-
-    #[test]
-    fn pkcs12_truststore_should_be_deterministic() -> anyhow::Result<()> {
-        let pkey = PKey::try_from(Rsa::generate(2048)?)?;
-        let mut x509 = X509::builder()?;
-        x509.set_pubkey(&pkey)?;
-        x509.set_version(3 - 1)?;
-        x509.sign(&pkey, MessageDigest::sha256())?;
-        let cert = x509.build();
-        let password = "";
-        assert_eq!(
-            pkcs12_truststore([cert.as_ref()], password)?,
-            pkcs12_truststore([cert.as_ref()], password)?,
-        );
-        Ok(())
-    }
 }
