@@ -71,9 +71,6 @@ struct OlmDeployerRun {
 
     #[command(flatten)]
     pub telemetry: TelemetryOptions,
-
-    #[command(flatten)]
-    pub cluster_info: KubernetesClusterInfoOptions,
 }
 
 #[tokio::main]
@@ -85,7 +82,6 @@ async fn main() -> Result<()> {
         namespace,
         dir,
         telemetry,
-        cluster_info,
     }) = opts.cmd
     {
         // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
@@ -104,7 +100,13 @@ async fn main() -> Result<()> {
             description = built_info::PKG_DESCRIPTION
         );
 
-        let client = client::initialize_operator(Some(APP_NAME.to_string()), &cluster_info).await?;
+        let dummy_cluster_info = KubernetesClusterInfoOptions {
+            kubernetes_cluster_domain: None,
+            kubernetes_node_name: "".to_string(),
+        };
+
+        let client =
+            client::initialize_operator(Some(APP_NAME.to_string()), &dummy_cluster_info).await?;
 
         let deployment = get_deployment(&csv, &namespace, &client).await?;
         let cluster_role = get_cluster_role(&csv, &client).await?;
