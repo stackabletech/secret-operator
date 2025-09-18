@@ -23,6 +23,7 @@ use clap::Parser;
 use stackable_operator::{
     cli::Command,
     client,
+    commons::networking::DomainName,
     k8s_openapi::api::{apps::v1::Deployment, rbac::v1::ClusterRole},
     kube::{
         self,
@@ -101,7 +102,7 @@ async fn main() -> Result<()> {
         );
 
         let dummy_cluster_info = KubernetesClusterInfoOptions {
-            kubernetes_cluster_domain: None,
+            kubernetes_cluster_domain: Some(DomainName::try_from("cluster.local")?),
             kubernetes_node_name: "".to_string(),
         };
 
