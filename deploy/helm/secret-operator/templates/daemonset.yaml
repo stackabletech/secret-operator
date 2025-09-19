@@ -28,11 +28,11 @@ spec:
       containers:
         - name: {{ include "operator.appname" . }}
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+            {{- toYaml .Values.secretOperator.securityContext | nindent 12 }}
+          image: "{{ .Values.secretOperator.image.repository }}:{{ .Values.secretOperator.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.secretOperator.image.pullPolicy }}
           resources:
-            {{ .Values.node.driver.resources | toYaml | nindent 12 }}
+            {{ .Values.secretOperator.resources | toYaml | nindent 12 }}
           env:
             # The following env vars are passed as clap (think CLI) arguments to the operator.
             # They are picked up by clap using the structs defied in the operator.
@@ -42,7 +42,7 @@ spec:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
             - name: PRIVILEGED
-              value: {{ .Values.securityContext.privileged | quote }}
+              value: {{ .Values.secretOperator.securityContext.privileged | quote }}
 
             # Sometimes products need to know the operator image, e.g. the opa-bundle-builder OPA
             # sidecar uses the operator image.
@@ -81,16 +81,16 @@ spec:
               mountPath: /csi
             - name: mountpoint
               mountPath: {{ .Values.kubeletDir }}/pods
-              {{- if .Values.securityContext.privileged }}
+              {{- if .Values.secretOperator.securityContext.privileged }}
               mountPropagation: Bidirectional
               {{- end }}
             - name: tmp
               mountPath: /tmp
         - name: external-provisioner
-          image: "{{ .Values.csiProvisioner.image.repository }}:{{ .Values.csiProvisioner.image.tag }}"
-          imagePullPolicy: {{ .Values.csiProvisioner.image.pullPolicy }}
+          image: "{{ .Values.externalProvisioner.image.repository }}:{{ .Values.externalProvisioner.image.tag }}"
+          imagePullPolicy: {{ .Values.externalProvisioner.image.pullPolicy }}
           resources:
-            {{ .Values.csiProvisioner.resources | toYaml | nindent 12 }}
+            {{ .Values.externalProvisioner.resources | toYaml | nindent 12 }}
           args:
             - --csi-address=/csi/csi.sock
             - --feature-gates=Topology=true
@@ -99,10 +99,10 @@ spec:
             - name: csi
               mountPath: /csi
         - name: node-driver-registrar
-          image: "{{ .Values.csiNodeDriverRegistrar.image.repository }}:{{ .Values.csiNodeDriverRegistrar.image.tag }}"
-          imagePullPolicy: {{ .Values.csiNodeDriverRegistrar.image.pullPolicy }}
+          image: "{{ .Values.nodeDriverRegistrar.image.repository }}:{{ .Values.nodeDriverRegistrar.image.tag }}"
+          imagePullPolicy: {{ .Values.nodeDriverRegistrar.image.pullPolicy }}
           resources:
-            {{ .Values.csiNodeDriverRegistrar.resources | toYaml | nindent 12 }}
+            {{ .Values.nodeDriverRegistrar.resources | toYaml | nindent 12 }}
           args:
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path={{ .Values.kubeletDir }}/plugins/secrets.stackable.tech/csi.sock
