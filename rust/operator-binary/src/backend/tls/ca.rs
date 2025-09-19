@@ -189,6 +189,10 @@ pub struct Config {
     /// The duration of any new CA certificates provisioned.
     pub ca_certificate_lifetime: Duration,
 
+    /// The retirement duration at the end of the CA certificate lifetime, where the CA is not used
+    /// to sign certificates and where the CA certificate does not have to be published.
+    pub ca_certificate_retirement_duration: Duration,
+
     /// If no existing CA certificate outlives `rotate_if_ca_expires_before`, a new
     /// certificate will be generated.
     ///
@@ -342,6 +346,7 @@ pub struct Manager {
     source_secret: ObjectRef<Secret>,
     certificate_authorities: Vec<CertificateAuthority>,
     additional_trusted_certificates: Vec<X509>,
+    ca_certificate_retirement_duration: Duration,
 }
 
 impl Manager {
@@ -513,6 +518,7 @@ impl Manager {
                 .get()
                 .map(|secret| secret.to_object_ref(()))
                 .unwrap_or_else(|| secret_ref.into()),
+            ca_certificate_retirement_duration: config.ca_certificate_retirement_duration,
         })
     }
 
@@ -616,25 +622,230 @@ impl Manager {
     /// Get an appropriate [`CertificateAuthority`] for signing a given certificate.
     pub fn find_certificate_authority_for_signing(
         &self,
-        valid_until_at_least: OffsetDateTime,
+        active_until_at_least: OffsetDateTime,
     ) -> Result<&CertificateAuthority, GetCaError> {
         use get_ca_error::*;
-        self.certificate_authorities
-            .iter()
-            .filter(|ca| ca.not_after > valid_until_at_least)
+        self.active_certificate_authorities(active_until_at_least)
+            .into_iter()
             // pick the oldest valid CA, since it will be trusted by the most peers
             .min_by_key(|ca| ca.not_after)
             .with_context(|| NoCaLivesLongEnoughSnafu {
-                cutoff: valid_until_at_least,
+                cutoff: active_until_at_least,
                 secret: self.source_secret.clone(),
             })
     }
 
     /// Get all active trust root certificates.
-    pub fn trust_roots(&self) -> impl IntoIterator<Item = &X509> + '_ {
-        self.certificate_authorities
-            .iter()
+    pub fn trust_roots(
+        &self,
+        active_until_at_least: OffsetDateTime,
+    ) -> impl IntoIterator<Item = &X509> + '_ {
+        self.active_certificate_authorities(active_until_at_least)
+            .into_iter()
             .map(|ca| &ca.certificate)
-            .chain(&self.additional_trusted_certificates)
+            .chain(self.active_additional_trusted_certificates(active_until_at_least))
+    }
+
+    /// Returns all certificate authorities which are not retired or expired
+    fn active_certificate_authorities(
+        &self,
+        active_until_at_least: OffsetDateTime,
+    ) -> impl IntoIterator<Item = &CertificateAuthority> {
+        self.certificate_authorities.iter().filter(move |ca| {
+            ca.not_after - self.ca_certificate_retirement_duration >= active_until_at_least
+        })
+    }
+
+    /// Returns all additional trusted certificates which are not retired or expired
+    fn active_additional_trusted_certificates(
+        &self,
+        active_until_at_least: OffsetDateTime,
+    ) -> impl IntoIterator<Item = &X509> + '_ {
+        self.additional_trusted_certificates
+            .iter()
+            .filter(move |cert| {
+                asn1time_to_offsetdatetime(cert.not_after()).is_ok_and(|not_after| {
+                    not_after - self.ca_certificate_retirement_duration >= active_until_at_least
+                })
+            })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use kube_runtime::reflector::ObjectRef;
+    use openssl::{
+        asn1::{Asn1Integer, Asn1Time},
+        bn::BigNum,
+        hash::MessageDigest,
+        pkey::{PKey, Private},
+        rsa::Rsa,
+        x509::{X509, X509Builder},
+    };
+    use stackable_operator::{
+        k8s_openapi::{ByteString, api::core::v1::Secret},
+        shared::time::Duration,
+    };
+    use stackable_secret_operator_utils::crd::SecretReference;
+    use time::{OffsetDateTime, macros::datetime};
+
+    use super::{CertificateAuthority, Manager};
+
+    fn create_certificate(
+        serial_number: u32,
+        not_before: OffsetDateTime,
+        not_after: OffsetDateTime,
+    ) -> Result<(X509, PKey<Private>), openssl::error::ErrorStack> {
+        let key_pair = Rsa::generate(512)?;
+        let pkey = PKey::try_from(key_pair)?;
+
+        let mut x509_builder = X509Builder::new()?;
+        x509_builder.set_serial_number(
+            Asn1Integer::from_bn(BigNum::from_u32(serial_number)?.as_ref())?.as_ref(),
+        )?;
+        x509_builder.set_not_before(Asn1Time::from_unix(not_before.unix_timestamp())?.as_ref())?;
+        x509_builder.set_not_after(Asn1Time::from_unix(not_after.unix_timestamp())?.as_ref())?;
+        x509_builder.set_pubkey(&pkey)?;
+        x509_builder.sign(&pkey, MessageDigest::sha256())?;
+        let x509 = x509_builder.build();
+
+        Ok((x509, pkey))
+    }
+
+    fn create_certificate_authority(
+        serial_number: u32,
+        not_before: OffsetDateTime,
+        not_after: OffsetDateTime,
+    ) -> Result<CertificateAuthority, openssl::error::ErrorStack> {
+        let (certificate, pkey) = create_certificate(serial_number, not_before, not_after)?;
+
+        let key_certificate = "crt";
+        let key_private_key = "key";
+
+        Ok(CertificateAuthority::from_secret_data(
+            &[
+                (
+                    key_certificate.to_owned(),
+                    ByteString(certificate.to_pem()?),
+                ),
+                (
+                    key_private_key.to_owned(),
+                    ByteString(pkey.private_key_to_pem_pkcs8()?),
+                ),
+            ]
+            .into(),
+            &SecretReference {
+                namespace: "default".to_owned(),
+                name: "secret-provisioner-tls-ca".to_owned(),
+            },
+            key_certificate,
+            key_private_key,
+        )
+        .expect(""))
+    }
+
+    #[test]
+    fn test_find_certificate_authority_for_signing() {
+        let ca_certificate_retirement_duration = Duration::from_hours_unchecked(1);
+
+        let ca1 = create_certificate_authority(
+            1,
+            datetime!(2025-01-01 0:00 UTC),
+            datetime!(2025-01-01 12:00 UTC),
+        )
+        .expect("should create a valid certificate");
+        let ca2 = create_certificate_authority(
+            2,
+            datetime!(2025-01-01 6:00 UTC),
+            datetime!(2025-01-01 18:00 UTC),
+        )
+        .expect("should create a valid certificate");
+
+        let manager = Manager {
+            source_secret: ObjectRef::<Secret>::new("secret-provisioner-tls-ca"),
+            certificate_authorities: vec![ca1, ca2],
+            additional_trusted_certificates: vec![],
+            ca_certificate_retirement_duration,
+        };
+
+        let signing_ca_at_11_00 =
+            manager.find_certificate_authority_for_signing(datetime!(2025-01-01 11:00 UTC));
+
+        assert_eq!(
+            Some("CertificateAuthority(serial=1)".to_owned()),
+            signing_ca_at_11_00.ok().map(|ca| format!("{}", ca))
+        );
+
+        let signing_ca_at_11_01 =
+            manager.find_certificate_authority_for_signing(datetime!(2025-01-01 11:01 UTC));
+
+        assert_eq!(
+            Some("CertificateAuthority(serial=2)".to_owned()),
+            signing_ca_at_11_01.ok().map(|ca| format!("{}", ca))
+        );
+    }
+
+    #[test]
+    fn test_trust_roots() {
+        let ca_certificate_retirement_duration = Duration::from_hours_unchecked(1);
+
+        let ca1 = create_certificate_authority(
+            1,
+            datetime!(2025-01-01 0:00 UTC),
+            datetime!(2025-01-01 12:00 UTC),
+        )
+        .expect("should create a valid certificate");
+        let ca1_certificate = ca1.certificate.clone();
+
+        let ca2 = create_certificate_authority(
+            2,
+            datetime!(2025-01-01 6:00 UTC),
+            datetime!(2025-01-01 18:00 UTC),
+        )
+        .expect("should create a valid certificate");
+        let ca2_certificate = ca2.certificate.clone();
+
+        let (trust_root1, _) = create_certificate(
+            3,
+            datetime!(2025-01-01 0:00 UTC),
+            datetime!(2025-01-01 12:00 UTC),
+        )
+        .expect("should create a valid certificate");
+
+        let (trust_root2, _) = create_certificate(
+            4,
+            datetime!(2025-01-01 6:00 UTC),
+            datetime!(2025-01-01 18:00 UTC),
+        )
+        .expect("should create a valid certificate");
+
+        let manager = Manager {
+            source_secret: ObjectRef::<Secret>::new("secret-provisioner-tls-ca"),
+            certificate_authorities: vec![ca1, ca2],
+            additional_trusted_certificates: vec![trust_root1.clone(), trust_root2.clone()],
+            ca_certificate_retirement_duration,
+        };
+
+        let trust_roots_at_11_00: Vec<&X509> = manager
+            .trust_roots(datetime!(2025-01-01 11:00 UTC))
+            .into_iter()
+            .collect();
+
+        assert_eq!(
+            vec![
+                &ca1_certificate,
+                &ca2_certificate,
+                &trust_root1,
+                &trust_root2
+            ],
+            trust_roots_at_11_00
+        );
+
+        let trust_roots_at_11_01: Vec<&X509> = manager
+            .trust_roots(datetime!(2025-01-01 11:01 UTC))
+            .into_iter()
+            .collect();
+
+        assert_eq!(vec![&ca2_certificate, &trust_root2], trust_roots_at_11_01);
     }
 }

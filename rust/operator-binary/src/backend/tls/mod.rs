@@ -1,6 +1,6 @@
 //! Dynamically provisions TLS certificates
 
-use std::ops::Range;
+use std::{cmp::min, ops::Range};
 
 use async_trait::async_trait;
 use openssl::{
@@ -20,7 +20,7 @@ use openssl::{
     },
 };
 use rand::Rng;
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu, ensure};
 use stackable_operator::{
     k8s_openapi::chrono::{self, FixedOffset, TimeZone},
     shared::time::Duration,
@@ -40,15 +40,33 @@ use crate::{
 
 mod ca;
 
+/// Fraction of the active lifetime of a CA after which it is rotated.
+// Use a fraction instead of a factor because [`Duration::mul`] is not defined for floating point
+// numbers.
+pub const CA_ROTATION_FRACTION: u32 = 2;
+
 /// How long CA certificates should last for. Also used for calculating when they should be rotated.
-/// [`DEFAULT_MAX_CERT_LIFETIME`] must be less than half of [`DEFAULT_CA_CERT_LIFETIME`].
 pub const DEFAULT_CA_CERT_LIFETIME: Duration = Duration::from_days_unchecked(365);
+
+/// Duration at the end of the CA certificate lifetime where no certificates signed by the CA
+/// certificate may exist.
+///
+/// The CA certificate is not published anymore while in retirement to avoid that pods get almost
+/// expired certificates.
+///
+/// see https://github.com/stackabletech/secret-operator/issues/625
+pub const DEFAULT_CA_CERT_RETIREMENT_DURATION: Duration = Duration::from_hours_unchecked(1);
 
 /// As the Pods will be evicted [`DEFAULT_CERT_RESTART_BUFFER`] before
 /// the cert actually expires, this results in a restart in approx every 2 weeks,
 /// which matches the rolling re-deploy of k8s nodes of e.g.:
 /// * 1 week for IONOS
 /// * 2 weeks for some on-prem k8s clusters
+///
+/// [`DEFAULT_MAX_CERT_LIFETIME`] must be less than `([DEFAULT_CA_CERT_LIFETIME] -
+/// [DEFAULT_CA_CERT_RETIREMENT_DURATION]) / [CA_ROTATION_FACTOR] / 2`.
+///
+/// see the explanation in [`AutoTlsBackend::max_certificate_lifetime`]
 pub const DEFAULT_MAX_CERT_LIFETIME: Duration = Duration::from_days_unchecked(15);
 
 /// Default lifetime of certs when no annotations are set on the Volume.
@@ -94,6 +112,12 @@ pub enum Error {
     #[snafu(display("invalid certificate lifetime"))]
     InvalidCertLifetime { source: DateTimeOutOfBoundsError },
 
+    #[snafu(display("retirement duration is not shorter than the CA certificate lifetime"))]
+    RetirementDurationNotShorterThanCertificateLifetime {
+        ca_certificate_lifetime: Duration,
+        ca_certificate_retirement_duration: Duration,
+    },
+
     #[snafu(display(
         "certificate expiring at {expires_at} would schedule the pod to be restarted at {restart_at}, which is in the past (and we don't have a time machine (yet and/or anymore))"
     ))]
@@ -123,6 +147,9 @@ impl SecretBackendError for Error {
             Error::BuildCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::SerializeCertificate { .. } => tonic::Code::FailedPrecondition,
             Error::InvalidCertLifetime { .. } => tonic::Code::Internal,
+            Error::RetirementDurationNotShorterThanCertificateLifetime { .. } => {
+                tonic::Code::InvalidArgument
+            }
             Error::TooShortCertLifetimeRequiresTimeTravel { .. } => tonic::Code::InvalidArgument,
             Error::JitterOutOfRange { .. } => tonic::Code::InvalidArgument,
         }
@@ -140,6 +167,7 @@ impl SecretBackendError for Error {
             Error::BuildCertificate { .. } => None,
             Error::SerializeCertificate { .. } => None,
             Error::InvalidCertLifetime { .. } => None,
+            Error::RetirementDurationNotShorterThanCertificateLifetime { .. } => None,
             Error::TooShortCertLifetimeRequiresTimeTravel { .. } => None,
             Error::JitterOutOfRange { .. } => None,
         }
@@ -166,11 +194,33 @@ impl TlsGenerate {
             secret: ca_secret,
             auto_generate: auto_generate_ca,
             ca_certificate_lifetime,
+            ca_certificate_retirement_duration,
             key_generation,
         }: &v1alpha1::AutoTlsCa,
         additional_trust_roots: &[v1alpha1::AdditionalTrustRoot],
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
+        ensure!(
+            ca_certificate_retirement_duration < ca_certificate_lifetime,
+            RetirementDurationNotShorterThanCertificateLifetimeSnafu {
+                ca_certificate_lifetime: *ca_certificate_lifetime,
+                ca_certificate_retirement_duration: *ca_certificate_retirement_duration
+            }
+        );
+
+        let active_ca_certificate_lifetime =
+            *ca_certificate_lifetime - *ca_certificate_retirement_duration;
+
+        // Safe maximum certificate lifetime that ensures that the lifetimes of two certificates do
+        // not overlap if their issuer certificates are not known to each other.
+        let safe_max_cert_lifetime = active_ca_certificate_lifetime / CA_ROTATION_FRACTION / 2;
+
+        if max_cert_lifetime > safe_max_cert_lifetime {
+            tracing::warn!(%max_cert_lifetime, %safe_max_cert_lifetime, "maxCertificateLifetime is longer than (caCertificateLifetime - caCertificateRetirementDuration) / {} and will be capped", CA_ROTATION_FRACTION * 2);
+        }
+
+        let max_cert_lifetime = min(max_cert_lifetime, safe_max_cert_lifetime);
+
         Ok(Self {
             ca_manager: ca::Manager::load_or_create(
                 client,
@@ -179,7 +229,10 @@ impl TlsGenerate {
                 &ca::Config {
                     manage_ca: *auto_generate_ca,
                     ca_certificate_lifetime: *ca_certificate_lifetime,
-                    rotate_if_ca_expires_before: Some(*ca_certificate_lifetime / 2),
+                    ca_certificate_retirement_duration: *ca_certificate_retirement_duration,
+                    rotate_if_ca_expires_before: Some(
+                        active_ca_certificate_lifetime / CA_ROTATION_FRACTION,
+                    ),
                     key_generation: key_generation.clone(),
                 },
             )
@@ -347,7 +400,7 @@ impl SecretBackend for TlsGenerate {
             SecretContents::new(SecretData::WellKnown(WellKnownSecretData::TlsPem(
                 well_known::TlsPem {
                     ca_pem: iterator_try_concat_bytes(
-                        self.ca_manager.trust_roots().into_iter().map(|ca| {
+                        self.ca_manager.trust_roots(now).into_iter().map(|ca| {
                             ca.to_pem()
                                 .context(SerializeCertificateSnafu { tpe: CertType::Ca })
                         }),
@@ -374,14 +427,15 @@ impl SecretBackend for TlsGenerate {
         &self,
         _selector: &super::TrustSelector,
     ) -> Result<SecretContents, Self::Error> {
+        let now = OffsetDateTime::now_utc();
         Ok(SecretContents::new(SecretData::WellKnown(
             WellKnownSecretData::TlsPem(well_known::TlsPem {
-                ca_pem: iterator_try_concat_bytes(self.ca_manager.trust_roots().into_iter().map(
-                    |ca| {
+                ca_pem: iterator_try_concat_bytes(
+                    self.ca_manager.trust_roots(now).into_iter().map(|ca| {
                         ca.to_pem()
                             .context(SerializeCertificateSnafu { tpe: CertType::Ca })
-                    },
-                ))?,
+                    }),
+                )?,
                 certificate_pem: None,
                 key_pem: None,
             }),
