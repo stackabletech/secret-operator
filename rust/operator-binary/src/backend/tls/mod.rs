@@ -1,6 +1,6 @@
 //! Dynamically provisions TLS certificates
 
-use std::ops::Range;
+use std::{cmp::min, ops::Range};
 
 use async_trait::async_trait;
 use openssl::{
@@ -40,19 +40,36 @@ use crate::{
 
 mod ca;
 
+// Use a fraction instead of a factor because [`Duration::mul`] is not defined for floating point
+// numbers.
+pub const CA_ROTATION_FRACTION: u32 = 2;
+
 /// How long CA certificates should last for. Also used for calculating when they should be rotated.
-/// [`DEFAULT_MAX_CERT_LIFETIME`] must be less than half of [`DEFAULT_CA_CERT_LIFETIME`].
-pub const DEFAULT_CA_CERT_LIFETIME: Duration = Duration::from_days_unchecked(365);
+pub const DEFAULT_CA_CERT_LIFETIME: Duration = Duration::from_minutes_unchecked(10);
+
+/// Duration at the end of the CA certificate lifetime where no certificates signed by the CA
+/// certificate may exist.
+///
+/// The CA certificate is not published anymore while in retirement to avoid that pods get almost
+/// expired certificates.
+///
+/// see https://github.com/stackabletech/secret-operator/issues/625
+pub const DEFAULT_CA_CERT_RETIREMENT_DURATION: Duration = Duration::from_minutes_unchecked(1); // Duration::from_hours_unchecked(1);
 
 /// As the Pods will be evicted [`DEFAULT_CERT_RESTART_BUFFER`] before
 /// the cert actually expires, this results in a restart in approx every 2 weeks,
 /// which matches the rolling re-deploy of k8s nodes of e.g.:
 /// * 1 week for IONOS
 /// * 2 weeks for some on-prem k8s clusters
-pub const DEFAULT_MAX_CERT_LIFETIME: Duration = Duration::from_days_unchecked(15);
+///
+/// [`DEFAULT_MAX_CERT_LIFETIME`] must be less than `([DEFAULT_CA_CERT_LIFETIME] -
+/// [DEFAULT_CA_CERT_RETIREMENT_DURATION]) * [CA_ROTATION_FACTOR] / 2`.
+///
+/// see the explanation in [`AutoTlsBackend::max_certificate_lifetime`]
+pub const DEFAULT_MAX_CERT_LIFETIME: Duration = Duration::from_minutes_unchecked(4);
 
 /// Default lifetime of certs when no annotations are set on the Volume.
-pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_hours_unchecked(24);
+pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_minutes_unchecked(4);
 
 /// When a StatefulSet has many Pods (e.g. 80 HDFS datanodes or Trino workers) a rolling
 /// redeployment can take multiple hours. When the certificates of all datanodes
@@ -60,10 +77,10 @@ pub const DEFAULT_CERT_LIFETIME: Duration = Duration::from_hours_unchecked(24);
 /// So they need to be restarted sequentially - combined with a graceful shutdown this can
 /// take hours. To prevent expired certificates we need to evict them enough time in advance
 /// - which is the purpose of the buffer.
-pub const DEFAULT_CERT_RESTART_BUFFER: Duration = Duration::from_hours_unchecked(6);
+pub const DEFAULT_CERT_RESTART_BUFFER: Duration = Duration::from_minutes_unchecked(0);
 
 /// We randomize the certificate lifetimes slightly, in order to avoid all pods of a set restarting/failing at the same time.
-pub const DEFAULT_CERT_JITTER_FACTOR: f64 = 0.2;
+pub const DEFAULT_CERT_JITTER_FACTOR: f64 = 0.01;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -166,11 +183,20 @@ impl TlsGenerate {
             secret: ca_secret,
             auto_generate: auto_generate_ca,
             ca_certificate_lifetime,
+            ca_certificate_retirement_duration,
             key_generation,
         }: &v1alpha1::AutoTlsCa,
         additional_trust_roots: &[v1alpha1::AdditionalTrustRoot],
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
+        // TODO Check that ca_certificate_retirement_duration < ca_certificate_lifetime
+        let active_ca_certificate_lifetime =
+            *ca_certificate_lifetime - *ca_certificate_retirement_duration;
+        let max_cert_lifetime = min(
+            max_cert_lifetime,
+            active_ca_certificate_lifetime / CA_ROTATION_FRACTION / 2,
+        );
+
         Ok(Self {
             ca_manager: ca::Manager::load_or_create(
                 client,
@@ -179,7 +205,10 @@ impl TlsGenerate {
                 &ca::Config {
                     manage_ca: *auto_generate_ca,
                     ca_certificate_lifetime: *ca_certificate_lifetime,
-                    rotate_if_ca_expires_before: Some(*ca_certificate_lifetime / 2),
+                    ca_certificate_retirement_duration: *ca_certificate_retirement_duration,
+                    rotate_if_ca_expires_before: Some(
+                        active_ca_certificate_lifetime / CA_ROTATION_FRACTION,
+                    ),
                     key_generation: key_generation.clone(),
                 },
             )

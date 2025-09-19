@@ -189,6 +189,8 @@ pub struct Config {
     /// The duration of any new CA certificates provisioned.
     pub ca_certificate_lifetime: Duration,
 
+    pub ca_certificate_retirement_duration: Duration,
+
     /// If no existing CA certificate outlives `rotate_if_ca_expires_before`, a new
     /// certificate will be generated.
     ///
@@ -342,6 +344,7 @@ pub struct Manager {
     source_secret: ObjectRef<Secret>,
     certificate_authorities: Vec<CertificateAuthority>,
     additional_trusted_certificates: Vec<X509>,
+    ca_certificate_retirement_duration: Duration,
 }
 
 impl Manager {
@@ -513,6 +516,7 @@ impl Manager {
                 .get()
                 .map(|secret| secret.to_object_ref(()))
                 .unwrap_or_else(|| secret_ref.into()),
+            ca_certificate_retirement_duration: config.ca_certificate_retirement_duration,
         })
     }
 
@@ -621,7 +625,9 @@ impl Manager {
         use get_ca_error::*;
         self.certificate_authorities
             .iter()
-            .filter(|ca| ca.not_after > valid_until_at_least)
+            .filter(|ca| {
+                ca.not_after - self.ca_certificate_retirement_duration > valid_until_at_least
+            })
             // pick the oldest valid CA, since it will be trusted by the most peers
             .min_by_key(|ca| ca.not_after)
             .with_context(|| NoCaLivesLongEnoughSnafu {
@@ -634,6 +640,10 @@ impl Manager {
     pub fn trust_roots(&self) -> impl IntoIterator<Item = &X509> + '_ {
         self.certificate_authorities
             .iter()
+            // TODO Filter also additional_trusted_certificates below?
+            .filter(|ca| {
+                ca.not_after - self.ca_certificate_retirement_duration >= OffsetDateTime::now_utc()
+            })
             .map(|ca| &ca.certificate)
             .chain(&self.additional_trusted_certificates)
     }

@@ -124,6 +124,10 @@ impl AutoTlsCa {
     pub(crate) fn default_ca_certificate_lifetime() -> Duration {
         backend::tls::DEFAULT_CA_CERT_LIFETIME
     }
+
+    pub(crate) fn default_ca_certificate_retirement_duration() -> Duration {
+        backend::tls::DEFAULT_CA_CERT_RETIREMENT_DURATION
+    }
 }
 
 impl CertificateKeyGeneration {

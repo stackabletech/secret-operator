@@ -412,6 +412,8 @@ impl Node for SecretProvisionerNode {
                     .await
                     .context(publish_error::InitBackendSnafu)?;
                 let pod_ref = ObjectRef::<Pod>::new(&selector.pod).within(&selector.namespace);
+                // TODO Perhaps remove the backend because it grows with the number of CA
+                // certificates
                 tracing::info!(pod = %pod_ref, ?selector, ?pod_info, ?backend, "issuing secret for Pod");
                 let data = backend
                     .get_secret_data(&selector, pod_info)
