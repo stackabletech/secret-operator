@@ -1,11 +1,9 @@
 # Default values for secret-operator.
 ---
 image:
-  repository: oci.stackable.tech/sdp/secret-operator
-  pullPolicy: IfNotPresent
   pullSecrets: []
 
-csiProvisioner:
+externalProvisioner:
   image:
     repository: oci.stackable.tech/sdp/sig-storage/csi-provisioner
     tag: v5.2.0
@@ -17,7 +15,7 @@ csiProvisioner:
     limits:
       cpu: 100m
       memory: 128Mi
-csiNodeDriverRegistrar:
+nodeDriverRegistrar:
   image:
     repository: oci.stackable.tech/sdp/sig-storage/csi-node-driver-registrar
     tag: v2.13.0
@@ -30,16 +28,33 @@ csiNodeDriverRegistrar:
       cpu: 100m
       memory: 128Mi
 
-node:
-  driver:
-    # Resources of the secret-operator container itself
-    resources:
-      limits:
-        cpu: 100m
-        memory: 128Mi
-      requests:
-        cpu: 100m
-        memory: 128Mi
+secretOperator:
+  image:
+    repository: oci.stackable.tech/sdp/secret-operator
+    # tag: 0.0.0-dev
+    pullPolicy: IfNotPresent
+  # Resources of the secret-operator container itself
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  securityContext:
+    # secret-operator requires root permissions
+    runAsUser: 0
+    # It is strongly recommended to run secret-operator as a privileged container, since
+    # it enables additional protections for the secret contents.
+    # Unprivileged mode is EXPERIMENTAL and requires manual migration for an existing cluster.
+    privileged: true
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
 
 nameOverride: ""
 fullnameOverride: ""
@@ -62,25 +77,13 @@ labels:
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext:
-  # secret-operator requires root permissions
-  runAsUser: 0
-  # It is strongly recommended to run secret-operator as a privileged container, since
-  # it enables additional protections for the secret contents.
-  # Unprivileged mode is EXPERIMENTAL and requires manual migration for an existing cluster.
-  privileged: true
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
-
 nodeSelector: {}
 
 tolerations: []
 
 affinity: {}
+
+# priorityClassName: ...
 
 # When running on a non-default Kubernetes cluster domain, the cluster domain can be configured here.
 # See the https://docs.stackable.tech/home/stable/guides/kubernetes-cluster-domain guide for details.
