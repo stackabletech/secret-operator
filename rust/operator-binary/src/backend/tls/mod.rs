@@ -33,7 +33,7 @@ use super::{
     scope::SecretScope,
 };
 use crate::{
-    crd::v1alpha1,
+    crd::v1alpha2,
     format::{SecretData, WellKnownSecretData, well_known},
     utils::iterator_try_concat_bytes,
 };
@@ -150,7 +150,7 @@ impl SecretBackendError for Error {
 pub struct TlsGenerate {
     ca_manager: ca::Manager,
     max_cert_lifetime: Duration,
-    key_generation: v1alpha1::CertificateKeyGeneration,
+    key_generation: v1alpha2::CertificateKeyGeneration,
 }
 
 impl TlsGenerate {
@@ -162,13 +162,13 @@ impl TlsGenerate {
     /// an independent self-signed CA.
     pub async fn get_or_create_k8s_certificate(
         client: &stackable_operator::client::Client,
-        v1alpha1::AutoTlsCa {
+        v1alpha2::AutoTlsCa {
             secret: ca_secret,
             auto_generate: auto_generate_ca,
             ca_certificate_lifetime,
             key_generation,
-        }: &v1alpha1::AutoTlsCa,
-        additional_trust_roots: &[v1alpha1::AdditionalTrustRoot],
+        }: &v1alpha2::AutoTlsCa,
+        additional_trust_roots: &[v1alpha2::AdditionalTrustRoot],
         max_cert_lifetime: Duration,
     ) -> Result<Self> {
         Ok(Self {
@@ -260,7 +260,7 @@ impl SecretBackend for TlsGenerate {
             Conf::new(ConfMethod::default()).expect("failed to initialize OpenSSL configuration");
 
         let pod_key_length = match self.key_generation {
-            v1alpha1::CertificateKeyGeneration::Rsa { length } => length,
+            v1alpha2::CertificateKeyGeneration::Rsa { length } => length,
         };
 
         let pod_key = Rsa::generate(pod_key_length)
