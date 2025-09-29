@@ -18,7 +18,7 @@ externalProvisioner:
 nodeDriverRegistrar:
   image:
     repository: oci.stackable.tech/sdp/sig-storage/csi-node-driver-registrar
-    tag: v2.13.0
+    tag: v2.15.0
     pullPolicy: IfNotPresent
   resources:
     requests:
