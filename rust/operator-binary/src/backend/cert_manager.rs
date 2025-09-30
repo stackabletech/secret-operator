@@ -20,7 +20,7 @@ use super::{
     scope::SecretScope,
 };
 use crate::{
-    crd::v1alpha1,
+    crd::v1alpha2,
     external_crd::{self, cert_manager::CertificatePrivateKey},
     format::SecretData,
     utils::Unloggable,
@@ -99,7 +99,7 @@ impl SecretBackendError for Error {
 pub struct CertManager {
     // Not secret per se, but Client isn't Debug: https://github.com/stackabletech/secret-operator/issues/411
     pub client: Unloggable<stackable_operator::client::Client>,
-    pub config: v1alpha1::CertManagerBackend,
+    pub config: v1alpha2::CertManagerBackend,
 }
 
 #[async_trait]
@@ -160,7 +160,7 @@ impl SecretBackend for CertManager {
                     kind: Some(self.config.issuer.kind.to_string()),
                 },
                 private_key: match self.config.key_generation {
-                    v1alpha1::CertificateKeyGeneration::Rsa { length } => CertificatePrivateKey {
+                    v1alpha2::CertificateKeyGeneration::Rsa { length } => CertificatePrivateKey {
                         algorithm: "RSA".to_string(),
                         size: length,
                     },
