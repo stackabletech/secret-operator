@@ -6,7 +6,7 @@ image:
 externalProvisioner:
   image:
     repository: oci.stackable.tech/sdp/sig-storage/csi-provisioner
-    tag: v5.2.0
+    tag: v5.3.0
     pullPolicy: IfNotPresent
   resources:
     requests:
