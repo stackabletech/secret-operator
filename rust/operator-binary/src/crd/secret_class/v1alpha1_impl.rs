@@ -1,7 +1,7 @@
 use stackable_operator::{
     k8s_openapi::api::core::v1::{ConfigMap, Secret},
     kube::api::PartialObjectMeta,
-    schemars::{self, schema::Schema},
+    schemars::{Schema, SchemaGenerator},
 };
 
 use crate::crd::secret_class::v1alpha1::{
@@ -113,7 +113,7 @@ impl CertificateKeyGeneration {
     //             - '3072'
     //             - '4096'
     //           type: string
-    pub fn tls_key_length_schema(_: &mut schemars::gen::SchemaGenerator) -> Schema {
+    pub fn tls_key_length_schema(_: &mut SchemaGenerator) -> Schema {
         serde_json::from_value(serde_json::json!({
             "type": "integer",
             "enum": [

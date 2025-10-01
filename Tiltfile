@@ -28,6 +28,6 @@ k8s_yaml(helm(
    namespace="stackable-operators",
    set=[
       'image.repository=' + registry + '/' + operator_name,
-      'telemetry.consoleLog.level=trace,h2=off',
+      'telemetry.consoleLog.level=info',
    ],
 ))

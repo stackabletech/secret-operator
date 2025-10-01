@@ -1,22 +1,17 @@
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
-    kube::Client,
     webhook::{
-        constants::DEFAULT_SOCKET_ADDRESS,
         servers::{ConversionWebhookOptions, ConversionWebhookServer},
+        x509_cert::Certificate,
     },
 };
+use tokio::sync::mpsc;
 
-use crate::{
-    OPERATOR_NAME,
-    crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion},
-};
+use crate::crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion};
 
 pub async fn conversion_webhook(
-    client: Client,
-    operator_environment: OperatorEnvironmentOptions,
-    disable_crd_management: bool,
-) -> anyhow::Result<ConversionWebhookServer> {
+    operator_environment: &OperatorEnvironmentOptions,
+) -> anyhow::Result<(ConversionWebhookServer, mpsc::Receiver<Certificate>)> {
     let crds_and_handlers = [
         (
             SecretClass::merged_crd(SecretClassVersion::V1Alpha2)?,
@@ -29,12 +24,10 @@ pub async fn conversion_webhook(
     ];
 
     let options = ConversionWebhookOptions {
-        socket_addr: DEFAULT_SOCKET_ADDRESS,
-        field_manager: OPERATOR_NAME.to_owned(),
-        namespace: operator_environment.operator_namespace,
-        service_name: operator_environment.operator_service_name,
-        maintain_crds: !disable_crd_management,
+        socket_addr: ConversionWebhookServer::DEFAULT_SOCKET_ADDRESS,
+        namespace: operator_environment.operator_namespace.clone(),
+        service_name: operator_environment.operator_service_name.clone(),
     };
 
-    Ok(ConversionWebhookServer::new(crds_and_handlers, options, client).await?)
+    Ok(ConversionWebhookServer::new(crds_and_handlers, options).await?)
 }

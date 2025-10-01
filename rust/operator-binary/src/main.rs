@@ -16,17 +16,25 @@ use grpc::csi::v1::{
 };
 use stackable_operator::{
     YamlSchema,
-    cli::{CommonOptions, ProductOperatorRun},
+    cli::{CommonOptions, RunArguments},
+    client::Client,
+    crd::maintainer::{
+        CustomResourceDefinitionMaintainer, CustomResourceDefinitionMaintainerOptions,
+    },
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
+    webhook::WebhookServer,
 };
-use tokio::signal::unix::{SignalKind, signal};
+use tokio::{
+    signal::unix::{SignalKind, signal},
+    sync::oneshot,
+};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use utils::{TonicUnixStream, uds_bind_private};
 use webhooks::conversion::conversion_webhook;
 
-use crate::crd::{SecretClass, TrustStore};
+use crate::crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha2};
 
 mod backend;
 mod crd;
@@ -62,7 +70,7 @@ struct SecretOperatorRun {
     privileged: bool,
 
     #[clap(flatten)]
-    common: ProductOperatorRun,
+    common: RunArguments,
 }
 
 mod built_info {
@@ -83,7 +91,7 @@ async fn main() -> anyhow::Result<()> {
             csi_endpoint,
             privileged,
             common:
-                ProductOperatorRun {
+                RunArguments {
                     common:
                         CommonOptions {
                             telemetry,
@@ -92,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
                     product_config: _,
                     watch_namespace,
                     operator_environment,
-                    disable_crd_maintenance,
+                    maintenance,
                 },
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
@@ -122,6 +130,27 @@ async fn main() -> anyhow::Result<()> {
             {
                 let _ = std::fs::remove_file(&csi_endpoint);
             }
+
+            let (conversion_webhook, certificate_rx) = conversion_webhook(&operator_environment)
+                .await
+                .context("failed to create conversion webhook")?;
+
+            let (maintainer, initial_reconcile_rx) = CustomResourceDefinitionMaintainer::new(
+                client.as_kube_client(),
+                certificate_rx,
+                [
+                    SecretClass::merged_crd(SecretClassVersion::V1Alpha2).unwrap(),
+                    TrustStore::merged_crd(TrustStoreVersion::V1Alpha1).unwrap(),
+                ],
+                CustomResourceDefinitionMaintainerOptions {
+                    operator_service_name: operator_environment.operator_service_name,
+                    operator_namespace: operator_environment.operator_namespace,
+                    field_manager: OPERATOR_NAME.to_owned(),
+                    webhook_https_port: WebhookServer::DEFAULT_HTTPS_PORT,
+                    disabled: maintenance.disable_crd_maintenance,
+                },
+            );
+
             let mut sigterm = signal(SignalKind::terminate())?;
             let csi_server = Server::builder()
                 .add_service(
@@ -151,19 +180,42 @@ async fn main() -> anyhow::Result<()> {
             let truststore_controller =
                 truststore_controller::start(&client, &watch_namespace).map(anyhow::Ok);
 
-            let conversion_webhook = conversion_webhook(
-                client.as_kube_client(),
-                operator_environment,
-                disable_crd_maintenance,
-            )
-            .await
-            .context("failed to create conversion webhook")?;
             let conversion_webhook = conversion_webhook
                 .run()
                 .map_err(|err| anyhow!(err).context("failed to run conversion webhook"));
 
-            try_join!(csi_server, truststore_controller, conversion_webhook,)?;
+            let maintainer = maintainer
+                .run()
+                .map_err(|err| anyhow!(err).context("failed to run CRD maintainer"));
+
+            let cr_applier = apply_crs(initial_reconcile_rx, client.clone())
+                .map_err(|err| anyhow!(err).context("failed to apply default custom resources"));
+
+            try_join!(
+                csi_server,
+                truststore_controller,
+                conversion_webhook,
+                maintainer,
+                cr_applier,
+            )?;
         }
     }
+    Ok(())
+}
+
+async fn apply_crs(
+    initial_reconcile_rx: oneshot::Receiver<()>,
+    client: Client,
+) -> anyhow::Result<()> {
+    initial_reconcile_rx.await?;
+
+    tracing::info!("applying default custom resources");
+
+    let deserializer = serde_yaml::Deserializer::from_slice(include_bytes!("secretclass.yaml"));
+    let tls_secret_class: v1alpha2::SecretClass =
+        serde_yaml::with::singleton_map_recursive::deserialize(deserializer)?;
+
+    client.create_if_missing(&tls_secret_class).await?;
+
     Ok(())
 }

@@ -122,6 +122,8 @@ rules:
       - secretclasses
       - truststores
     verbs:
+      - create
+      - patch
       - get
       - watch
       - list
