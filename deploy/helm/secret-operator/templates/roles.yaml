@@ -43,6 +43,13 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
+  # Required to maintain the CRD. The operator needs to do this, as it needs to enter e.g. it's
+  # generated certificate in the conversion webhook.
+  - apiGroups: [apiextensions.k8s.io]
+    resources: [customresourcedefinitions]
+    verbs:
+      - create
+      - patch
   - apiGroups:
       - ""
     resources:
@@ -115,6 +122,8 @@ rules:
       - secretclasses
       - truststores
     verbs:
+      - create
+      - patch
       - get
       - watch
       - list

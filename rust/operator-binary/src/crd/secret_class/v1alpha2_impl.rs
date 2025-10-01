@@ -1,36 +1,18 @@
-use std::{fmt::Display, ops::Deref};
-
-use snafu::Snafu;
 use stackable_operator::{
     k8s_openapi::api::core::v1::{ConfigMap, Secret},
     kube::api::PartialObjectMeta,
-    schemars::{self, schema::Schema},
+    schemars::{Schema, SchemaGenerator},
     shared::time::Duration,
 };
 
 use crate::{
     backend,
-    crd::{
-        KerberosPrincipal,
-        v1alpha1::{
-            ActiveDirectorySamAccountNameRules, AutoTlsBackend, AutoTlsCa, CertManagerBackend,
-            CertificateKeyGeneration, SearchNamespace, SearchNamespaceMatchCondition,
-            SecretClassBackend,
-        },
+    crd::v1alpha2::{
+        ActiveDirectorySamAccountNameRules, AutoTlsBackend, AutoTlsCa, CertManagerBackend,
+        CertificateKeyGeneration, SearchNamespace, SearchNamespaceMatchCondition,
+        SecretClassBackend,
     },
 };
-
-#[derive(Debug, Snafu)]
-#[snafu(module)]
-pub enum InvalidKerberosPrincipal {
-    #[snafu(display(
-        "principal contains illegal characters (allowed: alphanumeric, /, @, -, _, and .)"
-    ))]
-    IllegalCharacter,
-
-    #[snafu(display("principal may not start with a dash"))]
-    StartWithDash,
-}
 
 impl SecretClassBackend {
     // Currently no `refers_to_*` method actually returns more than one element,
@@ -149,7 +131,7 @@ impl CertificateKeyGeneration {
     //             - '3072'
     //             - '4096'
     //           type: string
-    pub fn tls_key_length_schema(_: &mut schemars::gen::SchemaGenerator) -> Schema {
+    pub fn tls_key_length_schema(_: &mut SchemaGenerator) -> Schema {
         serde_json::from_value(serde_json::json!({
             "type": "integer",
             "enum": [
@@ -180,46 +162,5 @@ impl ActiveDirectorySamAccountNameRules {
     pub(crate) fn default_total_length() -> u8 {
         // Default AD samAccountName length limit
         20
-    }
-}
-
-impl TryFrom<String> for KerberosPrincipal {
-    type Error = InvalidKerberosPrincipal;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        if value.starts_with('-') {
-            invalid_kerberos_principal::StartWithDashSnafu.fail()
-        } else if value.contains(|chr: char| {
-            !chr.is_alphanumeric()
-                && chr != '/'
-                && chr != '@'
-                && chr != '.'
-                && chr != '-'
-                && chr != '_'
-        }) {
-            invalid_kerberos_principal::IllegalCharacterSnafu.fail()
-        } else {
-            Ok(KerberosPrincipal(value))
-        }
-    }
-}
-
-impl From<KerberosPrincipal> for String {
-    fn from(value: KerberosPrincipal) -> Self {
-        value.0
-    }
-}
-
-impl Display for KerberosPrincipal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl Deref for KerberosPrincipal {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
