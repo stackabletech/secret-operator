@@ -10,5 +10,6 @@
   "git+https://github.com/stackabletech//operator-rs.git?branch=main#stackable-webhook@0.6.0": "0h2bwc02wavsw14f1b59pbflcx4mskrw89imq5c3fqdrsacxp674",
   "git+https://github.com/stackabletech/krb5-rs.git?tag=v0.1.0#krb5-sys@0.1.0": "148zr0q04163hpirkrff5q7cbxqgwzzxh0091zr4g23x7l64jh39",
   "git+https://github.com/stackabletech/krb5-rs.git?tag=v0.1.0#krb5@0.1.0": "148zr0q04163hpirkrff5q7cbxqgwzzxh0091zr4g23x7l64jh39",
+  "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-telemetry-0.6.1#stackable-telemetry@0.6.1": "0hiymhr40ix4jv9dmvp5d009xs6v0frvllr2xkf5mw43rcg44mgd",
   "git+https://github.com/stackabletech/product-config.git?tag=0.8.0#product-config@0.8.0": "1dz70kapm2wdqcr7ndyjji0lhsl98bsq95gnb2lw487wf6yr7987"
 }
