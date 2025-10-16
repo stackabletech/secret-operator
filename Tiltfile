@@ -22,6 +22,11 @@ custom_build(
 # oci.stackable.tech/sandbox/opa-operator:0.0.0-dev (which does not exist)
 k8s_kind('DaemonSet', image_json_path='{.spec.template.metadata.annotations.internal\\.stackable\\.tech/image}')
 
+# Optionally specify a custom Helm values file to be passed to the Helm deployment below.
+# This file can for example be used to set custom telemetry options (like log level) which is not
+# supported by helm(set).
+helm_values = settings.get('helm_values', None)
+
 k8s_yaml(helm(
    'deploy/helm/' + operator_name,
    name=operator_name,
@@ -29,4 +34,5 @@ k8s_yaml(helm(
    set=[
       'secretOperator.image.repository=' + registry + '/' + operator_name,
    ],
+   values=helm_values
 ))
