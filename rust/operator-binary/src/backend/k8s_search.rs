@@ -20,7 +20,7 @@ use super::{
     pod_info::{PodInfo, SchedulingPodInfo},
     scope::SecretScope,
 };
-use crate::{crd::SearchNamespace, format::SecretData, utils::Unloggable};
+use crate::{crd::v1alpha2, format::SecretData, utils::Unloggable};
 
 const LABEL_CLASS: &str = "secrets.stackable.tech/class";
 pub(super) const LABEL_SCOPE_NODE: &str = "secrets.stackable.tech/node";
@@ -89,7 +89,7 @@ impl SecretBackendError for Error {
 pub struct K8sSearch {
     // Not secret per se, but isn't Debug: https://github.com/stackabletech/secret-operator/issues/411
     pub client: Unloggable<stackable_operator::client::Client>,
-    pub search_namespace: SearchNamespace,
+    pub search_namespace: v1alpha2::SearchNamespace,
     pub trust_store_config_map_name: Option<String>,
 }
 

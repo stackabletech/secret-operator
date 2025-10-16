@@ -1,0 +1,35 @@
+use serde::{Deserialize, Serialize};
+use stackable_operator::{
+    kube::CustomResource,
+    schemars::{self, JsonSchema},
+    versioned::versioned,
+};
+
+use crate::format::SecretFormat;
+
+#[versioned(
+    version(name = "v1alpha1"),
+    crates(
+        kube_core = "stackable_operator::kube::core",
+        kube_client = "stackable_operator::kube::client",
+        k8s_openapi = "stackable_operator::k8s_openapi",
+        schemars = "stackable_operator::schemars",
+        versioned = "stackable_operator::versioned"
+    )
+)]
+pub mod versioned {
+    /// A [TrustStore](DOCS_BASE_URL_PLACEHOLDER/secret-operator/truststore) requests information about how to
+    /// validate secrets issued by a [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass).
+    ///
+    /// The requested information is written to a ConfigMap with the same name as the TrustStore.
+    #[versioned(crd(group = "secrets.stackable.tech", namespaced))]
+    #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+    #[serde(rename_all = "camelCase")]
+    pub struct TrustStoreSpec {
+        /// The name of the SecretClass that the request concerns.
+        pub secret_class_name: String,
+
+        /// The [format](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#format) that the data should be converted into.
+        pub format: Option<SecretFormat>,
+    }
+}

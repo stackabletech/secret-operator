@@ -20,6 +20,8 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use utils::{TonicUnixStream, uds_bind_private};
 
+use crate::crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha2};
+
 mod backend;
 mod crd;
 mod csi_server;
@@ -65,8 +67,10 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         stackable_operator::cli::Command::Crd => {
-            crd::SecretClass::print_yaml_schema(built_info::PKG_VERSION)?;
-            crd::TrustStore::print_yaml_schema(built_info::PKG_VERSION)?;
+            SecretClass::merged_crd(crd::SecretClassVersion::V1Alpha2)?
+                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
+            TrustStore::merged_crd(crd::TrustStoreVersion::V1Alpha1)?
+                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun {
             csi_endpoint,
