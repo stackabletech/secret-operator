@@ -11,10 +11,11 @@ spec:
       {{- include "operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        internal.stackable.tech/image: "{{ .Values.secretOperator.image.repository }}:{{ .Values.secretOperator.image.tag | default .Chart.AppVersion }}"
+        {{- with .Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         {{- include "operator.selectorLabels" . | nindent 8 }}
     spec:
