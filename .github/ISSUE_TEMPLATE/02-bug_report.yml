@@ -12,7 +12,8 @@ body:
       label: Affected Stackable version
       description: Which version of the Stackable Operator do you see this bug in?
 
-# 
+  #
+
   - type: textarea
     attributes:
       label: Current and expected behavior
@@ -34,7 +35,7 @@ body:
     attributes:
       label: Environment
       description: |
-        What type of kubernetes cluster you are running aginst (k3s/eks/aks/gke/other) and any other information about your environment?
+        What type of kubernetes cluster you are running against (k3s/eks/aks/gke/other) and any other information about your environment?
       placeholder: |
         Examples:
         Output of `kubectl version --short`

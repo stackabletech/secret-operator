@@ -192,5 +192,7 @@ async fn main() {
         .init();
     let res = run().await.map_err(|err| Report::from(err).to_string());
     println!("{}", serde_json::to_string_pretty(&res).unwrap());
-    std::process::exit(res.is_ok().into());
+
+    // Exit code 0 for Ok, 1 for Err
+    std::process::exit(res.is_err().into())
 }

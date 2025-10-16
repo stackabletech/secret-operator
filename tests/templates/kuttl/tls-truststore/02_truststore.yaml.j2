@@ -7,6 +7,7 @@ metadata:
 spec:
   secretClassName: tls-$NAMESPACE
   format: tls-pem
+  targetKind: {{ test_scenario['values']['truststore-target-kind'] }}
 ---
 apiVersion: secrets.stackable.tech/v1alpha1
 kind: TrustStore
@@ -15,6 +16,7 @@ metadata:
 spec:
   secretClassName: tls-$NAMESPACE
   format: tls-pkcs12
+  targetKind: {{ test_scenario['values']['truststore-target-kind'] }}
 ---
 apiVersion: secrets.stackable.tech/v1alpha1
 kind: TrustStore
@@ -22,3 +24,4 @@ metadata:
   name: truststore-k8ssearch
 spec:
   secretClassName: k8ssearch-$NAMESPACE
+  targetKind: {{ test_scenario['values']['truststore-target-kind'] }}

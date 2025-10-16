@@ -10,7 +10,7 @@ publish = false
 
 [dependencies]
 stackable-krb5-provision-keytab = { path = "../krb5-provision-keytab" }
-stackable-secret-operator-crd-utils = { path = "../crd-utils" }
+stackable-secret-operator-utils = { path = "../utils", features = ["crd"] }
 p12 = { path = "../p12" }
 
 anyhow.workspace = true
@@ -41,7 +41,6 @@ tonic-prost.workspace = true
 tonic-reflection.workspace = true
 tracing.workspace = true
 uuid.workspace = true
-yasna.workspace = true
 rand.workspace = true
 const_format.workspace = true
 

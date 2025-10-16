@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Support exporting the TrustStore CA certificate information to Secrets or ConfigMaps ([#597]).
+- New helm value for `priorityClassName` ([#641]).
+
+### Changed
+
+- Version CRD structs and enums as v1alpha1 ([#636]).
+- BREAKING: Rearrange values to be somewhat consistent with the listener-operator value changes ([#641]).
+  - `image.repository` has been moved to `secretOperator.image.repository`.
+  - `image.tag` has been moved to `secretOperator.image.tag`.
+  - `image.pullPolicy` has been moved to `secretOperator.image.pullPolicy`.
+  - `csiProvisioner` values have been moved to `externalProvisioner`.
+  - `csiNodeDriverRegistrar` values have been moved to `nodeDriverRegistrar`.
+  - `node.driver` values have been moved to `secretOperator`.
+  - `securityContext` values have been moved to `secretOperator.securityContext`.
+- Bump csi-node-driver-registrar to `v2.15.0` ([#642]).
+- Bump csi-provisioner to `v5.3.0` ([#643]).
+
+[#597]: https://github.com/stackabletech/secret-operator/pull/597
+[#636]: https://github.com/stackabletech/secret-operator/pull/636
+[#641]: https://github.com/stackabletech/secret-operator/pull/641
+[#642]: https://github.com/stackabletech/secret-operator/pull/642
+[#643]: https://github.com/stackabletech/secret-operator/pull/643
+
 ## [25.7.0] - 2025-07-23
 
 ## [25.7.0-rc1] - 2025-07-18

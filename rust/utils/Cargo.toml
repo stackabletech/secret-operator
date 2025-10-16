@@ -1,0 +1,24 @@
+[package]
+name = "stackable-secret-operator-utils"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+default = []
+crd = ["dep:stackable-operator", "dep:serde"]
+
+[dependencies]
+p12 = { path = "../p12" }
+stackable-operator = { workspace = true, optional = true }
+
+openssl.workspace = true
+serde = { workspace = true, optional = true }
+snafu.workspace = true
+yasna.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
