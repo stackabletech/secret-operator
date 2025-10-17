@@ -222,14 +222,10 @@ async fn create_default_secretclass(
 
     #[rustfmt::skip]
     let managed_by = Label::managed_by(OPERATOR_NAME, "secretclass").expect("managed-by label must be valid");
-    let version = Label::version(built_info::PKG_VERSION).expect("version label must be valid");
-    let instance = Label::instance(OPERATOR_NAME).expect("instance label must be valid");
     let name = Label::name(OPERATOR_NAME).expect("name label must be valid");
 
     tls_secret_class
         .add_label(managed_by)
-        .add_label(version)
-        .add_label(instance)
         .add_label(name)
         .add_label(Label::stackable_vendor());
 
