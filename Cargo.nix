@@ -3516,15 +3516,15 @@ rec {
         };
         resolvedDefaultFeatures = [ "std" ];
       };
-      "git+https://github.com/stackabletech//operator-rs.git?branch=main#stackable-telemetry@0.6.1" = rec {
+      "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.100.0#stackable-telemetry@0.6.1" = rec {
         crateName = "stackable-telemetry";
         version = "0.6.1";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "5184eb328d36ed0176cf854d226aed944b4ed77f";
-          sha256 = "0h2bwc02wavsw14f1b59pbflcx4mskrw89imq5c3fqdrsacxp674";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "5ff7d2ea14a06e9d66ba4410b94cd23e43666d55";
+          sha256 = "0330rzvnq05xai5dfx4ghhsz2162himcbj46fvh27a9pgqd92y4d";
         };
         libName = "stackable_telemetry";
         authors = [
@@ -4642,7 +4642,7 @@ rec {
           }
           {
             name = "windows-core";
-            packageId = "windows-core 0.62.2";
+            packageId = "windows-core";
             target = { target, features }: ("windows" == target."os" or null);
           }
         ];
@@ -5182,6 +5182,7 @@ rec {
           "default" = [ "use_std" ];
           "use_std" = [ "use_alloc" "either/use_std" ];
         };
+        resolvedDefaultFeatures = [ "default" "use_alloc" "use_std" ];
       };
       "itertools 0.14.0" = rec {
         crateName = "itertools";
@@ -5457,9 +5458,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "5184eb328d36ed0176cf854d226aed944b4ed77f";
-          sha256 = "0h2bwc02wavsw14f1b59pbflcx4mskrw89imq5c3fqdrsacxp674";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "5ff7d2ea14a06e9d66ba4410b94cd23e43666d55";
+          sha256 = "0330rzvnq05xai5dfx4ghhsz2162himcbj46fvh27a9pgqd92y4d";
         };
         libName = "k8s_version";
         authors = [
@@ -8904,7 +8905,7 @@ rec {
           }
           {
             name = "itertools";
-            packageId = "itertools 0.14.0";
+            packageId = "itertools 0.13.0";
             usesDefaultFeatures = false;
             features = [ "use_alloc" ];
           }
@@ -8996,7 +8997,7 @@ rec {
           }
           {
             name = "itertools";
-            packageId = "itertools 0.14.0";
+            packageId = "itertools 0.13.0";
           }
           {
             name = "proc-macro2";
@@ -9034,7 +9035,7 @@ rec {
           }
           {
             name = "itertools";
-            packageId = "itertools 0.14.0";
+            packageId = "itertools 0.13.0";
           }
           {
             name = "proc-macro2";
@@ -11454,9 +11455,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "5184eb328d36ed0176cf854d226aed944b4ed77f";
-          sha256 = "0h2bwc02wavsw14f1b59pbflcx4mskrw89imq5c3fqdrsacxp674";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "5ff7d2ea14a06e9d66ba4410b94cd23e43666d55";
+          sha256 = "0330rzvnq05xai5dfx4ghhsz2162himcbj46fvh27a9pgqd92y4d";
         };
         libName = "stackable_certs";
         authors = [
@@ -11636,13 +11637,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.99.0";
+        version = "0.100.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "5184eb328d36ed0176cf854d226aed944b4ed77f";
-          sha256 = "0h2bwc02wavsw14f1b59pbflcx4mskrw89imq5c3fqdrsacxp674";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "5ff7d2ea14a06e9d66ba4410b94cd23e43666d55";
+          sha256 = "0330rzvnq05xai5dfx4ghhsz2162himcbj46fvh27a9pgqd92y4d";
         };
         libName = "stackable_operator";
         authors = [
@@ -11687,7 +11688,7 @@ rec {
           }
           {
             name = "stackable-telemetry";
-            packageId = "git+https://github.com/stackabletech//operator-rs.git?branch=main#stackable-telemetry@0.6.1";
+            packageId = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.100.0#stackable-telemetry@0.6.1";
             optional = true;
             features = [ "clap" ];
           }
@@ -11814,9 +11815,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "5184eb328d36ed0176cf854d226aed944b4ed77f";
-          sha256 = "0h2bwc02wavsw14f1b59pbflcx4mskrw89imq5c3fqdrsacxp674";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "5ff7d2ea14a06e9d66ba4410b94cd23e43666d55";
+          sha256 = "0330rzvnq05xai5dfx4ghhsz2162himcbj46fvh27a9pgqd92y4d";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -12144,9 +12145,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "5184eb328d36ed0176cf854d226aed944b4ed77f";
-          sha256 = "0h2bwc02wavsw14f1b59pbflcx4mskrw89imq5c3fqdrsacxp674";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "5ff7d2ea14a06e9d66ba4410b94cd23e43666d55";
+          sha256 = "0330rzvnq05xai5dfx4ghhsz2162himcbj46fvh27a9pgqd92y4d";
         };
         libName = "stackable_shared";
         authors = [
@@ -12226,9 +12227,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "5184eb328d36ed0176cf854d226aed944b4ed77f";
-          sha256 = "0h2bwc02wavsw14f1b59pbflcx4mskrw89imq5c3fqdrsacxp674";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "5ff7d2ea14a06e9d66ba4410b94cd23e43666d55";
+          sha256 = "0330rzvnq05xai5dfx4ghhsz2162himcbj46fvh27a9pgqd92y4d";
         };
         libName = "stackable_versioned";
         authors = [
@@ -12270,9 +12271,9 @@ rec {
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "5184eb328d36ed0176cf854d226aed944b4ed77f";
-          sha256 = "0h2bwc02wavsw14f1b59pbflcx4mskrw89imq5c3fqdrsacxp674";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "5ff7d2ea14a06e9d66ba4410b94cd23e43666d55";
+          sha256 = "0330rzvnq05xai5dfx4ghhsz2162himcbj46fvh27a9pgqd92y4d";
         };
         procMacro = true;
         libName = "stackable_versioned_macros";
@@ -12330,13 +12331,13 @@ rec {
       };
       "stackable-webhook" = rec {
         crateName = "stackable-webhook";
-        version = "0.6.0";
+        version = "0.7.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "5184eb328d36ed0176cf854d226aed944b4ed77f";
-          sha256 = "0h2bwc02wavsw14f1b59pbflcx4mskrw89imq5c3fqdrsacxp674";
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "5ff7d2ea14a06e9d66ba4410b94cd23e43666d55";
+          sha256 = "0330rzvnq05xai5dfx4ghhsz2162himcbj46fvh27a9pgqd92y4d";
         };
         libName = "stackable_webhook";
         authors = [
@@ -12358,7 +12359,7 @@ rec {
           }
           {
             name = "stackable-telemetry";
-            packageId = "git+https://github.com/stackabletech//operator-rs.git?branch=main#stackable-telemetry@0.6.1";
+            packageId = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.100.0#stackable-telemetry@0.6.1";
           }
           {
             name = "hyper";
@@ -15721,7 +15722,7 @@ rec {
           }
           {
             name = "windows-core";
-            packageId = "windows-core 0.61.2";
+            packageId = "windows-core";
             usesDefaultFeatures = false;
           }
           {
@@ -16445,7 +16446,7 @@ rec {
         dependencies = [
           {
             name = "windows-core";
-            packageId = "windows-core 0.61.2";
+            packageId = "windows-core";
             usesDefaultFeatures = false;
           }
         ];
@@ -16453,7 +16454,7 @@ rec {
           "default" = [ "std" ];
         };
       };
-      "windows-core 0.61.2" = rec {
+      "windows-core" = rec {
         crateName = "windows-core";
         version = "0.61.2";
         edition = "2021";
@@ -16480,51 +16481,12 @@ rec {
           }
           {
             name = "windows-result";
-            packageId = "windows-result 0.3.4";
+            packageId = "windows-result";
             usesDefaultFeatures = false;
           }
           {
             name = "windows-strings";
-            packageId = "windows-strings 0.4.2";
-            usesDefaultFeatures = false;
-          }
-        ];
-        features = {
-          "default" = [ "std" ];
-          "std" = [ "windows-result/std" "windows-strings/std" ];
-        };
-        resolvedDefaultFeatures = [ "std" ];
-      };
-      "windows-core 0.62.2" = rec {
-        crateName = "windows-core";
-        version = "0.62.2";
-        edition = "2021";
-        sha256 = "1swxpv1a8qvn3bkxv8cn663238h2jccq35ff3nsj61jdsca3ms5q";
-        libName = "windows_core";
-        dependencies = [
-          {
-            name = "windows-implement";
-            packageId = "windows-implement";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "windows-interface";
-            packageId = "windows-interface";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "windows-link";
-            packageId = "windows-link 0.2.1";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "windows-result";
-            packageId = "windows-result 0.4.1";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "windows-strings";
-            packageId = "windows-strings 0.5.1";
+            packageId = "windows-strings";
             usesDefaultFeatures = false;
           }
         ];
@@ -16543,7 +16505,7 @@ rec {
         dependencies = [
           {
             name = "windows-core";
-            packageId = "windows-core 0.61.2";
+            packageId = "windows-core";
             usesDefaultFeatures = false;
           }
           {
@@ -16643,7 +16605,7 @@ rec {
         dependencies = [
           {
             name = "windows-core";
-            packageId = "windows-core 0.61.2";
+            packageId = "windows-core";
             usesDefaultFeatures = false;
           }
           {
@@ -16656,7 +16618,7 @@ rec {
           "default" = [ "std" ];
         };
       };
-      "windows-result 0.3.4" = rec {
+      "windows-result" = rec {
         crateName = "windows-result";
         version = "0.3.4";
         edition = "2021";
@@ -16677,25 +16639,7 @@ rec {
         };
         resolvedDefaultFeatures = [ "std" ];
       };
-      "windows-result 0.4.1" = rec {
-        crateName = "windows-result";
-        version = "0.4.1";
-        edition = "2021";
-        sha256 = "1d9yhmrmmfqh56zlj751s5wfm9a2aa7az9rd7nn5027nxa4zm0bp";
-        libName = "windows_result";
-        dependencies = [
-          {
-            name = "windows-link";
-            packageId = "windows-link 0.2.1";
-            usesDefaultFeatures = false;
-          }
-        ];
-        features = {
-          "default" = [ "std" ];
-        };
-        resolvedDefaultFeatures = [ "std" ];
-      };
-      "windows-strings 0.4.2" = rec {
+      "windows-strings" = rec {
         crateName = "windows-strings";
         version = "0.4.2";
         edition = "2021";
@@ -16708,24 +16652,6 @@ rec {
           {
             name = "windows-link";
             packageId = "windows-link 0.1.3";
-            usesDefaultFeatures = false;
-          }
-        ];
-        features = {
-          "default" = [ "std" ];
-        };
-        resolvedDefaultFeatures = [ "std" ];
-      };
-      "windows-strings 0.5.1" = rec {
-        crateName = "windows-strings";
-        version = "0.5.1";
-        edition = "2021";
-        sha256 = "14bhng9jqv4fyl7lqjz3az7vzh8pw0w4am49fsqgcz67d67x0dvq";
-        libName = "windows_strings";
-        dependencies = [
-          {
-            name = "windows-link";
-            packageId = "windows-link 0.2.1";
             usesDefaultFeatures = false;
           }
         ];
