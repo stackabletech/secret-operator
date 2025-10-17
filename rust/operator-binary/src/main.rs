@@ -56,7 +56,7 @@ struct Opts {
 
 #[derive(clap::Parser)]
 struct SecretOperatorRun {
-    #[clap(long, env)]
+    #[arg(long, env)]
     csi_endpoint: PathBuf,
 
     /// Unprivileged mode disables any features that require running secret-operator in a privileged container.
@@ -65,10 +65,16 @@ struct SecretOperatorRun {
     /// - Secret volumes will be stored on disk, rather than in a ramdisk
     ///
     /// Unprivileged mode is EXPERIMENTAL and heavily discouraged, since it increases the risk of leaking secrets.
-    #[clap(long, env)]
+    #[arg(long, env)]
     privileged: bool,
 
-    #[clap(flatten)]
+    /// The namespace that the TLS Certificate Authority is installed into.
+    ///
+    /// Defaults to the namespace where secret-operator is installed.
+    #[arg(long, env)]
+    tls_secretclass_ca_secret_namespace: Option<String>,
+
+    #[command(flatten)]
     common: RunArguments,
 }
 
@@ -87,6 +93,7 @@ async fn main() -> anyhow::Result<()> {
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun {
+            tls_secretclass_ca_secret_namespace,
             csi_endpoint,
             privileged,
             common:
@@ -176,9 +183,12 @@ async fn main() -> anyhow::Result<()> {
                 .run()
                 .map_err(|err| anyhow!(err).context("failed to run CRD maintainer"));
 
+            let ca_secret_namespace = tls_secretclass_ca_secret_namespace
+                .unwrap_or(operator_environment.operator_namespace.clone());
+
             let default_secretclass = create_default_secretclass(
                 initial_reconcile_rx,
-                operator_environment.operator_namespace.clone(),
+                ca_secret_namespace,
                 client.clone(),
             )
             .map_err(|err| anyhow!(err).context("failed to apply default custom resources"));
@@ -197,7 +207,7 @@ async fn main() -> anyhow::Result<()> {
 
 async fn create_default_secretclass(
     initial_reconcile_rx: oneshot::Receiver<()>,
-    operator_namespace: String,
+    ca_secret_namespace: String,
     client: Client,
 ) -> anyhow::Result<()> {
     initial_reconcile_rx.await?;
@@ -225,7 +235,7 @@ async fn create_default_secretclass(
     if let v1alpha2::SecretClassBackend::AutoTls(auto_tls_backend) =
         &mut tls_secret_class.spec.backend
     {
-        auto_tls_backend.ca.secret.namespace = operator_namespace
+        auto_tls_backend.ca.secret.namespace = ca_secret_namespace
     }
 
     client.create_if_missing(&tls_secret_class).await?;
