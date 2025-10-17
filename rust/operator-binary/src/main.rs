@@ -21,7 +21,6 @@ use stackable_operator::{
     kvp::{Label, LabelExt},
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
-    webhook::servers::ConversionWebhookServer,
 };
 use tokio::{
     signal::unix::{SignalKind, signal},
@@ -31,7 +30,10 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use utils::{TonicUnixStream, uds_bind_private};
 
-use crate::crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha2};
+use crate::crd::{
+    SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion,
+    create_conversion_webhook_and_maintainer, v1alpha2,
+};
 
 mod backend;
 mod crd;
@@ -79,9 +81,9 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         stackable_operator::cli::Command::Crd => {
-            SecretClass::merged_crd(crd::SecretClassVersion::V1Alpha2)?
+            SecretClass::merged_crd(SecretClassVersion::V1Alpha2)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
-            TrustStore::merged_crd(crd::TrustStoreVersion::V1Alpha1)?
+            TrustStore::merged_crd(TrustStoreVersion::V1Alpha1)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         stackable_operator::cli::Command::Run(SecretOperatorRun {
@@ -129,30 +131,13 @@ async fn main() -> anyhow::Result<()> {
                 let _ = std::fs::remove_file(&csi_endpoint);
             }
 
-            // NOTE (@Techassi): This could maybe be moved into a setup function again. For now,
-            // it is here.
-            let crds_and_handlers = [
-                (
-                    SecretClass::merged_crd(SecretClassVersion::V1Alpha2)?,
-                    SecretClass::try_convert as fn(_) -> _,
-                ),
-                (
-                    TrustStore::merged_crd(TrustStoreVersion::V1Alpha1)?,
-                    TrustStore::try_convert as fn(_) -> _,
-                ),
-            ];
-
             let (conversion_webhook, crd_maintainer, initial_reconcile_rx) =
-                ConversionWebhookServer::with_maintainer(
-                    crds_and_handlers,
-                    &operator_environment.operator_service_name,
-                    &operator_environment.operator_namespace,
-                    FIELD_MANAGER,
-                    maintenance.disable_crd_maintenance,
+                create_conversion_webhook_and_maintainer(
+                    &operator_environment,
+                    &maintenance,
                     client.as_kube_client(),
                 )
-                .await
-                .context("failed to create conversion webhook server and CRD maintainer")?;
+                .await?;
 
             let mut sigterm = signal(SignalKind::terminate())?;
             let csi_server = Server::builder()
