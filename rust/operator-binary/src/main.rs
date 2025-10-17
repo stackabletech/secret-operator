@@ -30,9 +30,9 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use utils::{TonicUnixStream, uds_bind_private};
 
-use crate::crd::{
-    SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion,
-    create_conversion_webhook_and_maintainer, v1alpha2,
+use crate::{
+    crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha2},
+    webhooks::conversion::create_webhook_and_maintainer,
 };
 
 mod backend;
@@ -43,6 +43,7 @@ mod format;
 mod grpc;
 mod truststore_controller;
 mod utils;
+mod webhooks;
 
 pub const OPERATOR_NAME: &str = "secrets.stackable.tech";
 pub const FIELD_MANAGER: &str = "secret-operator";
@@ -139,7 +140,7 @@ async fn main() -> anyhow::Result<()> {
             }
 
             let (conversion_webhook, crd_maintainer, initial_reconcile_rx) =
-                create_conversion_webhook_and_maintainer(
+                create_webhook_and_maintainer(
                     &operator_environment,
                     &maintenance,
                     client.as_kube_client(),
