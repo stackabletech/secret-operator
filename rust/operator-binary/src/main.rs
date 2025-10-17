@@ -222,7 +222,11 @@ async fn create_default_secretclass(
         .add_label(name)
         .add_label(Label::stackable_vendor());
 
-    tls_secret_class.metadata.namespace = Some(operator_namespace);
+    if let v1alpha2::SecretClassBackend::AutoTls(auto_tls_backend) =
+        &mut tls_secret_class.spec.backend
+    {
+        auto_tls_backend.ca.secret.namespace = operator_namespace
+    }
 
     client.create_if_missing(&tls_secret_class).await?;
 
