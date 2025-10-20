@@ -37,7 +37,8 @@ spec:
             {{ .Values.secretOperator.resources | toYaml | nindent 12 }}
           # The arguments passed to the command being run in the container. The final command will
           # look like `secret-operator run controller [OPTIONS]`. The controller needs to only run
-          # once in a Kubernetes cluster and as such is deployed as a Deployment.
+          # once in a Kubernetes cluster and as such is deployed as a Deployment with a single
+          # replica.
           args:
             - run
             - controller
