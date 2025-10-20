@@ -18,10 +18,7 @@ use stackable_operator::{
     YamlSchema, cli::RunArguments, eos::EndOfSupportChecker, shared::yaml::SerializeOptions,
     telemetry::Tracing,
 };
-use tokio::{
-    pin,
-    signal::unix::{SignalKind, signal},
-};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use utils::{TonicUnixStream, uds_bind_private};
@@ -154,10 +151,6 @@ async fn main() -> anyhow::Result<()> {
             let truststore_controller =
                 truststore_controller::start(&client, &watch_namespace).map(Ok);
 
-            // NOTE (@Techassi): I'm not quite sure if there is any benefit to pinning these futures
-            // to the stack (maybe slightly better performance), but it was there before and as such
-            // we will keep it.
-            pin!(csi_server, truststore_controller, eos_checker);
             futures::try_join!(csi_server, truststore_controller, eos_checker)?;
         }
     }
