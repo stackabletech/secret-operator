@@ -2,7 +2,7 @@
 // This will need changes in our and upstream error types.
 #![allow(clippy::result_large_err)]
 
-use std::{os::unix::prelude::FileTypeExt, path::PathBuf, pin::pin};
+use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
 
 use anyhow::Context;
 use clap::Parser;
@@ -15,9 +15,7 @@ use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
 use stackable_operator::{
-    YamlSchema,
-    cli::{CommonOptions, ProductOperatorRun},
-    shared::yaml::SerializeOptions,
+    YamlSchema, cli::RunArguments, eos::EndOfSupportChecker, shared::yaml::SerializeOptions,
     telemetry::Tracing,
 };
 use tokio::signal::unix::{SignalKind, signal};
@@ -60,7 +58,7 @@ struct SecretOperatorRun {
     privileged: bool,
 
     #[clap(flatten)]
-    common: ProductOperatorRun,
+    common: RunArguments,
 }
 
 mod built_info {
@@ -81,22 +79,20 @@ async fn main() -> anyhow::Result<()> {
             csi_endpoint,
             privileged,
             common:
-                ProductOperatorRun {
-                    common:
-                        CommonOptions {
-                            telemetry,
-                            cluster_info,
-                        },
+                RunArguments {
+                    operator_environment: _,
                     product_config: _,
                     watch_namespace,
-                    operator_environment: _,
+                    maintenance,
+                    common,
                 },
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
             // - The console log level was set by `SECRET_PROVISIONER_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
             // - The file log level was set by `SECRET_PROVISIONER_LOG`, and is now set via `FILE_LOG` (when using Tracing::pre_configured).
             // - The file log directory was set by `SECRET_PROVISIONER_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
-            let _tracing_guard = Tracing::pre_configured(built_info::PKG_NAME, telemetry).init()?;
+            let _tracing_guard =
+                Tracing::pre_configured(built_info::PKG_NAME, common.telemetry).init()?;
 
             tracing::info!(
                 built_info.pkg_version = built_info::PKG_VERSION,
@@ -108,50 +104,54 @@ async fn main() -> anyhow::Result<()> {
                 description = built_info::PKG_DESCRIPTION
             );
 
+            let eos_checker =
+                EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, maintenance.end_of_support)?
+                    .run()
+                    .map(Ok);
+
             let client = stackable_operator::client::initialize_operator(
                 Some(OPERATOR_NAME.to_string()),
-                &cluster_info,
+                &common.cluster_info,
             )
             .await?;
+
             if csi_endpoint
                 .symlink_metadata()
                 .is_ok_and(|meta| meta.file_type().is_socket())
             {
                 let _ = std::fs::remove_file(&csi_endpoint);
             }
+
             let mut sigterm = signal(SignalKind::terminate())?;
-            let csi_server = pin!(
-                Server::builder()
-                    .add_service(
-                        tonic_reflection::server::Builder::configure()
-                            .include_reflection_service(true)
-                            .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
-                            .build_v1()?,
+
+            let csi_server = Server::builder()
+                .add_service(
+                    tonic_reflection::server::Builder::configure()
+                        .include_reflection_service(true)
+                        .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
+                        .build_v1()?,
+                )
+                .add_service(IdentityServer::new(SecretProvisionerIdentity))
+                .add_service(ControllerServer::new(SecretProvisionerController {
+                    client: client.clone(),
+                }))
+                .add_service(NodeServer::new(SecretProvisionerNode {
+                    client: client.clone(),
+                    node_name: common.cluster_info.kubernetes_node_name.to_owned(),
+                    privileged,
+                }))
+                .serve_with_incoming_shutdown(
+                    UnixListenerStream::new(
+                        uds_bind_private(csi_endpoint).context("failed to bind CSI listener")?,
                     )
-                    .add_service(IdentityServer::new(SecretProvisionerIdentity))
-                    .add_service(ControllerServer::new(SecretProvisionerController {
-                        client: client.clone(),
-                    }))
-                    .add_service(NodeServer::new(SecretProvisionerNode {
-                        client: client.clone(),
-                        node_name: cluster_info.kubernetes_node_name.to_owned(),
-                        privileged,
-                    }))
-                    .serve_with_incoming_shutdown(
-                        UnixListenerStream::new(
-                            uds_bind_private(csi_endpoint)
-                                .context("failed to bind CSI listener")?,
-                        )
-                        .map_ok(TonicUnixStream),
-                        sigterm.recv().map(|_| ()),
-                    )
-            );
+                    .map_ok(TonicUnixStream),
+                    sigterm.recv().map(|_| ()),
+                );
+
             let truststore_controller =
-                pin!(truststore_controller::start(&client, &watch_namespace).map(Ok));
-            futures::future::select(csi_server, truststore_controller)
-                .await
-                .factor_first()
-                .0?;
+                truststore_controller::start(&client, &watch_namespace).map(Ok);
+
+            futures::try_join!(csi_server, truststore_controller, eos_checker)?;
         }
     }
     Ok(())
