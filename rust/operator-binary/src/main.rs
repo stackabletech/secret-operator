@@ -4,21 +4,20 @@
 
 use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
 
-use anyhow::Context;
+use anyhow::{Context, Ok, anyhow};
 use clap::Parser;
 use csi_server::{
     controller::SecretProvisionerController, identity::SecretProvisionerIdentity,
     node::SecretProvisionerNode,
 };
-use futures::{FutureExt, TryStreamExt};
+use futures::{FutureExt, TryFutureExt, TryStreamExt, try_join};
 use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
 use stackable_operator::{
     YamlSchema,
-    cli::{Command, CommonOptions, ProductOperatorRun},
-    client::Client,
-    namespace::WatchNamespace,
+    cli::{Command, CommonOptions, RunArguments},
+    eos::EndOfSupportChecker,
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
 };
@@ -54,7 +53,7 @@ struct SecretOperatorRun {
     mode: RunMode,
 
     #[clap(flatten)]
-    common: ProductOperatorRun,
+    common: RunArguments,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -97,10 +96,11 @@ async fn main() -> anyhow::Result<()> {
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(SecretOperatorRun { common, mode }) => {
-            let ProductOperatorRun {
+            let RunArguments {
                 operator_environment: _,
                 product_config: _,
                 watch_namespace,
+                maintenance,
                 common,
             } = common;
 
@@ -125,6 +125,11 @@ async fn main() -> anyhow::Result<()> {
                 description = built_info::PKG_DESCRIPTION
             );
 
+            let eos_checker =
+                EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, maintenance.end_of_support)?
+                    .run()
+                    .map(Ok);
+
             let client = stackable_operator::client::initialize_operator(
                 Some(OPERATOR_NAME.to_string()),
                 &cluster_info,
@@ -136,64 +141,54 @@ async fn main() -> anyhow::Result<()> {
                     csi_endpoint,
                     privileged,
                 }) => {
-                    run_csi_server(
-                        csi_endpoint,
-                        cluster_info.kubernetes_node_name,
-                        privileged,
-                        client,
-                    )
-                    .await?
+                    if csi_endpoint
+                        .symlink_metadata()
+                        .is_ok_and(|meta| meta.file_type().is_socket())
+                    {
+                        let _ = std::fs::remove_file(&csi_endpoint);
+                    }
+
+                    let mut sigterm = signal(SignalKind::terminate())?;
+
+                    let csi_server = Server::builder()
+                        .add_service(
+                            tonic_reflection::server::Builder::configure()
+                                .include_reflection_service(true)
+                                .register_encoded_file_descriptor_set(
+                                    grpc::FILE_DESCRIPTOR_SET_BYTES,
+                                )
+                                .build_v1()?,
+                        )
+                        .add_service(IdentityServer::new(SecretProvisionerIdentity))
+                        .add_service(ControllerServer::new(SecretProvisionerController {
+                            client: client.clone(),
+                        }))
+                        .add_service(NodeServer::new(SecretProvisionerNode {
+                            node_name: cluster_info.kubernetes_node_name,
+                            privileged,
+                            client,
+                        }))
+                        .serve_with_incoming_shutdown(
+                            UnixListenerStream::new(
+                                uds_bind_private(csi_endpoint)
+                                    .context("failed to bind CSI listener")?,
+                            )
+                            .map_ok(TonicUnixStream),
+                            sigterm.recv().map(|_| ()),
+                        )
+                        .map_err(|err| anyhow!(err).context("failed to run CSI server"));
+
+                    try_join!(csi_server, eos_checker)?;
                 }
-                RunMode::Controller => run_controller(watch_namespace, client).await,
+                RunMode::Controller => {
+                    let truststore_controller =
+                        truststore_controller::start(client, &watch_namespace).map(anyhow::Ok);
+
+                    try_join!(truststore_controller, eos_checker)?;
+                }
             }
         }
     }
 
     Ok(())
-}
-
-async fn run_csi_server(
-    csi_endpoint: PathBuf,
-    node_name: String,
-    privileged: bool,
-    client: Client,
-) -> anyhow::Result<()> {
-    if csi_endpoint
-        .symlink_metadata()
-        .is_ok_and(|meta| meta.file_type().is_socket())
-    {
-        let _ = std::fs::remove_file(&csi_endpoint);
-    }
-
-    let mut sigterm = signal(SignalKind::terminate())?;
-
-    let csi_server = Server::builder()
-        .add_service(
-            tonic_reflection::server::Builder::configure()
-                .include_reflection_service(true)
-                .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
-                .build_v1()?,
-        )
-        .add_service(IdentityServer::new(SecretProvisionerIdentity))
-        .add_service(ControllerServer::new(SecretProvisionerController {
-            client: client.clone(),
-        }))
-        .add_service(NodeServer::new(SecretProvisionerNode {
-            privileged,
-            node_name,
-            client,
-        }))
-        .serve_with_incoming_shutdown(
-            UnixListenerStream::new(
-                uds_bind_private(csi_endpoint).context("failed to bind CSI listener")?,
-            )
-            .map_ok(TonicUnixStream),
-            sigterm.recv().map(|_| ()),
-        );
-
-    csi_server.await.context("failed to run the CSI server")
-}
-
-async fn run_controller(watch_namespace: WatchNamespace, client: Client) {
-    truststore_controller::start(client, &watch_namespace).await
 }

@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Add end-of-support checker which can be controlled with environment variables and CLI arguments ([#644]).
+  - `EOS_CHECK_MODE` (`--eos-check-mode`) to set the EoS check mode. Currently, only "offline" is supported.
+  - `EOS_INTERVAL` (`--eos-interval`) to set the interval in which the operator checks if it is EoS.
+  - `EOS_DISABLED` (`--eos-disabled`) to disable the EoS checker completely.
 - Support exporting the TrustStore CA certificate information to Secrets or ConfigMaps ([#597]).
 - New helm value for `priorityClassName` ([#641]).
 
@@ -32,6 +36,7 @@ All notable changes to this project will be documented in this file.
 [#641]: https://github.com/stackabletech/secret-operator/pull/641
 [#642]: https://github.com/stackabletech/secret-operator/pull/642
 [#643]: https://github.com/stackabletech/secret-operator/pull/643
+[#644]: https://github.com/stackabletech/secret-operator/pull/644
 [#645]: https://github.com/stackabletech/secret-operator/pull/645
 
 ## [25.7.0] - 2025-07-23

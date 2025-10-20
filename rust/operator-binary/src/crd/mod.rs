@@ -300,6 +300,7 @@ pub mod versioned {
         ///
         /// Note that this should be as large as possible, to minimize the risk of collisions.
         #[serde(default = "ActiveDirectorySamAccountNameRules::default_total_length")]
+        #[schemars(range(max = 20))]
         pub total_length: u8,
     }
 
