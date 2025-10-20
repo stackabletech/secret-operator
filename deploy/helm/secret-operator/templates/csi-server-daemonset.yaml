@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ include "operator.fullname" . }}-daemonset
+  name: {{ include "operator.fullname" . }}-csi-server
   labels:
     {{- include "operator.labels" . | nindent 4 }}
 spec:
@@ -11,10 +11,11 @@ spec:
       {{- include "operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        internal.stackable.tech/image: "{{ .Values.secretOperator.image.repository }}:{{ .Values.secretOperator.image.tag | default .Chart.AppVersion }}"
+        {{- with .Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         {{- include "operator.selectorLabels" . | nindent 8 }}
     spec:
@@ -22,17 +23,24 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # NOTE (@Techassi): Does it maybe make sense to have two different service accounts?
       serviceAccountName: {{ include "operator.fullname" . }}-serviceaccount
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ include "operator.appname" . }}
+        - name: {{ include "operator.appname" . }}-csi-server
           securityContext:
             {{- toYaml .Values.secretOperator.securityContext | nindent 12 }}
           image: "{{ .Values.secretOperator.image.repository }}:{{ .Values.secretOperator.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.secretOperator.image.pullPolicy }}
           resources:
             {{ .Values.secretOperator.resources | toYaml | nindent 12 }}
+          # The arguments passed to the command being run in the container. The final command will
+          # look like `secret-operator run csi-server [OPTIONS]`. The CSI server needs to run on
+          # every Kubernetes cluster node and as such is deployed as a DaemonSet.
+          args:
+            - run
+            - csi-server
           env:
             # The following env vars are passed as clap (think CLI) arguments to the operator.
             # They are picked up by clap using the structs defied in the operator.
