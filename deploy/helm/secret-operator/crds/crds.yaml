@@ -308,7 +308,7 @@ spec:
 
                                         Note that this should be as large as possible, to minimize the risk of collisions.
                                       format: uint8
-                                      maximum: 255.0
+                                      maximum: 20.0
                                       minimum: 0.0
                                       type: integer
                                   type: object
