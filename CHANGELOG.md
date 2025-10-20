@@ -11,6 +11,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Split operator deployment into Deployment and DaemonSet ([#645]).
+  - Introduce two different modes: `csi-server` and `controller`.
+  - The CSI server is deployed via a DaemonSet to be available on every node.
+  - The controller is deployed via a Deployment with a single replica.
 - Version CRD structs and enums as v1alpha1 ([#636]).
 - BREAKING: Rearrange values to be somewhat consistent with the listener-operator value changes ([#641]).
   - `image.repository` has been moved to `secretOperator.image.repository`.
@@ -28,6 +32,7 @@ All notable changes to this project will be documented in this file.
 [#641]: https://github.com/stackabletech/secret-operator/pull/641
 [#642]: https://github.com/stackabletech/secret-operator/pull/642
 [#643]: https://github.com/stackabletech/secret-operator/pull/643
+[#645]: https://github.com/stackabletech/secret-operator/pull/645
 
 ## [25.7.0] - 2025-07-23
 
