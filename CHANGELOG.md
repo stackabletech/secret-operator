@@ -20,14 +20,13 @@ All notable changes to this project will be documented in this file.
   - The CSI server is deployed via a DaemonSet to be available on every node.
   - The controller is deployed via a Deployment with a single replica.
 - Version CRD structs and enums as v1alpha1 ([#636]).
-- BREAKING: Rearrange values to be somewhat consistent with the listener-operator value changes ([#641]).
-  - `image.repository` has been moved to `secretOperator.image.repository`.
-  - `image.tag` has been moved to `secretOperator.image.tag`.
-  - `image.pullPolicy` has been moved to `secretOperator.image.pullPolicy`.
-  - `csiProvisioner` values have been moved to `externalProvisioner`.
-  - `csiNodeDriverRegistrar` values have been moved to `nodeDriverRegistrar`.
-  - `node.driver` values have been moved to `secretOperator`.
-  - `securityContext` values have been moved to `secretOperator.securityContext`.
+- BREAKING: Rearrange values to be somewhat consistent with the listener-operator value changes ([#641], [#645]).
+  - `csiProvisioner` values have been moved to `csiNodeDriver.externalProvisioner`.
+  - `csiNodeDriverRegistrar` values have been moved to `csiNodeDriver.nodeDriverRegistrar`.
+  - `node.driver.resources` values have been split into `controllerService.resources` and `csiNodeDriver.nodeService.resources`.
+  - `securityContext` values have been split into `controllerService.securityContext` and `.csiNodeDriver.nodeService.securityContext`.
+  - `podAnnotations`, `podSecurityContext`, `nodeSelector`, `tolerations`, and `affinity` have been split into `controllerService` and `csiNodeDriver`.
+  - `kubeletDir` has been move to `csiNodeDriver.kubeletDir`.
 - Bump csi-node-driver-registrar to `v2.15.0` ([#642]).
 - Bump csi-provisioner to `v5.3.0` ([#643]).
 
