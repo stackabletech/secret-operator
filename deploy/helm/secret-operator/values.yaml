@@ -2,7 +2,7 @@
 ---
 # Used by both the Controller Service and Node Service containers
 image:
-  repository: oci.stackable.tech/sdp/listener-operator
+  repository: oci.stackable.tech/sdp/secret-operator
   # tag: 0.0.0-dev
   pullPolicy: IfNotPresent
   pullSecrets: []
