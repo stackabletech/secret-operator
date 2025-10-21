@@ -26,6 +26,7 @@ if os.path.exists('result'):
 # oci.stackable.tech/sandbox/opa-operator:7y19m3d8clwxlv34v5q2x4p7v536s00g instead of
 # oci.stackable.tech/sandbox/opa-operator:0.0.0-dev (which does not exist)
 k8s_kind('Deployment', image_json_path='{.spec.template.metadata.annotations.internal\\.stackable\\.tech/image}')
+k8s_kind('DaemonSet', image_json_path='{.spec.template.metadata.annotations.internal\\.stackable\\.tech/image}')
 
 # Exclude stale CRDs from Helm chart, and apply the rest
 helm_crds, helm_non_crds = filter_yaml(

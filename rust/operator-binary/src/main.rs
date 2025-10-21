@@ -4,18 +4,21 @@
 
 use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
 
-use anyhow::Context;
+use anyhow::{Context, Ok, anyhow};
 use clap::Parser;
 use csi_server::{
     controller::SecretProvisionerController, identity::SecretProvisionerIdentity,
     node::SecretProvisionerNode,
 };
-use futures::{FutureExt, TryStreamExt};
+use futures::{FutureExt, TryFutureExt, TryStreamExt, try_join};
 use grpc::csi::v1::{
     controller_server::ControllerServer, identity_server::IdentityServer, node_server::NodeServer,
 };
 use stackable_operator::{
-    YamlSchema, cli::RunArguments, eos::EndOfSupportChecker, shared::yaml::SerializeOptions,
+    YamlSchema,
+    cli::{Command, CommonOptions, RunArguments},
+    eos::EndOfSupportChecker,
+    shared::yaml::SerializeOptions,
     telemetry::Tracing,
 };
 use tokio::signal::unix::{SignalKind, signal};
@@ -38,14 +41,33 @@ pub const OPERATOR_NAME: &str = "secrets.stackable.tech";
 
 #[derive(clap::Parser)]
 #[clap(author, version)]
-struct Opts {
+struct Cli {
     #[clap(subcommand)]
-    cmd: stackable_operator::cli::Command<SecretOperatorRun>,
+    cmd: Command<SecretOperatorRun>,
 }
 
 #[derive(clap::Parser)]
 struct SecretOperatorRun {
-    #[clap(long, env)]
+    /// The run mode in which this operator should run in.
+    #[command(subcommand)]
+    mode: RunMode,
+
+    #[clap(flatten)]
+    common: RunArguments,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum RunMode {
+    /// Run the CSI server, one per Kubernetes cluster node.
+    CsiNodeService(CsiNodeServiceArguments),
+
+    /// Run the controller, one per Kubernetes cluster.
+    Controller,
+}
+
+#[derive(Debug, clap::Args)]
+struct CsiNodeServiceArguments {
+    #[arg(long, env)]
     csi_endpoint: PathBuf,
 
     /// Unprivileged mode disables any features that require running secret-operator in a privileged container.
@@ -54,11 +76,8 @@ struct SecretOperatorRun {
     /// - Secret volumes will be stored on disk, rather than in a ramdisk
     ///
     /// Unprivileged mode is EXPERIMENTAL and heavily discouraged, since it increases the risk of leaking secrets.
-    #[clap(long, env)]
+    #[arg(long, env)]
     privileged: bool,
-
-    #[clap(flatten)]
-    common: RunArguments,
 }
 
 mod built_info {
@@ -67,32 +86,34 @@ mod built_info {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let opts = Opts::parse();
-    match opts.cmd {
-        stackable_operator::cli::Command::Crd => {
+    let cli = Cli::parse();
+
+    match cli.cmd {
+        Command::Crd => {
             SecretClass::merged_crd(crd::SecretClassVersion::V1Alpha1)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
             TrustStore::merged_crd(crd::TrustStoreVersion::V1Alpha1)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
-        stackable_operator::cli::Command::Run(SecretOperatorRun {
-            csi_endpoint,
-            privileged,
-            common:
-                RunArguments {
-                    operator_environment: _,
-                    product_config: _,
-                    watch_namespace,
-                    maintenance,
-                    common,
-                },
-        }) => {
+        Command::Run(SecretOperatorRun { common, mode }) => {
+            let RunArguments {
+                operator_environment: _,
+                product_config: _,
+                watch_namespace,
+                maintenance,
+                common,
+            } = common;
+
+            let CommonOptions {
+                telemetry,
+                cluster_info,
+            } = common;
+
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
             // - The console log level was set by `SECRET_PROVISIONER_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
             // - The file log level was set by `SECRET_PROVISIONER_LOG`, and is now set via `FILE_LOG` (when using Tracing::pre_configured).
             // - The file log directory was set by `SECRET_PROVISIONER_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
-            let _tracing_guard =
-                Tracing::pre_configured(built_info::PKG_NAME, common.telemetry).init()?;
+            let _tracing_guard = Tracing::pre_configured(built_info::PKG_NAME, telemetry).init()?;
 
             tracing::info!(
                 built_info.pkg_version = built_info::PKG_VERSION,
@@ -111,48 +132,63 @@ async fn main() -> anyhow::Result<()> {
 
             let client = stackable_operator::client::initialize_operator(
                 Some(OPERATOR_NAME.to_string()),
-                &common.cluster_info,
+                &cluster_info,
             )
             .await?;
 
-            if csi_endpoint
-                .symlink_metadata()
-                .is_ok_and(|meta| meta.file_type().is_socket())
-            {
-                let _ = std::fs::remove_file(&csi_endpoint);
-            }
-
-            let mut sigterm = signal(SignalKind::terminate())?;
-
-            let csi_server = Server::builder()
-                .add_service(
-                    tonic_reflection::server::Builder::configure()
-                        .include_reflection_service(true)
-                        .register_encoded_file_descriptor_set(grpc::FILE_DESCRIPTOR_SET_BYTES)
-                        .build_v1()?,
-                )
-                .add_service(IdentityServer::new(SecretProvisionerIdentity))
-                .add_service(ControllerServer::new(SecretProvisionerController {
-                    client: client.clone(),
-                }))
-                .add_service(NodeServer::new(SecretProvisionerNode {
-                    client: client.clone(),
-                    node_name: common.cluster_info.kubernetes_node_name.to_owned(),
+            match mode {
+                RunMode::CsiNodeService(CsiNodeServiceArguments {
+                    csi_endpoint,
                     privileged,
-                }))
-                .serve_with_incoming_shutdown(
-                    UnixListenerStream::new(
-                        uds_bind_private(csi_endpoint).context("failed to bind CSI listener")?,
-                    )
-                    .map_ok(TonicUnixStream),
-                    sigterm.recv().map(|_| ()),
-                );
+                }) => {
+                    if csi_endpoint
+                        .symlink_metadata()
+                        .is_ok_and(|meta| meta.file_type().is_socket())
+                    {
+                        let _ = std::fs::remove_file(&csi_endpoint);
+                    }
 
-            let truststore_controller =
-                truststore_controller::start(&client, &watch_namespace).map(Ok);
+                    let mut sigterm = signal(SignalKind::terminate())?;
 
-            futures::try_join!(csi_server, truststore_controller, eos_checker)?;
+                    let csi_server = Server::builder()
+                        .add_service(
+                            tonic_reflection::server::Builder::configure()
+                                .include_reflection_service(true)
+                                .register_encoded_file_descriptor_set(
+                                    grpc::FILE_DESCRIPTOR_SET_BYTES,
+                                )
+                                .build_v1()?,
+                        )
+                        .add_service(IdentityServer::new(SecretProvisionerIdentity))
+                        .add_service(ControllerServer::new(SecretProvisionerController {
+                            client: client.clone(),
+                        }))
+                        .add_service(NodeServer::new(SecretProvisionerNode {
+                            node_name: cluster_info.kubernetes_node_name,
+                            privileged,
+                            client,
+                        }))
+                        .serve_with_incoming_shutdown(
+                            UnixListenerStream::new(
+                                uds_bind_private(csi_endpoint)
+                                    .context("failed to bind CSI listener")?,
+                            )
+                            .map_ok(TonicUnixStream),
+                            sigterm.recv().map(|_| ()),
+                        )
+                        .map_err(|err| anyhow!(err).context("failed to run CSI server"));
+
+                    try_join!(csi_server, eos_checker)?;
+                }
+                RunMode::Controller => {
+                    let truststore_controller =
+                        truststore_controller::start(client, &watch_namespace).map(anyhow::Ok);
+
+                    try_join!(truststore_controller, eos_checker)?;
+                }
+            }
         }
     }
+
     Ok(())
 }

@@ -1,0 +1,97 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "operator.fullname" . }}
+  labels:
+    {{- include "operator.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "operator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        internal.stackable.tech/image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        {{- with .Values.controllerService.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "operator.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # NOTE (@Techassi): Does it maybe make sense to have two different service accounts?
+      serviceAccountName: {{ include "operator.fullname" . }}-serviceaccount
+      securityContext:
+        {{- toYaml .Values.controllerService.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ include "operator.appname" . }}
+          securityContext:
+            {{- toYaml .Values.controllerService.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{ .Values.controllerService.resources | toYaml | nindent 12 }}
+          # The arguments passed to the command being run in the container. The final command will
+          # look like `secret-operator run controller [OPTIONS]`. The controller needs to only run
+          # once in a Kubernetes cluster and as such is deployed as a Deployment with a single
+          # replica.
+          args:
+            - run
+            - controller
+          env:
+            # The following env vars are passed as clap (think CLI) arguments to the operator.
+            # They are picked up by clap using the structs defied in the operator.
+            # (which is turn pulls in https://github.com/stackabletech/operator-rs/blob/main/crates/stackable-operator/src/cli.rs)
+            # You can read there about the expected values and purposes.
+
+            # Sometimes products need to know the operator image, e.g. the opa-bundle-builder OPA
+            # sidecar uses the operator image.
+            - name: OPERATOR_IMAGE
+              # Tilt can use annotations as image paths, but not env variables
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['internal.stackable.tech/image']
+
+            # Namespace the operator Pod is running in, e.g. used to construct the conversion
+            # webhook endpoint.
+            - name: OPERATOR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+
+            # The name of the Kubernetes Service that point to the operator Pod, e.g. used to
+            # construct the conversion webhook endpoint.
+            - name: OPERATOR_SERVICE_NAME
+              value: {{ include "operator.fullname" . }}
+
+            # Operators need to know the node name they are running on, to e.g. discover the
+            # Kubernetes domain name from the kubelet API.
+            - name: KUBERNETES_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+            {{- if .Values.kubernetesClusterDomain }}
+            - name: KUBERNETES_CLUSTER_DOMAIN
+              value: {{ .Values.kubernetesClusterDomain | quote }}
+            {{- end }}
+            {{- include "telemetry.envVars" . | nindent 12 }}
+      {{- with .Values.controllerService.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controllerService.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controllerService.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controllerService.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
