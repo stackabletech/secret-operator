@@ -1,6 +1,6 @@
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    cli::{MaintenanceOptions, OperatorEnvironmentOptions},
+    cli::OperatorEnvironmentOptions,
     kube::{Client, core::crd::MergeError},
     webhook::{
         maintainer::CustomResourceDefinitionMaintainer,
@@ -28,7 +28,7 @@ pub enum Error {
 /// Creates and returns a [`ConversionWebhookServer`] and a [`CustomResourceDefinitionMaintainer`].
 pub async fn create_webhook_and_maintainer<'a>(
     operator_environment: &'a OperatorEnvironmentOptions,
-    maintenance: &MaintenanceOptions,
+    disable_crd_maintenance: bool,
     client: Client,
 ) -> Result<
     (
@@ -54,7 +54,7 @@ pub async fn create_webhook_and_maintainer<'a>(
         &operator_environment.operator_service_name,
         &operator_environment.operator_namespace,
         FIELD_MANAGER,
-        maintenance.disable_crd_maintenance,
+        disable_crd_maintenance,
         client,
     )
     .await

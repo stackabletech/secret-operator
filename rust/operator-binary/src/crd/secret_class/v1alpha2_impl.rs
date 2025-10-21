@@ -1,7 +1,7 @@
 use stackable_operator::{
     k8s_openapi::api::core::v1::{ConfigMap, Secret},
     kube::api::PartialObjectMeta,
-    schemars::{Schema, SchemaGenerator},
+    schemars::{Schema, SchemaGenerator, json_schema},
     shared::time::Duration,
 };
 
@@ -132,15 +132,14 @@ impl CertificateKeyGeneration {
     //             - '4096'
     //           type: string
     pub fn tls_key_length_schema(_: &mut SchemaGenerator) -> Schema {
-        serde_json::from_value(serde_json::json!({
+        json_schema!({
             "type": "integer",
             "enum": [
                 Self::RSA_KEY_LENGTH_2048,
                 Self::RSA_KEY_LENGTH_3072,
                 Self::RSA_KEY_LENGTH_4096
             ]
-        }))
-        .expect("Failed to parse JSON of custom tls key length schema")
+        })
     }
 }
 

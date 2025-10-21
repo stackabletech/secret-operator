@@ -43,10 +43,10 @@ use crate::{
 const CONTROLLER_NAME: &str = "truststore";
 const FULL_CONTROLLER_NAME: &str = concatcp!(CONTROLLER_NAME, ".", OPERATOR_NAME);
 
-pub async fn start(client: &stackable_operator::client::Client, watch_namespace: &WatchNamespace) {
+pub async fn start(client: stackable_operator::client::Client, watch_namespace: &WatchNamespace) {
     let (secretclasses, secretclasses_writer) = reflector::store();
     let controller = Controller::new(
-        watch_namespace.get_api::<DeserializeGuard<v1alpha1::TrustStore>>(client),
+        watch_namespace.get_api::<DeserializeGuard<v1alpha1::TrustStore>>(&client),
         watcher::Config::default(),
     );
     let truststores = controller.store();
@@ -82,16 +82,16 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
         )
         // TODO: merge this into the other ConfigMap watch
         .owns(
-            watch_namespace.get_api::<PartialObjectMeta<ConfigMap>>(client),
+            watch_namespace.get_api::<PartialObjectMeta<ConfigMap>>(&client),
             watcher::Config::default(),
         )
         // TODO: merge this into the other Secret watch
         .owns(
-            watch_namespace.get_api::<PartialObjectMeta<Secret>>(client),
+            watch_namespace.get_api::<PartialObjectMeta<Secret>>(&client),
             watcher::Config::default(),
         )
         .watches(
-            watch_namespace.get_api::<PartialObjectMeta<ConfigMap>>(client),
+            watch_namespace.get_api::<PartialObjectMeta<ConfigMap>>(&client),
             watcher::Config::default(),
             secretclass_dependency_watch_mapper(
                 truststores.clone(),
@@ -100,7 +100,7 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
             ),
         )
         .watches(
-            watch_namespace.get_api::<PartialObjectMeta<Secret>>(client),
+            watch_namespace.get_api::<PartialObjectMeta<Secret>>(&client),
             watcher::Config::default(),
             secretclass_dependency_watch_mapper(
                 truststores,
@@ -108,13 +108,7 @@ pub async fn start(client: &stackable_operator::client::Client, watch_namespace:
                 |secretclass, secret| secretclass.spec.backend.refers_to_secret(secret),
             ),
         )
-        .run(
-            reconcile,
-            error_policy,
-            Arc::new(Ctx {
-                client: client.clone(),
-            }),
-        )
+        .run(reconcile, error_policy, Arc::new(Ctx { client }))
         .for_each_concurrent(16, move |res| {
             let event_recorder = event_recorder.clone();
             async move {

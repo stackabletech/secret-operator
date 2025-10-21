@@ -6,20 +6,27 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Add end-of-support checker which can be controlled with environment variables and CLI arguments ([#644]).
+  - `EOS_CHECK_MODE` (`--eos-check-mode`) to set the EoS check mode. Currently, only "offline" is supported.
+  - `EOS_INTERVAL` (`--eos-interval`) to set the interval in which the operator checks if it is EoS.
+  - `EOS_DISABLED` (`--eos-disabled`) to disable the EoS checker completely.
 - Support exporting the TrustStore CA certificate information to Secrets or ConfigMaps ([#597]).
 - New helm value for `priorityClassName` ([#641]).
 
 ### Changed
 
+- Split operator deployment into Deployment and DaemonSet ([#645]).
+  - Introduce two different modes: `csi-server` and `controller`.
+  - The CSI server is deployed via a DaemonSet to be available on every node.
+  - The controller is deployed via a Deployment with a single replica.
 - Version CRD structs and enums as v1alpha1 ([#636]).
-- BREAKING: Rearrange values to be somewhat consistent with the listener-operator value changes ([#641]).
-  - `image.repository` has been moved to `secretOperator.image.repository`.
-  - `image.tag` has been moved to `secretOperator.image.tag`.
-  - `image.pullPolicy` has been moved to `secretOperator.image.pullPolicy`.
-  - `csiProvisioner` values have been moved to `externalProvisioner`.
-  - `csiNodeDriverRegistrar` values have been moved to `nodeDriverRegistrar`.
-  - `node.driver` values have been moved to `secretOperator`.
-  - `securityContext` values have been moved to `secretOperator.securityContext`.
+- BREAKING: Rearrange values to be somewhat consistent with the listener-operator value changes ([#641], [#645]).
+  - `csiProvisioner` values have been moved to `csiNodeDriver.externalProvisioner`.
+  - `csiNodeDriverRegistrar` values have been moved to `csiNodeDriver.nodeDriverRegistrar`.
+  - `node.driver.resources` values have been split into `controllerService.resources` and `csiNodeDriver.nodeService.resources`.
+  - `securityContext` values have been split into `controllerService.securityContext` and `.csiNodeDriver.nodeService.securityContext`.
+  - `podAnnotations`, `podSecurityContext`, `nodeSelector`, `tolerations`, and `affinity` have been split into `controllerService` and `csiNodeDriver`.
+  - `kubeletDir` has been move to `csiNodeDriver.kubeletDir`.
 - Bump csi-node-driver-registrar to `v2.15.0` ([#642]).
 - Bump csi-provisioner to `v5.3.0` ([#643]).
 
@@ -28,6 +35,8 @@ All notable changes to this project will be documented in this file.
 [#641]: https://github.com/stackabletech/secret-operator/pull/641
 [#642]: https://github.com/stackabletech/secret-operator/pull/642
 [#643]: https://github.com/stackabletech/secret-operator/pull/643
+[#644]: https://github.com/stackabletech/secret-operator/pull/644
+[#645]: https://github.com/stackabletech/secret-operator/pull/645
 
 ## [25.7.0] - 2025-07-23
 
