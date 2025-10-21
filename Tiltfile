@@ -35,7 +35,7 @@ helm_crds, helm_non_crds = filter_yaml(
       name=operator_name,
       namespace="stackable-operators",
       set=[
-         'secretOperator.image.repository=' + registry + '/' + operator_name,
+         'image.repository=' + registry + '/' + operator_name,
       ],
    ),
    api_version = "^apiextensions\\.k8s\\.io/.*$",

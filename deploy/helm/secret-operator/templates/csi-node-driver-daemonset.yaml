@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ include "operator.fullname" . }}-csi-server
+  name: {{ include "operator.fullname" . }}-csi-node-driver
   labels:
     {{- include "operator.labels" . | nindent 4 }}
 spec:
@@ -12,8 +12,8 @@ spec:
   template:
     metadata:
       annotations:
-        internal.stackable.tech/image: "{{ .Values.secretOperator.image.repository }}:{{ .Values.secretOperator.image.tag | default .Chart.AppVersion }}"
-        {{- with .Values.podAnnotations }}
+        internal.stackable.tech/image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        {{- with .Values.csiNodeDriver.podAnnotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
@@ -26,21 +26,21 @@ spec:
       # NOTE (@Techassi): Does it maybe make sense to have two different service accounts?
       serviceAccountName: {{ include "operator.fullname" . }}-serviceaccount
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- toYaml .Values.csiNodeDriver.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ include "operator.appname" . }}-csi-server
+        - name: csi-node-service
           securityContext:
-            {{- toYaml .Values.secretOperator.securityContext | nindent 12 }}
-          image: "{{ .Values.secretOperator.image.repository }}:{{ .Values.secretOperator.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.secretOperator.image.pullPolicy }}
+            {{- toYaml .Values.csiNodeDriver.nodeService.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
-            {{ .Values.secretOperator.resources | toYaml | nindent 12 }}
+            {{ .Values.csiNodeDriver.nodeService.resources | toYaml | nindent 12 }}
           # The arguments passed to the command being run in the container. The final command will
           # look like `secret-operator run csi-server [OPTIONS]`. The CSI server needs to run on
           # every Kubernetes cluster node and as such is deployed as a DaemonSet.
           args:
             - run
-            - csi-server
+            - csi-node-service
           env:
             # The following env vars are passed as clap (think CLI) arguments to the operator.
             # They are picked up by clap using the structs defied in the operator.
@@ -50,7 +50,7 @@ spec:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
             - name: PRIVILEGED
-              value: {{ .Values.secretOperator.securityContext.privileged | quote }}
+              value: {{ .Values.csiNodeDriver.nodeService.securityContext.privileged | quote }}
 
             # Sometimes products need to know the operator image, e.g. the opa-bundle-builder OPA
             # sidecar uses the operator image.
@@ -88,17 +88,18 @@ spec:
             - name: csi
               mountPath: /csi
             - name: mountpoint
-              mountPath: {{ .Values.kubeletDir }}/pods
-              {{- if .Values.secretOperator.securityContext.privileged }}
+              mountPath: {{ .Values.csiNodeDriver.kubeletDir }}/pods
+              {{- if .Values.csiNodeDriver.nodeService.securityContext.privileged }}
               mountPropagation: Bidirectional
               {{- end }}
             - name: tmp
               mountPath: /tmp
+
         - name: external-provisioner
-          image: "{{ .Values.externalProvisioner.image.repository }}:{{ .Values.externalProvisioner.image.tag }}"
-          imagePullPolicy: {{ .Values.externalProvisioner.image.pullPolicy }}
+          image: "{{ .Values.csiNodeDriver.externalProvisioner.image.repository }}:{{ .Values.csiNodeDriver.externalProvisioner.image.tag }}"
+          imagePullPolicy: {{ .Values.csiNodeDriver.externalProvisioner.image.pullPolicy }}
           resources:
-            {{ .Values.externalProvisioner.resources | toYaml | nindent 12 }}
+            {{ .Values.csiNodeDriver.externalProvisioner.resources | toYaml | nindent 12 }}
           args:
             - --csi-address=/csi/csi.sock
             - --feature-gates=Topology=true
@@ -106,14 +107,15 @@ spec:
           volumeMounts:
             - name: csi
               mountPath: /csi
+
         - name: node-driver-registrar
-          image: "{{ .Values.nodeDriverRegistrar.image.repository }}:{{ .Values.nodeDriverRegistrar.image.tag }}"
-          imagePullPolicy: {{ .Values.nodeDriverRegistrar.image.pullPolicy }}
+          image: "{{ .Values.csiNodeDriver.nodeDriverRegistrar.image.repository }}:{{ .Values.csiNodeDriver.nodeDriverRegistrar.image.tag }}"
+          imagePullPolicy: {{ .Values.csiNodeDriver.nodeDriverRegistrar.image.pullPolicy }}
           resources:
-            {{ .Values.nodeDriverRegistrar.resources | toYaml | nindent 12 }}
+            {{ .Values.csiNodeDriver.nodeDriverRegistrar.resources | toYaml | nindent 12 }}
           args:
             - --csi-address=/csi/csi.sock
-            - --kubelet-registration-path={{ .Values.kubeletDir }}/plugins/secrets.stackable.tech/csi.sock
+            - --kubelet-registration-path={{ .Values.csiNodeDriver.kubeletDir }}/plugins/secrets.stackable.tech/csi.sock
           volumeMounts:
             - name: registration-sock
               mountPath: /registration
@@ -124,27 +126,27 @@ spec:
           hostPath:
             # node-driver-registrar appends a driver-unique filename to this path to avoid conflicts
             # see https://github.com/stackabletech/secret-operator/issues/229 for why this path should not be too long
-            path: {{ .Values.kubeletDir }}/plugins_registry
+            path: {{ .Values.csiNodeDriver.kubeletDir }}/plugins_registry
         - name: csi
           hostPath:
-            path: {{ .Values.kubeletDir }}/plugins/secrets.stackable.tech/
+            path: {{ .Values.csiNodeDriver.kubeletDir }}/plugins/secrets.stackable.tech/
         - name: mountpoint
           hostPath:
-            path: {{ .Values.kubeletDir }}/pods/
+            path: {{ .Values.csiNodeDriver.kubeletDir }}/pods/
         - name: tmp
           emptyDir: {}
-      {{- with .Values.nodeSelector }}
+      {{- with .Values.csiNodeDriver.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- with .Values.csiNodeDriver.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.tolerations }}
+      {{- with .Values.csiNodeDriver.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.priorityClassName }}
+      {{- with .Values.csiNodeDriver.priorityClassName }}
       priorityClassName: {{ . }}
       {{- end }}

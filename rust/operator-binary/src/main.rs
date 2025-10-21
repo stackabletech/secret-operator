@@ -59,14 +59,14 @@ struct SecretOperatorRun {
 #[derive(Debug, clap::Subcommand)]
 enum RunMode {
     /// Run the CSI server, one per Kubernetes cluster node.
-    CsiServer(CsiServerArguments),
+    CsiNodeService(CsiNodeServiceArguments),
 
     /// Run the controller, one per Kubernetes cluster.
     Controller,
 }
 
 #[derive(Debug, clap::Args)]
-struct CsiServerArguments {
+struct CsiNodeServiceArguments {
     #[arg(long, env)]
     csi_endpoint: PathBuf,
 
@@ -137,7 +137,7 @@ async fn main() -> anyhow::Result<()> {
             .await?;
 
             match mode {
-                RunMode::CsiServer(CsiServerArguments {
+                RunMode::CsiNodeService(CsiNodeServiceArguments {
                     csi_endpoint,
                     privileged,
                 }) => {

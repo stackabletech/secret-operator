@@ -1,39 +1,20 @@
 # Default values for secret-operator.
 ---
+# Used by both the Controller Service and Node Service containers
 image:
+  repository: oci.stackable.tech/sdp/listener-operator
+  # tag: 0.0.0-dev
+  pullPolicy: IfNotPresent
   pullSecrets: []
 
-externalProvisioner:
-  image:
-    repository: oci.stackable.tech/sdp/sig-storage/csi-provisioner
-    tag: v5.3.0
-    pullPolicy: IfNotPresent
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
-nodeDriverRegistrar:
-  image:
-    repository: oci.stackable.tech/sdp/sig-storage/csi-node-driver-registrar
-    tag: v2.15.0
-    pullPolicy: IfNotPresent
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
+controllerService:
+  podAnnotations: {}
+  podSecurityContext: {}
+    # fsGroup: 2000
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
 
-secretOperator:
-  image:
-    repository: oci.stackable.tech/sdp/secret-operator
-    # tag: 0.0.0-dev
-    pullPolicy: IfNotPresent
-  # Resources of the secret-operator container itself
   resources:
     limits:
       cpu: 100m
@@ -45,16 +26,75 @@ secretOperator:
   securityContext:
     # secret-operator requires root permissions
     runAsUser: 0
-    # It is strongly recommended to run secret-operator as a privileged container, since
-    # it enables additional protections for the secret contents.
-    # Unprivileged mode is EXPERIMENTAL and requires manual migration for an existing cluster.
-    privileged: true
     # capabilities:
     #   drop:
     #   - ALL
     # readOnlyRootFilesystem: true
     # runAsNonRoot: true
     # runAsUser: 1000
+
+csiNodeDriver:
+  # Kubelet dir may vary in environments such as microk8s.
+  # See https://github.com/stackabletech/secret-operator/issues/229
+  kubeletDir: /var/lib/kubelet
+
+  podAnnotations: {}
+  podSecurityContext: {}
+    # fsGroup: 2000
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  nodeService:
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+    securityContext:
+      # secret-operator requires root permissions
+      runAsUser: 0
+      # It is strongly recommended to run secret-operator as a privileged container, since
+      # it enables additional protections for the secret contents.
+      # Unprivileged mode is EXPERIMENTAL and requires manual migration for an existing cluster.
+      privileged: true
+      # capabilities:
+      #   drop:
+      #   - ALL
+      # readOnlyRootFilesystem: true
+      # runAsNonRoot: true
+      # runAsUser: 1000
+
+  externalProvisioner:
+    image:
+      repository: oci.stackable.tech/sdp/sig-storage/csi-provisioner
+      tag: v5.3.0
+      pullPolicy: IfNotPresent
+      # NOTE (@Techassi): Support setting pullSecrets
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+  nodeDriverRegistrar:
+    image:
+      repository: oci.stackable.tech/sdp/sig-storage/csi-node-driver-registrar
+      tag: v2.15.0
+      pullPolicy: IfNotPresent
+      # NOTE (@Techassi): Support setting pullSecrets
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
 
 nameOverride: ""
 fullnameOverride: ""
@@ -68,30 +108,11 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
-podAnnotations: {}
-
 # Provide additional labels which get attached to all deployed resources
 labels:
   stackable.tech/vendor: Stackable
 
-podSecurityContext: {}
-  # fsGroup: 2000
-
-nodeSelector: {}
-
-tolerations: []
-
-affinity: {}
-
-# priorityClassName: ...
-
-# When running on a non-default Kubernetes cluster domain, the cluster domain can be configured here.
-# See the https://docs.stackable.tech/home/stable/guides/kubernetes-cluster-domain guide for details.
-# kubernetesClusterDomain: my-cluster.local
-
-# Kubelet dir may vary in environments such as microk8s, see https://github.com/stackabletech/secret-operator/issues/229
-kubeletDir: /var/lib/kubelet
-
+# Customize default custom resources deployed by the operator
 secretClasses:
   tls:
     # The namespace that the TLS Certificate Authority is installed into.

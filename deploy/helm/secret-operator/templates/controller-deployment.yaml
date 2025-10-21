@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "operator.fullname" . }}-controller
+  name: {{ include "operator.fullname" . }}
   labels:
     {{- include "operator.labels" . | nindent 4 }}
 spec:
@@ -12,29 +12,29 @@ spec:
   template:
     metadata:
       annotations:
-        internal.stackable.tech/image: "{{ .Values.secretOperator.image.repository }}:{{ .Values.secretOperator.image.tag | default .Chart.AppVersion }}"
-        {{- with .Values.podAnnotations }}
+        internal.stackable.tech/image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        {{- with .Values.controllerService.podAnnotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
         {{- include "operator.selectorLabels" . | nindent 8 }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+      {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       # NOTE (@Techassi): Does it maybe make sense to have two different service accounts?
       serviceAccountName: {{ include "operator.fullname" . }}-serviceaccount
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- toYaml .Values.controllerService.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ include "operator.appname" . }}-controller
+        - name: {{ include "operator.appname" . }}
           securityContext:
-            {{- toYaml .Values.secretOperator.securityContext | nindent 12 }}
-          image: "{{ .Values.secretOperator.image.repository }}:{{ .Values.secretOperator.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.secretOperator.image.pullPolicy }}
+            {{- toYaml .Values.controllerService.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
-            {{ .Values.secretOperator.resources | toYaml | nindent 12 }}
+            {{ .Values.controllerService.resources | toYaml | nindent 12 }}
           # The arguments passed to the command being run in the container. The final command will
           # look like `secret-operator run controller [OPTIONS]`. The controller needs to only run
           # once in a Kubernetes cluster and as such is deployed as a Deployment with a single
@@ -80,18 +80,18 @@ spec:
               value: {{ .Values.kubernetesClusterDomain | quote }}
             {{- end }}
             {{- include "telemetry.envVars" . | nindent 12 }}
-      {{- with .Values.nodeSelector }}
+      {{- with .Values.controllerService.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- with .Values.controllerService.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.tolerations }}
+      {{- with .Values.controllerService.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.priorityClassName }}
+      {{- with .Values.controllerService.priorityClassName }}
       priorityClassName: {{ . }}
       {{- end }}
