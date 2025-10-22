@@ -91,6 +91,7 @@ spec:
               value: {{ .Values.kubernetesClusterDomain | quote }}
             {{- end }}
             {{- include "telemetry.envVars" . | nindent 12 }}
+            {{- include "maintenance.envVars" . | nindent 12 }}
           volumeMounts:
             - name: csi
               mountPath: /csi

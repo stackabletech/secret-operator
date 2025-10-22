@@ -119,6 +119,15 @@ secretClasses:
     # Defaults to the namespace where secret-op is installed.
     caSecretNamespace: null
 
+maintenance:
+  endOfSupportCheck:
+    enabled: true
+    # mode: offline
+    # interval: 24h
+
+  customResourceDefinitions:
+    maintain: true
+
 # See all available options and detailed explanations about the concept here:
 # https://docs.stackable.tech/home/stable/concepts/telemetry/
 telemetry:
