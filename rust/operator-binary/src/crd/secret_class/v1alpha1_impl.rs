@@ -30,7 +30,7 @@ impl SecretClassBackend {
                     .and_then(|cm_ns| backend.search_namespace.matches_namespace(cm_ns))
             }
             Self::AutoTls(_) => None,
-            Self::CertManager(_) => None,
+            Self::ExperimentalCertManager(_) => None,
             Self::KerberosKeytab(_) => None,
         }
         .into_iter()
@@ -46,7 +46,7 @@ impl SecretClassBackend {
                 (backend.ca.secret == *secret).then_some(SearchNamespaceMatchCondition::True)
             }
             Self::K8sSearch(_) => None,
-            Self::CertManager(_) => None,
+            Self::ExperimentalCertManager(_) => None,
             Self::KerberosKeytab(_) => None,
         }
         .into_iter()

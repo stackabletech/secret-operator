@@ -60,7 +60,7 @@ pub mod versioned {
         /// will be reused after that (subject to cert-manager renewal rules).
         ///
         /// [1]: DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-certmanager
-        #[serde(rename = "experimentalCertManager")]
+        #[versioned(changed(since = "v1alpha2", from_name = "ExperimentalCertManager"))]
         CertManager(CertManagerBackend),
 
         /// The [`kerberosKeytab` backend](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-kerberoskeytab)

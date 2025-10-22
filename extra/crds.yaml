@@ -35,7 +35,7 @@ spec:
                 - required:
                   - autoTls
                 - required:
-                  - experimentalCertManager
+                  - certManager
                 - required:
                   - kerberosKeytab
                 properties:
@@ -169,7 +169,7 @@ spec:
                     required:
                     - ca
                     type: object
-                  experimentalCertManager:
+                  certManager:
                     description: |-
                       The [`experimentalCertManager` backend][1] injects a TLS certificate issued
                       by [cert-manager](https://cert-manager.io/).
