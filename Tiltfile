@@ -28,12 +28,14 @@ k8s_kind('DaemonSet', image_json_path='{.spec.template.metadata.annotations.inte
 # supported by helm(set).
 helm_values = settings.get('helm_values', None)
 
+helm_override_image_repository = 'image.repository=' + registry + '/' + operator_name
+
 k8s_yaml(helm(
    'deploy/helm/' + operator_name,
    name=operator_name,
    namespace="stackable-operators",
    set=[
-      'image.repository=' + registry + '/' + operator_name,
+      helm_override_image_repository,
    ],
-   values=helm_values
+   values=helm_values,
 ))
