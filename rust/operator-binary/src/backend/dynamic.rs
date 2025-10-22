@@ -15,7 +15,7 @@ use super::{
     pod_info::{PodInfo, SchedulingPodInfo},
     tls,
 };
-use crate::{crd::v1alpha1, utils::Unloggable};
+use crate::{crd::v1alpha2, utils::Unloggable};
 
 pub struct DynError(Box<dyn SecretBackendError>);
 
@@ -126,10 +126,10 @@ impl SecretBackendError for FromClassError {
 
 pub async fn from_class(
     client: &stackable_operator::client::Client,
-    class: v1alpha1::SecretClass,
+    class: v1alpha2::SecretClass,
 ) -> Result<Box<Dynamic>, FromClassError> {
     Ok(match class.spec.backend {
-        v1alpha1::SecretClassBackend::K8sSearch(v1alpha1::K8sSearchBackend {
+        v1alpha2::SecretClassBackend::K8sSearch(v1alpha2::K8sSearchBackend {
             search_namespace,
             trust_store_config_map_name,
         }) => from(super::K8sSearch {
@@ -137,7 +137,7 @@ pub async fn from_class(
             search_namespace,
             trust_store_config_map_name,
         }),
-        v1alpha1::SecretClassBackend::AutoTls(v1alpha1::AutoTlsBackend {
+        v1alpha2::SecretClassBackend::AutoTls(v1alpha2::AutoTlsBackend {
             ca,
             additional_trust_roots,
             max_certificate_lifetime,
@@ -150,11 +150,11 @@ pub async fn from_class(
             )
             .await?,
         ),
-        v1alpha1::SecretClassBackend::CertManager(config) => from(super::CertManager {
+        v1alpha2::SecretClassBackend::CertManager(config) => from(super::CertManager {
             client: Unloggable(client.clone()),
             config,
         }),
-        v1alpha1::SecretClassBackend::KerberosKeytab(v1alpha1::KerberosKeytabBackend {
+        v1alpha2::SecretClassBackend::KerberosKeytab(v1alpha2::KerberosKeytabBackend {
             realm_name,
             kdc,
             admin,
@@ -182,14 +182,14 @@ pub enum FromSelectorError {
     #[snafu(display("failed to get {class}"))]
     GetSecretClass {
         source: stackable_operator::client::Error,
-        class: ObjectRef<v1alpha1::SecretClass>,
+        class: ObjectRef<v1alpha2::SecretClass>,
     },
 
     #[snafu(display("failed to initialize backend for {class}"))]
     FromClass {
         #[snafu(source(from(FromClassError, Box::new)))]
         source: Box<FromClassError>,
-        class: ObjectRef<v1alpha1::SecretClass>,
+        class: ObjectRef<v1alpha2::SecretClass>,
     },
 }
 
@@ -217,7 +217,7 @@ pub async fn from_selector(
 ) -> Result<Box<Dynamic>, FromSelectorError> {
     let class_ref = || ObjectRef::new(&selector.class);
     let class = client
-        .get::<v1alpha1::SecretClass>(&selector.class, &())
+        .get::<v1alpha2::SecretClass>(&selector.class, &())
         .await
         .with_context(|_| from_selector_error::GetSecretClassSnafu { class: class_ref() })?;
     from_class(client, class)

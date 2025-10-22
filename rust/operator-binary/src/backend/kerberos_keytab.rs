@@ -22,7 +22,7 @@ use super::{
     scope::SecretScope,
 };
 use crate::{
-    crd::{KerberosPrincipal, v1alpha1},
+    crd::{self, KerberosPrincipal, v1alpha2},
     format::{SecretData, WellKnownSecretData, well_known},
     utils::Unloggable,
 };
@@ -60,7 +60,7 @@ pub enum Error {
 
     #[snafu(display("generated invalid Kerberos principal for pod"))]
     PodPrincipal {
-        source: v1alpha1::InvalidKerberosPrincipal,
+        source: crd::InvalidKerberosPrincipal,
     },
 
     #[snafu(display("failed to read the provisioned keytab"))]
@@ -105,7 +105,7 @@ impl SecretBackendError for Error {
 pub struct KerberosProfile {
     pub realm_name: KerberosRealmName,
     pub kdc: HostName,
-    pub admin: v1alpha1::KerberosKeytabBackendAdmin,
+    pub admin: v1alpha2::KerberosKeytabBackendAdmin,
 }
 
 #[derive(Debug)]
@@ -168,10 +168,12 @@ impl SecretBackend for KerberosKeytab {
         } = self;
 
         let admin_server_clause = match admin {
-            v1alpha1::KerberosKeytabBackendAdmin::Mit { kadmin_server } => {
+            v1alpha2::KerberosKeytabBackendAdmin::Mit(v1alpha2::KerberosKeytabBackendMit {
+                kadmin_server,
+            }) => {
                 format!("  admin_server = {kadmin_server}")
             }
-            v1alpha1::KerberosKeytabBackendAdmin::ActiveDirectory { .. } => String::new(),
+            v1alpha2::KerberosKeytabBackendAdmin::ActiveDirectory { .. } => String::new(),
         };
 
         let tmp = tempdir().context(TempSetupSnafu)?;
@@ -253,24 +255,26 @@ cluster.local = {realm_name}
                     })
                     .collect(),
                 admin_backend: match admin {
-                    v1alpha1::KerberosKeytabBackendAdmin::Mit { .. } => {
+                    v1alpha2::KerberosKeytabBackendAdmin::Mit { .. } => {
                         stackable_krb5_provision_keytab::AdminBackend::Mit
                     }
-                    v1alpha1::KerberosKeytabBackendAdmin::ActiveDirectory {
-                        ldap_server,
-                        ldap_tls_ca_secret,
-                        password_cache_secret,
-                        user_distinguished_name,
-                        schema_distinguished_name,
-                        generate_sam_account_name,
-                    } => stackable_krb5_provision_keytab::AdminBackend::ActiveDirectory {
+                    v1alpha2::KerberosKeytabBackendAdmin::ActiveDirectory(
+                        v1alpha2::KerberosKeytabBackendActiveDirectory {
+                            ldap_server,
+                            ldap_tls_ca_secret,
+                            password_cache_secret,
+                            user_distinguished_name,
+                            schema_distinguished_name,
+                            generate_sam_account_name,
+                        },
+                    ) => stackable_krb5_provision_keytab::AdminBackend::ActiveDirectory {
                         ldap_server: ldap_server.to_string(),
                         ldap_tls_ca_secret: ldap_tls_ca_secret.clone(),
                         password_cache_secret: password_cache_secret.clone(),
                         user_distinguished_name: user_distinguished_name.clone(),
                         schema_distinguished_name: schema_distinguished_name.clone(),
                         generate_sam_account_name: generate_sam_account_name.clone().map(
-                            |v1alpha1::ActiveDirectorySamAccountNameRules {
+                            |v1alpha2::ActiveDirectorySamAccountNameRules {
                                  prefix,
                                  total_length,
                              }| {
