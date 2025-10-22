@@ -45,11 +45,13 @@ metadata:
 rules:
   # Required to maintain the CRD. The operator needs to do this, as it needs to enter e.g. it's
   # generated certificate in the conversion webhook.
+  {{- if .Values.maintenance.customResourceDefinitions.maintain }}
   - apiGroups: [apiextensions.k8s.io]
     resources: [customresourcedefinitions]
     verbs:
       - create
       - patch
+  {{- end }}
   - apiGroups:
       - ""
     resources:
