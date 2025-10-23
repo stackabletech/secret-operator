@@ -741,7 +741,7 @@ mod tests {
             key_certificate,
             key_private_key,
         )
-        .expect(""))
+        .expect("should load the valid certificates from the given Secret data"))
     }
 
     #[test]
