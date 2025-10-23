@@ -20,5 +20,7 @@ include::example$truststore-tls.yaml[]
 This will create a ConfigMap (or `Secret` based on `targetKind`) named `truststore-pem` containing a `ca.crt` with the trust root certificates.
 It can then either be mounted into a Pod or retrieved and used from outside of Kubernetes.
 
+Expired or retired (see xref:secretclass.adoc#ca-rotation[Certificate Authority rotation]) certificates will not be published, because they should not be needed and some products, e.g. OpenSearch, have problems if they are present at startup.
+
 NOTE: Make sure to have a procedure for updating the retrieved certificates.
       The Secret Operator will automatically rotate the xref:secretclass.adoc#backend-autotls[autoTls] certificate authority as needed, but all trust roots will require some form of update occasionally.
