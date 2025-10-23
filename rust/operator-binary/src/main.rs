@@ -17,16 +17,24 @@ use grpc::csi::v1::{
 use stackable_operator::{
     YamlSchema,
     cli::{Command, CommonOptions, RunArguments},
+    client::Client,
     eos::EndOfSupportChecker,
+    kvp::{Label, LabelExt},
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
 };
-use tokio::signal::unix::{SignalKind, signal};
+use tokio::{
+    signal::unix::{SignalKind, signal},
+    sync::oneshot,
+};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use utils::{TonicUnixStream, uds_bind_private};
 
-use crate::crd::{SecretClass, TrustStore};
+use crate::{
+    crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha2},
+    webhooks::conversion::create_webhook_and_maintainer,
+};
 
 mod backend;
 mod crd;
@@ -36,8 +44,10 @@ mod format;
 mod grpc;
 mod truststore_controller;
 mod utils;
+mod webhooks;
 
 pub const OPERATOR_NAME: &str = "secrets.stackable.tech";
+pub const FIELD_MANAGER: &str = "secret-operator";
 
 #[derive(clap::Parser)]
 #[clap(author, version)]
@@ -62,7 +72,7 @@ enum RunMode {
     CsiNodeService(CsiNodeServiceArguments),
 
     /// Run the controller, one per Kubernetes cluster.
-    Controller,
+    Controller(ControllerArguments),
 }
 
 #[derive(Debug, clap::Args)]
@@ -80,6 +90,15 @@ struct CsiNodeServiceArguments {
     privileged: bool,
 }
 
+#[derive(Debug, clap::Args)]
+struct ControllerArguments {
+    /// The namespace that the TLS Certificate Authority is installed into.
+    ///
+    /// Defaults to the namespace where secret-operator is installed.
+    #[arg(long, env)]
+    tls_secretclass_ca_secret_namespace: Option<String>,
+}
+
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
@@ -90,14 +109,14 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.cmd {
         Command::Crd => {
-            SecretClass::merged_crd(crd::SecretClassVersion::V1Alpha1)?
+            SecretClass::merged_crd(SecretClassVersion::V1Alpha2)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
-            TrustStore::merged_crd(crd::TrustStoreVersion::V1Alpha1)?
+            TrustStore::merged_crd(TrustStoreVersion::V1Alpha1)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(SecretOperatorRun { common, mode }) => {
             let RunArguments {
-                operator_environment: _,
+                operator_environment,
                 product_config: _,
                 watch_namespace,
                 maintenance,
@@ -180,15 +199,85 @@ async fn main() -> anyhow::Result<()> {
 
                     try_join!(csi_server, eos_checker)?;
                 }
-                RunMode::Controller => {
+                RunMode::Controller(ControllerArguments {
+                    tls_secretclass_ca_secret_namespace,
+                }) => {
+                    let (conversion_webhook, crd_maintainer, initial_reconcile_rx) =
+                        create_webhook_and_maintainer(
+                            &operator_environment,
+                            maintenance.disable_crd_maintenance,
+                            client.as_kube_client(),
+                        )
+                        .await?;
+
+                    let conversion_webhook = conversion_webhook
+                        .run()
+                        .map_err(|err| anyhow!(err).context("failed to run conversion webhook"));
+
+                    let crd_maintainer = crd_maintainer
+                        .run()
+                        .map_err(|err| anyhow!(err).context("failed to run CRD maintainer"));
+
+                    let ca_secret_namespace = tls_secretclass_ca_secret_namespace
+                        .unwrap_or(operator_environment.operator_namespace.clone());
+
+                    let default_secretclass = create_default_secretclass(
+                        initial_reconcile_rx,
+                        ca_secret_namespace,
+                        client.clone(),
+                    )
+                    .map_err(|err| {
+                        anyhow!(err).context("failed to apply default custom resources")
+                    });
+
                     let truststore_controller =
                         truststore_controller::start(client, &watch_namespace).map(anyhow::Ok);
 
-                    try_join!(truststore_controller, eos_checker)?;
+                    try_join!(
+                        truststore_controller,
+                        default_secretclass,
+                        conversion_webhook,
+                        crd_maintainer,
+                        eos_checker,
+                    )?;
                 }
             }
         }
     }
+
+    Ok(())
+}
+
+async fn create_default_secretclass(
+    initial_reconcile_rx: oneshot::Receiver<()>,
+    ca_secret_namespace: String,
+    client: Client,
+) -> anyhow::Result<()> {
+    initial_reconcile_rx.await?;
+
+    tracing::info!("applying default secretclass");
+
+    let deserializer = serde_yaml::Deserializer::from_slice(include_bytes!("secretclass.yaml"));
+    let mut tls_secret_class: v1alpha2::SecretClass =
+        serde_yaml::with::singleton_map_recursive::deserialize(deserializer)
+            .expect("compile-time included secretclass must be valid YAML");
+
+    #[rustfmt::skip]
+    let managed_by = Label::managed_by(OPERATOR_NAME, "secretclass").expect("managed-by label must be valid");
+    let name = Label::name(OPERATOR_NAME).expect("name label must be valid");
+
+    tls_secret_class
+        .add_label(managed_by)
+        .add_label(name)
+        .add_label(Label::stackable_vendor());
+
+    if let v1alpha2::SecretClassBackend::AutoTls(auto_tls_backend) =
+        &mut tls_secret_class.spec.backend
+    {
+        auto_tls_backend.ca.secret.namespace = ca_secret_namespace
+    }
+
+    client.create_if_missing(&tls_secret_class).await?;
 
     Ok(())
 }

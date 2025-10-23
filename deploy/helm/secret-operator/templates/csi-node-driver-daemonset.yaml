@@ -79,11 +79,19 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
 
+            # The namespace that the TLS Certificate Authority is installed into.
+            # Internally defaults to the namespace where secret-operator is installed.
+            {{- if .Values.secretClasses.tls.caSecretNamespace }}
+            - name: TLS_SECRETCLASS_CA_SECRET_NAMESPACE
+              value: {{ .Values.secretClasses.tls.caSecretNamespace }}
+            {{- end }}
+
             {{- if .Values.kubernetesClusterDomain }}
             - name: KUBERNETES_CLUSTER_DOMAIN
               value: {{ .Values.kubernetesClusterDomain | quote }}
             {{- end }}
             {{- include "telemetry.envVars" . | nindent 12 }}
+            {{- include "maintenance.envVars" . | nindent 12 }}
           volumeMounts:
             - name: csi
               mountPath: /csi

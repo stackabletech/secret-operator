@@ -32,7 +32,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     OPERATOR_NAME,
     backend::{self, SecretBackendError, TrustSelector},
-    crd::v1alpha1,
+    crd::{v1alpha1, v1alpha2},
     format::{
         self,
         well_known::{CompatibilityOptions, NamingOptions},
@@ -60,7 +60,7 @@ pub async fn start(client: stackable_operator::client::Client, watch_namespace: 
     controller
         .watches_stream(
             watcher(
-                client.get_api::<DeserializeGuard<v1alpha1::SecretClass>>(&()),
+                client.get_api::<DeserializeGuard<v1alpha2::SecretClass>>(&()),
                 watcher::Config::default(),
             )
             .reflect(secretclasses_writer)
@@ -118,15 +118,15 @@ pub async fn start(client: stackable_operator::client::Client, watch_namespace: 
         .await;
 }
 
-/// Resolves modifications to dependencies of [`v1alpha1::SecretClass`] objects into
+/// Resolves modifications to dependencies of [`v1alpha2::SecretClass`] objects into
 /// a list of affected [`v1alpha1::TrustStore`]s.
 fn secretclass_dependency_watch_mapper<Dep: Resource, Conds>(
     truststores: reflector::Store<DeserializeGuard<v1alpha1::TrustStore>>,
-    secretclasses: reflector::Store<DeserializeGuard<v1alpha1::SecretClass>>,
-    reference_conditions: impl Copy + Fn(&v1alpha1::SecretClass, &Dep) -> Conds,
+    secretclasses: reflector::Store<DeserializeGuard<v1alpha2::SecretClass>>,
+    reference_conditions: impl Copy + Fn(&v1alpha2::SecretClass, &Dep) -> Conds,
 ) -> impl Fn(Dep) -> Vec<ObjectRef<DeserializeGuard<v1alpha1::TrustStore>>>
 where
-    Conds: IntoIterator<Item = v1alpha1::SearchNamespaceMatchCondition>,
+    Conds: IntoIterator<Item = v1alpha2::SearchNamespaceMatchCondition>,
 {
     move |dep| {
         let potentially_matching_secretclasses =
@@ -142,8 +142,8 @@ where
                     })
                 })
                 .collect::<HashMap<
-                    ObjectRef<v1alpha1::SecretClass>,
-                    Vec<v1alpha1::SearchNamespaceMatchCondition>,
+                    ObjectRef<v1alpha2::SecretClass>,
+                    Vec<v1alpha2::SearchNamespaceMatchCondition>,
                 >>();
         truststores
             .state()
@@ -154,7 +154,7 @@ where
                         return false;
                     };
                     let secret_class_ref =
-                        ObjectRef::<v1alpha1::SecretClass>::new(&ts.spec.secret_class_name);
+                        ObjectRef::<v1alpha2::SecretClass>::new(&ts.spec.secret_class_name);
                     potentially_matching_secretclasses
                         .get(&secret_class_ref)
                         .is_some_and(|conds| {
@@ -180,13 +180,13 @@ pub enum Error {
     #[snafu(display("failed to get {secret_class} for TrustStore"))]
     GetSecretClass {
         source: stackable_operator::client::Error,
-        secret_class: ObjectRef<v1alpha1::SecretClass>,
+        secret_class: ObjectRef<v1alpha2::SecretClass>,
     },
 
     #[snafu(display("failed to initialize SecretClass backend for {secret_class}"))]
     InitBackend {
         source: backend::dynamic::FromClassError,
-        secret_class: ObjectRef<v1alpha1::SecretClass>,
+        secret_class: ObjectRef<v1alpha2::SecretClass>,
     },
 
     #[snafu(display("failed to get trust data from backend"))]
@@ -198,7 +198,7 @@ pub enum Error {
     #[snafu(display("failed to convert trust data into desired format"))]
     FormatData {
         source: format::IntoFilesError,
-        secret_class: ObjectRef<v1alpha1::SecretClass>,
+        secret_class: ObjectRef<v1alpha2::SecretClass>,
     },
 
     #[snafu(display("failed to build owner reference to the TrustStore"))]
@@ -256,10 +256,10 @@ async fn reconcile(
     let secret_class_name = &truststore.spec.secret_class_name;
     let secret_class = ctx
         .client
-        .get::<v1alpha1::SecretClass>(secret_class_name, &())
+        .get::<v1alpha2::SecretClass>(secret_class_name, &())
         .await
         .context(GetSecretClassSnafu {
-            secret_class: ObjectRef::<v1alpha1::SecretClass>::new(secret_class_name),
+            secret_class: ObjectRef::<v1alpha2::SecretClass>::new(secret_class_name),
         })?;
     let secret_class_ref = secret_class.to_object_ref(());
     let backend = backend::dynamic::from_class(&ctx.client, secret_class)

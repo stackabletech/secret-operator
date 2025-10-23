@@ -1,3 +1,4 @@
 nix/** linguist-generated
 Cargo.nix linguist-generated
 crate-hashes.json linguist-generated
+extra/crds.yaml linguist-generated
