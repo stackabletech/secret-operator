@@ -1,8 +1,8 @@
 ---
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
-  name: {{ include "operator.fullname" . }}-daemonset
+  name: {{ include "operator.fullname" . }}
   labels:
     {{- include "operator.labels" . | nindent 4 }}
 spec:
@@ -11,38 +11,45 @@ spec:
       {{- include "operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        internal.stackable.tech/image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        {{- with .Values.controllerService.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
+        {{- if .Values.maintenance.customResourceDefinitions.maintain }}
+        webhook.stackable.tech/conversion: enabled
+        {{- end }}
         {{- include "operator.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # NOTE (@Techassi): Does it maybe make sense to have two different service accounts?
       serviceAccountName: {{ include "operator.fullname" . }}-serviceaccount
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- toYaml .Values.controllerService.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ include "operator.appname" . }}
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+            {{- toYaml .Values.controllerService.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
-            {{ .Values.node.driver.resources | toYaml | nindent 12 }}
+            {{ .Values.controllerService.resources | toYaml | nindent 12 }}
+          # The arguments passed to the command being run in the container. The final command will
+          # look like `secret-operator run controller [OPTIONS]`. The controller needs to only run
+          # once in a Kubernetes cluster and as such is deployed as a Deployment with a single
+          # replica.
+          args:
+            - run
+            - controller
           env:
             # The following env vars are passed as clap (think CLI) arguments to the operator.
             # They are picked up by clap using the structs defied in the operator.
             # (which is turn pulls in https://github.com/stackabletech/operator-rs/blob/main/crates/stackable-operator/src/cli.rs)
             # You can read there about the expected values and purposes.
-
-            - name: CSI_ENDPOINT
-              value: /csi/csi.sock
-            - name: PRIVILEGED
-              value: {{ .Values.securityContext.privileged | quote }}
 
             # Sometimes products need to know the operator image, e.g. the opa-bundle-builder OPA
             # sidecar uses the operator image.
@@ -76,64 +83,19 @@ spec:
               value: {{ .Values.kubernetesClusterDomain | quote }}
             {{- end }}
             {{- include "telemetry.envVars" . | nindent 12 }}
-          volumeMounts:
-            - name: csi
-              mountPath: /csi
-            - name: mountpoint
-              mountPath: {{ .Values.kubeletDir }}/pods
-              {{- if .Values.securityContext.privileged }}
-              mountPropagation: Bidirectional
-              {{- end }}
-            - name: tmp
-              mountPath: /tmp
-        - name: external-provisioner
-          image: "{{ .Values.csiProvisioner.image.repository }}:{{ .Values.csiProvisioner.image.tag }}"
-          imagePullPolicy: {{ .Values.csiProvisioner.image.pullPolicy }}
-          resources:
-            {{ .Values.csiProvisioner.resources | toYaml | nindent 12 }}
-          args:
-            - --csi-address=/csi/csi.sock
-            - --feature-gates=Topology=true
-            - --extra-create-metadata
-          volumeMounts:
-            - name: csi
-              mountPath: /csi
-        - name: node-driver-registrar
-          image: "{{ .Values.csiNodeDriverRegistrar.image.repository }}:{{ .Values.csiNodeDriverRegistrar.image.tag }}"
-          imagePullPolicy: {{ .Values.csiNodeDriverRegistrar.image.pullPolicy }}
-          resources:
-            {{ .Values.csiNodeDriverRegistrar.resources | toYaml | nindent 12 }}
-          args:
-            - --csi-address=/csi/csi.sock
-            - --kubelet-registration-path={{ .Values.kubeletDir }}/plugins/secrets.stackable.tech/csi.sock
-          volumeMounts:
-            - name: registration-sock
-              mountPath: /registration
-            - name: csi
-              mountPath: /csi
-      volumes:
-        - name: registration-sock
-          hostPath:
-            # node-driver-registrar appends a driver-unique filename to this path to avoid conflicts
-            # see https://github.com/stackabletech/secret-operator/issues/229 for why this path should not be too long
-            path: {{ .Values.kubeletDir }}/plugins_registry
-        - name: csi
-          hostPath:
-            path: {{ .Values.kubeletDir }}/plugins/secrets.stackable.tech/
-        - name: mountpoint
-          hostPath:
-            path: {{ .Values.kubeletDir }}/pods/
-        - name: tmp
-          emptyDir: {}
-      {{- with .Values.nodeSelector }}
+            {{- include "maintenance.envVars" . | nindent 12 }}
+      {{- with .Values.controllerService.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- with .Values.controllerService.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.tolerations }}
+      {{- with .Values.controllerService.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controllerService.priorityClassName }}
+      priorityClassName: {{ . }}
       {{- end }}
