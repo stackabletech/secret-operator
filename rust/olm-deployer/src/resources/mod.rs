@@ -6,23 +6,28 @@ use stackable_operator::{
     },
 };
 
-use crate::data::container;
+use crate::data::containers;
 
 /// Copies the resources of the container named "secret-operator-deployer" from `source`
-/// to the container "secret-operator" in `target`.
-/// Does nothing if there are no resources or if the `target` is not a DaemonSet.
+/// to *all* containers  in `target`.
+/// Does nothing if there are no resources or if the `target` is not a DaemonSet or a Deployment.
+/// This function allows OLM Subscription objects to configure the resources
+/// of operator containers.
 pub(super) fn maybe_copy_resources(
     source: &Deployment,
     target: &mut DynamicObject,
     target_gvk: &GroupVersionKind,
 ) -> anyhow::Result<()> {
-    if target_gvk.kind == "DaemonSet" {
+    let target_kind_set = ["DaemonSet", "Deployment"];
+    if target_kind_set.contains(&target_gvk.kind.as_str()) {
         if let Some(res) = deployment_resources(source) {
-            match container(target, "secret-operator")? {
-                serde_json::Value::Object(c) => {
-                    c.insert("resources".to_string(), serde_json::json!(res));
+            for container in containers(target)? {
+                match container {
+                    serde_json::Value::Object(c) => {
+                        c.insert("resources".to_string(), serde_json::json!(res));
+                    }
+                    _ => anyhow::bail!("no containers found in object {}", target.name_any()),
                 }
-                _ => anyhow::bail!("no containers found in object {}", target.name_any()),
             }
         }
     }
@@ -150,7 +155,9 @@ spec:
             ..ResourceRequirements::default()
         });
         assert_eq!(
-            container(&mut daemonset, "secret-operator")?
+            containers(&mut daemonset)?
+                .first()
+                .expect("daemonset has no containers")
                 .get("resources")
                 .unwrap(),
             &expected

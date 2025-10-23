@@ -1,37 +1,12 @@
-use anyhow::{Result, bail};
 use stackable_operator::kube::{ResourceExt, api::DynamicObject};
 
-pub fn data_field_as_mut<'a>(
-    value: &'a mut serde_json::Value,
-    pointer: &str,
-) -> Result<&'a mut serde_json::Value> {
-    match value.pointer_mut(pointer) {
-        Some(field) => Ok(field),
-        x => bail!("invalid pointer {pointer} for object {x:?}"),
-    }
-}
-
-pub fn container<'a>(
+pub fn containers<'a>(
     target: &'a mut DynamicObject,
-    container_name: &str,
-) -> anyhow::Result<&'a mut serde_json::Value> {
+) -> anyhow::Result<&'a mut Vec<serde_json::Value>> {
     let tname = target.name_any();
     let path = "template/spec/containers".split("/");
     match get_or_create(target.data.pointer_mut("/spec").unwrap(), path)? {
-        serde_json::Value::Array(containers) => {
-            for c in containers {
-                if c.is_object() {
-                    if let Some(serde_json::Value::String(name)) = c.get("name") {
-                        if container_name == name {
-                            return Ok(c);
-                        }
-                    }
-                } else {
-                    anyhow::bail!("container is not a object: {:?}", c);
-                }
-            }
-            anyhow::bail!("container named {container_name} not found");
-        }
+        serde_json::Value::Array(containers) => Ok(containers),
         _ => anyhow::bail!("no containers found in object {tname}"),
     }
 }
