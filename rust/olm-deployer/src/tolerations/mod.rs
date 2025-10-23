@@ -7,13 +7,16 @@ use crate::data::get_or_create;
 
 /// Copies the pod tolerations from the `source` to the `target`.
 /// Does nothing if there are no tolerations or if the `target` is not
-/// a DaemonSet.
+/// a DaemonSet or a Deployment.
+/// Admins can configure Subscription tolerations when installing the operator
+/// and these need to be copied over to the objects created by the deployer.
 pub(super) fn maybe_copy_tolerations(
     source: &Deployment,
     target: &mut DynamicObject,
     target_gvk: &GroupVersionKind,
 ) -> anyhow::Result<()> {
-    if target_gvk.kind == "DaemonSet" {
+    let target_kind_set = ["DaemonSet", "Deployment"];
+    if target_kind_set.contains(&target_gvk.kind.as_str()) {
         if let Some(tolerations) = deployment_tolerations(source) {
             let path = "template/spec/tolerations".split("/");
             *get_or_create(target.data.pointer_mut("/spec").unwrap(), path)? = serde_json::json!(
