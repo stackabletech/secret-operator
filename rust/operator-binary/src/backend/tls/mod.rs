@@ -428,14 +428,16 @@ impl SecretBackend for TlsGenerate {
         _selector: &super::TrustSelector,
     ) -> Result<SecretContents, Self::Error> {
         let now = OffsetDateTime::now_utc();
+        let active_trust_roots = self.ca_manager.trust_roots(now);
+        let pems = active_trust_roots.into_iter().map(|ca| {
+            ca.to_pem()
+                .context(SerializeCertificateSnafu { tpe: CertType::Ca })
+        });
+        let concatenated_pem = iterator_try_concat_bytes(pems)?;
+
         Ok(SecretContents::new(SecretData::WellKnown(
             WellKnownSecretData::TlsPem(well_known::TlsPem {
-                ca_pem: iterator_try_concat_bytes(
-                    self.ca_manager.trust_roots(now).into_iter().map(|ca| {
-                        ca.to_pem()
-                            .context(SerializeCertificateSnafu { tpe: CertType::Ca })
-                    }),
-                )?,
+                ca_pem: concatenated_pem,
                 certificate_pem: None,
                 key_pem: None,
             }),

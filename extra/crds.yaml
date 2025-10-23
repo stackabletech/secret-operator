@@ -119,7 +119,8 @@ spec:
                             description: |-
                               Duration at the end of the CA certificate lifetime where no signed certificate will exist.
 
-                              Retired (or expired) CA certificates will not be published.
+                              Retired (or expired) CA certificates will not be published and will not be used for
+                              signing leaf certificates.
                             type: string
                           keyGeneration:
                             default:
@@ -545,7 +546,8 @@ spec:
                             description: |-
                               Duration at the end of the CA certificate lifetime where no signed certificate will exist.
 
-                              Retired (or expired) CA certificates will not be published.
+                              Retired (or expired) CA certificates will not be published and will not be used for
+                              signing leaf certificates.
                             type: string
                           keyGeneration:
                             default:

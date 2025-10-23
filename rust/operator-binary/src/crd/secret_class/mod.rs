@@ -164,7 +164,8 @@ pub mod versioned {
 
         /// Duration at the end of the CA certificate lifetime where no signed certificate will exist.
         ///
-        /// Retired (or expired) CA certificates will not be published.
+        /// Retired (or expired) CA certificates will not be published and will not be used for
+        /// signing leaf certificates.
         #[serde(default = "v1alpha2::AutoTlsCa::default_ca_certificate_retirement_duration")]
         pub ca_certificate_retirement_duration: Duration,
 

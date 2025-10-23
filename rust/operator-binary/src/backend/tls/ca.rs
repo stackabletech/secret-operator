@@ -753,13 +753,13 @@ mod tests {
             datetime!(2025-01-01 0:00 UTC),
             datetime!(2025-01-01 12:00 UTC),
         )
-        .expect("should create a valid certificate");
+        .expect("must be able to create a valid certificate");
         let ca2 = create_certificate_authority(
             2,
             datetime!(2025-01-01 6:00 UTC),
             datetime!(2025-01-01 18:00 UTC),
         )
-        .expect("should create a valid certificate");
+        .expect("must be able to create a valid certificate");
 
         let manager = Manager {
             source_secret: ObjectRef::<Secret>::new("secret-provisioner-tls-ca"),
@@ -794,7 +794,7 @@ mod tests {
             datetime!(2025-01-01 0:00 UTC),
             datetime!(2025-01-01 12:00 UTC),
         )
-        .expect("should create a valid certificate");
+        .expect("must be able to create a valid certificate");
         let ca1_certificate = ca1.certificate.clone();
 
         let ca2 = create_certificate_authority(
@@ -802,7 +802,7 @@ mod tests {
             datetime!(2025-01-01 6:00 UTC),
             datetime!(2025-01-01 18:00 UTC),
         )
-        .expect("should create a valid certificate");
+        .expect("must be able to create a valid certificate");
         let ca2_certificate = ca2.certificate.clone();
 
         let (trust_root1, _) = create_certificate(
@@ -810,14 +810,14 @@ mod tests {
             datetime!(2025-01-01 0:00 UTC),
             datetime!(2025-01-01 12:00 UTC),
         )
-        .expect("should create a valid certificate");
+        .expect("must be able to create a valid certificate");
 
         let (trust_root2, _) = create_certificate(
             4,
             datetime!(2025-01-01 6:00 UTC),
             datetime!(2025-01-01 18:00 UTC),
         )
-        .expect("should create a valid certificate");
+        .expect("must be able to create a valid certificate");
 
         let manager = Manager {
             source_secret: ObjectRef::<Secret>::new("secret-provisioner-tls-ca"),
