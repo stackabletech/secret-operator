@@ -54,7 +54,7 @@ pub const DEFAULT_CA_CERT_LIFETIME: Duration = Duration::from_days_unchecked(365
 /// The CA certificate is not published anymore while in retirement to avoid that pods get almost
 /// expired certificates.
 ///
-/// see https://github.com/stackabletech/secret-operator/issues/625
+/// see <https://github.com/stackabletech/secret-operator/issues/625>
 pub const DEFAULT_CA_CERT_RETIREMENT_DURATION: Duration = Duration::from_hours_unchecked(1);
 
 /// As the Pods will be evicted [`DEFAULT_CERT_RESTART_BUFFER`] before
@@ -66,7 +66,7 @@ pub const DEFAULT_CA_CERT_RETIREMENT_DURATION: Duration = Duration::from_hours_u
 /// [`DEFAULT_MAX_CERT_LIFETIME`] must be less than `([DEFAULT_CA_CERT_LIFETIME] -
 /// [DEFAULT_CA_CERT_RETIREMENT_DURATION]) / [CA_ROTATION_FACTOR] / 2`.
 ///
-/// see the explanation in [`AutoTlsBackend::max_certificate_lifetime`]
+/// see the explanation in [`v1alpha2::AutoTlsBackend::max_certificate_lifetime`]
 pub const DEFAULT_MAX_CERT_LIFETIME: Duration = Duration::from_days_unchecked(15);
 
 /// Default lifetime of certs when no annotations are set on the Volume.
