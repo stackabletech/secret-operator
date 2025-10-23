@@ -1,30 +1,5 @@
 use stackable_operator::kube::{ResourceExt, api::DynamicObject};
 
-pub fn container<'a>(
-    target: &'a mut DynamicObject,
-    container_name: &str,
-) -> anyhow::Result<&'a mut serde_json::Value> {
-    let tname = target.name_any();
-    let path = "template/spec/containers".split("/");
-    match get_or_create(target.data.pointer_mut("/spec").unwrap(), path)? {
-        serde_json::Value::Array(containers) => {
-            for c in containers {
-                if c.is_object() {
-                    if let Some(serde_json::Value::String(name)) = c.get("name") {
-                        if container_name == name {
-                            return Ok(c);
-                        }
-                    }
-                } else {
-                    anyhow::bail!("container is not a object: {:?}", c);
-                }
-            }
-            anyhow::bail!("container named {container_name} not found");
-        }
-        _ => anyhow::bail!("no containers found in object {tname}"),
-    }
-}
-
 pub fn containers<'a>(
     target: &'a mut DynamicObject,
 ) -> anyhow::Result<&'a mut Vec<serde_json::Value>> {
