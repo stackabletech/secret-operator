@@ -1,15 +1,4 @@
-use anyhow::{Result, bail};
 use stackable_operator::kube::{ResourceExt, api::DynamicObject};
-
-pub fn data_field_as_mut<'a>(
-    value: &'a mut serde_json::Value,
-    pointer: &str,
-) -> Result<&'a mut serde_json::Value> {
-    match value.pointer_mut(pointer) {
-        Some(field) => Ok(field),
-        x => bail!("invalid pointer {pointer} for object {x:?}"),
-    }
-}
 
 pub fn container<'a>(
     target: &'a mut DynamicObject,
