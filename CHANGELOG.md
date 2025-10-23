@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
   - `EOS_DISABLED` (`--eos-disabled`) to disable the EoS checker completely.
 - Support exporting the TrustStore CA certificate information to Secrets or ConfigMaps ([#597]).
 - New helm value for `priorityClassName` ([#641]).
+- CA certificates are retired one hour (configurable via
+  `autoTls.ca.caCertificateRetirementDuration`) before they expire ([#650]).
 
 ### Changed
 
@@ -29,6 +31,8 @@ All notable changes to this project will be documented in this file.
   - `kubeletDir` has been move to `csiNodeDriver.kubeletDir`.
 - Bump csi-node-driver-registrar to `v2.15.0` ([#642]).
 - Bump csi-provisioner to `v5.3.0` ([#643]).
+- BREAKING: Expired and retired CA certificates are no longer published in Volumes and TrustStores
+  ([#650]).
 
 [#597]: https://github.com/stackabletech/secret-operator/pull/597
 [#636]: https://github.com/stackabletech/secret-operator/pull/636
@@ -37,6 +41,7 @@ All notable changes to this project will be documented in this file.
 [#643]: https://github.com/stackabletech/secret-operator/pull/643
 [#644]: https://github.com/stackabletech/secret-operator/pull/644
 [#645]: https://github.com/stackabletech/secret-operator/pull/645
+[#650]: https://github.com/stackabletech/secret-operator/pull/650
 
 ## [25.7.0] - 2025-07-23
 
