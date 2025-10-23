@@ -36,6 +36,17 @@ pub fn container<'a>(
     }
 }
 
+pub fn containers<'a>(
+    target: &'a mut DynamicObject,
+) -> anyhow::Result<&'a mut Vec<serde_json::Value>> {
+    let tname = target.name_any();
+    let path = "template/spec/containers".split("/");
+    match get_or_create(target.data.pointer_mut("/spec").unwrap(), path)? {
+        serde_json::Value::Array(containers) => Ok(containers),
+        _ => anyhow::bail!("no containers found in object {tname}"),
+    }
+}
+
 /// Returns the object nested in `root` by traversing the `path` of nested keys.
 /// Creates any missing objects in path.
 /// In case of success, the returned value is either the existing object or
