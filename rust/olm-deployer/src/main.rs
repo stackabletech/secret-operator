@@ -13,7 +13,6 @@
 ///
 mod data;
 mod env;
-mod namespace;
 mod owner;
 mod resources;
 mod tolerations;
@@ -23,6 +22,7 @@ use clap::Parser;
 use stackable_operator::{
     cli::Command,
     client,
+    commons::networking::DomainName,
     k8s_openapi::api::{apps::v1::Deployment, rbac::v1::ClusterRole},
     kube::{
         self,
@@ -71,9 +71,6 @@ struct OlmDeployerRun {
 
     #[command(flatten)]
     pub telemetry: TelemetryOptions,
-
-    #[command(flatten)]
-    pub cluster_info: KubernetesClusterInfoOptions,
 }
 
 #[tokio::main]
@@ -85,7 +82,6 @@ async fn main() -> Result<()> {
         namespace,
         dir,
         telemetry,
-        cluster_info,
     }) = opts.cmd
     {
         // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
@@ -104,7 +100,13 @@ async fn main() -> Result<()> {
             description = built_info::PKG_DESCRIPTION
         );
 
-        let client = client::initialize_operator(Some(APP_NAME.to_string()), &cluster_info).await?;
+        let dummy_cluster_info = KubernetesClusterInfoOptions {
+            kubernetes_cluster_domain: Some(DomainName::try_from("cluster.local")?),
+            kubernetes_node_name: "".to_string(),
+        };
+
+        let client =
+            client::initialize_operator(Some(APP_NAME.to_string()), &dummy_cluster_info).await?;
 
         let deployment = get_deployment(&csv, &namespace, &client).await?;
         let cluster_role = get_cluster_role(&csv, &client).await?;
@@ -143,7 +145,6 @@ async fn main() -> Result<()> {
                                 &deployment,
                                 &cluster_role,
                             )?;
-                            namespace::maybe_patch_namespace(&namespace, &mut obj, &gvk)?;
                             env::maybe_copy_env(&deployment, &mut obj, &gvk)?;
                             resources::maybe_copy_resources(&deployment, &mut obj, &gvk)?;
                             // ---------- apply
