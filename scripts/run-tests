@@ -11,7 +11,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 
 __version__ = "0.0.1"
 
@@ -438,7 +437,6 @@ def main(argv) -> int:
         gen_tests(opts.test_suite, opts.namespace, opts.work_dir)
         with release_file(opts.operator, opts.skip_operator) as f:
             maybe_install_release(opts.skip_release, f)
-            time.sleep(10)
         if opts.skip_tests:
             logging.info("Skip running tests.")
         else:
