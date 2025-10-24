@@ -6,41 +6,46 @@ use stackable_operator::{
     },
 };
 
-use crate::data::container;
+use crate::data::containers;
 
 /// Copy the environment from the "secret-operator-deployer" container in `source`
-/// to the container "secret-operator" in `target`.
-/// The `target` must be a DaemonSet object otherwise this is a no-op.
+/// to *all* containers in target.
+/// The target must be a DaemonSet or Deployment, otherwise this function is a no-op.
+/// This function allows OLM Subscription objects to configure the environment
+/// of operator containers.
 pub(super) fn maybe_copy_env(
     source: &Deployment,
     target: &mut DynamicObject,
     target_gvk: &GroupVersionKind,
 ) -> anyhow::Result<()> {
-    if target_gvk.kind == "DaemonSet" {
+    let target_kind_set = ["DaemonSet", "Deployment"];
+    if target_kind_set.contains(&target_gvk.kind.as_str()) {
         if let Some(env) = deployer_env_var(source) {
-            match container(target, "secret-operator")? {
-                serde_json::Value::Object(c) => {
-                    let json_env = env
-                        .iter()
-                        .map(|e| serde_json::json!(e))
-                        .collect::<Vec<serde_json::Value>>();
+            for container in containers(target)? {
+                match container {
+                    serde_json::Value::Object(c) => {
+                        let json_env = env
+                            .iter()
+                            .map(|e| serde_json::json!(e))
+                            .collect::<Vec<serde_json::Value>>();
 
-                    match c.get_mut("env") {
-                        Some(env) => match env {
-                            v @ serde_json::Value::Null => {
-                                *v = serde_json::json!(json_env);
+                        match c.get_mut("env") {
+                            Some(env) => match env {
+                                v @ serde_json::Value::Null => {
+                                    *v = serde_json::json!(json_env);
+                                }
+                                serde_json::Value::Array(container_env) => {
+                                    container_env.extend_from_slice(&json_env)
+                                }
+                                _ => anyhow::bail!("env is not null or an array"),
+                            },
+                            None => {
+                                c.insert("env".to_string(), serde_json::json!(json_env));
                             }
-                            serde_json::Value::Array(container_env) => {
-                                container_env.extend_from_slice(&json_env)
-                            }
-                            _ => anyhow::bail!("env is not null or an array"),
-                        },
-                        None => {
-                            c.insert("env".to_string(), serde_json::json!(json_env));
                         }
                     }
+                    _ => anyhow::bail!("no containers found in object {}", target.name_any()),
                 }
-                _ => anyhow::bail!("no containers found in object {}", target.name_any()),
             }
         }
     }
@@ -149,7 +154,9 @@ spec:
             },
         ]);
         assert_eq!(
-            container(&mut daemonset, "secret-operator")?
+            containers(&mut daemonset)?
+                .first()
+                .expect("daemonset has no containers")
                 .get("env")
                 .unwrap(),
             &expected
