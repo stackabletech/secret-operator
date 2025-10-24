@@ -213,6 +213,16 @@ impl TlsGenerate {
 
         // Safe maximum certificate lifetime that ensures that the lifetimes of two certificates do
         // not overlap if their issuer certificates are not known to each other.
+        //
+        // For instance, if the `active_ca_certificate_lifetime` is 20 days, then it is rotated
+        // after 10 days (= active_ca_certificate_lifetime / CA_ROTATION_FRACTION). Let us assume
+        // that `max_cert_lifetime` is 6 days (> 10 days / 2). If pod 1 is generated on day 9, it
+        // can be alive until day 15 and only knows CA 1. If pod 2 is generated on day 15, its
+        // certificate is signed by CA 2 because CA 1 expires while pod 2 is alive. On day 15, pod
+        // 1 would not be able to communicate with pod 2 because it has no knowledge of CA 2. To
+        // ensure, that the lifetimes of these two pods cannot overlap, the
+        // `safe_max_cert_lifetime` is the half of the 10 days (= active_ca_certificate_lifetime /
+        // CA_ROTATION_FRACTION / 2).
         let safe_max_cert_lifetime = active_ca_certificate_lifetime / CA_ROTATION_FRACTION / 2;
 
         if max_cert_lifetime > safe_max_cert_lifetime {
