@@ -11971,7 +11971,7 @@ rec {
           {
             name = "time";
             packageId = "time";
-            features = [ "parsing" ];
+            features = [ "macros" "parsing" ];
           }
           {
             name = "tokio";
@@ -12915,7 +12915,7 @@ rec {
           "std" = [ "alloc" ];
           "wasm-bindgen" = [ "dep:js-sys" ];
         };
-        resolvedDefaultFeatures = [ "alloc" "default" "formatting" "parsing" "std" ];
+        resolvedDefaultFeatures = [ "alloc" "default" "formatting" "macros" "parsing" "std" ];
       };
       "time-core" = rec {
         crateName = "time-core";
