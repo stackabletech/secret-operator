@@ -53,13 +53,13 @@ pub mod versioned {
         /// A new certificate and key pair will be generated and signed for each Pod, keys or certificates are never reused.
         AutoTls(AutoTlsBackend),
 
-        /// The [`experimentalCertManager` backend][1] injects a TLS certificate issued
-        /// by [cert-manager](https://cert-manager.io/).
+        /// The [`certManager` backend][1] injects a TLS certificate issued by [cert-manager].
         ///
         /// A new certificate will be requested the first time it is used by a Pod, it
         /// will be reused after that (subject to cert-manager renewal rules).
         ///
         /// [1]: DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-certmanager
+        /// [cert-manager]: https://cert-manager.io/
         #[versioned(changed(since = "v1alpha2", from_name = "ExperimentalCertManager"))]
         CertManager(CertManagerBackend),
 
