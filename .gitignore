@@ -13,6 +13,7 @@ result
 image.tar
 
 tilt_options.json
+local_values.yaml
 
 .direnv/
 .direnvrc
