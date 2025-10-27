@@ -3,7 +3,7 @@
 :cert-manager: https://cert-manager.io/
 :letsencrypt: https://letsencrypt.org/
 
-WARNING: The Cert-Manager backend is experimental, and subject to change.
+NOTE: The Cert-Manager backend was marked as non-experimental in SDP 25.11.0
 
 {cert-manager}[Cert-Manager] is a common tool to manage certificates in Kubernetes, especially when backed by an external Certificate Authority (CA) such as {letsencrypt}[Let\'s Encrypt].
 
