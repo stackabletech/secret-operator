@@ -43,7 +43,7 @@ include::example$cert-manager/issuer.yaml[]
 == Creating a SecretClass
 
 The Stackable Secret Operator needs to know how to request the certificates from Cert-Manager.
-Do this by creating a xref:secretclass.adoc[] using the xref:secretclass.adoc#backend-certmanager[`experimentalCertManager` backend].
+Do this by creating a xref:secretclass.adoc[] using the xref:secretclass.adoc#backend-certmanager[`certManager` backend].
 
 [source,yaml]
 ----
