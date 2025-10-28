@@ -114,6 +114,14 @@ spec:
                               If `autoGenerate: true` then the Secret Operator will prepare a new CA certificate the old CA approaches expiration.
                               If `autoGenerate: false` then the Secret Operator will log a warning instead.
                             type: string
+                          caCertificateRetirementDuration:
+                            default: 1h
+                            description: |-
+                              Duration at the end of the CA certificate lifetime where no signed certificate will exist.
+
+                              Retired (or expired) CA certificates will not be published and will not be used for
+                              signing leaf certificates.
+                            type: string
                           keyGeneration:
                             default:
                               rsa:
@@ -165,6 +173,20 @@ spec:
                           In case consumers request a longer lifetime than allowed by this setting,
                           the lifetime will be the minimum of both, so this setting takes precedence.
                           The default value is 15 days.
+
+                          The maximum lifetime must be less than a quarter of the active CA certificate lifetime
+                          where the active CA certificate lifetime is  `ca.ca_certificate_lifetime -
+                          ca.ca_certificate_retirement_duration` to ensure that two subjects always have a common
+                          CA certificate in their trust stores – assuming that CAs are rotated at half of their
+                          active lifetimes.
+
+                          For instance, if a pod is created right before half of the active CA lifetime has
+                          passed, then it is signed by this CA but it does not know yet the new CA certificate
+                          which is created right afterwards. If another pod is created so that its certificate
+                          lifetime ends right after the first active CA lifetime then it is signed by the new CA.
+                          The `max_certificate_lifetime` must be chosen so that these two pods have no
+                          overlapping lifetimes, otherwise the first pod would see the second one signed by an
+                          unknown CA certificate. This can be achieved by the mentioned formula.
                         type: string
                     required:
                     - ca
@@ -519,6 +541,14 @@ spec:
                               If `autoGenerate: true` then the Secret Operator will prepare a new CA certificate the old CA approaches expiration.
                               If `autoGenerate: false` then the Secret Operator will log a warning instead.
                             type: string
+                          caCertificateRetirementDuration:
+                            default: 1h
+                            description: |-
+                              Duration at the end of the CA certificate lifetime where no signed certificate will exist.
+
+                              Retired (or expired) CA certificates will not be published and will not be used for
+                              signing leaf certificates.
+                            type: string
                           keyGeneration:
                             default:
                               rsa:
@@ -570,6 +600,20 @@ spec:
                           In case consumers request a longer lifetime than allowed by this setting,
                           the lifetime will be the minimum of both, so this setting takes precedence.
                           The default value is 15 days.
+
+                          The maximum lifetime must be less than a quarter of the active CA certificate lifetime
+                          where the active CA certificate lifetime is  `ca.ca_certificate_lifetime -
+                          ca.ca_certificate_retirement_duration` to ensure that two subjects always have a common
+                          CA certificate in their trust stores – assuming that CAs are rotated at half of their
+                          active lifetimes.
+
+                          For instance, if a pod is created right before half of the active CA lifetime has
+                          passed, then it is signed by this CA but it does not know yet the new CA certificate
+                          which is created right afterwards. If another pod is created so that its certificate
+                          lifetime ends right after the first active CA lifetime then it is signed by the new CA.
+                          The `max_certificate_lifetime` must be chosen so that these two pods have no
+                          overlapping lifetimes, otherwise the first pod would see the second one signed by an
+                          unknown CA certificate. This can be achieved by the mentioned formula.
                         type: string
                     required:
                     - ca

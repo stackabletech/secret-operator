@@ -122,6 +122,20 @@ pub mod versioned {
         /// In case consumers request a longer lifetime than allowed by this setting,
         /// the lifetime will be the minimum of both, so this setting takes precedence.
         /// The default value is 15 days.
+        ///
+        /// The maximum lifetime must be less than a quarter of the active CA certificate lifetime
+        /// where the active CA certificate lifetime is  `ca.ca_certificate_lifetime -
+        /// ca.ca_certificate_retirement_duration` to ensure that two subjects always have a common
+        /// CA certificate in their trust stores – assuming that CAs are rotated at half of their
+        /// active lifetimes.
+        ///
+        /// For instance, if a pod is created right before half of the active CA lifetime has
+        /// passed, then it is signed by this CA but it does not know yet the new CA certificate
+        /// which is created right afterwards. If another pod is created so that its certificate
+        /// lifetime ends right after the first active CA lifetime then it is signed by the new CA.
+        /// The `max_certificate_lifetime` must be chosen so that these two pods have no
+        /// overlapping lifetimes, otherwise the first pod would see the second one signed by an
+        /// unknown CA certificate. This can be achieved by the mentioned formula.
         #[serde(default = "v1alpha2::AutoTlsBackend::default_max_certificate_lifetime")]
         pub max_certificate_lifetime: Duration,
     }
@@ -147,6 +161,13 @@ pub mod versioned {
         /// If `autoGenerate: false` then the Secret Operator will log a warning instead.
         #[serde(default = "v1alpha2::AutoTlsCa::default_ca_certificate_lifetime")]
         pub ca_certificate_lifetime: Duration,
+
+        /// Duration at the end of the CA certificate lifetime where no signed certificate will exist.
+        ///
+        /// Retired (or expired) CA certificates will not be published and will not be used for
+        /// signing leaf certificates.
+        #[serde(default = "v1alpha2::AutoTlsCa::default_ca_certificate_retirement_duration")]
+        pub ca_certificate_retirement_duration: Duration,
 
         /// The algorithm used to generate a key pair and required configuration settings.
         /// Currently only RSA and a key length of 2048, 3072 or 4096 bits can be configured.
@@ -318,7 +339,10 @@ mod test {
     use stackable_secret_operator_utils::crd::{ConfigMapReference, SecretReference};
 
     use crate::{
-        backend::tls::{DEFAULT_CA_CERT_LIFETIME, DEFAULT_MAX_CERT_LIFETIME},
+        backend::tls::{
+            DEFAULT_CA_CERT_LIFETIME, DEFAULT_CA_CERT_RETIREMENT_DURATION,
+            DEFAULT_MAX_CERT_LIFETIME,
+        },
         crd::v1alpha2::{
             AdditionalTrustRoot, AutoTlsBackend, AutoTlsCa, CertificateKeyGeneration, SecretClass,
             SecretClassBackend, SecretClassSpec,
@@ -357,6 +381,7 @@ mod test {
                         },
                         auto_generate: false,
                         ca_certificate_lifetime: DEFAULT_CA_CERT_LIFETIME,
+                        ca_certificate_retirement_duration: DEFAULT_CA_CERT_RETIREMENT_DURATION,
                         key_generation: CertificateKeyGeneration::Rsa {
                             length: CertificateKeyGeneration::RSA_KEY_LENGTH_3072
                         }
@@ -381,6 +406,7 @@ mod test {
                   namespace: default
                 autoGenerate: true
                 caCertificateLifetime: 100d
+                caCertificateRetirementDuration: 1d
               additionalTrustRoots:
                 - configMap:
                     name: tls-root-ca-config-map
@@ -404,6 +430,7 @@ mod test {
                         },
                         auto_generate: true,
                         ca_certificate_lifetime: Duration::from_days_unchecked(100),
+                        ca_certificate_retirement_duration: Duration::from_days_unchecked(1),
                         key_generation: CertificateKeyGeneration::default()
                     },
                     additional_trust_roots: vec![
