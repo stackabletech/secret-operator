@@ -3517,15 +3517,15 @@ rec {
         };
         resolvedDefaultFeatures = [ "std" ];
       };
-      "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.100.1#stackable-telemetry@0.6.1" = rec {
+      "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.100.3#stackable-telemetry@0.6.1" = rec {
         crateName = "stackable-telemetry";
         version = "0.6.1";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
-          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
+          rev = "d74c0ce53a12375876c489996c262f6037c099d2";
+          sha256 = "0w54yii3chcw18lkl3bm1ay504vf0m8ais8mrifzvas2vcxibbzb";
         };
         libName = "stackable_telemetry";
         authors = [
@@ -5459,8 +5459,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
-          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
+          rev = "d74c0ce53a12375876c489996c262f6037c099d2";
+          sha256 = "0w54yii3chcw18lkl3bm1ay504vf0m8ais8mrifzvas2vcxibbzb";
         };
         libName = "k8s_version";
         authors = [
@@ -11456,8 +11456,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
-          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
+          rev = "d74c0ce53a12375876c489996c262f6037c099d2";
+          sha256 = "0w54yii3chcw18lkl3bm1ay504vf0m8ais8mrifzvas2vcxibbzb";
         };
         libName = "stackable_certs";
         authors = [
@@ -11637,13 +11637,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.100.1";
+        version = "0.100.3";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
-          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
+          rev = "d74c0ce53a12375876c489996c262f6037c099d2";
+          sha256 = "0w54yii3chcw18lkl3bm1ay504vf0m8ais8mrifzvas2vcxibbzb";
         };
         libName = "stackable_operator";
         authors = [
@@ -11688,7 +11688,7 @@ rec {
           }
           {
             name = "stackable-telemetry";
-            packageId = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.100.1#stackable-telemetry@0.6.1";
+            packageId = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.100.3#stackable-telemetry@0.6.1";
             optional = true;
             features = [ "clap" ];
           }
@@ -11816,8 +11816,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
-          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
+          rev = "d74c0ce53a12375876c489996c262f6037c099d2";
+          sha256 = "0w54yii3chcw18lkl3bm1ay504vf0m8ais8mrifzvas2vcxibbzb";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -12146,8 +12146,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
-          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
+          rev = "d74c0ce53a12375876c489996c262f6037c099d2";
+          sha256 = "0w54yii3chcw18lkl3bm1ay504vf0m8ais8mrifzvas2vcxibbzb";
         };
         libName = "stackable_shared";
         authors = [
@@ -12228,8 +12228,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
-          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
+          rev = "d74c0ce53a12375876c489996c262f6037c099d2";
+          sha256 = "0w54yii3chcw18lkl3bm1ay504vf0m8ais8mrifzvas2vcxibbzb";
         };
         libName = "stackable_versioned";
         authors = [
@@ -12272,8 +12272,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
-          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
+          rev = "d74c0ce53a12375876c489996c262f6037c099d2";
+          sha256 = "0w54yii3chcw18lkl3bm1ay504vf0m8ais8mrifzvas2vcxibbzb";
         };
         procMacro = true;
         libName = "stackable_versioned_macros";
@@ -12331,13 +12331,13 @@ rec {
       };
       "stackable-webhook" = rec {
         crateName = "stackable-webhook";
-        version = "0.7.0";
+        version = "0.7.1";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
-          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
+          rev = "d74c0ce53a12375876c489996c262f6037c099d2";
+          sha256 = "0w54yii3chcw18lkl3bm1ay504vf0m8ais8mrifzvas2vcxibbzb";
         };
         libName = "stackable_webhook";
         authors = [
@@ -12359,7 +12359,7 @@ rec {
           }
           {
             name = "stackable-telemetry";
-            packageId = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.100.1#stackable-telemetry@0.6.1";
+            packageId = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.100.3#stackable-telemetry@0.6.1";
           }
           {
             name = "hyper";
