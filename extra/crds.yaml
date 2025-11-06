@@ -21,13 +21,13 @@ spec:
         properties:
           spec:
             description: |-
-              A [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass) is a cluster-global Kubernetes resource
+              A [SecretClass](https://docs.stackable.tech/home/25.11/secret-operator/secretclass) is a cluster-global Kubernetes resource
               that defines a category of secrets that the Secret Operator knows how to provision.
             properties:
               backend:
                 description: |-
                   Each SecretClass is associated with a single
-                  [backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend),
+                  [backend](https://docs.stackable.tech/home/25.11/secret-operator/secretclass#backend),
                   which dictates the mechanism for issuing that kind of Secret.
                 oneOf:
                 - required:
@@ -41,7 +41,7 @@ spec:
                 properties:
                   autoTls:
                     description: |-
-                      The [`autoTls` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-autotls)
+                      The [`autoTls` backend](https://docs.stackable.tech/home/25.11/secret-operator/secretclass#backend-autotls)
                       issues a TLS certificate signed by the Secret Operator.
                       The certificate authority can be provided by the administrator, or managed automatically by the Secret Operator.
 
@@ -198,7 +198,7 @@ spec:
                       A new certificate will be requested the first time it is used by a Pod, it
                       will be reused after that (subject to cert-manager renewal rules).
 
-                      [1]: https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-certmanager
+                      [1]: https://docs.stackable.tech/home/25.11/secret-operator/secretclass#backend-certmanager
                       [cert-manager]: https://cert-manager.io/
                     properties:
                       defaultCertificateLifetime:
@@ -258,7 +258,7 @@ spec:
                     type: object
                   k8sSearch:
                     description: |-
-                      The [`k8sSearch` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-k8ssearch)
+                      The [`k8sSearch` backend](https://docs.stackable.tech/home/25.11/secret-operator/secretclass#backend-k8ssearch)
                       can be used to mount Secrets across namespaces into Pods.
                     properties:
                       searchNamespace:
@@ -294,7 +294,7 @@ spec:
                     type: object
                   kerberosKeytab:
                     description: |-
-                      The [`kerberosKeytab` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-kerberoskeytab)
+                      The [`kerberosKeytab` backend](https://docs.stackable.tech/home/25.11/secret-operator/secretclass#backend-kerberoskeytab)
                       creates a Kerberos keytab file for a selected realm.
                       The Kerberos KDC and administrator credentials must be provided by the administrator.
                     properties:
@@ -448,13 +448,13 @@ spec:
         properties:
           spec:
             description: |-
-              A [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass) is a cluster-global Kubernetes resource
+              A [SecretClass](https://docs.stackable.tech/home/25.11/secret-operator/secretclass) is a cluster-global Kubernetes resource
               that defines a category of secrets that the Secret Operator knows how to provision.
             properties:
               backend:
                 description: |-
                   Each SecretClass is associated with a single
-                  [backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend),
+                  [backend](https://docs.stackable.tech/home/25.11/secret-operator/secretclass#backend),
                   which dictates the mechanism for issuing that kind of Secret.
                 oneOf:
                 - required:
@@ -468,7 +468,7 @@ spec:
                 properties:
                   autoTls:
                     description: |-
-                      The [`autoTls` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-autotls)
+                      The [`autoTls` backend](https://docs.stackable.tech/home/25.11/secret-operator/secretclass#backend-autotls)
                       issues a TLS certificate signed by the Secret Operator.
                       The certificate authority can be provided by the administrator, or managed automatically by the Secret Operator.
 
@@ -625,7 +625,7 @@ spec:
                       A new certificate will be requested the first time it is used by a Pod, it
                       will be reused after that (subject to cert-manager renewal rules).
 
-                      [1]: https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-certmanager
+                      [1]: https://docs.stackable.tech/home/25.11/secret-operator/secretclass#backend-certmanager
                       [cert-manager]: https://cert-manager.io/
                     properties:
                       defaultCertificateLifetime:
@@ -685,7 +685,7 @@ spec:
                     type: object
                   k8sSearch:
                     description: |-
-                      The [`k8sSearch` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-k8ssearch)
+                      The [`k8sSearch` backend](https://docs.stackable.tech/home/25.11/secret-operator/secretclass#backend-k8ssearch)
                       can be used to mount Secrets across namespaces into Pods.
                     properties:
                       searchNamespace:
@@ -721,7 +721,7 @@ spec:
                     type: object
                   kerberosKeytab:
                     description: |-
-                      The [`kerberosKeytab` backend](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#backend-kerberoskeytab)
+                      The [`kerberosKeytab` backend](https://docs.stackable.tech/home/25.11/secret-operator/secretclass#backend-kerberoskeytab)
                       creates a Kerberos keytab file for a selected realm.
                       The Kerberos KDC and administrator credentials must be provided by the administrator.
                     properties:
@@ -890,13 +890,13 @@ spec:
         properties:
           spec:
             description: |-
-              A [TrustStore](https://docs.stackable.tech/home/nightly/secret-operator/truststore) requests information about how to
-              validate secrets issued by a [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass).
+              A [TrustStore](https://docs.stackable.tech/home/25.11/secret-operator/truststore) requests information about how to
+              validate secrets issued by a [SecretClass](https://docs.stackable.tech/home/25.11/secret-operator/secretclass).
 
               The requested information is written to a ConfigMap with the same name as the TrustStore.
             properties:
               format:
-                description: The [format](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#format) that the data should be converted into.
+                description: The [format](https://docs.stackable.tech/home/25.11/secret-operator/secretclass#format) that the data should be converted into.
                 enum:
                 - tls-pem
                 - tls-pkcs12
