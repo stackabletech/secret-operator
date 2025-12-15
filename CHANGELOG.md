@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 - OLM deployer doesn't add owner references to cluster scoped objects anymore ([#667]).
   Owner references ensure that objects are garbage collected by OpenShift upon operator removal but they cause problems when the operator is updated.
   This means that cluster wide objects are not removed anymore when the operator is uninstalled.
-  This behaviur is in line with the default behaviour of Helm and OLM.
+  This behaviour is in line with the default behaviour of Helm and OLM.
 
 [#667]: https://github.com/stackabletech/secret-operator/pull/667
 
