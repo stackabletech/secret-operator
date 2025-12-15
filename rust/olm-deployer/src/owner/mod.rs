@@ -17,8 +17,7 @@ use stackable_operator::{
 /// Namespaced object's owner references are updated in place with the value of `ns_owner`.
 ///
 /// A previous version of this function also updated cluster scoped objects to set the owner
-/// reference to `cluster_owner`, but this turned out to be problematic. First, this is not how OLM
-/// and Helm behave by default.
+/// reference to `cluster_owner`, but this turned out to be problematic.
 pub(super) fn maybe_update_owner(
     target: &mut DynamicObject,
     scope: &Scope,
