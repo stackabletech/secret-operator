@@ -11,9 +11,13 @@ use stackable_operator::{
     },
 };
 
-/// Updates the owner list of the `target` according to it's scope.
-/// For namespaced objects it uses the `ns_owner` whereas for cluster wide
-/// objects it uses the `cluster_owner`.
+/// Updates owner references of objects created by this deployer so that when an operator is
+/// uninstalled by OLM, all created objects are also removed by Kubernetes garbage collection.
+///
+/// Namespaced object's owner references are updated in place with the value of `ns_owner`.
+///
+/// A previous version of this function also updated cluster scoped objects to set the owner
+/// reference to `cluster_owner`, but this turned out to be problematic.
 pub(super) fn maybe_update_owner(
     target: &mut DynamicObject,
     scope: &Scope,
@@ -21,9 +25,13 @@ pub(super) fn maybe_update_owner(
     cluster_owner: &ClusterRole,
 ) -> Result<()> {
     let owner_ref = owner_ref(scope, ns_owner, cluster_owner)?;
-    match target.metadata.owner_references {
-        Some(ref mut ors) => ors.push(owner_ref),
-        None => target.metadata.owner_references = Some(vec![owner_ref]),
+    // 2025-12-12: do not set owner references for cluster scoped objects anymore to prevent them from being
+    // deleted upon operator upgrades.
+    if scope == &Scope::Namespaced {
+        match target.metadata.owner_references {
+            Some(ref mut ors) => ors.push(owner_ref),
+            None => target.metadata.owner_references = Some(vec![owner_ref]),
+        }
     }
     Ok(())
 }
@@ -147,13 +155,8 @@ rules:
         let mut daemonset = DAEMONSET.clone();
         maybe_update_owner(&mut daemonset, &Scope::Cluster, &DEPLOYMENT, &CLUSTER_ROLE)?;
 
-        let expected = Some(vec![OwnerReference {
-            uid: "d9287d0a-3069-47c3-8c90-b714dc6dddaa".to_string(),
-            name: "secret-operator-clusterrole".to_string(),
-            kind: "ClusterRole".to_string(),
-            api_version: "rbac.authorization.k8s.io/v1".to_string(),
-            ..OwnerReference::default()
-        }]);
+        let expected = None;
+
         assert_eq!(daemonset.metadata.owner_references, expected);
         Ok(())
     }
