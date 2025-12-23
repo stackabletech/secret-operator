@@ -35,12 +35,12 @@ Helm will deploy the operator in Kubernetes containers and apply the CRDs. You'r
 === Microk8s
 
 Microk8s uses a non-standard Kubelet state directory. Installing secret-operator on Microk8s requires the argument
-`--set kubeletDir=/var/snap/microk8s/common/var/lib/kubelet` to be added to the `helm install` command.
+`--set csiNodeDriver.kubeletDir=/var/snap/microk8s/common/var/lib/kubelet` to be added to the `helm install` command.
 
 === k0s
 
 k0s uses a non-standard Kubelet state directory. Installing secret-operator on k0s requires the argument
-`--set kubeletDir=/var/lib/k0s/kubelet` to be added to the `helm install` command.
+`--set csiNodeDriver.kubeletDir=/var/lib/k0s/kubelet` to be added to the `helm install` command.
 
 === HUAWEI cloud
 
@@ -48,7 +48,7 @@ In some cases HUAWEI cloud has the kubelet directory located at `/mnt/paas/kuber
 
 `failed to publish volume error=status: Unavailable, message: "failed to create secret parent dir /mnt/paas/kubernetes/kubelet/pods/<POD_ID>/volumes/kubernetes.io~csi/pvc-<PVC_ID>/mount: No such file or directory (os error 2)"`
 
-In case you are encountering the mentioned error (or secret-operator does not work on your HUAWEI cloud at all), you need to add the argument `--set kubeletDir=/mnt/paas/kubernetes/kubelet` to the `helm install` command.
+In case you are encountering the mentioned error (or secret-operator does not work on your HUAWEI cloud at all), you need to add the argument `--set csiNodeDriver.kubeletDir=/mnt/paas/kubernetes/kubelet` to the `helm install` command.
 
 === IBM cloud
 
@@ -56,9 +56,9 @@ In some cases IBM cloud has the kubelet directory located at `/var/data/kubelet/
 
 `failed to publish volume error=status: Unavailable, message: "failed to create secret parent dir /var/data/kubelet/pods/<POD_ID>/volumes/kubernetes.io~csi/pvc-<PVC_ID>/mount: No such file or directory (os error 2)"`
 
-In case you are encountering the mentioned error (or secret-operator does not work on your IBM cloud at all), you need to add the argument `--set kubeletDir=/var/data/kubelet` to the `helm install` command.
+In case you are encountering the mentioned error (or secret-operator does not work on your IBM cloud at all), you need to add the argument `--set csiNodeDriver.kubeletDir=/var/data/kubelet` to the `helm install` command.
 
 === VMware Tanzu
 
 VMware Tanzu uses a non-standard Kubelet state directory. Installing secret-operator on Tanzu requires the argument
-`--set kubeletDir=/var/vcap/data/kubelet` to be added to the `helm install` command.
+`--set csiNodeDriver.kubeletDir=/var/vcap/data/kubelet` to be added to the `helm install` command.
