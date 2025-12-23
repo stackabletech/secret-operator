@@ -37,6 +37,11 @@ Helm will deploy the operator in Kubernetes containers and apply the CRDs. You'r
 Microk8s uses a non-standard Kubelet state directory. Installing secret-operator on Microk8s requires the argument
 `--set kubeletDir=/var/snap/microk8s/common/var/lib/kubelet` to be added to the `helm install` command.
 
+=== k0s
+
+k0s uses a non-standard Kubelet state directory. Installing secret-operator on k0s requires the argument
+`--set kubeletDir=/var/lib/k0s/kubelet` to be added to the `helm install` command.
+
 === HUAWEI cloud
 
 In some cases HUAWEI cloud has the kubelet directory located at `/mnt/paas/kubernetes/kubelet`, resulting in the following error:
