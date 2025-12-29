@@ -13,7 +13,7 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 
-- BREAKING: Removed support for ephemeral CSI volumes ([#481], [#XXX]).
+- BREAKING: Removed support for ephemeral CSI volumes ([#481], [#670]).
   This means that the following form would no longer be supported:
 
   ```yaml
@@ -33,7 +33,7 @@ All notable changes to this project will be documented in this file.
 
 [#481]: https://github.com/stackabletech/secret-operator/issues/481
 [#667]: https://github.com/stackabletech/secret-operator/pull/667
-[#XXX]: https://github.com/stackabletech/secret-operator/pull/XXX
+[#670]: https://github.com/stackabletech/secret-operator/pull/670
 
 ## [25.11.0] - 2025-11-07
 
