@@ -10,8 +10,10 @@ All notable changes to this project will be documented in this file.
   Owner references ensure that objects are garbage collected by OpenShift upon operator removal but they cause problems when the operator is updated.
   This means that cluster wide objects are not removed anymore when the operator is uninstalled.
   This behaviour is in line with the default behaviour of Helm and OLM.
+- Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#671]).
 
 [#667]: https://github.com/stackabletech/secret-operator/pull/667
+[#671]: https://github.com/stackabletech/secret-operator/pull/671
 
 ## [25.11.0] - 2025-11-07
 
