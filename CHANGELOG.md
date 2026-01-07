@@ -11,7 +11,29 @@ All notable changes to this project will be documented in this file.
   This means that cluster wide objects are not removed anymore when the operator is uninstalled.
   This behaviour is in line with the default behaviour of Helm and OLM.
 
+### Removed
+
+- BREAKING: Removed support for ephemeral CSI volumes ([#481], [#670]).
+  This means that the following form would no longer be supported:
+
+  ```yaml
+  volumes:
+    - csi: # ...
+  ```
+
+  This has been deprecated since 0.4.0 because it doesn't support pod stickiness ([#125]).
+
+  Ephemeral PersistentVolumes that use CSI would still be supported (and the recommended syntax):
+
+  ```yaml
+  volumes:
+    - ephemeral:
+        volumeClaimTemplate: # ...
+  ```
+
+[#481]: https://github.com/stackabletech/secret-operator/issues/481
 [#667]: https://github.com/stackabletech/secret-operator/pull/667
+[#670]: https://github.com/stackabletech/secret-operator/pull/670
 
 ## [25.11.0] - 2025-11-07
 
