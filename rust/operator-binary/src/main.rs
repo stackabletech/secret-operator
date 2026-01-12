@@ -33,7 +33,7 @@ use utils::{TonicUnixStream, uds_bind_private};
 
 use crate::{
     crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha2},
-    webhooks::conversion::create_webhook_and_maintainer,
+    webhooks::conversion::create_webhook_server,
 };
 
 mod backend;
@@ -202,21 +202,16 @@ async fn main() -> anyhow::Result<()> {
                 RunMode::Controller(ControllerArguments {
                     tls_secretclass_ca_secret_namespace,
                 }) => {
-                    let (conversion_webhook, crd_maintainer, initial_reconcile_rx) =
-                        create_webhook_and_maintainer(
-                            &operator_environment,
-                            maintenance.disable_crd_maintenance,
-                            client.as_kube_client(),
-                        )
-                        .await?;
+                    let (webhook_server, initial_reconcile_rx) = create_webhook_server(
+                        &operator_environment,
+                        maintenance.disable_crd_maintenance,
+                        client.as_kube_client(),
+                    )
+                    .await?;
 
-                    let conversion_webhook = conversion_webhook
+                    let webhook_server = webhook_server
                         .run()
-                        .map_err(|err| anyhow!(err).context("failed to run conversion webhook"));
-
-                    let crd_maintainer = crd_maintainer
-                        .run()
-                        .map_err(|err| anyhow!(err).context("failed to run CRD maintainer"));
+                        .map_err(|err| anyhow!(err).context("failed to run webhook server"));
 
                     let ca_secret_namespace = tls_secretclass_ca_secret_namespace
                         .unwrap_or(operator_environment.operator_namespace.clone());
@@ -236,8 +231,7 @@ async fn main() -> anyhow::Result<()> {
                     try_join!(
                         truststore_controller,
                         default_secretclass,
-                        conversion_webhook,
-                        crd_maintainer,
+                        webhook_server,
                         eos_checker,
                     )?;
                 }
