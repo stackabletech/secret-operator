@@ -26,8 +26,8 @@ pub enum Error {
 }
 
 /// Creates and returns a [`ConversionWebhookServer`] and a [`CustomResourceDefinitionMaintainer`].
-pub async fn create_webhook_server<'a>(
-    operator_environment: &'a OperatorEnvironmentOptions,
+pub async fn create_webhook_server(
+    operator_environment: &OperatorEnvironmentOptions,
     disable_crd_maintenance: bool,
     client: Client,
 ) -> Result<(WebhookServer, oneshot::Receiver<()>), Error> {
