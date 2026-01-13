@@ -25,7 +25,8 @@ pub enum Error {
     CreateWebhookServer { source: WebhookServerError },
 }
 
-/// Creates and returns a [`ConversionWebhookServer`] and a [`CustomResourceDefinitionMaintainer`].
+/// Creates and returns a [`WebhookServer`] and a [`oneshot::Receiver`] that is fired once the CRDs
+/// are initially reconciled.
 pub async fn create_webhook_server(
     operator_environment: &OperatorEnvironmentOptions,
     disable_crd_maintenance: bool,
