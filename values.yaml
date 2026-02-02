@@ -1,0 +1,5 @@
+---
+telemetry:
+  consoleLog:
+    enabled: true
+    level: "info,stackable_operator=trace,stackable_webhook=trace"
