@@ -22,11 +22,9 @@ use stackable_operator::{
     kvp::{Label, LabelExt},
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
+    utils::signal::SignalWatcher,
 };
-use tokio::{
-    signal::unix::{SignalKind, signal},
-    sync::oneshot,
-};
+use tokio::sync::oneshot;
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use utils::{TonicUnixStream, uds_bind_private};
@@ -144,9 +142,13 @@ async fn main() -> anyhow::Result<()> {
                 description = built_info::PKG_DESCRIPTION
             );
 
+            // Watches for the SIGTERM signal and sends a signal to all receivers, which gracefully
+            // shuts down all concurrent tasks below (EoS checker, controller, webhook server).
+            let sigterm_watcher = SignalWatcher::sigterm()?;
+
             let eos_checker =
                 EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, maintenance.end_of_support)?
-                    .run()
+                    .run(sigterm_watcher.handle())
                     .map(Ok);
 
             let client = stackable_operator::client::initialize_operator(
@@ -166,8 +168,6 @@ async fn main() -> anyhow::Result<()> {
                     {
                         let _ = std::fs::remove_file(&csi_endpoint);
                     }
-
-                    let mut sigterm = signal(SignalKind::terminate())?;
 
                     let csi_server = Server::builder()
                         .add_service(
@@ -193,7 +193,7 @@ async fn main() -> anyhow::Result<()> {
                                     .context("failed to bind CSI listener")?,
                             )
                             .map_ok(TonicUnixStream),
-                            sigterm.recv().map(|_| ()),
+                            sigterm_watcher.handle(),
                         )
                         .map_err(|err| anyhow!(err).context("failed to run CSI server"));
 
@@ -210,7 +210,7 @@ async fn main() -> anyhow::Result<()> {
                     .await?;
 
                     let webhook_server = webhook_server
-                        .run()
+                        .run(sigterm_watcher.handle())
                         .map_err(|err| anyhow!(err).context("failed to run webhook server"));
 
                     let ca_secret_namespace = tls_secretclass_ca_secret_namespace
@@ -225,8 +225,12 @@ async fn main() -> anyhow::Result<()> {
                         anyhow!(err).context("failed to apply default custom resources")
                     });
 
-                    let truststore_controller =
-                        truststore_controller::start(client, &watch_namespace).map(anyhow::Ok);
+                    let truststore_controller = truststore_controller::start(
+                        client,
+                        &watch_namespace,
+                        sigterm_watcher.handle(),
+                    )
+                    .map(anyhow::Ok);
 
                     try_join!(
                         truststore_controller,

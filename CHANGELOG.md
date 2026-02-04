@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#674]).
 - OLM deployer doesn't add owner references to cluster scoped objects anymore ([#667]).
   Owner references ensure that objects are garbage collected by OpenShift upon operator removal but they cause problems when the operator is updated.
   This means that cluster wide objects are not removed anymore when the operator is uninstalled.
@@ -36,6 +37,7 @@ All notable changes to this project will be documented in this file.
 [#667]: https://github.com/stackabletech/secret-operator/pull/667
 [#670]: https://github.com/stackabletech/secret-operator/pull/670
 [#671]: https://github.com/stackabletech/secret-operator/pull/671
+[#674]: https://github.com/stackabletech/secret-operator/pull/674
 
 ## [25.11.0] - 2025-11-07
 

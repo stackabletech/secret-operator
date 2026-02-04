@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, future::Future, sync::Arc, time::Duration};
 
 use const_format::concatcp;
 use futures::StreamExt;
@@ -43,7 +43,13 @@ use crate::{
 const CONTROLLER_NAME: &str = "truststore";
 const FULL_CONTROLLER_NAME: &str = concatcp!(CONTROLLER_NAME, ".", OPERATOR_NAME);
 
-pub async fn start(client: stackable_operator::client::Client, watch_namespace: &WatchNamespace) {
+pub async fn start<F>(
+    client: stackable_operator::client::Client,
+    watch_namespace: &WatchNamespace,
+    shutdown_signal: F,
+) where
+    F: Future<Output = ()> + Send + Sync + 'static,
+{
     let (secretclasses, secretclasses_writer) = reflector::store();
     let controller = Controller::new(
         watch_namespace.get_api::<DeserializeGuard<v1alpha1::TrustStore>>(&client),
@@ -108,6 +114,7 @@ pub async fn start(client: stackable_operator::client::Client, watch_namespace: 
                 |secretclass, secret| secretclass.spec.backend.refers_to_secret(secret),
             ),
         )
+        .graceful_shutdown_on(shutdown_signal)
         .run(reconcile, error_policy, Arc::new(Ctx { client }))
         .for_each_concurrent(16, move |res| {
             let event_recorder = event_recorder.clone();
