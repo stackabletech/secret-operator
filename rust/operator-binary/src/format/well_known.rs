@@ -47,35 +47,45 @@ pub enum WellKnownSecretData {
 }
 
 impl WellKnownSecretData {
-    pub fn into_files(self, names: NamingOptions) -> SecretFiles {
+    pub fn into_files(self, names: NamingOptions, only_identity: bool) -> SecretFiles {
         match self {
             WellKnownSecretData::TlsPem(TlsPem {
                 certificate_pem,
                 key_pem,
                 ca_pem,
-            }) => [
-                Some(names.tls_pem_cert_name).zip(certificate_pem),
-                Some(names.tls_pem_key_name).zip(key_pem),
-                Some((names.tls_pem_ca_name, ca_pem)),
-            ]
-            .into_iter()
-            .flatten()
-            .collect(),
+            }) => {
+                let mut files = vec![Some((names.tls_pem_ca_name, ca_pem))];
+
+                if !only_identity {
+                    files.extend([
+                        Some(names.tls_pem_cert_name).zip(certificate_pem),
+                        Some(names.tls_pem_key_name).zip(key_pem),
+                    ]);
+                }
+
+                files.into_iter().flatten().collect()
+            }
             WellKnownSecretData::TlsPkcs12(TlsPkcs12 {
                 keystore,
                 truststore,
-            }) => [
-                Some(names.tls_pkcs12_keystore_name).zip(keystore),
-                Some((names.tls_pkcs12_truststore_name, truststore)),
-            ]
-            .into_iter()
-            .flatten()
-            .collect(),
-            WellKnownSecretData::Kerberos(Kerberos { keytab, krb5_conf }) => [
-                (FILE_KERBEROS_KEYTAB_KEYTAB.to_string(), keytab),
-                (FILE_KERBEROS_KEYTAB_KRB5_CONF.to_string(), krb5_conf),
-            ]
-            .into(),
+            }) => {
+                let mut files = vec![Some((names.tls_pkcs12_truststore_name, truststore))];
+
+                if !only_identity {
+                    files.push(Some(names.tls_pkcs12_keystore_name).zip(keystore));
+                }
+
+                files.into_iter().flatten().collect()
+            }
+            WellKnownSecretData::Kerberos(Kerberos { keytab, krb5_conf }) => {
+                let mut files = vec![(FILE_KERBEROS_KEYTAB_KRB5_CONF.to_string(), krb5_conf)];
+
+                if !only_identity {
+                    files.push((FILE_KERBEROS_KEYTAB_KEYTAB.to_string(), keytab));
+                }
+
+                SecretFiles::from_iter(files)
+            }
         }
     }
 

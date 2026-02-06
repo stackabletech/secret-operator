@@ -73,6 +73,7 @@ pub struct SecretVolumeSelector {
     /// The desired format of the mounted secrets
     ///
     /// Currently supported formats:
+    ///
     /// - `tls-pem` - A Kubernetes-style triple of PEM-encoded certificate files (`tls.crt`, `tls.key`, `ca.crt`).
     /// - `tls-pkcs12` - A PKCS#12 key store named `keystore.p12` and truststore named `truststore.p12`.
     /// - `kerberos` - A Kerberos keytab named `keytab`, along with a `krb5.conf`.
@@ -138,6 +139,21 @@ pub struct SecretVolumeSelector {
         default
     )]
     pub cert_manager_cert_lifetime: Option<Duration>,
+
+    // TODO (@Techassi): Name to be decided. Will potentially be renamed.
+    /// Only provision non-sensitive secret data.
+    ///
+    /// - TLS (PEM): Only provision the `ca.crt` file
+    /// - TLS (PKCS#12): Only provision the `truststore.p12` file
+    /// - Kerberos: Only provision the `krb5.conf` file
+    ///
+    /// This defaults to `false` to be backwords compatible with behaviour before SDP 26.3.0.
+    #[serde(
+        rename = "secrets.stackable.tech/only-provision-identity",
+        deserialize_with = "SecretVolumeSelector::deserialize_str_as_bool",
+        default
+    )]
+    pub only_provision_identity: bool,
 }
 
 /// Configuration provided by the [`TrustStore`] selecting what trust data should be provided.
@@ -267,6 +283,16 @@ impl SecretVolumeSelector {
             <D::Error as serde::de::Error>::invalid_value(
                 Unexpected::Str(&str),
                 &"a string containing a f64",
+            )
+        })
+    }
+
+    fn deserialize_str_as_bool<'de, D: Deserializer<'de>>(de: D) -> Result<bool, D::Error> {
+        let str = String::deserialize(de)?;
+        str.parse().map_err(|_| {
+            <D::Error as serde::de::Error>::invalid_value(
+                Unexpected::Str(&str),
+                &"a string containing a boolean",
             )
         })
     }

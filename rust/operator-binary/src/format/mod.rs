@@ -22,7 +22,7 @@ pub enum SecretData {
 impl SecretData {
     pub fn parse(self) -> Result<WellKnownSecretData, ParseError> {
         match self {
-            Self::WellKnown(x) => Ok(x),
+            Self::WellKnown(data) => Ok(data),
             Self::Unknown(files) => WellKnownSecretData::from_files(files),
         }
     }
@@ -32,15 +32,20 @@ impl SecretData {
         format: Option<SecretFormat>,
         names: NamingOptions,
         compat: CompatibilityOptions,
+        only_identity: bool,
     ) -> Result<SecretFiles, IntoFilesError> {
-        if let Some(format) = format {
-            Ok(self.parse()?.convert_to(format, compat)?.into_files(names))
+        let files = if let Some(format) = format {
+            self.parse()?
+                .convert_to(format, compat)?
+                .into_files(names, only_identity)
         } else {
-            Ok(match self {
-                SecretData::WellKnown(data) => data.into_files(names),
+            match self {
+                SecretData::WellKnown(data) => data.into_files(names, only_identity),
                 SecretData::Unknown(files) => files,
-            })
-        }
+            }
+        };
+
+        Ok(files)
     }
 }
 

@@ -291,6 +291,7 @@ async fn reconcile(
             truststore.spec.format,
             NamingOptions::default(),
             CompatibilityOptions::default(),
+            false,
         )
         .context(FormatDataSnafu {
             secret_class: secret_class_ref,
