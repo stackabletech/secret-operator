@@ -3,7 +3,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_krb5_provision_keytab::{
     // Some qualified paths get long enough to break rustfmt, alias the crate name to work around that
     self as provision,
-    provision_keytab,
+    provision_keytab_file,
 };
 use stackable_operator::{
     commons::networking::{HostName, KerberosRealmName},
@@ -167,6 +167,8 @@ impl SecretBackend for KerberosKeytab {
             admin_principal,
         } = self;
 
+        let provision_keytab = !selector.only_provision_identity;
+
         let admin_server_clause = match admin {
             v1alpha2::KerberosKeytabBackendAdmin::Mit(v1alpha2::KerberosKeytabBackendMit {
                 kadmin_server,
@@ -207,102 +209,110 @@ cluster.local = {realm_name}
                 .await
                 .context(WriteConfigSnafu)?;
         }
-        let admin_keytab_file_path = tmp.path().join("admin-keytab");
-        {
-            let mut admin_keytab_file = File::create(&admin_keytab_file_path)
-                .await
-                .context(WriteAdminKeytabSnafu)?;
-            admin_keytab_file
-                .write_all(admin_keytab)
-                .await
-                .context(WriteAdminKeytabSnafu)?;
-        }
 
-        let keytab_file_path = tmp.path().join("pod-keytab");
-        let mut pod_principals: Vec<KerberosPrincipal> = Vec::new();
-        for service_name in &selector.kerberos_service_names {
-            for scope in &selector.scope {
-                for addr in
-                    selector
-                        .scope_addresses(&pod_info, scope)
-                        .context(ScopeAddressesSnafu {
-                            scope: scope.clone(),
-                        })?
+        let keytab_data =
+            if provision_keytab {
+                let admin_keytab_file_path = tmp.path().join("admin-keytab");
                 {
-                    pod_principals.push(
-                        match addr {
-                            Address::Dns(hostname) => {
-                                format!("{service_name}/{hostname}")
-                            }
-                            Address::Ip(ip) => {
-                                format!("{service_name}/{ip}")
-                            }
-                        }
-                        .try_into()
-                        .context(PodPrincipalSnafu)?,
-                    );
+                    let mut admin_keytab_file = File::create(&admin_keytab_file_path)
+                        .await
+                        .context(WriteAdminKeytabSnafu)?;
+                    admin_keytab_file
+                        .write_all(admin_keytab)
+                        .await
+                        .context(WriteAdminKeytabSnafu)?;
                 }
-            }
-        }
-        provision_keytab(
-            &profile_file_path,
-            &stackable_krb5_provision_keytab::Request {
-                admin_keytab_path: admin_keytab_file_path,
-                admin_principal_name: admin_principal.to_string(),
-                pod_keytab_path: keytab_file_path.clone(),
-                principals: pod_principals
-                    .into_iter()
-                    .map(|princ| stackable_krb5_provision_keytab::PrincipalRequest {
-                        name: princ.to_string(),
-                    })
-                    .collect(),
-                admin_backend: match admin {
-                    v1alpha2::KerberosKeytabBackendAdmin::Mit { .. } => {
-                        stackable_krb5_provision_keytab::AdminBackend::Mit
-                    }
-                    v1alpha2::KerberosKeytabBackendAdmin::ActiveDirectory(
-                        v1alpha2::KerberosKeytabBackendActiveDirectory {
-                            ldap_server,
-                            ldap_tls_ca_secret,
-                            password_cache_secret,
-                            user_distinguished_name,
-                            schema_distinguished_name,
-                            generate_sam_account_name,
-                        },
-                    ) => stackable_krb5_provision_keytab::AdminBackend::ActiveDirectory {
-                        ldap_server: ldap_server.to_string(),
-                        ldap_tls_ca_secret: ldap_tls_ca_secret.clone(),
-                        password_cache_secret: password_cache_secret.clone(),
-                        user_distinguished_name: user_distinguished_name.clone(),
-                        schema_distinguished_name: schema_distinguished_name.clone(),
-                        generate_sam_account_name: generate_sam_account_name.clone().map(
-                            |v1alpha2::ActiveDirectorySamAccountNameRules {
-                                 prefix,
-                                 total_length,
-                             }| {
-                                provision::ActiveDirectorySamAccountNameRules {
-                                    prefix,
-                                    total_length,
-                                }
+
+                let keytab_file_path = tmp.path().join("pod-keytab");
+                let mut pod_principals: Vec<KerberosPrincipal> = Vec::new();
+                for service_name in &selector.kerberos_service_names {
+                    for scope in &selector.scope {
+                        for addr in selector.scope_addresses(&pod_info, scope).context(
+                            ScopeAddressesSnafu {
+                                scope: scope.clone(),
                             },
-                        ),
+                        )? {
+                            pod_principals.push(
+                                match addr {
+                                    Address::Dns(hostname) => {
+                                        format!("{service_name}/{hostname}")
+                                    }
+                                    Address::Ip(ip) => {
+                                        format!("{service_name}/{ip}")
+                                    }
+                                }
+                                .try_into()
+                                .context(PodPrincipalSnafu)?,
+                            );
+                        }
+                    }
+                }
+                provision_keytab_file(
+                    &profile_file_path,
+                    &stackable_krb5_provision_keytab::Request {
+                        admin_keytab_path: admin_keytab_file_path,
+                        admin_principal_name: admin_principal.to_string(),
+                        pod_keytab_path: keytab_file_path.clone(),
+                        principals: pod_principals
+                            .into_iter()
+                            .map(|princ| stackable_krb5_provision_keytab::PrincipalRequest {
+                                name: princ.to_string(),
+                            })
+                            .collect(),
+                        admin_backend: match admin {
+                            v1alpha2::KerberosKeytabBackendAdmin::Mit { .. } => {
+                                stackable_krb5_provision_keytab::AdminBackend::Mit
+                            }
+                            v1alpha2::KerberosKeytabBackendAdmin::ActiveDirectory(
+                                v1alpha2::KerberosKeytabBackendActiveDirectory {
+                                    ldap_server,
+                                    ldap_tls_ca_secret,
+                                    password_cache_secret,
+                                    user_distinguished_name,
+                                    schema_distinguished_name,
+                                    generate_sam_account_name,
+                                },
+                            ) => stackable_krb5_provision_keytab::AdminBackend::ActiveDirectory {
+                                ldap_server: ldap_server.to_string(),
+                                ldap_tls_ca_secret: ldap_tls_ca_secret.clone(),
+                                password_cache_secret: password_cache_secret.clone(),
+                                user_distinguished_name: user_distinguished_name.clone(),
+                                schema_distinguished_name: schema_distinguished_name.clone(),
+                                generate_sam_account_name: generate_sam_account_name.clone().map(
+                                    |v1alpha2::ActiveDirectorySamAccountNameRules {
+                                         prefix,
+                                         total_length,
+                                     }| {
+                                        provision::ActiveDirectorySamAccountNameRules {
+                                            prefix,
+                                            total_length,
+                                        }
+                                    },
+                                ),
+                            },
+                        },
                     },
-                },
-            },
-        )
-        .await
-        .context(ProvisionKeytabSnafu)?;
-        let mut keytab_data = Vec::new();
-        let mut keytab_file = File::open(keytab_file_path)
-            .await
-            .context(ReadProvisionedKeytabSnafu)?;
-        keytab_file
-            .read_to_end(&mut keytab_data)
-            .await
-            .context(ReadProvisionedKeytabSnafu)?;
+                )
+                .await
+                .context(ProvisionKeytabSnafu)?;
+                let mut keytab_data = Vec::new();
+                let mut keytab_file = File::open(keytab_file_path)
+                    .await
+                    .context(ReadProvisionedKeytabSnafu)?;
+                keytab_file
+                    .read_to_end(&mut keytab_data)
+                    .await
+                    .context(ReadProvisionedKeytabSnafu)?;
+
+                Some(keytab_data)
+            } else {
+                // NOTE (@Techassi): I kinda hate this, but I guess there is no way around it
+                None
+            };
+
         Ok(SecretContents::new(SecretData::WellKnown(
             WellKnownSecretData::Kerberos(well_known::Kerberos {
-                keytab: Some(keytab_data),
+                keytab: keytab_data,
                 krb5_conf: profile.into_bytes(),
             }),
         )))
