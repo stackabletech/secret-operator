@@ -10,10 +10,9 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::kube::runtime::reflector::ObjectRef;
 
 use super::{
-    SecretBackend, SecretBackendError, SecretVolumeSelector,
+    SecretBackend, SecretBackendError, SecretVolumeSelector, auto_tls,
     kerberos_keytab::{self, KerberosProfile},
     pod_info::{PodInfo, SchedulingPodInfo},
-    tls,
 };
 use crate::{crd::v1alpha2, utils::Unloggable};
 
@@ -99,7 +98,7 @@ pub fn from(backend: impl SecretBackend + 'static) -> Box<Dynamic> {
 #[snafu(module)]
 pub enum FromClassError {
     #[snafu(display("failed to initialize TLS backend"), context(false))]
-    Tls { source: tls::Error },
+    Tls { source: auto_tls::Error },
 
     #[snafu(
         display("failed to initialize Kerberos Keytab backend"),
