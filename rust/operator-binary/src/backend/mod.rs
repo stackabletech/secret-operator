@@ -1,16 +1,17 @@
 //! Collects or generates secret data based on the request in the Kubernetes `Volume` definition
 
+pub mod auto_tls;
 pub mod cert_manager;
 pub mod dynamic;
 pub mod k8s_search;
 pub mod kerberos_keytab;
 pub mod pod_info;
 pub mod scope;
-pub mod tls;
 
 use std::{collections::HashSet, convert::Infallible, fmt::Debug};
 
 use async_trait::async_trait;
+pub use auto_tls::TlsGenerate;
 pub use cert_manager::CertManager;
 pub use k8s_search::K8sSearch;
 pub use kerberos_keytab::KerberosKeytab;
@@ -25,7 +26,6 @@ use stackable_operator::{
     kube::api::DynamicObject,
     shared::time::Duration,
 };
-pub use tls::TlsGenerate;
 
 use self::pod_info::SchedulingPodInfo;
 #[cfg(doc)]
@@ -180,15 +180,15 @@ pub struct InternalSecretVolumeSelectorParams {
 }
 
 fn default_cert_restart_buffer() -> Duration {
-    tls::DEFAULT_CERT_RESTART_BUFFER
+    auto_tls::DEFAULT_CERT_RESTART_BUFFER
 }
 
 fn default_cert_lifetime() -> Duration {
-    tls::DEFAULT_CERT_LIFETIME
+    auto_tls::DEFAULT_CERT_LIFETIME
 }
 
 fn default_cert_jitter_factor() -> f64 {
-    tls::DEFAULT_CERT_JITTER_FACTOR
+    auto_tls::DEFAULT_CERT_JITTER_FACTOR
 }
 
 #[derive(Snafu, Debug)]

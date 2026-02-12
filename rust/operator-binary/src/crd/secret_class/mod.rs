@@ -339,7 +339,7 @@ mod test {
     use stackable_secret_operator_utils::crd::{ConfigMapReference, SecretReference};
 
     use crate::{
-        backend::tls::{
+        backend::auto_tls::{
             DEFAULT_CA_CERT_LIFETIME, DEFAULT_CA_CERT_RETIREMENT_DURATION,
             DEFAULT_MAX_CERT_LIFETIME,
         },
