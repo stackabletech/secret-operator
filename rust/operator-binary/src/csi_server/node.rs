@@ -220,7 +220,7 @@ impl SecretProvisionerNode {
         selector: SecretVolumeSelector,
     ) -> Result<(), PublishError> {
         let SecretVolumeSelector {
-            only_provision_identity,
+            only_provision_identity: relaxed,
             format,
             compat,
             names,
@@ -240,7 +240,7 @@ impl SecretProvisionerNode {
 
         for (k, v) in data
             .data
-            .into_files(format, names, compat, only_provision_identity)
+            .into_files(format, names, compat, relaxed)
             .context(publish_error::FormatDataSnafu)?
         {
             // The following few lines of code do some basic checks against

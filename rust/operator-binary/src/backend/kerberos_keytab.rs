@@ -196,6 +196,7 @@ cluster.local = {realm_name}
 .cluster.local = {realm_name}
 "#
         );
+
         let profile_file_path = tmp.path().join("krb5.conf");
         {
             let mut profile_file = File::create(&profile_file_path)
@@ -216,6 +217,7 @@ cluster.local = {realm_name}
                 .await
                 .context(WriteAdminKeytabSnafu)?;
         }
+
         let keytab_file_path = tmp.path().join("pod-keytab");
         let mut pod_principals: Vec<KerberosPrincipal> = Vec::new();
         for service_name in &selector.kerberos_service_names {
@@ -300,7 +302,7 @@ cluster.local = {realm_name}
             .context(ReadProvisionedKeytabSnafu)?;
         Ok(SecretContents::new(SecretData::WellKnown(
             WellKnownSecretData::Kerberos(well_known::Kerberos {
-                keytab: keytab_data,
+                keytab: Some(keytab_data),
                 krb5_conf: profile.into_bytes(),
             }),
         )))
