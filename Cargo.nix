@@ -1219,6 +1219,13 @@ rec {
             features = [ "env-filter" ];
           }
         ];
+        buildDependencies = [
+          {
+            name = "built";
+            packageId = "built";
+            features = [ "chrono" "git2" ];
+          }
+        ];
 
       };
       "cexpr" = rec {

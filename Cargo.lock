@@ -357,6 +357,7 @@ dependencies = [
 name = "cert-tools"
 version = "0.0.0-dev"
 dependencies = [
+ "built",
  "clap",
  "hex",
  "openssl",

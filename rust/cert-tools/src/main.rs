@@ -13,12 +13,16 @@ mod cert_ext;
 mod cli_args;
 mod parsers;
 
+mod built_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
+
 #[snafu::report]
 pub fn main() -> Result<(), snafu::Whatever> {
     let cli = Cli::parse();
 
     // Use `CONSOLE_LOG_LEVEL` to modify the console log level
-    let _tracing_guard = Tracing::pre_configured("cert-tools", cli.telemetry)
+    let _tracing_guard = Tracing::pre_configured(built_info::PKG_NAME, cli.telemetry)
         .init()
         .whatever_context("failed to initialize tracing")?;
 
