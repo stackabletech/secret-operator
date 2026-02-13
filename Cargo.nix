@@ -1219,6 +1219,13 @@ rec {
             features = [ "env-filter" ];
           }
         ];
+        buildDependencies = [
+          {
+            name = "built";
+            packageId = "built";
+            features = [ "chrono" "git2" ];
+          }
+        ];
 
       };
       "cexpr" = rec {
@@ -7037,9 +7044,9 @@ rec {
       };
       "num-conv" = rec {
         crateName = "num-conv";
-        version = "0.1.0";
+        version = "0.2.0";
         edition = "2021";
-        sha256 = "1ndiyg82q73783jq18isi71a7mjh56wxrk52rlvyx0mi5z9ibmai";
+        sha256 = "0l4hj7lp8zbb9am4j3p7vlcv47y9bbazinvnxx9zjhiwkibyr5yg";
         libName = "num_conv";
         authors = [
           "Jacob Pratt <jacob@jhpratt.dev>"
@@ -12960,9 +12967,9 @@ rec {
       };
       "time" = rec {
         crateName = "time";
-        version = "0.3.44";
-        edition = "2021";
-        sha256 = "179awlwb36zly3nmz5h9awai1h4pbf1d83g2pmvlw4v1pgixkrwi";
+        version = "0.3.47";
+        edition = "2024";
+        sha256 = "0b7g9ly2iabrlgizliz6v5x23yq5d6bpp0mqz6407z1s526d8fvl";
         authors = [
           "Jacob Pratt <open-source@jhpratt.dev>"
           "Time contributors"
@@ -12988,8 +12995,8 @@ rec {
             usesDefaultFeatures = false;
           }
           {
-            name = "serde";
-            packageId = "serde";
+            name = "serde_core";
+            packageId = "serde_core";
             optional = true;
             usesDefaultFeatures = false;
           }
@@ -13009,21 +13016,15 @@ rec {
             packageId = "num-conv";
           }
           {
-            name = "serde";
-            packageId = "serde";
-            usesDefaultFeatures = false;
-            features = [ "derive" ];
-          }
-          {
             name = "time-macros";
             packageId = "time-macros";
           }
         ];
         features = {
-          "alloc" = [ "serde?/alloc" ];
+          "alloc" = [ "serde_core?/alloc" ];
           "default" = [ "std" ];
           "formatting" = [ "dep:itoa" "std" "time-macros?/formatting" ];
-          "large-dates" = [ "time-macros?/large-dates" ];
+          "large-dates" = [ "time-core/large-dates" "time-macros?/large-dates" ];
           "local-offset" = [ "std" "dep:libc" "dep:num_threads" ];
           "macros" = [ "dep:time-macros" ];
           "parsing" = [ "time-macros?/parsing" ];
@@ -13031,7 +13032,7 @@ rec {
           "rand" = [ "rand08" "rand09" ];
           "rand08" = [ "dep:rand08" "deranged/rand08" ];
           "rand09" = [ "dep:rand09" "deranged/rand09" ];
-          "serde" = [ "dep:serde" "time-macros?/serde" "deranged/serde" ];
+          "serde" = [ "dep:serde_core" "time-macros?/serde" "deranged/serde" ];
           "serde-human-readable" = [ "serde" "formatting" "parsing" ];
           "serde-well-known" = [ "serde" "formatting" "parsing" ];
           "std" = [ "alloc" ];
@@ -13041,21 +13042,22 @@ rec {
       };
       "time-core" = rec {
         crateName = "time-core";
-        version = "0.1.6";
-        edition = "2021";
-        sha256 = "0sqwhg7n47gbffyr0zhipqcnskxgcgzz1ix8wirqs2rg3my8x1j0";
+        version = "0.1.8";
+        edition = "2024";
+        sha256 = "1jidl426mw48i7hjj4hs9vxgd9lwqq4vyalm4q8d7y4iwz7y353n";
         libName = "time_core";
         authors = [
           "Jacob Pratt <open-source@jhpratt.dev>"
           "Time contributors"
         ];
-
+        features = {
+        };
       };
       "time-macros" = rec {
         crateName = "time-macros";
-        version = "0.2.24";
-        edition = "2021";
-        sha256 = "1wzb6hnl35856f58cx259q7ijc4c7yis0qsnydvw5n8jbw9b1krh";
+        version = "0.2.27";
+        edition = "2024";
+        sha256 = "058ja265waq275wxvnfwavbz9r1hd4dgwpfn7a1a9a70l32y8w1f";
         procMacro = true;
         libName = "time_macros";
         authors = [
