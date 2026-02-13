@@ -1,6 +1,6 @@
 [package]
 name = "cert-tools"
-description = "A CLI tool to merge two truststores in PEM or PKCS12 format in such as way that they are accepted by the JVM"
+description = "Merge multiple truststores encoded as PEM or PKCS12 into a JVM compatible format"
 version = "0.0.0-dev"
 authors.workspace = true
 license.workspace = true

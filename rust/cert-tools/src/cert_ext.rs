@@ -3,24 +3,36 @@ use openssl::{
     string::OpensslString,
     x509::X509,
 };
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
+
+#[derive(Debug, Snafu)]
+pub enum Error {
+    #[snafu(display("failed to convert certificate serial number to BigNum"))]
+    ConvertSerialToBigNum { source: openssl::error::ErrorStack },
+
+    #[snafu(display("failed to convert certificate serial number to a hexadecimal string"))]
+    ConvertSerialToHexString { source: openssl::error::ErrorStack },
+
+    #[snafu(display("failed to retireve certificate digest as SHA256"))]
+    RetrieveDigest { source: openssl::error::ErrorStack },
+}
 
 pub trait CertExt {
-    fn serial_as_hex(&self) -> Result<OpensslString, snafu::Whatever>;
-    fn sha256_digest(&self) -> Result<DigestBytes, snafu::Whatever>;
+    fn serial_as_hex(&self) -> Result<OpensslString, Error>;
+    fn sha256_digest(&self) -> Result<DigestBytes, Error>;
 }
 
 impl CertExt for X509 {
-    fn serial_as_hex(&self) -> Result<OpensslString, snafu::Whatever> {
+    fn serial_as_hex(&self) -> Result<OpensslString, Error> {
         self.serial_number()
             .to_bn()
-            .whatever_context("failed to get certificate serial number as BigNumber")?
+            .context(ConvertSerialToBigNumSnafu)?
             .to_hex_str()
-            .whatever_context("failed to convert certificate serial number to hex string")
+            .context(ConvertSerialToHexStringSnafu)
     }
 
-    fn sha256_digest(&self) -> Result<DigestBytes, snafu::Whatever> {
+    fn sha256_digest(&self) -> Result<DigestBytes, Error> {
         self.digest(MessageDigest::sha256())
-            .whatever_context("failed to get certificate digest")
+            .context(RetrieveDigestSnafu)
     }
 }
