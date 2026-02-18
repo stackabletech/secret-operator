@@ -44,11 +44,11 @@ pub fn generate_truststore(args: GeneratePkcs12TruststoreArguments) -> Result<()
     let certificate_sources = certificate_sources
         .iter()
         .map(|source| {
-            let certificate = source.from_file().context(ReadCertificateSnafu {
+            let certificates_list = source.from_file().context(ReadCertificateSnafu {
                 path: source.path(),
             })?;
 
-            Ok((source, certificate))
+            Ok((source, certificates_list))
         })
         .collect::<Result<Vec<_>, Error>>()?;
 
