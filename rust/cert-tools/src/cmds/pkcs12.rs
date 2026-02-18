@@ -66,7 +66,8 @@ pub fn generate_truststore(args: GeneratePkcs12TruststoreArguments) -> Result<()
                 .context(RetrieveCertificateSerialSnafu)?;
 
             // Trying to stick to https://opentelemetry.io/docs/specs/semconv/registry/attributes/tls/#tls-attributes
-            // Converting `Asn1TimeRef` to a ISO 8601 timestamp really sucks, so we omitted that.
+            // for the tracing statements. Converting `Asn1TimeRef` to a ISO 8601 timestamp really
+            // sucks, so we omitted that.
             if let Some(existing) = certificates.get(&*sha256_digest) {
                 let existing_serial = existing
                     .serial_as_hex()
