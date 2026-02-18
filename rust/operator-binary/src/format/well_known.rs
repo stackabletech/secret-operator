@@ -7,7 +7,7 @@ use super::{ConvertError, SecretFiles, convert};
 
 const FILE_PEM_CERT_CERT: &str = "tls.crt";
 const FILE_PEM_CERT_KEY: &str = "tls.key";
-const FILE_PEM_CERT_CA: &str = "ca.crt";
+pub const FILE_PEM_CERT_CA: &str = "ca.crt";
 
 const FILE_PKCS12_CERT_KEYSTORE: &str = "keystore.p12";
 const FILE_PKCS12_CERT_TRUSTSTORE: &str = "truststore.p12";

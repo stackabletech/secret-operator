@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Support configuring the name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate of the Truststore should be placed ([#674]).
+
 ### Changed
 
 - Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#674]).

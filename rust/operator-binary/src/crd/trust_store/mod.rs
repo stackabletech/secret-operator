@@ -5,7 +5,7 @@ use stackable_operator::{
     versioned::versioned,
 };
 
-use crate::format::SecretFormat;
+use crate::format::{SecretFormat, well_known::FILE_PEM_CERT_CA};
 
 #[versioned(
     version(name = "v1alpha1"),
@@ -41,6 +41,13 @@ pub mod versioned {
 
         /// The [format](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#format) that the data should be converted into.
         pub format: Option<SecretFormat>,
+
+        /// Name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate should be placed.
+        ///
+        /// Only takes effect in case the `format` is `tls-pem`.
+        /// Defaults to `ca.crt`.
+        #[serde(default = "TrustStoreSpec::default_tls_pem_ca_name")]
+        pub tls_pem_ca_name: String,
     }
 
     #[derive(Clone, Debug, Default, PartialEq, JsonSchema, Serialize, Deserialize)]
@@ -50,5 +57,11 @@ pub mod versioned {
 
         #[default]
         ConfigMap,
+    }
+}
+
+impl v1alpha1::TrustStoreSpec {
+    fn default_tls_pem_ca_name() -> String {
+        FILE_PEM_CERT_CA.to_owned()
     }
 }
