@@ -6,7 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Support configuring the name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate of the Truststore should be placed ([#XXX]).
+- Support configuring the name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate of the Truststore should be placed.
+  This is e.g. needed to be able to use the generated Secret within an OpenShift Ingress ([#679]).
 
 ### Changed
 
@@ -42,7 +43,7 @@ All notable changes to this project will be documented in this file.
 [#670]: https://github.com/stackabletech/secret-operator/pull/670
 [#671]: https://github.com/stackabletech/secret-operator/pull/671
 [#674]: https://github.com/stackabletech/secret-operator/pull/674
-[#XXX]: https://github.com/stackabletech/secret-operator/pull/XXX
+[#679]: https://github.com/stackabletech/secret-operator/pull/679
 
 ## [25.11.0] - 2025-11-07
 
