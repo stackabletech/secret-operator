@@ -285,11 +285,15 @@ async fn reconcile(
         .get_trust_data(&selector)
         .await
         .context(BackendGetTrustDataSnafu)?;
+    let naming_options = NamingOptions {
+        tls_pem_ca_name: truststore.spec.tls_pem_ca_name.clone(),
+        ..Default::default()
+    };
     let trust_file_contents = trust_data
         .data
         .into_files(
             truststore.spec.format,
-            NamingOptions::default(),
+            naming_options,
             CompatibilityOptions::default(),
         )
         .context(FormatDataSnafu {

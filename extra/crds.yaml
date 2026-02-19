@@ -920,6 +920,14 @@ spec:
                 - Secret
                 - ConfigMap
                 type: string
+              tlsPemCaName:
+                default: ca.crt
+                description: |-
+                  Name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate should be placed.
+
+                  Only takes effect in case the `format` is `tls-pem`.
+                  Defaults to `ca.crt`.
+                type: string
             required:
             - secretClassName
             type: object
