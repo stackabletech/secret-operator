@@ -4,14 +4,18 @@ use std::{
 };
 
 use openssl::{pkcs12::Pkcs12, x509::X509};
-use snafu::{OptionExt, ResultExt, whatever};
-use stackable_secret_operator_utils::pem::split_pem_certificates;
+use snafu::{OptionExt, ResultExt, Snafu};
 
-pub fn parse_pem_contents(pem_bytes: &[u8]) -> Result<Vec<X509>, snafu::Whatever> {
-    let pems = split_pem_certificates(pem_bytes);
-    pems.into_iter()
-        .map(|pem| X509::from_pem(pem).whatever_context("failed to parse PEM encoded certificate"))
-        .collect()
+#[derive(Debug, Snafu)]
+pub enum ParseError {
+    #[snafu(display("failed to deseralize PKCS#12 DER encoded file"))]
+    DeserializeFile { source: openssl::error::ErrorStack },
+
+    #[snafu(display("failed to parse file as PKCS#12"))]
+    ParseFile { source: openssl::error::ErrorStack },
+
+    #[snafu(display("the PKCS#12 truststore contains no certificate authority"))]
+    NoCertificateAuthority,
 }
 
 /// This function is how we would *should* do it.
@@ -44,30 +48,50 @@ pub fn parse_pem_contents(pem_bytes: &[u8]) -> Result<Vec<X509>, snafu::Whatever
 /// The proper solution would be that secret-operator writes PKCS12 truststores using modern algorithms.
 /// For that we probably(?) drop the p12 crate?
 #[allow(unused)]
-pub fn parse_pkcs12_file(
-    file_contents: &[u8],
-    password: &str,
-) -> Result<Vec<X509>, snafu::Whatever> {
+pub fn parse_file(file_contents: &[u8], password: &str) -> Result<Vec<X509>, ParseError> {
     let parsed = Pkcs12::from_der(file_contents)
-        .whatever_context("failed to parse PKCS12 DER encoded file")?
+        .context(DeserializeFileSnafu)?
         .parse2(password)
-        .whatever_context("Failed to parse PKCS12 using the provided password")?;
+        .context(ParseFileSnafu)?;
 
     parsed
         .ca
-        .whatever_context("pkcs12 truststore did not contain a CA")?
+        .context(NoCertificateAuthoritySnafu)?
         .into_iter()
         .map(Ok)
         .collect()
 }
 
+#[derive(Debug, Snafu)]
+pub enum WorkaroundError {
+    #[snafu(display("failed to spawn openssl process"))]
+    SpawnProcess { source: std::io::Error },
+
+    #[snafu(display("failed to acquire openssl process stdin handle"))]
+    AcquireStdinHandle,
+
+    #[snafu(display("failed to write data to openssl process stdin"))]
+    WriteToStdin { source: std::io::Error },
+
+    #[snafu(display("failed to wait for openssl process to complete"))]
+    WaitForProcess { source: std::io::Error },
+
+    #[snafu(display("the openssl process failed to complete successfully: {reason:?}"))]
+    ProcessFailed { reason: String },
+
+    #[snafu(display("failed to parse openssl process stdout as PEM"))]
+    ParseOutput {
+        source: crate::parsers::pem::ParseError,
+    },
+}
+
 /// Workaround for [`parse_pkcs12_file`]. Please read it's documentation for details.
 ///
 /// Yes, I hate it as well...
-pub fn parse_pkcs12_file_workaround(
+pub fn parse_file_workaround(
     file_contents: &[u8],
     password: &str,
-) -> Result<Vec<X509>, snafu::Whatever> {
+) -> Result<Vec<X509>, WorkaroundError> {
     let mut child = Command::new("openssl")
         .args(&[
             "pkcs12",
@@ -81,30 +105,40 @@ pub fn parse_pkcs12_file_workaround(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .whatever_context("Failed to spawn openssl process")?;
+        .context(SpawnProcessSnafu)?;
 
     {
-        let stdin = child
-            .stdin
-            .as_mut()
-            .whatever_context("Failed to open openssl process stdin")?;
-        stdin
-            .write_all(file_contents)
-            .whatever_context("Failed to write PKCS12 data to openssl process stdin")?;
+        let stdin = child.stdin.as_mut().context(AcquireStdinHandleSnafu)?;
+        stdin.write_all(file_contents).context(WriteToStdinSnafu)?;
     }
 
-    let output = child
-        .wait_with_output()
-        .whatever_context("Failed to read openssl process output")?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        whatever!("openssl process failed with STDERR:\n{stderr}");
-    }
+    let output = child.wait_with_output().context(WaitForProcessSnafu)?;
+    output.status.success().context(|| ProcessFailedSnafu {
+        reason: String::from_utf8_lossy(&output.stderr),
+    })?;
 
-    parse_pem_contents(&output.stdout).with_whatever_context(|_| {
-        format!(
-            "failed to parse openssl process output, which should be PEM. STDOUT:\n{stdout}",
-            stdout = String::from_utf8_lossy(&output.stdout)
-        )
-    })
+    crate::parsers::pem::parse_contents(&output.stdout).context(ParseOutputSnafu)
+}
+
+trait BoolExt {
+    fn context<F, C, E>(self, context: F) -> Result<(), E>
+    where
+        F: FnOnce() -> C,
+        C: snafu::IntoError<E, Source = snafu::NoneError>,
+        E: std::error::Error + snafu::ErrorCompat;
+}
+
+impl BoolExt for bool {
+    fn context<F, C, E>(self, context: F) -> Result<(), E>
+    where
+        F: FnOnce() -> C,
+        C: snafu::IntoError<E, Source = snafu::NoneError>,
+        E: std::error::Error + snafu::ErrorCompat,
+    {
+        if self {
+            Ok(())
+        } else {
+            Err(context().into_error(snafu::NoneError))
+        }
+    }
 }
