@@ -12,17 +12,16 @@ use std::{collections::HashSet, convert::Infallible, fmt::Debug};
 
 use async_trait::async_trait;
 pub use cert_manager::CertManager;
+use chrono::{DateTime, FixedOffset};
 pub use k8s_search::K8sSearch;
 pub use kerberos_keytab::KerberosKeytab;
-use kube_runtime::reflector::ObjectRef;
 use pod_info::Address;
 use scope::SecretScope;
 use serde::{Deserialize, Deserializer, Serialize, de::Unexpected};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     crd::listener,
-    k8s_openapi::chrono::{DateTime, FixedOffset},
-    kube::api::DynamicObject,
+    kube::{api::DynamicObject, runtime::reflector::ObjectRef},
     shared::time::Duration,
 };
 pub use tls::TlsGenerate;

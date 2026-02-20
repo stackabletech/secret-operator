@@ -6,13 +6,12 @@ use std::{
 };
 
 use futures::{StreamExt, TryStreamExt};
-use kube_runtime::reflector::Lookup;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::networking::DomainName,
     crd::listener,
     k8s_openapi::api::core::v1::{Node, PersistentVolumeClaim, Pod},
-    kube::runtime::reflector::ObjectRef,
+    kube::runtime::reflector::{Lookup, ObjectRef},
 };
 
 use super::scope::SecretScope;

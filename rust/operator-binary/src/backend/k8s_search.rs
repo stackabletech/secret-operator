@@ -3,7 +3,6 @@
 use std::collections::{BTreeMap, HashSet};
 
 use async_trait::async_trait;
-use kube_runtime::reflector::ObjectRef;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{
@@ -11,7 +10,7 @@ use stackable_operator::{
         api::core::v1::{ConfigMap, Secret},
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kube::api::ListParams,
+    kube::{api::ListParams, runtime::reflector::ObjectRef},
     kvp::{LabelError, LabelSelectorExt, Labels},
 };
 
