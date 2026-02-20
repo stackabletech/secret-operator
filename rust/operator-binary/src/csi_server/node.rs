@@ -26,10 +26,7 @@ use crate::{
         self, SecretBackendError, SecretContents, SecretVolumeSelector,
         pod_info::{self, PodInfo},
     },
-    format::{
-        self, SecretFormat,
-        well_known::{CompatibilityOptions, NamingOptions},
-    },
+    format,
     grpc::csi::v1::{
         NodeExpandVolumeRequest, NodeExpandVolumeResponse, NodeGetCapabilitiesRequest,
         NodeGetCapabilitiesResponse, NodeGetInfoRequest, NodeGetInfoResponse,
@@ -220,10 +217,16 @@ impl SecretProvisionerNode {
         &self,
         target_path: &Path,
         data: SecretContents,
-        format: Option<SecretFormat>,
-        names: NamingOptions,
-        compat: CompatibilityOptions,
+        selector: SecretVolumeSelector,
     ) -> Result<(), PublishError> {
+        let SecretVolumeSelector {
+            only_provision_identity: relaxed,
+            format,
+            compat,
+            names,
+            ..
+        } = selector;
+
         let create_secret = {
             let mut opts = OpenOptions::new();
             opts.create(true)
@@ -234,9 +237,10 @@ impl SecretProvisionerNode {
                 .mode(0o640);
             opts
         };
+
         for (k, v) in data
             .data
-            .into_files(format, names, compat)
+            .into_files(format, names, compat, relaxed)
             .context(publish_error::FormatDataSnafu)?
         {
             // The following few lines of code do some basic checks against
@@ -423,10 +427,7 @@ impl Node for SecretProvisionerNode {
                 self.save_secret_data(
                     &target_path,
                     data,
-                    // NOTE (@Techassi): At this point, we might want to pass the whole selector instead
-                    selector.format,
-                    selector.names,
-                    selector.compat,
+                    selector
                 )
                 .await?;
                 Ok(Response::new(NodePublishVolumeResponse {}))

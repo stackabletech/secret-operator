@@ -4,6 +4,7 @@ use stackable_operator::schemars::{self, JsonSchema};
 use strum::EnumDiscriminants;
 
 use super::{ConvertError, SecretFiles, convert};
+use crate::utils::ResultExt;
 
 const FILE_PEM_CERT_CERT: &str = "tls.crt";
 const FILE_PEM_CERT_KEY: &str = "tls.key";
@@ -30,7 +31,7 @@ pub struct TlsPkcs12 {
 
 #[derive(Debug)]
 pub struct Kerberos {
-    pub keytab: Vec<u8>,
+    pub keytab: Option<Vec<u8>>,
     pub krb5_conf: Vec<u8>,
 }
 
@@ -54,9 +55,9 @@ impl WellKnownSecretData {
                 key_pem,
                 ca_pem,
             }) => [
+                Some((names.tls_pem_ca_name, ca_pem)),
                 Some(names.tls_pem_cert_name).zip(certificate_pem),
                 Some(names.tls_pem_key_name).zip(key_pem),
-                Some((names.tls_pem_ca_name, ca_pem)),
             ]
             .into_iter()
             .flatten()
@@ -65,43 +66,70 @@ impl WellKnownSecretData {
                 keystore,
                 truststore,
             }) => [
-                Some(names.tls_pkcs12_keystore_name).zip(keystore),
                 Some((names.tls_pkcs12_truststore_name, truststore)),
+                Some(names.tls_pkcs12_keystore_name).zip(keystore),
             ]
             .into_iter()
             .flatten()
             .collect(),
             WellKnownSecretData::Kerberos(Kerberos { keytab, krb5_conf }) => [
-                (FILE_KERBEROS_KEYTAB_KEYTAB.to_string(), keytab),
-                (FILE_KERBEROS_KEYTAB_KRB5_CONF.to_string(), krb5_conf),
+                Some((FILE_KERBEROS_KEYTAB_KRB5_CONF.to_owned(), krb5_conf)),
+                Some(FILE_KERBEROS_KEYTAB_KEYTAB.to_owned()).zip(keytab),
             ]
-            .into(),
+            .into_iter()
+            .flatten()
+            .collect(),
         }
     }
 
-    pub fn from_files(mut files: SecretFiles) -> Result<WellKnownSecretData, FromFilesError> {
+    pub fn from_files(
+        mut files: SecretFiles,
+        relaxed: bool,
+    ) -> Result<WellKnownSecretData, FromFilesError> {
+        tracing::debug!(relaxed, "Constructing well-known secret data from files");
+
         let mut take_file = |format, file| {
             files
                 .remove(file)
                 .context(from_files_error::MissingRequiredFileSnafu { format, file })
         };
 
-        if let Ok(certificate_pem) = take_file(SecretFormat::TlsPem, FILE_PEM_CERT_CERT) {
+        // Which file is tried to be parsed first matters. To support the use-case of people bringing
+        // their own non-sensitive data via a Secret and consumers only requiring access to
+        // non-sensitve data (for example for CA verification), the non-senstive files are parsed
+        // first. If the `relaxed` flag is provided, this function tries to parse sensitive files
+        // but won't hard-error when they are not found.
+
+        if let Ok(ca_pem) = take_file(SecretFormat::TlsPem, FILE_PEM_CERT_CA) {
             let mut take_file = |file| take_file(SecretFormat::TlsPem, file);
+
+            let certificate_pem = take_file(FILE_PEM_CERT_CERT).ok_if(relaxed)?;
+            let key_pem = take_file(FILE_PEM_CERT_KEY).ok_if(relaxed)?;
+
             Ok(WellKnownSecretData::TlsPem(TlsPem {
-                certificate_pem: Some(certificate_pem),
-                key_pem: Some(take_file(FILE_PEM_CERT_KEY)?),
-                ca_pem: take_file(FILE_PEM_CERT_CA)?,
+                certificate_pem,
+                key_pem,
+                ca_pem,
             }))
-        } else if let Ok(keystore) = take_file(SecretFormat::TlsPkcs12, FILE_PKCS12_CERT_KEYSTORE) {
+        } else if let Ok(truststore) =
+            take_file(SecretFormat::TlsPkcs12, FILE_PKCS12_CERT_TRUSTSTORE)
+        {
+            let keystore =
+                take_file(SecretFormat::TlsPkcs12, FILE_PKCS12_CERT_KEYSTORE).ok_if(relaxed)?;
+
             Ok(WellKnownSecretData::TlsPkcs12(TlsPkcs12 {
-                keystore: Some(keystore),
-                truststore: take_file(SecretFormat::TlsPkcs12, FILE_PKCS12_CERT_TRUSTSTORE)?,
+                keystore,
+                truststore,
             }))
-        } else if let Ok(keytab) = take_file(SecretFormat::Kerberos, FILE_KERBEROS_KEYTAB_KEYTAB) {
+        } else if let Ok(krb5_conf) =
+            take_file(SecretFormat::Kerberos, FILE_KERBEROS_KEYTAB_KRB5_CONF)
+        {
+            let keytab =
+                take_file(SecretFormat::Kerberos, FILE_KERBEROS_KEYTAB_KEYTAB).ok_if(relaxed)?;
+
             Ok(WellKnownSecretData::Kerberos(Kerberos {
                 keytab,
-                krb5_conf: take_file(SecretFormat::Kerberos, FILE_KERBEROS_KEYTAB_KRB5_CONF)?,
+                krb5_conf,
             }))
         } else {
             from_files_error::UnknownFormatSnafu {

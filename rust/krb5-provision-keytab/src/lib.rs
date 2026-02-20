@@ -68,7 +68,10 @@ pub enum Error {
 /// Provisions a Kerberos Keytab based on the [`Request`].
 ///
 /// This function assumes that the binary produced by this crate is on the `$PATH`, and will fail otherwise.
-pub async fn provision_keytab(krb5_config_path: &Path, req: &Request) -> Result<Response, Error> {
+pub async fn provision_keytab_file(
+    krb5_config_path: &Path,
+    req: &Request,
+) -> Result<Response, Error> {
     let req_str = serde_json::to_vec(&req).context(SerializeRequestSnafu)?;
 
     let mut child = Command::new("stackable-krb5-provision-keytab")
