@@ -48,6 +48,8 @@ tests:
   - name: cert-manager-tls
     dimensions:
       - openshift
+  - name: non-sensitive-data
+    dimensions: []
 suites:
   - name: nightly
   - name: openshift
