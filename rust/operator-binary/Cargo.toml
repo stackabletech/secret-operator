@@ -15,9 +15,11 @@ p12 = { path = "../p12" }
 
 anyhow.workspace = true
 async-trait.workspace = true
+chrono.workspace = true
 clap.workspace = true
 futures.workspace = true
 h2.workspace = true
+# We don't directly use this crate, we declare it here to use feature unification
 kube-runtime.workspace = true
 libc.workspace = true
 openssl.workspace = true

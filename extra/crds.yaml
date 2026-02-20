@@ -901,6 +901,7 @@ spec:
                 - tls-pem
                 - tls-pkcs12
                 - kerberos
+                - null
                 nullable: true
                 type: string
               secretClassName:
