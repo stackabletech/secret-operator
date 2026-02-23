@@ -5,5 +5,6 @@ timeout: 10
 commands:
   # Ensure that the Pod comes up
   - script: kubectl wait --for=condition=Ready pod/secret-consumer-$NAMESPACE --namespace "$NAMESPACE" --timeout 60s
-  # Ensure there is only a single file in the target directory
-  - script: kubectl exec secret-consumer-$NAMESPACE --namespace "$NAMESPACE" -- bash -c 'if [ $(ls -p /stackable/ca | grep -v / | wc -l) = "1" ]; then echo "Success"; else exit 1; fi'
+  # Ensure there is only a single file in the target directories
+  - script: kubectl exec secret-consumer-$NAMESPACE --namespace "$NAMESPACE" -- bash -c 'if [ $(ls -p /stackable/ca/pem | grep -v / | wc -l) = "1" ]; then echo "Success"; else exit 1; fi'
+  - script: kubectl exec secret-consumer-$NAMESPACE --namespace "$NAMESPACE" -- bash -c 'if [ $(ls -p /stackable/ca/pkcs12 | grep -v / | wc -l) = "1" ]; then echo "Success"; else exit 1; fi'

@@ -8,7 +8,7 @@ spec:
   securityContext:
     fsGroup: 1000
   volumes:
-    - name: ca
+    - name: ca-pem
       ephemeral:
         volumeClaimTemplate:
           metadata:
@@ -25,11 +25,30 @@ spec:
             resources:
               requests:
                 storage: "1"
+    - name: ca-pkcs12
+      ephemeral:
+        volumeClaimTemplate:
+          metadata:
+            annotations:
+              secrets.stackable.tech/class: root-trust-$NAMESPACE
+              # Only non-sensitive data is needed
+              secrets.stackable.tech/only-provision-identity: "true"
+              # Explicitly request a format to trigger parsing in the secret-operator
+              secrets.stackable.tech/format: tls-pkcs12
+          spec:
+            storageClassName: secrets.stackable.tech
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: "1"
   containers:
     - name: test
       image: oci.stackable.tech/sdp/testing-tools:0.3.0-stackable0.0.0-dev
       stdin: true
       tty: true
       volumeMounts:
-        - name: ca
-          mountPath: /stackable/ca
+        - name: ca-pem
+          mountPath: /stackable/ca/pem
+        - name: ca-pkcs12
+          mountPath: /stackable/ca/pkcs12
