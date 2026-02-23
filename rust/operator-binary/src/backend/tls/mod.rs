@@ -3,6 +3,7 @@
 use std::{cmp::min, ops::Range};
 
 use async_trait::async_trait;
+use chrono::{FixedOffset, TimeZone};
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},
     bn::{BigNum, MsbOption},
@@ -21,10 +22,7 @@ use openssl::{
 };
 use rand::Rng;
 use snafu::{OptionExt, ResultExt, Snafu, ensure};
-use stackable_operator::{
-    k8s_openapi::chrono::{self, FixedOffset, TimeZone},
-    shared::time::Duration,
-};
+use stackable_operator::{kube::runtime::reflector::ObjectRef, shared::time::Duration};
 use time::OffsetDateTime;
 
 use super::{
@@ -155,10 +153,7 @@ impl SecretBackendError for Error {
         }
     }
 
-    fn secondary_object(
-        &self,
-    ) -> Option<kube_runtime::reflector::ObjectRef<stackable_operator::kube::api::DynamicObject>>
-    {
+    fn secondary_object(&self) -> Option<ObjectRef<stackable_operator::kube::api::DynamicObject>> {
         match self {
             Error::ScopeAddresses { source, .. } => source.secondary_object(),
             Error::GenerateKey { .. } => None,
@@ -478,7 +473,7 @@ fn time_datetime_to_chrono(
 mod tests {
     use time::format_description::well_known::Rfc3339;
 
-    use super::{chrono, time_datetime_to_chrono};
+    use super::time_datetime_to_chrono;
 
     #[test]
     fn datetime_conversion() {
