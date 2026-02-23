@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MESSAGE="# Managed by .scripts\/release_cert-tools.sh"
+# NOTE: Slashes need to be escaped.
+CRATE_VERSION_COMMENT="# Managed by .scripts\/release_cert-tools.sh"
 
 BUMPED_VERSION=$(git-cliff --config rust/cert-tools/cliff.toml --bumped-version)
 CLEANED_BUMPED_VERSION=${BUMPED_VERSION#boil-}
@@ -46,7 +47,7 @@ echo "Generating updated changelog for $BUMPED_VERSION"
 git-cliff --config rust/cert-tools/cliff.toml --tag "$BUMPED_VERSION" > rust/cert-tools/CHANGELOG.md
 
 echo "Updating the version to $CLEANED_BUMPED_VERSION in the Cargo.toml file"
-sed -E -i "s/^version = .* $MESSAGE$/version = \"$CLEANED_BUMPED_VERSION\" $MESSAGE/" rust/cert-tools/Cargo.toml
+sed -E -i "s/^version = .*$/version = \"$CLEANED_BUMPED_VERSION\" $CRATE_VERSION_COMMENT/" rust/cert-tools/Cargo.toml
 cargo check
 
 echo "Committing changes"
