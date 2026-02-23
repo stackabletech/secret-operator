@@ -16,6 +16,7 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
+          fetch-depth: 0
       - shell: bash
         env:
           PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
