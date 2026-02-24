@@ -2,7 +2,6 @@
 
 use std::{collections::BTreeMap, ffi::OsStr, fmt::Display, path::Path};
 
-use kube_runtime::reflector::Lookup;
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},
     bn::{BigNum, MsbOption},
@@ -28,7 +27,7 @@ use stackable_operator::{
             DynamicObject, PostParams,
             entry::{self, Entry},
         },
-        runtime::reflector::ObjectRef,
+        runtime::reflector::{Lookup, ObjectRef},
     },
     shared::time::Duration,
 };
@@ -673,7 +672,6 @@ impl Manager {
 
 #[cfg(test)]
 mod tests {
-    use kube_runtime::reflector::ObjectRef;
     use openssl::{
         asn1::{Asn1Integer, Asn1Time},
         bn::BigNum,
@@ -684,6 +682,7 @@ mod tests {
     };
     use stackable_operator::{
         k8s_openapi::{ByteString, api::core::v1::Secret},
+        kube::runtime::reflector::ObjectRef,
         shared::time::Duration,
     };
     use stackable_secret_operator_utils::crd::SecretReference;

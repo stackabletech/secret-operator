@@ -2,11 +2,6 @@ use std::{collections::HashMap, future::Future, sync::Arc, time::Duration};
 
 use const_format::concatcp;
 use futures::StreamExt;
-use kube_runtime::{
-    WatchStreamExt as _,
-    events::{Recorder, Reporter},
-    reflector::Lookup,
-};
 use snafu::{OptionExt as _, ResultExt as _, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
@@ -19,8 +14,9 @@ use stackable_operator::{
         api::PartialObjectMeta,
         core::{DeserializeGuard, error_boundary},
         runtime::{
-            Controller, controller,
-            reflector::{self, ObjectRef},
+            Controller, WatchStreamExt as _, controller,
+            events::{Recorder, Reporter},
+            reflector::{self, Lookup, ObjectRef},
             watcher,
         },
     },
