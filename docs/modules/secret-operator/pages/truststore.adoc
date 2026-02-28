@@ -16,6 +16,9 @@ include::example$truststore-tls.yaml[]
 <3> Optional requested xref:secretclass.adoc#format[format]
 <4> Optional Kubernetes resource kind, which should be used to output the requested information to.
     Either `ConfigMap` or `Secret`, defaults to `ConfigMap`.
+<6> Optional name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate should be placed.
+    Only takes effect in case the `format` is `tls-pem`.
+    Defaults to `ca.crt`.
 
 This will create a ConfigMap (or `Secret` based on `targetKind`) named `truststore-pem` containing a `ca.crt` with the trust root certificates.
 It can then either be mounted into a Pod or retrieved and used from outside of Kubernetes.
@@ -24,3 +27,47 @@ Expired or retired (see xref:secretclass.adoc#ca-rotation[Certificate Authority 
 
 NOTE: Make sure to have a procedure for updating the retrieved certificates.
       The Secret Operator will automatically rotate the xref:secretclass.adoc#backend-autotls[autoTls] certificate authority as needed, but all trust roots will require some form of update occasionally.
+
+== Integration with OpenShift Ingress
+
+Sometimes you want to create an OpenShift Ingress to expose a stacklet that is secured using `https`.
+For TLS re-encryption to work you need to specify a Secret that contains a `tls.crt` key with the PEM ca certificate.
+
+A concrete example is shown below:
+
+[source,yaml]
+----
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: TrustStore
+metadata:
+  name: cluster-internal-ca
+  namespace: my-trino-namespace
+spec:
+  secretClassName: tls # Or any other SecretClass you are using
+  format: tls-pem # As expected by OpenShift
+  targetKind: Secret # As expected by OpenShift
+  tlsPemCaName: tls.crt # As expected by OpenShift
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trino
+  namespace: my-trino-namespace
+  annotations:
+    route.openshift.io/termination: "reencrypt"
+    route.openshift.io/destination-ca-certificate-secret: cluster-internal-ca
+spec:
+  rules:
+    - host: trino.example.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: trino-coordinator
+                port:
+                  name: https
+            path: /
+            pathType: Prefix
+  tls:
+    - {}
+----
