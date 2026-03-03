@@ -172,7 +172,7 @@ impl<T: std::error::Error> From<T> for Report<T> {
 impl<T: std::error::Error> Display for Report<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut is_first = true;
-        let mut curr: Option<&(dyn std::error::Error)> = Some(&self.error);
+        let mut curr: Option<&dyn std::error::Error> = Some(&self.error);
         while let Some(err) = curr {
             if !is_first {
                 f.write_str(": ")?;
