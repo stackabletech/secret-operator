@@ -15,7 +15,7 @@ spec:
             annotations:
               secrets.stackable.tech/class: root-trust-$NAMESPACE
               # Only non-sensitive data is needed
-              secrets.stackable.tech/only-provision-identity: "true"
+              secrets.stackable.tech/provision-parts: "public"
               # Explicitly request a format to trigger parsing in the secret-operator
               secrets.stackable.tech/format: tls-pem
           spec:
@@ -32,7 +32,7 @@ spec:
             annotations:
               secrets.stackable.tech/class: root-trust-$NAMESPACE
               # Only non-sensitive data is needed
-              secrets.stackable.tech/only-provision-identity: "true"
+              secrets.stackable.tech/provision-parts: "public"
               # Explicitly request a format to trigger parsing in the secret-operator
               secrets.stackable.tech/format: tls-pkcs12
           spec:
