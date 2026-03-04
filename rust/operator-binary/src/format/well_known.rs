@@ -4,7 +4,7 @@ use stackable_operator::schemars::{self, JsonSchema};
 use strum::EnumDiscriminants;
 
 use super::{ConvertError, SecretFiles, convert};
-use crate::utils::ResultExt;
+use crate::{backend::ProvisionParts, utils::ResultExt};
 
 const FILE_PEM_CERT_CERT: &str = "tls.crt";
 const FILE_PEM_CERT_KEY: &str = "tls.key";
@@ -84,9 +84,16 @@ impl WellKnownSecretData {
 
     pub fn from_files(
         mut files: SecretFiles,
-        relaxed: bool,
+        provision_parts: ProvisionParts,
     ) -> Result<WellKnownSecretData, FromFilesError> {
-        tracing::debug!(relaxed, "Constructing well-known secret data from files");
+        tracing::debug!(
+            %provision_parts,
+            "Constructing well-known secret data from files"
+        );
+
+        // Apply the relaxed file loading/parsing if the user only requested to provision the public
+        // parts.
+        let relaxed = provision_parts == ProvisionParts::Public;
 
         let mut take_file = |format, file| {
             files

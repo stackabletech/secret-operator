@@ -22,6 +22,7 @@ use super::{
     scope::SecretScope,
 };
 use crate::{
+    backend::ProvisionParts,
     crd::{self, KerberosPrincipal, v1alpha2},
     format::{SecretData, WellKnownSecretData, well_known},
     utils::Unloggable,
@@ -167,8 +168,6 @@ impl SecretBackend for KerberosKeytab {
             admin_principal,
         } = self;
 
-        let provision_keytab = !selector.only_provision_identity;
-
         let admin_server_clause = match admin {
             v1alpha2::KerberosKeytabBackendAdmin::Mit(v1alpha2::KerberosKeytabBackendMit {
                 kadmin_server,
@@ -211,7 +210,7 @@ cluster.local = {realm_name}
         }
 
         let keytab_data =
-            if provision_keytab {
+            if selector.provision_parts == ProvisionParts::PublicPrivate {
                 let admin_keytab_file_path = tmp.path().join("admin-keytab");
                 {
                     let mut admin_keytab_file = File::create(&admin_keytab_file_path)

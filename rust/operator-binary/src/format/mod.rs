@@ -7,7 +7,7 @@ pub use self::{
     convert::ConvertError,
     well_known::{FromFilesError as ParseError, SecretFormat, WellKnownSecretData},
 };
-use crate::format::well_known::NamingOptions;
+use crate::{backend::ProvisionParts, format::well_known::NamingOptions};
 
 mod convert;
 pub mod well_known;
@@ -20,10 +20,10 @@ pub enum SecretData {
     Unknown(SecretFiles),
 }
 impl SecretData {
-    pub fn parse(self, relaxed: bool) -> Result<WellKnownSecretData, ParseError> {
+    pub fn parse(self, provision_parts: ProvisionParts) -> Result<WellKnownSecretData, ParseError> {
         match self {
             Self::WellKnown(data) => Ok(data),
-            Self::Unknown(files) => WellKnownSecretData::from_files(files, relaxed),
+            Self::Unknown(files) => WellKnownSecretData::from_files(files, provision_parts),
         }
     }
 
@@ -32,17 +32,17 @@ impl SecretData {
         format: Option<SecretFormat>,
         names: NamingOptions,
         compat: CompatibilityOptions,
-        relaxed: bool,
+        provision_parts: ProvisionParts,
     ) -> Result<SecretFiles, IntoFilesError> {
         let files = if let Some(format) = format {
             tracing::debug!(
                 ?format,
                 ?names,
-                relaxed,
+                %provision_parts,
                 "Explicit format requested: parsing and converting to transform into files"
             );
 
-            self.parse(relaxed)?
+            self.parse(provision_parts)?
                 .convert_to(format, compat)?
                 .into_files(names)
         } else {

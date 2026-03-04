@@ -27,7 +27,7 @@ use time::OffsetDateTime;
 
 use crate::{
     backend::{
-        ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents,
+        ProvisionParts, ScopeAddressesError, SecretBackend, SecretBackendError, SecretContents,
         SecretVolumeSelector,
         pod_info::{Address, PodInfo},
         scope::SecretScope,
@@ -267,7 +267,6 @@ impl SecretBackend for TlsGenerate {
         // Extract and convert consumer input from the Volume annotations.
         let cert_lifetime = selector.autotls_cert_lifetime;
         let cert_restart_buffer = selector.autotls_cert_restart_buffer;
-        let provision_cert = !selector.only_provision_identity;
 
         // We need to check that the cert lifetime it is not longer than allowed,
         // by capping it to the maximum configured at the SecretClass.
@@ -325,7 +324,7 @@ impl SecretBackend for TlsGenerate {
         // Only run leaf certificate generation if it was requested based on the
         // secret volume selector. Otherwise only a ca.crt file as a PEM envelope
         // will be available (to be mounted).
-        let tls_secret_data = if provision_cert {
+        let tls_secret_data = if selector.provision_parts == ProvisionParts::PublicPrivate {
             let conf = Conf::new(ConfMethod::default())
                 .expect("failed to initialize OpenSSL configuration");
 

@@ -140,25 +140,37 @@ pub struct SecretVolumeSelector {
     pub cert_manager_cert_lifetime: Option<Duration>,
 
     // TODO (@Techassi): Name to be decided. Will potentially be renamed.
-    /// Only provision non-sensitive secret data.
+    /// Configure to either only provision public data or public + private data.
+    ///
+    /// The following pieces of data are considered public/non-senstive:
     ///
     /// - TLS (PEM): Only provision the `ca.crt` file
     /// - TLS (PKCS#12): Only provision the `truststore.p12` file
     /// - Kerberos: Only provision the `krb5.conf` file
     ///
-    /// This defaults to `false` to be backwords compatible with behaviour before SDP 26.3.0.
-    #[serde(
-        rename = "secrets.stackable.tech/only-provision-identity",
-        deserialize_with = "SecretVolumeSelector::deserialize_str_as_bool",
-        default
-    )]
-    pub only_provision_identity: bool,
+    /// This defaults to [`ProvisionParts::PublicPrivate`] to be backwords compatible with behaviour
+    /// before SDP 26.3.0.
+    #[serde(rename = "secrets.stackable.tech/provision-parts", default)]
+    pub provision_parts: ProvisionParts,
 }
 
 /// Configuration provided by the [`TrustStore`] selecting what trust data should be provided.
 pub struct TrustSelector {
     /// The name of the [`TrustStore`]'s `Namespace`.
     pub namespace: String,
+}
+
+/// Contains options available for the `secrets.stackable.tech/provision-parts` annotation.
+#[derive(Debug, Default, PartialEq, Eq, Deserialize, strum::Display)]
+#[strum(serialize_all = "kebab-case")]
+#[serde(rename_all = "kebab-case")]
+pub enum ProvisionParts {
+    /// Provision only public (non-senstive) data.
+    Public,
+
+    /// Provision both public and private data.
+    #[default]
+    PublicPrivate,
 }
 
 /// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself.
@@ -282,16 +294,6 @@ impl SecretVolumeSelector {
             <D::Error as serde::de::Error>::invalid_value(
                 Unexpected::Str(&str),
                 &"a string containing a f64",
-            )
-        })
-    }
-
-    fn deserialize_str_as_bool<'de, D: Deserializer<'de>>(de: D) -> Result<bool, D::Error> {
-        let str = String::deserialize(de)?;
-        str.parse().map_err(|_| {
-            <D::Error as serde::de::Error>::invalid_value(
-                Unexpected::Str(&str),
-                &"a string containing a boolean",
             )
         })
     }
