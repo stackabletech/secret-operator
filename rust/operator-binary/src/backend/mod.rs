@@ -168,6 +168,8 @@ pub enum ProvisionParts {
     Public,
 
     /// Provision both public and private data.
+    ///
+    /// This is the default variant to be backwords compatible with behaviour before SDP 26.3.0.
     #[default]
     PublicPrivate,
 }
