@@ -139,7 +139,6 @@ pub struct SecretVolumeSelector {
     )]
     pub cert_manager_cert_lifetime: Option<Duration>,
 
-    // TODO (@Techassi): Name to be decided. Will potentially be renamed.
     /// Configure to either only provision public data or public + private data.
     ///
     /// The following pieces of data are considered public/non-senstive:
