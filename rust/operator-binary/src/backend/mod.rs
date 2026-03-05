@@ -160,6 +160,9 @@ pub struct TrustSelector {
 }
 
 /// Contains options available for the `secrets.stackable.tech/provision-parts` annotation.
+//
+// TODO: Use the `SecretClassVolumeProvisionParts` struct from stackable-operator
+// that will be added in https://github.com/stackabletech/operator-rs/pull/1165
 #[derive(Debug, Default, PartialEq, Eq, Deserialize, strum::Display)]
 #[strum(serialize_all = "kebab-case")]
 #[serde(rename_all = "kebab-case")]
