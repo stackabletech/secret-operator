@@ -324,132 +324,126 @@ impl SecretBackend for TlsGenerate {
         // Only run leaf certificate generation if it was requested based on the
         // secret volume selector. Otherwise only a ca.crt file as a PEM envelope
         // will be available (to be mounted).
-        let tls_secret_data = if selector.provision_parts == ProvisionParts::PublicPrivate {
-            let conf = Conf::new(ConfMethod::default())
-                .expect("failed to initialize OpenSSL configuration");
+        let (certificate_pem, key_pem) = match selector.provision_parts {
+            ProvisionParts::Public => (None, None),
+            ProvisionParts::PublicPrivate => {
+                let conf = Conf::new(ConfMethod::default())
+                    .expect("failed to initialize OpenSSL configuration");
 
-            let pod_key_length = match self.key_generation {
-                v1alpha2::CertificateKeyGeneration::Rsa { length } => length,
-            };
+                let pod_key_length = match self.key_generation {
+                    v1alpha2::CertificateKeyGeneration::Rsa { length } => length,
+                };
 
-            let pod_key = Rsa::generate(pod_key_length)
-                .and_then(PKey::try_from)
-                .context(GenerateKeySnafu)?;
+                let pod_key = Rsa::generate(pod_key_length)
+                    .and_then(PKey::try_from)
+                    .context(GenerateKeySnafu)?;
 
-            let mut addresses = Vec::new();
-            for scope in &selector.scope {
-                addresses.extend(
-                    selector
-                        .scope_addresses(&pod_info, scope)
-                        .context(ScopeAddressesSnafu { scope })?,
-                );
-            }
-            for address in &mut addresses {
-                if let Address::Dns(dns) = address {
-                    // Turn FQDNs into bare domain names by removing the trailing dot
-                    if dns.ends_with('.') {
-                        dns.pop();
+                let mut addresses = Vec::new();
+                for scope in &selector.scope {
+                    addresses.extend(
+                        selector
+                            .scope_addresses(&pod_info, scope)
+                            .context(ScopeAddressesSnafu { scope })?,
+                    );
+                }
+                for address in &mut addresses {
+                    if let Address::Dns(dns) = address {
+                        // Turn FQDNs into bare domain names by removing the trailing dot
+                        if dns.ends_with('.') {
+                            dns.pop();
+                        }
                     }
                 }
-            }
 
-            let pod_cert = X509Builder::new()
-                .and_then(|mut x509| {
-                    let subject_name = X509NameBuilder::new()
-                        .and_then(|mut name| {
-                            name.append_entry_by_nid(
-                                Nid::COMMONNAME,
-                                "generated certificate for pod",
-                            )?;
-                            Ok(name)
-                        })?
-                        .build();
-                    x509.set_subject_name(&subject_name)?;
-                    x509.set_issuer_name(ca.certificate.subject_name())?;
-                    x509.set_not_before(
-                        Asn1Time::from_unix(not_before.unix_timestamp())?.as_ref(),
-                    )?;
-                    x509.set_not_after(Asn1Time::from_unix(not_after.unix_timestamp())?.as_ref())?;
-                    x509.set_pubkey(&pod_key)?;
-                    x509.set_version(
-                        3 - 1, // zero-indexed
-                    )?;
-                    let mut serial = BigNum::new()?;
-                    serial.rand(64, MsbOption::MAYBE_ZERO, false)?;
-                    x509.set_serial_number(Asn1Integer::from_bn(&serial)?.as_ref())?;
-                    let ctx = x509.x509v3_context(Some(&ca.certificate), Some(&conf));
-                    let mut exts = vec![
-                        BasicConstraints::new().critical().build()?,
-                        KeyUsage::new()
-                            .key_encipherment()
-                            .digital_signature()
-                            .build()?,
-                        ExtendedKeyUsage::new()
-                            .server_auth()
-                            .client_auth()
-                            .build()?,
-                        SubjectKeyIdentifier::new().build(&ctx)?,
-                        AuthorityKeyIdentifier::new()
-                            .issuer(true)
-                            .keyid(true)
-                            .build(&ctx)?,
-                    ];
-                    let mut san_ext = SubjectAlternativeName::new();
-                    san_ext.critical();
-                    let mut has_san = false;
-                    for addr in addresses {
-                        has_san = true;
-                        match addr {
-                            Address::Dns(dns) => san_ext.dns(&dns),
-                            Address::Ip(ip) => san_ext.ip(&ip.to_string()),
-                        };
-                    }
-                    if has_san {
-                        exts.push(san_ext.build(&ctx)?);
-                    }
-                    for ext in exts {
-                        x509.append_extension(ext)?;
-                    }
-                    x509.sign(&ca.private_key, MessageDigest::sha256())?;
-                    Ok(x509)
-                })
-                .context(BuildCertificateSnafu)?
-                .build();
+                let pod_cert = X509Builder::new()
+                    .and_then(|mut x509| {
+                        let subject_name = X509NameBuilder::new()
+                            .and_then(|mut name| {
+                                name.append_entry_by_nid(
+                                    Nid::COMMONNAME,
+                                    "generated certificate for pod",
+                                )?;
+                                Ok(name)
+                            })?
+                            .build();
+                        x509.set_subject_name(&subject_name)?;
+                        x509.set_issuer_name(ca.certificate.subject_name())?;
+                        x509.set_not_before(
+                            Asn1Time::from_unix(not_before.unix_timestamp())?.as_ref(),
+                        )?;
+                        x509.set_not_after(
+                            Asn1Time::from_unix(not_after.unix_timestamp())?.as_ref(),
+                        )?;
+                        x509.set_pubkey(&pod_key)?;
+                        x509.set_version(
+                            3 - 1, // zero-indexed
+                        )?;
+                        let mut serial = BigNum::new()?;
+                        serial.rand(64, MsbOption::MAYBE_ZERO, false)?;
+                        x509.set_serial_number(Asn1Integer::from_bn(&serial)?.as_ref())?;
+                        let ctx = x509.x509v3_context(Some(&ca.certificate), Some(&conf));
+                        let mut exts = vec![
+                            BasicConstraints::new().critical().build()?,
+                            KeyUsage::new()
+                                .key_encipherment()
+                                .digital_signature()
+                                .build()?,
+                            ExtendedKeyUsage::new()
+                                .server_auth()
+                                .client_auth()
+                                .build()?,
+                            SubjectKeyIdentifier::new().build(&ctx)?,
+                            AuthorityKeyIdentifier::new()
+                                .issuer(true)
+                                .keyid(true)
+                                .build(&ctx)?,
+                        ];
+                        let mut san_ext = SubjectAlternativeName::new();
+                        san_ext.critical();
+                        let mut has_san = false;
+                        for addr in addresses {
+                            has_san = true;
+                            match addr {
+                                Address::Dns(dns) => san_ext.dns(&dns),
+                                Address::Ip(ip) => san_ext.ip(&ip.to_string()),
+                            };
+                        }
+                        if has_san {
+                            exts.push(san_ext.build(&ctx)?);
+                        }
+                        for ext in exts {
+                            x509.append_extension(ext)?;
+                        }
+                        x509.sign(&ca.private_key, MessageDigest::sha256())?;
+                        Ok(x509)
+                    })
+                    .context(BuildCertificateSnafu)?
+                    .build();
 
-            well_known::TlsPem {
-                ca_pem: iterator_try_concat_bytes(
-                    self.ca_manager.trust_roots(now).into_iter().map(|ca| {
-                        ca.to_pem()
-                            .context(SerializeCertificateSnafu { tpe: CertType::Ca })
-                    }),
-                )?,
-                certificate_pem: Some(
-                    pod_cert
-                        .to_pem()
-                        .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
-                ),
-                key_pem: Some(
-                    pod_key
-                        .private_key_to_pem_pkcs8()
-                        .context(SerializeCertificateSnafu { tpe: CertType::Pod })?,
-                ),
-            }
-        } else {
-            well_known::TlsPem {
-                ca_pem: iterator_try_concat_bytes(
-                    self.ca_manager.trust_roots(now).into_iter().map(|ca| {
-                        ca.to_pem()
-                            .context(SerializeCertificateSnafu { tpe: CertType::Ca })
-                    }),
-                )?,
-                certificate_pem: None,
-                key_pem: None,
+                let certificate_pem = pod_cert
+                    .to_pem()
+                    .context(SerializeCertificateSnafu { tpe: CertType::Pod })?;
+                let key_pem = pod_key
+                    .private_key_to_pem_pkcs8()
+                    .context(SerializeCertificateSnafu { tpe: CertType::Pod })?;
+
+                (Some(certificate_pem), Some(key_pem))
             }
         };
 
+        let ca_pem =
+            iterator_try_concat_bytes(self.ca_manager.trust_roots(now).into_iter().map(|ca| {
+                ca.to_pem()
+                    .context(SerializeCertificateSnafu { tpe: CertType::Ca })
+            }))?;
+
         Ok(
             SecretContents::new(SecretData::WellKnown(WellKnownSecretData::TlsPem(
-                tls_secret_data,
+                well_known::TlsPem {
+                    certificate_pem,
+                    key_pem,
+                    ca_pem,
+                },
             )))
             .expires_after(
                 time_datetime_to_chrono(expire_pod_after).context(InvalidCertLifetimeSnafu)?,
