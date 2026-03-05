@@ -50,7 +50,7 @@ The xref:secretclass.adoc#format[format] that the secret should be written as.
 
 This can be either the default output format of the xref:secretclass.adoc#backend[backend], or a format that it defines a conversion into.
 
-=== `secrets.stackable.tech/privision-parts`
+=== `secrets.stackable.tech/provision-parts`
 
 *Required*: false
 
