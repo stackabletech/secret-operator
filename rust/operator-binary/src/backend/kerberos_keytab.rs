@@ -209,8 +209,9 @@ cluster.local = {realm_name}
                 .context(WriteConfigSnafu)?;
         }
 
-        let keytab_data =
-            if selector.provision_parts == ProvisionParts::PublicPrivate {
+        let keytab = match selector.provision_parts {
+            ProvisionParts::Public => None,
+            ProvisionParts::PublicPrivate => {
                 let admin_keytab_file_path = tmp.path().join("admin-keytab");
                 {
                     let mut admin_keytab_file = File::create(&admin_keytab_file_path)
@@ -304,15 +305,13 @@ cluster.local = {realm_name}
                     .context(ReadProvisionedKeytabSnafu)?;
 
                 Some(keytab_data)
-            } else {
-                // NOTE (@Techassi): I kinda hate this, but I guess there is no way around it
-                None
-            };
+            }
+        };
 
         Ok(SecretContents::new(SecretData::WellKnown(
             WellKnownSecretData::Kerberos(well_known::Kerberos {
-                keytab: keytab_data,
                 krb5_conf: profile.into_bytes(),
+                keytab,
             }),
         )))
     }
