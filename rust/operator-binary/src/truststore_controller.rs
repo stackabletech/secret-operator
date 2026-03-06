@@ -27,7 +27,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     OPERATOR_NAME,
-    backend::{self, SecretBackendError, TrustSelector},
+    backend::{self, ProvisionParts, SecretBackendError, TrustSelector},
     crd::{v1alpha1, v1alpha2},
     format::{
         self,
@@ -287,6 +287,7 @@ async fn reconcile(
             truststore.spec.format,
             NamingOptions::default(),
             CompatibilityOptions::default(),
+            ProvisionParts::PublicPrivate,
         )
         .context(FormatDataSnafu {
             secret_class: secret_class_ref,

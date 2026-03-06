@@ -98,17 +98,17 @@ impl SearchNamespaceMatchCondition {
 
 impl AutoTlsBackend {
     pub(crate) fn default_max_certificate_lifetime() -> Duration {
-        backend::tls::DEFAULT_MAX_CERT_LIFETIME
+        backend::auto_tls::DEFAULT_MAX_CERT_LIFETIME
     }
 }
 
 impl AutoTlsCa {
     pub(crate) fn default_ca_certificate_lifetime() -> Duration {
-        backend::tls::DEFAULT_CA_CERT_LIFETIME
+        backend::auto_tls::DEFAULT_CA_CERT_LIFETIME
     }
 
     pub(crate) fn default_ca_certificate_retirement_duration() -> Duration {
-        backend::tls::DEFAULT_CA_CERT_RETIREMENT_DURATION
+        backend::auto_tls::DEFAULT_CA_CERT_RETIREMENT_DURATION
     }
 }
 
