@@ -14,6 +14,10 @@ All notable changes to this project will be documented in this file.
   This behaviour is in line with the default behaviour of Helm and OLM.
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#671]).
 
+### Fixed
+
+- Fix "404 page not found" error for the initial object list ([#687]).
+
 ### Removed
 
 - BREAKING: Removed support for ephemeral CSI volumes ([#481], [#670]).
@@ -40,6 +44,7 @@ All notable changes to this project will be documented in this file.
 [#671]: https://github.com/stackabletech/secret-operator/pull/671
 [#674]: https://github.com/stackabletech/secret-operator/pull/674
 [#685]: https://github.com/stackabletech/secret-operator/pull/685
+[#687]: https://github.com/stackabletech/secret-operator/pull/687
 
 ## [25.11.0] - 2025-11-07
 
