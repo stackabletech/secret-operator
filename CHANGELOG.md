@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Bump stackable-operator to 0.106.2, strum to 0.28, snafu to 0.9, and ldap3 to 0.12 ([#685]).
+- Bump stackable-operator to 0.108.0, strum to 0.28, snafu to 0.9, and ldap3 to 0.12 ([#685], [#688]).
 - Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#674]).
 - OLM deployer doesn't add owner references to cluster scoped objects anymore ([#667]).
   Owner references ensure that objects are garbage collected by OpenShift upon operator removal but they cause problems when the operator is updated.
@@ -16,7 +16,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- Fix "404 page not found" error for the initial object list ([#687]).
+- Fix "404 page not found" error for the initial object list ([#687], [#688]).
 
 ### Removed
 
@@ -45,6 +45,7 @@ All notable changes to this project will be documented in this file.
 [#674]: https://github.com/stackabletech/secret-operator/pull/674
 [#685]: https://github.com/stackabletech/secret-operator/pull/685
 [#687]: https://github.com/stackabletech/secret-operator/pull/687
+[#688]: https://github.com/stackabletech/secret-operator/pull/688
 
 ## [25.11.0] - 2025-11-07
 
