@@ -229,6 +229,24 @@ where
     }
 }
 
+pub trait ResultExt<T, E> {
+    /// Transforms this [`Result<T, E>`] into [`Ok(Some(T))`] if [`Ok`], [`Ok(None)`] if [`Err`] and
+    /// `predicate` is `true` or [`Err(_)`] if [`Err`].
+    ///
+    /// This basically applies [`Result::ok`] only if `predicate` is `true`.
+    fn ok_if(self, predicate: bool) -> Result<Option<T>, E>;
+}
+
+impl<T, E> ResultExt<T, E> for Result<T, E> {
+    fn ok_if(self, predicate: bool) -> Result<Option<T>, E> {
+        match self {
+            Ok(ok) => Ok(Some(ok)),
+            Err(_) if predicate => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use futures::StreamExt;
@@ -236,7 +254,7 @@ mod tests {
     use time::OffsetDateTime;
 
     use super::{asn1time_to_offsetdatetime, iterator_try_concat_bytes};
-    use crate::utils::{Flattened, FmtByteSlice, error_full_message, trystream_any};
+    use crate::utils::{Flattened, FmtByteSlice, ResultExt, error_full_message, trystream_any};
 
     #[test]
     fn fmt_hex_byte_slice() {
@@ -345,5 +363,17 @@ mod tests {
                 .collect();
         assert_eq!(small, vec![2, 10, 5]);
         assert_eq!(big, vec![1000, 2000]);
+    }
+
+    #[test]
+    fn ok_if() {
+        let ok: Result<_, ()> = Ok(42usize);
+        let err: Result<(), _> = Err(());
+
+        assert_eq!(Some(42usize), ok.ok_if(true).expect("must be Ok"));
+        assert_eq!(Some(42usize), ok.ok_if(false).expect("must be Ok"));
+
+        assert_eq!(None, err.ok_if(true).expect("must be Ok"));
+        assert!(err.ok_if(false).is_err());
     }
 }

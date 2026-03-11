@@ -1,31 +1,30 @@
 //! Collects or generates secret data based on the request in the Kubernetes `Volume` definition
 
+pub mod auto_tls;
 pub mod cert_manager;
 pub mod dynamic;
 pub mod k8s_search;
 pub mod kerberos_keytab;
 pub mod pod_info;
 pub mod scope;
-pub mod tls;
 
 use std::{collections::HashSet, convert::Infallible, fmt::Debug};
 
 use async_trait::async_trait;
+pub use auto_tls::TlsGenerate;
 pub use cert_manager::CertManager;
+use chrono::{DateTime, FixedOffset};
 pub use k8s_search::K8sSearch;
 pub use kerberos_keytab::KerberosKeytab;
-use kube_runtime::reflector::ObjectRef;
 use pod_info::Address;
 use scope::SecretScope;
 use serde::{Deserialize, Deserializer, Serialize, de::Unexpected};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     crd::listener,
-    k8s_openapi::chrono::{DateTime, FixedOffset},
-    kube::api::DynamicObject,
+    kube::{api::DynamicObject, runtime::reflector::ObjectRef},
     shared::time::Duration,
 };
-pub use tls::TlsGenerate;
 
 use self::pod_info::SchedulingPodInfo;
 #[cfg(doc)]
@@ -73,6 +72,7 @@ pub struct SecretVolumeSelector {
     /// The desired format of the mounted secrets
     ///
     /// Currently supported formats:
+    ///
     /// - `tls-pem` - A Kubernetes-style triple of PEM-encoded certificate files (`tls.crt`, `tls.key`, `ca.crt`).
     /// - `tls-pkcs12` - A PKCS#12 key store named `keystore.p12` and truststore named `truststore.p12`.
     /// - `kerberos` - A Kerberos keytab named `keytab`, along with a `krb5.conf`.
@@ -138,12 +138,43 @@ pub struct SecretVolumeSelector {
         default
     )]
     pub cert_manager_cert_lifetime: Option<Duration>,
+
+    /// Configure to either only provision public data or public + private data.
+    ///
+    /// The following pieces of data are considered public/non-senstive:
+    ///
+    /// - TLS (PEM): Only provision the `ca.crt` file
+    /// - TLS (PKCS#12): Only provision the `truststore.p12` file
+    /// - Kerberos: Only provision the `krb5.conf` file
+    ///
+    /// This defaults to [`ProvisionParts::PublicPrivate`] to be backwords compatible with behaviour
+    /// before SDP 26.3.0.
+    #[serde(rename = "secrets.stackable.tech/provision-parts", default)]
+    pub provision_parts: ProvisionParts,
 }
 
 /// Configuration provided by the [`TrustStore`] selecting what trust data should be provided.
 pub struct TrustSelector {
     /// The name of the [`TrustStore`]'s `Namespace`.
     pub namespace: String,
+}
+
+/// Contains options available for the `secrets.stackable.tech/provision-parts` annotation.
+//
+// TODO: Use the `SecretClassVolumeProvisionParts` struct from stackable-operator
+// that will be added in https://github.com/stackabletech/operator-rs/pull/1165
+#[derive(Debug, Default, PartialEq, Eq, Deserialize, strum::Display)]
+#[strum(serialize_all = "kebab-case")]
+#[serde(rename_all = "kebab-case")]
+pub enum ProvisionParts {
+    /// Provision only public (non-senstive) data.
+    Public,
+
+    /// Provision both public and private data.
+    ///
+    /// This is the default variant to be backwords compatible with behaviour before SDP 26.3.0.
+    #[default]
+    PublicPrivate,
 }
 
 /// Internal parameters of [`SecretVolumeSelector`] managed by secret-operator itself.
@@ -164,15 +195,15 @@ pub struct InternalSecretVolumeSelectorParams {
 }
 
 fn default_cert_restart_buffer() -> Duration {
-    tls::DEFAULT_CERT_RESTART_BUFFER
+    auto_tls::DEFAULT_CERT_RESTART_BUFFER
 }
 
 fn default_cert_lifetime() -> Duration {
-    tls::DEFAULT_CERT_LIFETIME
+    auto_tls::DEFAULT_CERT_LIFETIME
 }
 
 fn default_cert_jitter_factor() -> f64 {
-    tls::DEFAULT_CERT_JITTER_FACTOR
+    auto_tls::DEFAULT_CERT_JITTER_FACTOR
 }
 
 #[derive(Snafu, Debug)]

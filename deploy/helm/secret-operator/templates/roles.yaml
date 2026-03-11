@@ -51,6 +51,9 @@ rules:
     verbs:
       - create
       - patch
+      # Required for startup condition
+      - list
+      - watch
   {{- end }}
   - apiGroups:
       - ""

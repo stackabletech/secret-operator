@@ -50,6 +50,23 @@ The xref:secretclass.adoc#format[format] that the secret should be written as.
 
 This can be either the default output format of the xref:secretclass.adoc#backend[backend], or a format that it defines a conversion into.
 
+=== `secrets.stackable.tech/provision-parts`
+
+*Required*: false
+
+*Default value*: `public-private`
+
+*Backend*: All
+
+This annotation allows configuring which parts of the secret material should be provisioned.
+Supported values are `public` and `public-private`, provisioning only public or public+private data respectively.
+Using this annotation enables the following use-cases:
+
+* Use the `autoTls` backend, but only provision the `ca.crt`/`truststore.p12` for the consumer.
+* Use the `kerberosKeytab` backend, but only provision the `krb5.conf` for the consumer.
+* Use the `k8sSearch` backend to select Secrets which contain public data only and support parsing the partial set of files.
+  Using this annotation disables the strict parsing of files when an explicit format is requested.
+
 === `secrets.stackable.tech/format.tls-pkcs12.keystore-name`
 
 *Required*: false

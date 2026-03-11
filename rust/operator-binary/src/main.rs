@@ -2,7 +2,7 @@
 // This will need changes in our and upstream error types.
 #![allow(clippy::result_large_err)]
 
-use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
+use std::{future::Future, os::unix::prelude::FileTypeExt, path::PathBuf};
 
 use anyhow::{Context, Ok, anyhow};
 use clap::Parser;
@@ -19,18 +19,18 @@ use stackable_operator::{
     cli::{Command, CommonOptions, RunArguments},
     client::Client,
     eos::EndOfSupportChecker,
+    kube::CustomResourceExt,
     kvp::{Label, LabelExt},
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
-    utils::signal::SignalWatcher,
+    utils::signal::{self, SignalWatcher},
 };
-use tokio::sync::oneshot;
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use utils::{TonicUnixStream, uds_bind_private};
 
 use crate::{
-    crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha2},
+    crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha1, v1alpha2},
     webhooks::conversion::create_webhook_server,
 };
 
@@ -209,6 +209,12 @@ async fn main() -> anyhow::Result<()> {
                     )
                     .await?;
 
+                    // Here, we multiply the initial reconcile signal received by the oneshot receiver
+                    // to be able to pass it to both the default custom resource deployer and to delay
+                    // the startup of the controller.
+                    let initial_reconcile_signal =
+                        SignalWatcher::new(initial_reconcile_rx.map(|_| ()));
+
                     let webhook_server = webhook_server
                         .run(sigterm_watcher.handle())
                         .map_err(|err| anyhow!(err).context("failed to run webhook server"));
@@ -217,7 +223,7 @@ async fn main() -> anyhow::Result<()> {
                         .unwrap_or(operator_environment.operator_namespace.clone());
 
                     let default_secretclass = create_default_secretclass(
-                        initial_reconcile_rx,
+                        initial_reconcile_signal.handle(),
                         ca_secret_namespace,
                         client.clone(),
                     )
@@ -226,14 +232,20 @@ async fn main() -> anyhow::Result<()> {
                     });
 
                     let truststore_controller = truststore_controller::start(
-                        client,
+                        client.clone(),
                         &watch_namespace,
                         sigterm_watcher.handle(),
                     )
                     .map(anyhow::Ok);
 
+                    let delayed_truststore_controller = async {
+                        signal::crd_established(&client, v1alpha1::TrustStore::crd_name(), None)
+                            .await?;
+                        truststore_controller.await
+                    };
+
                     try_join!(
-                        truststore_controller,
+                        delayed_truststore_controller,
                         default_secretclass,
                         webhook_server,
                         eos_checker,
@@ -247,11 +259,11 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn create_default_secretclass(
-    initial_reconcile_rx: oneshot::Receiver<()>,
+    initial_reconcile_signal: impl Future<Output = ()>,
     ca_secret_namespace: String,
     client: Client,
 ) -> anyhow::Result<()> {
-    initial_reconcile_rx.await?;
+    initial_reconcile_signal.await;
 
     tracing::info!("applying default secretclass");
 
