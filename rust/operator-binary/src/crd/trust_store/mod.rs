@@ -9,13 +9,15 @@ use crate::format::{SecretFormat, well_known::FILE_PEM_CERT_CA};
 
 #[versioned(
     version(name = "v1alpha1"),
+    version(name = "v1alpha2"),
     crates(
         kube_core = "stackable_operator::kube::core",
         kube_client = "stackable_operator::kube::client",
         k8s_openapi = "stackable_operator::k8s_openapi",
         schemars = "stackable_operator::schemars",
         versioned = "stackable_operator::versioned"
-    )
+    ),
+    options(k8s(experimental_conversion_tracking))
 )]
 pub mod versioned {
     /// A [TrustStore](DOCS_BASE_URL_PLACEHOLDER/secret-operator/truststore) requests information about how to
@@ -40,14 +42,26 @@ pub mod versioned {
         pub target_kind: TrustStoreOutputType,
 
         /// The [format](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#format) that the data should be converted into.
-        pub format: Option<SecretFormat>,
+        #[versioned(
+            changed(since = "v1alpha2", from_type = "Option<SecretFormat>",),
+            hint(option)
+        )]
+        pub format: Option<TrustStoreFormat>,
+    }
 
-        /// Name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate should be placed.
-        ///
-        /// Only takes effect in case the `format` is `tls-pem`.
-        /// Defaults to `ca.crt`.
-        #[serde(default = "TrustStoreSpec::default_tls_pem_ca_name")]
-        pub tls_pem_ca_name: String,
+    #[derive(Clone, Debug, PartialEq, JsonSchema, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub enum TrustStoreFormat {
+        #[serde(rename_all = "camelCase")]
+        TlsPem {
+            /// Name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate should be placed.
+            ///
+            /// Defaults to `ca.crt`.
+            #[serde(default = "default_tls_pem_ca_name")]
+            ca_file_name: String,
+        },
+        TlsPkcs12 {},
+        Kerberos {},
     }
 
     #[derive(Clone, Debug, Default, PartialEq, JsonSchema, Serialize, Deserialize)]
@@ -60,8 +74,75 @@ pub mod versioned {
     }
 }
 
-impl v1alpha1::TrustStoreSpec {
-    fn default_tls_pem_ca_name() -> String {
-        FILE_PEM_CERT_CA.to_owned()
+fn default_tls_pem_ca_name() -> String {
+    FILE_PEM_CERT_CA.to_owned()
+}
+
+impl From<SecretFormat> for v1alpha2::TrustStoreFormat {
+    fn from(value: SecretFormat) -> Self {
+        match value {
+            SecretFormat::TlsPem => Self::TlsPem {
+                ca_file_name: default_tls_pem_ca_name(),
+            },
+            SecretFormat::TlsPkcs12 => Self::TlsPkcs12 {},
+            SecretFormat::Kerberos => Self::Kerberos {},
+        }
+    }
+}
+
+impl From<v1alpha2::TrustStoreFormat> for SecretFormat {
+    fn from(value: v1alpha2::TrustStoreFormat) -> Self {
+        match value {
+            v1alpha2::TrustStoreFormat::TlsPem { .. } => Self::TlsPem,
+            v1alpha2::TrustStoreFormat::TlsPkcs12 {} => Self::TlsPkcs12,
+            v1alpha2::TrustStoreFormat::Kerberos {} => Self::Kerberos,
+        }
+    }
+}
+
+#[cfg(test)]
+impl stackable_operator::versioned::test_utils::RoundtripTestData for v1alpha1::TrustStoreSpec {
+    fn roundtrip_test_data() -> Vec<Self> {
+        stackable_operator::utils::yaml_from_str_singleton_map(indoc::indoc! {"
+          - secretClassName: tls
+          - secretClassName: tls
+            targetKind: ConfigMap
+          - secretClassName: tls
+            format: tls-pem
+          - secretClassName: tls
+            format: tls-pkcs12
+          - secretClassName: tls
+            format: kerberos
+        "})
+        .expect("Failed to parse SecretClassSpec YAML")
+    }
+}
+
+#[cfg(test)]
+impl stackable_operator::versioned::test_utils::RoundtripTestData for v1alpha2::TrustStoreSpec {
+    fn roundtrip_test_data() -> Vec<Self> {
+        stackable_operator::utils::yaml_from_str_singleton_map(indoc::indoc! {"
+          - secretClassName: tls
+          - secretClassName: tls
+            targetKind: ConfigMap
+          - secretClassName: tls
+            format:
+              tlsPem: {}
+          - secretClassName: tls
+            format:
+              tlsPem:
+                caFileName: ca.crt # default value
+          - secretClassName: tls
+            format:
+              tlsPem:
+                caFileName: my-ca.crt # custom value
+          - secretClassName: tls
+            format:
+              tlsPkcs12: {}
+          - secretClassName: tls
+            format:
+              kerberos: {}
+        "})
+        .expect("Failed to parse SecretClassSpec YAML")
     }
 }

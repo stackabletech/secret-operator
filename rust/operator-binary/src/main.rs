@@ -30,7 +30,11 @@ use tonic::transport::Server;
 use utils::{TonicUnixStream, uds_bind_private};
 
 use crate::{
-    crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha1, v1alpha2},
+    crd::{
+        SecretClassVersion, TrustStoreVersion,
+        trust_store::v1alpha2::TrustStore,
+        v1alpha2::{SecretClass, SecretClassBackend},
+    },
     webhooks::conversion::create_webhook_server,
 };
 
@@ -107,9 +111,9 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.cmd {
         Command::Crd => {
-            SecretClass::merged_crd(SecretClassVersion::V1Alpha2)?
+            crd::SecretClass::merged_crd(SecretClassVersion::V1Alpha2)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
-            TrustStore::merged_crd(TrustStoreVersion::V1Alpha1)?
+            crd::TrustStore::merged_crd(TrustStoreVersion::V1Alpha2)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(SecretOperatorRun { common, mode }) => {
@@ -239,8 +243,7 @@ async fn main() -> anyhow::Result<()> {
                     .map(anyhow::Ok);
 
                     let delayed_truststore_controller = async {
-                        signal::crd_established(&client, v1alpha1::TrustStore::crd_name(), None)
-                            .await?;
+                        signal::crd_established(&client, TrustStore::crd_name(), None).await?;
                         truststore_controller.await
                     };
 
@@ -267,9 +270,8 @@ async fn create_default_secretclass(
 
     tracing::info!("applying default secretclass");
 
-    let deserializer = serde_yaml::Deserializer::from_slice(include_bytes!("secretclass.yaml"));
-    let mut tls_secret_class: v1alpha2::SecretClass =
-        serde_yaml::with::singleton_map_recursive::deserialize(deserializer)
+    let mut tls_secret_class: SecretClass =
+        stackable_operator::utils::yaml_from_str_singleton_map(include_str!("secretclass.yaml"))
             .expect("compile-time included secretclass must be valid YAML");
 
     #[rustfmt::skip]
@@ -281,9 +283,7 @@ async fn create_default_secretclass(
         .add_label(name)
         .add_label(Label::stackable_vendor());
 
-    if let v1alpha2::SecretClassBackend::AutoTls(auto_tls_backend) =
-        &mut tls_secret_class.spec.backend
-    {
+    if let SecretClassBackend::AutoTls(auto_tls_backend) = &mut tls_secret_class.spec.backend {
         auto_tls_backend.ca.secret.namespace = ca_secret_namespace
     }
 

@@ -883,6 +883,72 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns: []
+    name: v1alpha2
+    schema:
+      openAPIV3Schema:
+        description: Auto-generated derived type for TrustStoreSpec via `CustomResource`
+        properties:
+          spec:
+            description: |-
+              A [TrustStore](https://docs.stackable.tech/home/nightly/secret-operator/truststore) requests information about how to
+              validate secrets issued by a [SecretClass](https://docs.stackable.tech/home/nightly/secret-operator/secretclass).
+
+              The requested information is written to a ConfigMap with the same name as the TrustStore.
+            properties:
+              format:
+                description: The [format](https://docs.stackable.tech/home/nightly/secret-operator/secretclass#format) that the data should be converted into.
+                nullable: true
+                oneOf:
+                - required:
+                  - tlsPem
+                - required:
+                  - tlsPkcs12
+                - required:
+                  - kerberos
+                properties:
+                  kerberos:
+                    type: object
+                  tlsPem:
+                    properties:
+                      caFileName:
+                        default: ca.crt
+                        description: |-
+                          Name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate should be placed.
+
+                          Defaults to `ca.crt`.
+                        type: string
+                    type: object
+                  tlsPkcs12:
+                    type: object
+                type: object
+              secretClassName:
+                description: The name of the SecretClass that the request concerns.
+                type: string
+              targetKind:
+                default: ConfigMap
+                description: |-
+                  Which Kubernetes kind should be used to output the requested information to.
+
+                  The trust information (such as a `ca.crt`) can be considered public information, so we put
+                  it in a `ConfigMap` by default. However, some tools might require it to be placed in a
+                  `Secret`, so we also support that.
+
+                  Can be either `ConfigMap` or `Secret`, defaults to `ConfigMap`.
+                enum:
+                - Secret
+                - ConfigMap
+                type: string
+            required:
+            - secretClassName
+            type: object
+        required:
+        - spec
+        title: TrustStore
+        type: object
+    served: true
+    storage: true
+    subresources: {}
+  - additionalPrinterColumns: []
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -921,14 +987,6 @@ spec:
                 - Secret
                 - ConfigMap
                 type: string
-              tlsPemCaName:
-                default: ca.crt
-                description: |-
-                  Name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate should be placed.
-
-                  Only takes effect in case the `format` is `tls-pem`.
-                  Defaults to `ca.crt`.
-                type: string
             required:
             - secretClassName
             type: object
@@ -937,5 +995,5 @@ spec:
         title: TrustStore
         type: object
     served: true
-    storage: true
+    storage: false
     subresources: {}

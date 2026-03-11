@@ -334,6 +334,144 @@ pub mod versioned {
 }
 
 #[cfg(test)]
+impl stackable_operator::versioned::test_utils::RoundtripTestData for v1alpha1::SecretClassSpec {
+    fn roundtrip_test_data() -> Vec<Self> {
+        stackable_operator::utils::yaml_from_str_singleton_map(indoc::indoc! {"
+          - backend:
+              autoTls:
+                ca:
+                  secret:
+                    name: secret-provisioner-tls-ca
+                    namespace: default
+          - backend:
+              autoTls:
+                ca:
+                  secret:
+                    name: secret-provisioner-tls-ca
+                    namespace: default
+                  autogenerate: false
+                  caCertificateLifetime: 365d
+                  caCertificateRetirementDuration: 12h
+                  keyGeneration:
+                    rsa:
+                      length: 4096
+                additionalTrustRoots:
+                  - configMap:
+                      name: my-ca
+                      namespace: default
+                  - secret:
+                      name: my-ca
+                      namespace: default
+                maxCertificateLifetime: 42d
+          - backend:
+              k8sSearch:
+                searchNamespace:
+                  pod: {}
+          - backend:
+              k8sSearch:
+                searchNamespace:
+                  name: default
+                trustStoreConfigMapName: my-ca
+          - backend:
+              experimentalCertManager:
+                issuer:
+                  kind: Issuer
+                  name: secret-operator-demonstration
+          - backend:
+              experimentalCertManager:
+                issuer:
+                  kind: Issuer
+                  name: secret-operator-demonstration
+                defaultCertificateLifetime: 42h
+                keyGeneration:
+                  rsa:
+                    length: 4096
+          - backend:
+              kerberosKeytab:
+                realmName: KNAB.COM
+                kdc: krb5-kdc.default.svc.cluster.local
+                admin:
+                  mit:
+                    kadminServer: krb5-kdc.default.svc.cluster.local
+                adminKeytabSecret:
+                  namespace: default
+                  name: secret-operator-keytab
+                adminPrincipal: stackable-secret-operator
+        "})
+        .expect("Failed to parse SecretClassSpec YAML")
+    }
+}
+
+#[cfg(test)]
+impl stackable_operator::versioned::test_utils::RoundtripTestData for v1alpha2::SecretClassSpec {
+    fn roundtrip_test_data() -> Vec<Self> {
+        stackable_operator::utils::yaml_from_str_singleton_map(indoc::indoc! {"
+          - backend:
+              autoTls:
+                ca:
+                  secret:
+                    name: secret-provisioner-tls-ca
+                    namespace: default
+          - backend:
+              autoTls:
+                ca:
+                  secret:
+                    name: secret-provisioner-tls-ca
+                    namespace: default
+                  autogenerate: false
+                  caCertificateLifetime: 365d
+                  caCertificateRetirementDuration: 12h
+                  keyGeneration:
+                    rsa:
+                      length: 4096
+                additionalTrustRoots:
+                  - configMap:
+                      name: my-ca
+                      namespace: default
+                  - secret:
+                      name: my-ca
+                      namespace: default
+                maxCertificateLifetime: 42d
+          - backend:
+              k8sSearch:
+                searchNamespace:
+                  pod: {}
+          - backend:
+              k8sSearch:
+                searchNamespace:
+                  name: default
+                trustStoreConfigMapName: my-ca
+          - backend:
+              certManager:
+                issuer:
+                  kind: Issuer
+                  name: secret-operator-demonstration
+          - backend:
+              certManager:
+                issuer:
+                  kind: Issuer
+                  name: secret-operator-demonstration
+                defaultCertificateLifetime: 42h
+                keyGeneration:
+                  rsa:
+                    length: 4096
+          - backend:
+              kerberosKeytab:
+                realmName: KNAB.COM
+                kdc: krb5-kdc.default.svc.cluster.local
+                admin:
+                  mit:
+                    kadminServer: krb5-kdc.default.svc.cluster.local
+                adminKeytabSecret:
+                  namespace: default
+                  name: secret-operator-keytab
+                adminPrincipal: stackable-secret-operator
+        "})
+        .expect("Failed to parse SecretClassSpec YAML")
+    }
+}
+
+#[cfg(test)]
 mod test {
     use stackable_operator::shared::time::Duration;
     use stackable_secret_operator_utils::crd::{ConfigMapReference, SecretReference};

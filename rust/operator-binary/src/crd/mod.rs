@@ -5,12 +5,7 @@ use snafu::Snafu;
 use stackable_operator::schemars::{self, JsonSchema};
 
 mod secret_class;
-mod trust_store;
-
-pub mod v1alpha1 {
-    // NOTE (@Techassi): SecretClass v1alpha1 is unused and as such not exported.
-    pub use crate::crd::trust_store::v1alpha1::*;
-}
+pub mod trust_store;
 
 pub use secret_class::{SecretClass, SecretClassVersion};
 
