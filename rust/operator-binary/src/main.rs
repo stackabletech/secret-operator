@@ -19,17 +19,18 @@ use stackable_operator::{
     cli::{Command, CommonOptions, RunArguments},
     client::Client,
     eos::EndOfSupportChecker,
+    kube::CustomResourceExt,
     kvp::{Label, LabelExt},
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
-    utils::signal::SignalWatcher,
+    utils::signal::{self, SignalWatcher},
 };
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
 use utils::{TonicUnixStream, uds_bind_private};
 
 use crate::{
-    crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha2},
+    crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha1, v1alpha2},
     webhooks::conversion::create_webhook_server,
 };
 
@@ -231,14 +232,15 @@ async fn main() -> anyhow::Result<()> {
                     });
 
                     let truststore_controller = truststore_controller::start(
-                        client,
+                        client.clone(),
                         &watch_namespace,
                         sigterm_watcher.handle(),
                     )
                     .map(anyhow::Ok);
 
                     let delayed_truststore_controller = async {
-                        let _ = initial_reconcile_signal.handle().await;
+                        signal::crd_established(&client, v1alpha1::TrustStore::crd_name(), None)
+                            .await?;
                         truststore_controller.await
                     };
 
