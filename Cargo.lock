@@ -358,7 +358,7 @@ dependencies = [
 
 [[package]]
 name = "cert-tools"
-version = "26.3.0-rc1"
+version = "26.3.0"
 dependencies = [
  "built",
  "clap",
@@ -2383,7 +2383,7 @@ dependencies = [
 
 [[package]]
 name = "p12"
-version = "26.3.0-rc1"
+version = "26.3.0"
 dependencies = [
  "cbc",
  "cipher",
@@ -3476,7 +3476,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-krb5-provision-keytab"
-version = "26.3.0-rc1"
+version = "26.3.0"
 dependencies = [
  "byteorder",
  "futures 0.3.32",
@@ -3546,7 +3546,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-secret-operator"
-version = "26.3.0-rc1"
+version = "26.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3588,7 +3588,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-secret-operator-olm-deployer"
-version = "26.3.0-rc1"
+version = "26.3.0"
 dependencies = [
  "anyhow",
  "built",
@@ -3604,7 +3604,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-secret-operator-utils"
-version = "26.3.0-rc1"
+version = "26.3.0"
 dependencies = [
  "anyhow",
  "openssl",
