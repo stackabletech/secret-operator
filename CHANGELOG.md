@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [26.3.0-rc1] - 2026-03-16
+
 ### Changed
 
 - Bump stackable-operator to 0.108.0, strum to 0.28, snafu to 0.9, and ldap3 to 0.12 ([#685], [#688]).
