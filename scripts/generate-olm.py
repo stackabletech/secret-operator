@@ -8,7 +8,7 @@
 """
 Generate OpenShift OLM (Operator Lifecycle Manager) manifests for the Stackable Secret Operator.
 
-The script renders the Helm chart, generates CRDs via cargo, looks up image digests on
+The script renders the Helm chart, looks up image digests on
 quay.io, and writes a complete OLM bundle under deploy/olm/<version>/.
 
 Usage:
@@ -16,9 +16,6 @@ Usage:
 
     # Or directly with python3 (PyYAML must be installed):
     python3 scripts/generate-olm.py --version 26.3.0 --openshift-versions v4.18-v4.21
-
-    # Skip the cargo CRD build (use existing extra/crds.yaml):
-    uv run --script scripts/generate-olm.py --version 26.3.0 --openshift-versions v4.18-v4.21 --skip-crd-build
 
 Requirements:
     - uv    (https://docs.astral.sh/uv/) — installs PyYAML automatically
@@ -1076,19 +1073,6 @@ def render_helm(version: str) -> list[dict]:
     return [d for d in yaml.safe_load_all(result.stdout) if d is not None]
 
 
-def get_crds() -> list[dict]:
-    """Generate CRD manifests by running the operator binary with the 'crd' subcommand."""
-    print("  Running: cargo run --bin stackable-secret-operator -- crd")
-    result = subprocess.run(
-        ["cargo", "run", "--bin", "stackable-secret-operator", "--", "crd"],
-        capture_output=True,
-        text=True,
-        check=True,
-        cwd=REPO_ROOT,
-    )
-    return [d for d in yaml.safe_load_all(result.stdout) if d is not None]
-
-
 def load_values() -> dict:
     with open(HELM_CHART / "values.yaml") as fh:
         return yaml.safe_load(fh)
@@ -1224,22 +1208,6 @@ def build_configmap(
     }
 
 
-def _crd_owned_entry(crd: dict) -> dict:
-    spec = crd.get("spec", {})
-    kind = spec["names"]["kind"]
-    storage_version = next(
-        (v["name"] for v in spec.get("versions", []) if v.get("storage", False)),
-        spec["versions"][0]["name"] if spec.get("versions") else "v1alpha1",
-    )
-    return {
-        "description": f"{kind} resource managed by the Stackable Secret Operator.",
-        "displayName": kind,
-        "kind": kind,
-        "name": crd["metadata"]["name"],
-        "version": storage_version,
-    }
-
-
 def _operator_cluster_rules(helm_docs: list[dict]) -> list[dict]:
     for doc in helm_docs:
         if doc.get("kind") == "ClusterRole":
@@ -1250,7 +1218,6 @@ def _operator_cluster_rules(helm_docs: list[dict]) -> list[dict]:
 def build_csv(
     version: str,
     helm_docs: list[dict],
-    crds: list[dict],
     images: dict[str, str],
     icon_b64: str,
     openshift_versions: str = "v4.18-v4.21",
@@ -1406,7 +1373,6 @@ def build_csv(
                     "deployments": [deployer_deployment],
                 },
             },
-            "customresourcedefinitions": {"owned": [_crd_owned_entry(c) for c in crds]},
         },
     }
 
@@ -1461,11 +1427,6 @@ def main() -> None:
         help="Operator version string, e.g. 26.3.0",
     )
     parser.add_argument(
-        "--skip-crd-build",
-        action="store_true",
-        help="Skip the cargo build; reuse extra/crds.yaml if it exists",
-    )
-    parser.add_argument(
         "--openshift-versions",
         metavar="RANGE",
         default="v4.18-v4.21",
@@ -1499,7 +1460,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     # 1. Load values.yaml
     # ------------------------------------------------------------------
-    print("[1/6] Reading Helm values.yaml ...")
+    print("[1/4] Reading Helm values.yaml ...")
     values = load_values()
     sidecars = sidecar_image_info(values)
     main_oci_repo: str = values["image"]["repository"]
@@ -1508,7 +1469,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     # 2. Look up quay.io image digests
     # ------------------------------------------------------------------
-    print("[2/6] Resolving image digests on quay.io ...")
+    print("[2/4] Resolving image digests on quay.io ...")
 
     print(f"  {main_quay_repo}:{version}")
     main_digest = get_quay_digest(main_quay_repo, version)
@@ -1535,39 +1496,14 @@ def main() -> None:
     # ------------------------------------------------------------------
     # 3. Render Helm chart
     # ------------------------------------------------------------------
-    print("[3/6] Rendering Helm chart ...")
+    print("[3/4] Rendering Helm chart ...")
     helm_docs = render_helm(version)
     print(f"  -> {len(helm_docs)} Kubernetes resources")
 
     # ------------------------------------------------------------------
-    # 4. Generate / load CRDs
+    # 4. Write output files
     # ------------------------------------------------------------------
-    crd_cache = REPO_ROOT / "extra" / "crds.yaml"
-    if args.skip_crd_build and crd_cache.exists():
-        print(
-            f"[4/6] Loading CRDs from {crd_cache.relative_to(REPO_ROOT)} (--skip-crd-build) ..."
-        )
-        with open(crd_cache) as fh:
-            crds = [d for d in yaml.safe_load_all(fh) if d is not None]
-    else:
-        print("[4/6] Generating CRDs via cargo ...")
-        crds = get_crds()
-    print(f"  -> {len(crds)} CRD(s)")
-
-    # ------------------------------------------------------------------
-    # 5. Use embedded Stackable logo icon
-    # ------------------------------------------------------------------
-    icon_b64 = _STACKABLE_ICON_B64
-
-    # ------------------------------------------------------------------
-    # 6. Write output files
-    # ------------------------------------------------------------------
-    print(f"[6/6] Writing OLM bundle to {output_dir} ...")
-
-    # CRD files (one per CRD)
-    for crd in crds:
-        crd_name = crd["metadata"]["name"]
-        write_yaml(output_dir / "manifests" / f"{crd_name}.crd.yaml", crd)
+    print(f"[4/4] Writing OLM bundle to {output_dir} ...")
 
     # tag_map: quay.io@digest -> human tag (for inline ``# <tag>`` comments)
     tag_map: dict[str, str] = {
@@ -1584,7 +1520,7 @@ def main() -> None:
 
     # ClusterServiceVersion
     csv = build_csv(
-        version, helm_docs, crds, final_images, icon_b64, openshift_versions
+        version, helm_docs, final_images, _STACKABLE_ICON_B64, openshift_versions
     )
     csv_filename = f"stackable-secret-operator.v{version}.clusterserviceversion.yaml"
     csv_path = output_dir / "manifests" / csv_filename
