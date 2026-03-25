@@ -55,10 +55,30 @@ rules:
       - list
       - watch
   {{- end }}
+  # Secrets: read/written by several subsystems:
+  # - autoTLS backend: reads and writes the CA Secret using the kube entry API, which issues
+  #   replace() (HTTP PUT) when updating an existing entry — this requires the `update` verb
+  #   in addition to the SSA verbs (create + patch). Also reads ConfigMap/Secret trust roots.
+  # - kerberosKeytab backend: reads the admin keytab Secret.
+  # - k8sSearch backend: lists Secrets by label selector.
+  # - certManager backend: reads the Secret provisioned by cert-manager.
+  # - truststore controller: applies Secrets via SSA (create + patch) and watches them via .owns().
   - apiGroups:
       - ""
     resources:
       - secrets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+      - update
+  # Events (core v1): required by the external-provisioner sidecar container, which runs under the
+  # same ServiceAccount and uses the legacy core/v1 events API (distinct from events.k8s.io below).
+  - apiGroups:
+      - ""
+    resources:
       - events
     verbs:
       - get
@@ -67,6 +87,9 @@ rules:
       - create
       - patch
       - update
+  # ConfigMaps: applied by the truststore controller via SSA (create + patch) and watched via
+  # .owns() and .watches(). Also read by the autoTLS backend for additional trust roots and
+  # by the k8sSearch backend for the trust-store ConfigMap.
   - apiGroups:
       - ""
     resources:
@@ -77,6 +100,8 @@ rules:
       - get
       - watch
       - list
+  # PersistentVolumes: managed by the external-provisioner sidecar container (not the operator
+  # binary directly). The sidecar creates, patches, and deletes PVs on behalf of the CSI driver.
   - apiGroups:
       - ""
     resources:
@@ -88,10 +113,13 @@ rules:
       - patch
       - create
       - delete
+  # Nodes: read by the CSI node service to look up node IPs for certificate SANs, and by the
+  # external-provisioner sidecar for topology-aware scheduling.
+  # PersistentVolumeClaims: read by the CSI controller service during CreateVolume to locate the
+  # owning Pod and resolve listener scope, and by the external-provisioner sidecar for PVC binding.
   - apiGroups:
       - ""
     resources:
-      - configmaps
       - nodes
       - persistentvolumeclaims
     verbs:
@@ -105,6 +133,9 @@ rules:
       - nodes/proxy
     verbs:
       - get
+  # CSINodes: used by the external-provisioner sidecar and node-driver-registrar for
+  # topology-aware volume scheduling.
+  # StorageClasses: used by the external-provisioner sidecar to read provisioner configuration.
   - apiGroups:
       - storage.k8s.io
     resources:
@@ -114,6 +145,9 @@ rules:
       - get
       - list
       - watch
+  # Pods: read by the CSI controller and node services to resolve secret scope (node IPs, service
+  # names). Patched with expiry annotations so the restarter can evict pods before their
+  # certificates expire.
   - apiGroups:
       - ""
     resources:
@@ -121,11 +155,15 @@ rules:
     verbs:
       - get
       - patch
+  # SecretClasses: the primary configuration CRD.
+  # - watched via .watches_stream() in the truststore controller to trigger re-reconciliation
+  #   when a referenced SecretClass changes.
+  # - read in reconcile() to initialise the secret backend.
+  # - create + patch (when CRD maintenance is enabled): used to deploy the default "tls" SecretClass.
   - apiGroups:
       - secrets.stackable.tech
     resources:
       - secretclasses
-      - truststores
     verbs:
       {{- if .Values.maintenance.customResourceDefinitions.maintain }}
       - create
@@ -134,6 +172,20 @@ rules:
       - get
       - watch
       - list
+  # TrustStores: the primary reconciled resource in the truststore controller
+  # (Controller::new watches this type). The operator only reconciles existing TrustStores;
+  # it never creates them, so no create/patch is needed here.
+  - apiGroups:
+      - secrets.stackable.tech
+    resources:
+      - truststores
+    verbs:
+      - get
+      - watch
+      - list
+  # ListenerClasses, Listeners, PodListeners: read during volume provisioning to resolve
+  # listener-scoped addresses (IPs/hostnames) for inclusion in TLS SANs and for topology
+  # node pinning.
   - apiGroups:
       - listeners.stackable.tech
     resources:
@@ -142,6 +194,9 @@ rules:
       - podlisteners
     verbs:
       - get
+  # cert-manager Certificates: applied via SSA (create + patch) by the certManager backend
+  # when provisioning a certificate, and read back (get) to check topology node affinity for
+  # re-scheduling decisions.
   - apiGroups:
       - cert-manager.io
     resources:
@@ -150,6 +205,8 @@ rules:
       - get
       - patch
       - create
+  # Events (events.k8s.io): used by the kube-rs controller event recorder (distinct from
+  # the legacy core/v1 events used by the external-provisioner sidecar above).
   - apiGroups:
       - events.k8s.io
     resources:
