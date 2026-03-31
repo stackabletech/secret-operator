@@ -1340,7 +1340,7 @@ def build_csv(
             "maturity": "stable",
             "provider": {"name": "Stackable GmbH", "url": "https://stackable.tech"},
             "version": version,
-            "minKubeVersion": "1.23.0",
+            "minKubeVersion": "1.31.0",
             "installModes": [
                 {"supported": True, "type": "OwnNamespace"},
                 {"supported": True, "type": "SingleNamespace"},
