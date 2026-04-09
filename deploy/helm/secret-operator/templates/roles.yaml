@@ -215,6 +215,9 @@ rules:
       - create
       - patch
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
+  # OpenShift SecurityContextConstraints: allows the operator's ServiceAccount to use the
+  # custom SCC defined above, which grants host-path volumes and bidirectional mount propagation
+  # required by the CSI driver.
   - apiGroups:
       - security.openshift.io
     resourceNames:
