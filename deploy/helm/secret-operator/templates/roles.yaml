@@ -43,26 +43,23 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
-  # Required to maintain the CRD. The operator needs to do this, as it needs to enter e.g. it's
-  # generated certificate in the conversion webhook.
+  # Required for maintaining the CRDs (including the conversion webhook configuration) and
+  # for the startup condition check.
   {{- if .Values.maintenance.customResourceDefinitions.maintain }}
   - apiGroups: [apiextensions.k8s.io]
     resources: [customresourcedefinitions]
     verbs:
+      # Required to maintain the CRD (e.g. conversion webhook certificate).
       - create
       - patch
       # Required for startup condition
       - list
       - watch
   {{- end }}
-  # Secrets: read/written by several subsystems:
-  # - autoTLS backend: reads and writes the CA Secret using the kube entry API, which issues
-  #   replace() (HTTP PUT) when updating an existing entry — this requires the `update` verb
-  #   in addition to the SSA verbs (create + patch). Also reads ConfigMap/Secret trust roots.
-  # - kerberosKeytab backend: reads the admin keytab Secret.
-  # - k8sSearch backend: lists Secrets by label selector.
-  # - certManager backend: reads the Secret provisioned by cert-manager.
-  # - truststore controller: applies Secrets via SSA (create + patch) and watches them via .owns().
+  # Secrets are read and written by multiple backends (autoTLS CA storage, Kerberos keytab,
+  # k8sSearch, cert-manager). The autoTLS backend uses replace (HTTP PUT) for CA entries,
+  # requiring the update verb in addition to SSA verbs. The truststore controller applies
+  # trust-store Secrets via SSA and watches them for changes.
   - apiGroups:
       - ""
     resources:
@@ -74,8 +71,7 @@ rules:
       - create
       - patch
       - update
-  # Events (core v1): required by the external-provisioner sidecar container, which runs under the
-  # same ServiceAccount and uses the legacy core/v1 events API (distinct from events.k8s.io below).
+  # Required by the external-provisioner sidecar, which uses the legacy core/v1 events API.
   - apiGroups:
       - ""
     resources:
@@ -87,9 +83,8 @@ rules:
       - create
       - patch
       - update
-  # ConfigMaps: applied by the truststore controller via SSA (create + patch) and watched via
-  # .owns() and .watches(). Also read by the autoTLS backend for additional trust roots and
-  # by the k8sSearch backend for the trust-store ConfigMap.
+  # ConfigMaps are applied by the truststore controller via SSA and watched for changes.
+  # Also read by the autoTLS backend for trust roots and by the k8sSearch backend.
   - apiGroups:
       - ""
     resources:
@@ -100,8 +95,7 @@ rules:
       - get
       - watch
       - list
-  # PersistentVolumes: managed by the external-provisioner sidecar container (not the operator
-  # binary directly). The sidecar creates, patches, and deletes PVs on behalf of the CSI driver.
+  # PersistentVolumes are managed by the external-provisioner sidecar on behalf of the CSI driver.
   - apiGroups:
       - ""
     resources:
@@ -127,16 +121,15 @@ rules:
       - get
       - list
       - watch
-  # For automatic cluster domain detection
+  # For automatic cluster domain detection.
   - apiGroups:
       - ""
     resources:
       - nodes/proxy
     verbs:
       - get
-  # CSINodes: used by the external-provisioner sidecar and node-driver-registrar for
-  # topology-aware volume scheduling.
-  # StorageClasses: used by the external-provisioner sidecar to read provisioner configuration.
+  # Required by the external-provisioner sidecar to discover driver topology keys (CSINodes)
+  # and determine volume binding mode (StorageClasses).
   - apiGroups:
       - storage.k8s.io
     resources:
@@ -146,9 +139,8 @@ rules:
       - get
       - list
       - watch
-  # Pods: read by the CSI controller and node services to resolve secret scope (node IPs, service
-  # names). Patched with expiry annotations so the restarter can evict pods before their
-  # certificates expire.
+  # Pods are read by the CSI driver to resolve secret scope. Patched with expiry annotations
+  # so the restarter can evict pods before their certificates expire.
   - apiGroups:
       - ""
     resources:
@@ -156,11 +148,9 @@ rules:
     verbs:
       - get
       - patch
-  # SecretClasses: the primary configuration CRD.
-  # - get: fetched by the CSI controller to initialize the secret backend, and by the truststore
-  #   controller during reconciliation.
-  # - watch + list: watched by the truststore controller to re-reconcile when a SecretClass changes.
-  # - create + patch (when CRD maintenance is enabled): used to deploy the default "tls" SecretClass.
+  # SecretClasses are the primary configuration CRD. Read by the CSI controller and the
+  # truststore controller. Watched to retrigger reconciliation when a SecretClass changes.
+  # The operator creates the default "tls" SecretClass at startup when CRD maintenance is enabled.
   - apiGroups:
       - secrets.stackable.tech
     resources:
@@ -173,9 +163,7 @@ rules:
       - get
       - watch
       - list
-  # TrustStores: the primary reconciled resource in the truststore controller
-  # (Controller::new watches this type). The operator only reconciles existing TrustStores;
-  # it never creates them, so no create/patch is needed here.
+  # TrustStores are the primary reconciled resource in the truststore controller.
   - apiGroups:
       - secrets.stackable.tech
     resources:
@@ -184,9 +172,7 @@ rules:
       - get
       - watch
       - list
-  # ListenerClasses, Listeners, PodListeners: read during volume provisioning to resolve
-  # listener-scoped addresses (IPs/hostnames) for inclusion in TLS SANs and for topology
-  # node pinning.
+  # Read during volume provisioning to resolve listener-scoped addresses for TLS SANs.
   - apiGroups:
       - listeners.stackable.tech
     resources:
@@ -195,9 +181,8 @@ rules:
       - podlisteners
     verbs:
       - get
-  # cert-manager Certificates: applied via SSA (create + patch) by the certManager backend
-  # when provisioning a certificate, and read back (get) to check topology node affinity for
-  # re-scheduling decisions.
+  # cert-manager Certificates are applied via SSA by the cert-manager backend when provisioning
+  # a certificate, and read back to check node affinity for scheduling decisions.
   - apiGroups:
       - cert-manager.io
     resources:
@@ -206,8 +191,7 @@ rules:
       - get
       - patch
       - create
-  # Events (events.k8s.io): used by the kube-rs controller event recorder (distinct from
-  # the legacy core/v1 events used by the external-provisioner sidecar above).
+  # Publish reconciliation errors as Kubernetes Events.
   - apiGroups:
       - events.k8s.io
     resources:
@@ -216,9 +200,8 @@ rules:
       - create
       - patch
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
-  # OpenShift SecurityContextConstraints: allows the operator's ServiceAccount to use the
-  # custom SCC defined above, which grants host-path volumes and bidirectional mount propagation
-  # required by the CSI driver.
+  # Required on OpenShift to allow the secret-operator pods to run with the custom SCC
+  # defined above (host-path volumes and bidirectional mount propagation for the CSI driver).
   - apiGroups:
       - security.openshift.io
     resourceNames:
