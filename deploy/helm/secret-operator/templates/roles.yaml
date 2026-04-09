@@ -156,9 +156,9 @@ rules:
       - get
       - patch
   # SecretClasses: the primary configuration CRD.
-  # - watched via .watches_stream() in the truststore controller to trigger re-reconciliation
-  #   when a referenced SecretClass changes.
-  # - read in reconcile() to initialise the secret backend.
+  # - get: fetched by the CSI controller to initialize the secret backend, and by the truststore
+  #   controller during reconciliation.
+  # - watch + list: watched by the truststore controller to re-reconcile when a SecretClass changes.
   # - create + patch (when CRD maintenance is enabled): used to deploy the default "tls" SecretClass.
   - apiGroups:
       - secrets.stackable.tech
