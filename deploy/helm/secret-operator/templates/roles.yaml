@@ -113,10 +113,11 @@ rules:
       - patch
       - create
       - delete
-  # Nodes: read by the CSI node service to look up node IPs for certificate SANs, and by the
-  # external-provisioner sidecar for topology-aware scheduling.
-  # PersistentVolumeClaims: read by the CSI controller service during CreateVolume to locate the
-  # owning Pod and resolve listener scope, and by the external-provisioner sidecar for PVC binding.
+  # Nodes are fetched to look up node IPs for certificate SANs. The external-provisioner
+  # sidecar lists and watches Nodes for CSI volume topology (--feature-gates=Topology=true).
+  # PersistentVolumeClaims are read by the CSI controller during CreateVolume to locate the
+  # owning Pod and resolve listener scope. The external-provisioner sidecar watches PVCs to
+  # trigger PV provisioning.
   - apiGroups:
       - ""
     resources:
