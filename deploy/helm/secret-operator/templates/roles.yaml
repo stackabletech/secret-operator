@@ -71,7 +71,9 @@ rules:
       - create
       - patch
       - update
-  # Required by the external-provisioner sidecar, which uses the legacy core/v1 events API.
+  # Required by the external-provisioner sidecar, which still uses the legacy core/v1 events
+  # API (not events.k8s.io). See upstream RBAC:
+  # https://github.com/kubernetes-csi/external-provisioner/blob/v5.3.0/deploy/kubernetes/rbac.yaml
   - apiGroups:
       - ""
     resources:
