@@ -45,17 +45,17 @@ metadata:
 rules:
   # Required for maintaining the CRDs (including the conversion webhook configuration) and
   # for the startup condition check.
-  {{- if .Values.maintenance.customResourceDefinitions.maintain }}
   - apiGroups: [apiextensions.k8s.io]
     resources: [customresourcedefinitions]
     verbs:
+      {{- if .Values.maintenance.customResourceDefinitions.maintain }}
       # Required to maintain the CRD (e.g. conversion webhook certificate).
       - create
       - patch
+      {{- end }}
       # Required for startup condition
       - list
       - watch
-  {{- end }}
   # Secrets are read and written by multiple backends (autoTLS CA storage, Kerberos keytab,
   # k8sSearch, cert-manager). The autoTLS backend uses replace (HTTP PUT) for CA entries,
   # requiring the update verb in addition to SSA verbs. The truststore controller applies
