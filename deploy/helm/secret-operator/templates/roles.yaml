@@ -43,22 +43,40 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
-  # Required to maintain the CRD. The operator needs to do this, as it needs to enter e.g. it's
-  # generated certificate in the conversion webhook.
-  {{- if .Values.maintenance.customResourceDefinitions.maintain }}
+  # Required for maintaining the CRDs (including the conversion webhook configuration) and
+  # for the startup condition check.
   - apiGroups: [apiextensions.k8s.io]
     resources: [customresourcedefinitions]
     verbs:
+      {{- if .Values.maintenance.customResourceDefinitions.maintain }}
+      # Required to maintain the CRD (e.g. conversion webhook certificate).
       - create
       - patch
+      {{- end }}
       # Required for startup condition
       - list
       - watch
-  {{- end }}
+  # Secrets are read and written by multiple backends (autoTLS CA storage, Kerberos keytab,
+  # k8sSearch, cert-manager). The autoTLS backend uses replace (HTTP PUT) for CA entries,
+  # requiring the update verb in addition to SSA verbs. The truststore controller applies
+  # trust-store Secrets via SSA and watches them for changes.
   - apiGroups:
       - ""
     resources:
       - secrets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+      - update
+  # Required by the external-provisioner sidecar, which still uses the legacy core/v1 events
+  # API (not events.k8s.io). See upstream RBAC:
+  # https://github.com/kubernetes-csi/external-provisioner/blob/v5.3.0/deploy/kubernetes/rbac.yaml
+  - apiGroups:
+      - ""
+    resources:
       - events
     verbs:
       - get
@@ -67,6 +85,8 @@ rules:
       - create
       - patch
       - update
+  # ConfigMaps are applied by the truststore controller via SSA and watched for changes.
+  # Also read by the autoTLS backend for trust roots and by the k8sSearch backend.
   - apiGroups:
       - ""
     resources:
@@ -77,6 +97,7 @@ rules:
       - get
       - watch
       - list
+  # PersistentVolumes are managed by the external-provisioner sidecar on behalf of the CSI driver.
   - apiGroups:
       - ""
     resources:
@@ -88,23 +109,29 @@ rules:
       - patch
       - create
       - delete
+  # Nodes are fetched to look up node IPs for certificate SANs. The external-provisioner
+  # sidecar lists and watches Nodes for CSI volume topology (--feature-gates=Topology=true).
+  # PersistentVolumeClaims are read by the CSI controller during CreateVolume to locate the
+  # owning Pod and resolve listener scope. The external-provisioner sidecar watches PVCs to
+  # trigger PV provisioning.
   - apiGroups:
       - ""
     resources:
-      - configmaps
       - nodes
       - persistentvolumeclaims
     verbs:
       - get
       - list
       - watch
-  # For automatic cluster domain detection
+  # For automatic cluster domain detection.
   - apiGroups:
       - ""
     resources:
       - nodes/proxy
     verbs:
       - get
+  # Required by the external-provisioner sidecar to discover driver topology keys (CSINodes)
+  # and determine volume binding mode (StorageClasses).
   - apiGroups:
       - storage.k8s.io
     resources:
@@ -114,6 +141,8 @@ rules:
       - get
       - list
       - watch
+  # Pods are read by the CSI driver to resolve secret scope. Patched with expiry annotations
+  # so the restarter can evict pods before their certificates expire.
   - apiGroups:
       - ""
     resources:
@@ -121,11 +150,13 @@ rules:
     verbs:
       - get
       - patch
+  # SecretClasses are the primary configuration CRD. Read by the CSI controller and the
+  # truststore controller. Watched to retrigger reconciliation when a SecretClass changes.
+  # The operator creates the default "tls" SecretClass at startup when CRD maintenance is enabled.
   - apiGroups:
       - secrets.stackable.tech
     resources:
       - secretclasses
-      - truststores
     verbs:
       {{- if .Values.maintenance.customResourceDefinitions.maintain }}
       - create
@@ -134,6 +165,16 @@ rules:
       - get
       - watch
       - list
+  # TrustStores are the primary reconciled resource in the truststore controller.
+  - apiGroups:
+      - secrets.stackable.tech
+    resources:
+      - truststores
+    verbs:
+      - get
+      - watch
+      - list
+  # Read during volume provisioning to resolve listener-scoped addresses for TLS SANs.
   - apiGroups:
       - listeners.stackable.tech
     resources:
@@ -142,6 +183,8 @@ rules:
       - podlisteners
     verbs:
       - get
+  # cert-manager Certificates are applied via SSA by the cert-manager backend when provisioning
+  # a certificate, and read back to check node affinity for scheduling decisions.
   - apiGroups:
       - cert-manager.io
     resources:
@@ -150,6 +193,7 @@ rules:
       - get
       - patch
       - create
+  # Publish reconciliation errors as Kubernetes Events.
   - apiGroups:
       - events.k8s.io
     resources:
@@ -158,6 +202,8 @@ rules:
       - create
       - patch
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
+  # Required on OpenShift to allow the secret-operator pods to run with the custom SCC
+  # defined above (host-path volumes and bidirectional mount propagation for the CSI driver).
   - apiGroups:
       - security.openshift.io
     resourceNames:
