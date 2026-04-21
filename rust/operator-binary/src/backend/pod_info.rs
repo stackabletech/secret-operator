@@ -104,7 +104,9 @@ pub enum FromPodError {
 #[derive(Debug)]
 pub struct PodInfo {
     pub pod_ips: Vec<IpAddr>,
+    pub pod_name: String,
     pub service_name: Option<String>,
+    pub namespace: String,
     pub node_name: String,
     pub node_ips: Vec<IpAddr>,
     pub listener_addresses: Option<ListenerAddresses>,
@@ -119,6 +121,8 @@ impl PodInfo {
         scopes: &[SecretScope],
     ) -> Result<Self, FromPodError> {
         use from_pod_error::*;
+        let pod_name = pod.metadata.name.clone().context(NoPodNameSnafu)?;
+        let namespace = pod.metadata.namespace.clone().context(NoNamespaceSnafu)?;
         let node_name = pod
             .spec
             .as_ref()
@@ -150,7 +154,9 @@ impl PodInfo {
                         .context(from_pod_error::IllegalAddressSnafu { address: ip })
                 })
                 .collect::<Result<_, _>>()?,
+            pod_name,
             service_name: pod.spec.as_ref().and_then(|spec| spec.subdomain.clone()),
+            namespace,
             node_name,
             node_ips: node
                 .status
