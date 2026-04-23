@@ -31,7 +31,7 @@ NOTE: Make sure to have a procedure for updating the retrieved certificates.
 == Integration with OpenShift Ingress
 
 Sometimes you want to create an OpenShift Ingress to expose a stacklet that is secured using `https`.
-For TLS re-encryption to work you need to specify a Secret that contains a `tls.crt` key with the PEM ca certificate.
+For the TLS re-encryption to work, you need to specify a Secret that contains a `tls.crt` key with the PEM ca certificate.
 
 A concrete example is shown below:
 
