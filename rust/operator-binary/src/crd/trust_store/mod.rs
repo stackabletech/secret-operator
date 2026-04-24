@@ -42,7 +42,7 @@ pub mod versioned {
         /// The [format](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#format) that the data should be converted into.
         pub format: Option<SecretFormat>,
 
-        /// Name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate should be placed.
+        /// The name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate should be placed.
         ///
         /// Only takes effect in case the `format` is `tls-pem`.
         /// Defaults to `ca.crt`.

@@ -16,7 +16,7 @@ include::example$truststore-tls.yaml[]
 <3> Optional requested xref:secretclass.adoc#format[format]
 <4> Optional Kubernetes resource kind, which should be used to output the requested information to.
     Either `ConfigMap` or `Secret`, defaults to `ConfigMap`.
-<6> Optional name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate should be placed.
+<5> Optional name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate should be placed.
     Only takes effect in case the `format` is `tls-pem`.
     Defaults to `ca.crt`.
 
