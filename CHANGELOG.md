@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Support configuring the name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate of the Truststore should be placed.
+  This is e.g. needed to be able to use the generated Secret within an OpenShift Ingress ([#679]).
+
 ### Changed
 
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#693]).
@@ -53,6 +58,7 @@ All notable changes to this project will be documented in this file.
 [#670]: https://github.com/stackabletech/secret-operator/pull/670
 [#671]: https://github.com/stackabletech/secret-operator/pull/671
 [#674]: https://github.com/stackabletech/secret-operator/pull/674
+[#679]: https://github.com/stackabletech/secret-operator/pull/679
 [#685]: https://github.com/stackabletech/secret-operator/pull/685
 [#687]: https://github.com/stackabletech/secret-operator/pull/687
 [#688]: https://github.com/stackabletech/secret-operator/pull/688
