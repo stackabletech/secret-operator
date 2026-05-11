@@ -2,7 +2,8 @@
 ---
 # Used by both the Controller Service and Node Service containers
 image:
-  repository: oci.stackable.tech/sdp/secret-operator
+  # By default, the correct registry is automatically selected based on the Helm Chart installation source
+  # repository: oci.stackable.tech/sdp
   # tag: 0.0.0-dev
   pullPolicy: IfNotPresent
   pullSecrets: []
@@ -70,7 +71,8 @@ csiNodeDriver:
 
   externalProvisioner:
     image:
-      repository: oci.stackable.tech/sdp/sig-storage/csi-provisioner
+      # By default, the correct registry is automatically selected based on the Helm Chart installation source
+      # repository: oci.stackable.tech/sdp/sig-storage
       tag: v5.3.0
       pullPolicy: IfNotPresent
       # NOTE (@Techassi): Support setting pullSecrets
@@ -84,7 +86,8 @@ csiNodeDriver:
 
   nodeDriverRegistrar:
     image:
-      repository: oci.stackable.tech/sdp/sig-storage/csi-node-driver-registrar
+      # By default, the correct registry is automatically selected based on the Helm Chart installation source
+      # repository: oci.stackable.tech/sdp/sig-storage
       tag: v2.15.0
       pullPolicy: IfNotPresent
       # NOTE (@Techassi): Support setting pullSecrets

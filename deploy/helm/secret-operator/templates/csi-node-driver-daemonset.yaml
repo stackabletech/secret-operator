@@ -12,7 +12,7 @@ spec:
   template:
     metadata:
       annotations:
-        internal.stackable.tech/image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        internal.stackable.tech/image: "{{ include "operator.image" . }}"
         {{- with .Values.csiNodeDriver.podAnnotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -31,7 +31,7 @@ spec:
         - name: csi-node-service
           securityContext:
             {{- toYaml .Values.csiNodeDriver.nodeService.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ include "operator.image" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
             {{ .Values.csiNodeDriver.nodeService.resources | toYaml | nindent 12 }}
@@ -72,6 +72,10 @@ spec:
             - name: OPERATOR_SERVICE_NAME
               value: {{ include "operator.fullname" . }}
 
+            # The image repository, like "oci.stackable.tech/sdp"
+            - name: IMAGE_REPOSITORY
+              value: {{ .Values.image.repository }}
+
             # Operators need to know the node name they are running on, to e.g. discover the
             # Kubernetes domain name from the kubelet API.
             - name: KUBERNETES_NODE_NAME
@@ -104,7 +108,7 @@ spec:
               mountPath: /tmp
 
         - name: external-provisioner
-          image: "{{ .Values.csiNodeDriver.externalProvisioner.image.repository }}:{{ .Values.csiNodeDriver.externalProvisioner.image.tag }}"
+          image: "{{ include "csi-provisioner.image" . }}"
           imagePullPolicy: {{ .Values.csiNodeDriver.externalProvisioner.image.pullPolicy }}
           resources:
             {{ .Values.csiNodeDriver.externalProvisioner.resources | toYaml | nindent 12 }}
@@ -117,7 +121,7 @@ spec:
               mountPath: /csi
 
         - name: node-driver-registrar
-          image: "{{ .Values.csiNodeDriver.nodeDriverRegistrar.image.repository }}:{{ .Values.csiNodeDriver.nodeDriverRegistrar.image.tag }}"
+          image: "{{ include "csi-node-driver-registrar.image" . }}"
           imagePullPolicy: {{ .Values.csiNodeDriver.nodeDriverRegistrar.image.pullPolicy }}
           resources:
             {{ .Values.csiNodeDriver.nodeDriverRegistrar.resources | toYaml | nindent 12 }}
