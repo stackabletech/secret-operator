@@ -179,6 +179,7 @@ pub fn asn1time_to_offsetdatetime(asn: &Asn1TimeRef) -> Result<OffsetDateTime, A
 
 /// Wrapper for (mostly) secret values that should not be logged.
 // When/if migrating to Valuable, provide a dummy implementation of Value too
+#[derive(Default)]
 pub struct Unloggable<T>(pub T);
 
 impl<T> Debug for Unloggable<T> {
@@ -198,6 +199,12 @@ impl<T> Deref for Unloggable<T> {
 impl<T> DerefMut for Unloggable<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Unloggable<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        T::deserialize(deserializer).map(Unloggable)
     }
 }
 
