@@ -179,8 +179,16 @@ pub fn asn1time_to_offsetdatetime(asn: &Asn1TimeRef) -> Result<OffsetDateTime, A
 
 /// Wrapper for (mostly) secret values that should not be logged.
 // When/if migrating to Valuable, provide a dummy implementation of Value too
-#[derive(Default)]
 pub struct Unloggable<T>(pub T);
+
+impl<T> Default for Unloggable<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self(T::default())
+    }
+}
 
 impl<T> Debug for Unloggable<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

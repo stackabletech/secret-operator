@@ -22,10 +22,7 @@ pub fn convert(
         (WellKnownSecretData::TlsPem(pem), SecretFormat::TlsPkcs12) => {
             Ok(WellKnownSecretData::TlsPkcs12(convert_tls_to_pkcs12(
                 pem,
-                compat
-                    .tls_pkcs12_password
-                    .as_deref()
-                    .map_or("", String::as_str),
+                &compat.tls_pkcs12_password.unwrap_or_default(),
             )?))
         }
 
