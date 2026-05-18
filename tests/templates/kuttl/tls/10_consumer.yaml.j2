@@ -22,7 +22,7 @@ spec:
               CERT_NAME=tls.crt
               CA_NAME=ca.crt
 {% endif %}
-            - |
+
               set -euo pipefail
               ls -la /stackable/tls-3d
               ls -la /stackable/tls-42h
@@ -67,11 +67,18 @@ spec:
               assert_trusted_roots_contain "cert 4b"
               assert_trusted_roots_contain "cert 5"
               assert_trusted_roots_contain "cert 6"
+
+              echo Test subject DN with domain components
+
+              openssl x509 -in /stackable/tls-domain-components/tls.crt -subject -noout | \
+                  grep "subject=CN=generated certificate for pod, DC=tls-consumer-.*, DC=$NAMESPACE, DC=svc, DC=.*"
           volumeMounts:
             - mountPath: /stackable/tls-3d
               name: tls-3d
             - mountPath: /stackable/tls-42h
               name: tls-42h
+            - mountPath: /stackable/tls-domain-components
+              name: tls-domain-components
       volumes:
         - name: tls-3d
           ephemeral:
@@ -104,6 +111,21 @@ spec:
                   secrets.stackable.tech/format.tls-pem.cert-name: custom-tls.crt
                   secrets.stackable.tech/format.tls-pem.ca-name: custom-ca.crt
 {% endif %}
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+        - name: tls-domain-components
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls-$NAMESPACE
+                  secrets.stackable.tech/scope: pod
+                  secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn: "true"
               spec:
                 storageClassName: secrets.stackable.tech
                 accessModes:
