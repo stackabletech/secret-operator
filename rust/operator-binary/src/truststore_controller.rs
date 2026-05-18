@@ -199,6 +199,12 @@ pub enum Error {
     #[snafu(display("TrustStore has no associated Namespace"))]
     NoTrustStoreNamespace,
 
+    #[snafu(display("TrustStore has no associated name"))]
+    NoTrustStoreName,
+
+    #[snafu(display("TrustStore has no associated UID"))]
+    NoTrustStoreUid,
+
     #[snafu(display("failed to convert trust data into desired format"))]
     FormatData {
         source: format::IntoFilesError,
@@ -236,12 +242,6 @@ pub enum Error {
     RefuseToOverwriteForeignTarget {
         object: ObjectRef<stackable_operator::kube::api::DynamicObject>,
     },
-
-    #[snafu(display("TrustStore has no associated UID"))]
-    NoTrustStoreUid,
-
-    #[snafu(display("TrustStore has no associated name"))]
-    NoTrustStoreName,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -257,14 +257,14 @@ impl ReconcilerError for Error {
             Error::InitBackend { secret_class, .. } => Some(secret_class.clone().erase()),
             Error::BackendGetTrustData { source } => source.secondary_object(),
             Error::NoTrustStoreNamespace => None,
+            Error::NoTrustStoreName => None,
+            Error::NoTrustStoreUid => None,
             Error::FormatData { secret_class, .. } => Some(secret_class.clone().erase()),
             Error::BuildOwnerReference { .. } => None,
             Error::ApplyTrustStoreConfigMap { config_map, .. } => Some(config_map.clone().erase()),
             Error::ApplyTrustStoreSecret { secret, .. } => Some(secret.clone().erase()),
             Error::GetExistingTarget { object, .. } => Some(object.clone()),
             Error::RefuseToOverwriteForeignTarget { object } => Some(object.clone()),
-            Error::NoTrustStoreUid => None,
-            Error::NoTrustStoreName => None,
         }
     }
 }
@@ -275,12 +275,45 @@ impl ReconcilerError for Error {
 /// from being abused to clobber foreign same-named objects (e.g. `kube-root-ca.crt`) via the
 /// operator's elevated cluster-wide write permissions.
 fn is_owned_by_truststore(existing_owners: &[OwnerReference], truststore_uid: &str) -> bool {
+    let truststore_kind = <v1alpha1::TrustStore as Resource>::kind(&());
     existing_owners.iter().any(|owner| {
         owner.controller == Some(true)
-            && owner.kind == "TrustStore"
+            && owner.kind == truststore_kind
             && owner.api_version.starts_with("secrets.stackable.tech/")
             && owner.uid == truststore_uid
     })
+}
+
+/// Looks up a pre-existing object with the same name/namespace as the TrustStore output and fails
+/// if it exists but is not controlled by this TrustStore. See [`is_owned_by_truststore`] for the
+/// security rationale.
+async fn ensure_existing_target_is_not_foreign<K>(
+    client: &stackable_operator::client::Client,
+    name: &str,
+    namespace: &str,
+    truststore_uid: &str,
+    object_ref: ObjectRef<stackable_operator::kube::api::DynamicObject>,
+) -> Result<()>
+where
+    K: stackable_operator::kube::Resource<DynamicType = ()>
+        + stackable_operator::client::GetApi<Namespace = str>
+        + Clone
+        + std::fmt::Debug
+        + serde::de::DeserializeOwned,
+{
+    let existing = client
+        .get_opt::<K>(name, namespace)
+        .await
+        .with_context(|_| GetExistingTargetSnafu {
+            object: object_ref.clone(),
+        })?;
+    if let Some(existing) = existing {
+        let owners = existing.meta().owner_references.as_deref().unwrap_or(&[]);
+        if !is_owned_by_truststore(owners, truststore_uid) {
+            return RefuseToOverwriteForeignTargetSnafu { object: object_ref }.fail();
+        }
+    }
+    Ok(())
 }
 
 struct Ctx {
@@ -371,22 +404,14 @@ async fn reconcile(
                 binary_data: Some(binary_data),
                 ..Default::default()
             };
-            let existing = ctx
-                .client
-                .get_opt::<ConfigMap>(truststore_name, truststore_namespace)
-                .await
-                .with_context(|_| GetExistingTargetSnafu {
-                    object: ObjectRef::from_obj(&trust_cm).erase(),
-                })?;
-            if let Some(existing) = existing {
-                let owners = existing.metadata.owner_references.as_deref().unwrap_or(&[]);
-                if !is_owned_by_truststore(owners, truststore_uid) {
-                    return RefuseToOverwriteForeignTargetSnafu {
-                        object: ObjectRef::from_obj(&trust_cm).erase(),
-                    }
-                    .fail();
-                }
-            }
+            ensure_existing_target_is_not_foreign::<ConfigMap>(
+                &ctx.client,
+                truststore_name,
+                truststore_namespace,
+                truststore_uid,
+                ObjectRef::from_obj(&trust_cm).erase(),
+            )
+            .await?;
             ctx.client
                 .apply_patch(CONTROLLER_NAME, &trust_cm, &trust_cm)
                 .await
@@ -401,22 +426,14 @@ async fn reconcile(
                 data: Some(binary_data),
                 ..Default::default()
             };
-            let existing = ctx
-                .client
-                .get_opt::<Secret>(truststore_name, truststore_namespace)
-                .await
-                .with_context(|_| GetExistingTargetSnafu {
-                    object: ObjectRef::from_obj(&trust_secret).erase(),
-                })?;
-            if let Some(existing) = existing {
-                let owners = existing.metadata.owner_references.as_deref().unwrap_or(&[]);
-                if !is_owned_by_truststore(owners, truststore_uid) {
-                    return RefuseToOverwriteForeignTargetSnafu {
-                        object: ObjectRef::from_obj(&trust_secret).erase(),
-                    }
-                    .fail();
-                }
-            }
+            ensure_existing_target_is_not_foreign::<Secret>(
+                &ctx.client,
+                truststore_name,
+                truststore_namespace,
+                truststore_uid,
+                ObjectRef::from_obj(&trust_secret).erase(),
+            )
+            .await?;
             ctx.client
                 .apply_patch(CONTROLLER_NAME, &trust_secret, &trust_secret)
                 .await
