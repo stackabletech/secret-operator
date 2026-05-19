@@ -181,6 +181,15 @@ pub fn asn1time_to_offsetdatetime(asn: &Asn1TimeRef) -> Result<OffsetDateTime, A
 // When/if migrating to Valuable, provide a dummy implementation of Value too
 pub struct Unloggable<T>(pub T);
 
+impl<T> Default for Unloggable<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self(T::default())
+    }
+}
+
 impl<T> Debug for Unloggable<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("<redacted>")
@@ -198,6 +207,12 @@ impl<T> Deref for Unloggable<T> {
 impl<T> DerefMut for Unloggable<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Unloggable<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        T::deserialize(deserializer).map(Unloggable)
     }
 }
 

@@ -15,7 +15,12 @@ All notable changes to this project will be documented in this file.
 
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#693]).
 
+### Fixed
+
+- Redact the user-provided PKCS#12 keystore password in operator logs. ([#706]).
+
 [#693]: https://github.com/stackabletech/secret-operator/pull/693
+[#706]: https://github.com/stackabletech/secret-operator/pull/706
 [#708]: https://github.com/stackabletech/secret-operator/pull/708
 
 ## [26.3.0] - 2026-03-16

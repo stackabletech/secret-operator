@@ -4,7 +4,10 @@ use stackable_operator::schemars::{self, JsonSchema};
 use strum::EnumDiscriminants;
 
 use super::{ConvertError, SecretFiles, convert};
-use crate::{backend::ProvisionParts, utils::ResultExt};
+use crate::{
+    backend::ProvisionParts,
+    utils::{ResultExt, Unloggable},
+};
 
 const FILE_PEM_CERT_CERT: &str = "tls.crt";
 const FILE_PEM_CERT_KEY: &str = "tls.key";
@@ -168,7 +171,7 @@ pub struct CompatibilityOptions {
         rename = "secrets.stackable.tech/format.compatibility.tls-pkcs12.password",
         default
     )]
-    pub tls_pkcs12_password: Option<String>,
+    pub tls_pkcs12_password: Option<Unloggable<String>>,
 }
 
 /// Options to customize the well-known format file names.
