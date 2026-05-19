@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Support configuring the name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate of the Truststore should be placed.
   This is e.g. needed to be able to use the generated Secret within an OpenShift Ingress ([#679]).
-- Support adding domain components to the subject DN of TLS certificates with the volume annotaton
+- Support adding domain components to the subject DN of TLS certificates with the volume annotation
   `secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn` ([#708]).
 
 ### Changed
