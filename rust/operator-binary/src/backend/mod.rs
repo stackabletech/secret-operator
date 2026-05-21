@@ -129,6 +129,12 @@ pub struct SecretVolumeSelector {
     )]
     pub autotls_cert_jitter_factor: f64,
 
+    /// If set to `"true"`, the domain components of the Pod's fully qualified domain name (FQDN)
+    /// are appended to the subject distinguished name (DN) of the TLS certificate.
+    ///
+    /// For example, the subject DN could look as follows:
+    ///
+    /// `CN=generated certificate for pod, DC=my-pod-0, DC=my-statefulset-service, DC=my-namespace, DC=svc, DC=cluster, DC=local`
     #[serde(
         rename = "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn",
         deserialize_with = "SecretVolumeSelector::deserialize_str_as_bool",
