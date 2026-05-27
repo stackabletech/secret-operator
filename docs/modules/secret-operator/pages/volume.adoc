@@ -176,10 +176,17 @@ Jittering may be disabled by setting the jitter factor to 0.
 
 If set to `"true"`, the domain components of the Pod's fully qualified domain name (FQDN) are appended to the subject distinguished name (DN) of the TLS certificate.
 
-For example, the subject DN could look as follows:
+For example, the subject DN could look as follows for a StatefulSet Pod:
 
 ```
 CN=generated certificate for pod, DC=my-pod-0, DC=my-statefulset-service, DC=my-namespace, DC=svc, DC=cluster, DC=local
+```
+
+The service name is not part of the domain components if the Pod spec does not contain a subdomain, e.g. for Deployments and Jobs:
+
+```
+CN=generated certificate for pod, DC=my-job-pod-7c5xx, DC=my-namespace, DC=svc, DC=cluster, DC=local
+
 ```
 
 [NOTE]
@@ -187,10 +194,11 @@ CN=generated certificate for pod, DC=my-pod-0, DC=my-statefulset-service, DC=my-
 Many products use the string representation of distinguished names as described in https://www.ietf.org/rfc/rfc4514.txt[RFC 4514{external-link-icon}^].
 The string representation starts with the last element of the sequence and moving backwards toward the first.
 
-The example above becomes:
+The examples above become:
 
 ```
 DC=local,DC=cluster,DC=svc,DC=my-namespace,DC=my-statefulset-service,DC=my-pod-0,CN=generated certificate for pod
+DC=local,DC=cluster,DC=svc,DC=my-namespace,DC=my-job-pod-7c5xx,CN=generated certificate for pod
 ```
 
 Attribute names can be in upper or lower case, with or without spaces between them.

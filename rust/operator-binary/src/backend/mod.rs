@@ -132,7 +132,7 @@ pub struct SecretVolumeSelector {
     /// If set to `"true"`, the domain components of the Pod's fully qualified domain name (FQDN)
     /// are appended to the subject distinguished name (DN) of the TLS certificate.
     ///
-    /// For example, the subject DN could look as follows:
+    /// For example, the subject DN could look as follows for a StatefulSet Pod:
     ///
     /// `CN=generated certificate for pod, DC=my-pod-0, DC=my-statefulset-service, DC=my-namespace, DC=svc, DC=cluster, DC=local`
     #[serde(
