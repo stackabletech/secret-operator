@@ -2,14 +2,14 @@
 name = "p12"
 version.workspace = true
 authors = ["hjiayz <hjiayz@gmail.com>", "Marc-Antoine Perennou <Marc-Antoine@Perennou.com>"]
-edition = "2021"
+edition.workspace = true
 keywords = ["pkcs12", "pkcs"]
 description = "pure rust pkcs12 tool (Stackable fork)"
 homepage = "https://github.com/hjiayz/p12"
 repository = "https://github.com/hjiayz/p12"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
-rust-version = "1.56.0"
+rust-version = "1.85.0"
 
 # Dependencies are tracked inline for now, to minimize divergence from upstream
 

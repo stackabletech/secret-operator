@@ -1180,7 +1180,7 @@ rec {
       "cert-tools" = rec {
         crateName = "cert-tools";
         version = "0.1.1";
-        edition = "2021";
+        edition = "2024";
         crateBin = [
           {
             name = "cert-tools";
@@ -8109,7 +8109,7 @@ rec {
       "p12" = rec {
         crateName = "p12";
         version = "0.0.0-dev";
-        edition = "2021";
+        edition = "2024";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/p12; };
         authors = [
           "hjiayz <hjiayz@gmail.com>"
@@ -10364,9 +10364,9 @@ rec {
       };
       "rustls-webpki" = rec {
         crateName = "rustls-webpki";
-        version = "0.103.9";
+        version = "0.103.13";
         edition = "2021";
-        sha256 = "0lwg1nnyv7pp2lfwwjhy81bxm233am99jnsp3iymdhd6k8827pyp";
+        sha256 = "0vkm7z9pnxz5qz66p2kmyy2pwx0g4jnsbqk5xzfhs4czcjl2ki31";
         libName = "webpki";
         dependencies = [
           {
@@ -11677,7 +11677,7 @@ rec {
       "stackable-krb5-provision-keytab" = rec {
         crateName = "stackable-krb5-provision-keytab";
         version = "0.0.0-dev";
-        edition = "2021";
+        edition = "2024";
         crateBin = [
           {
             name = "stackable-krb5-provision-keytab";
@@ -11967,7 +11967,7 @@ rec {
       "stackable-secret-operator" = rec {
         crateName = "stackable-secret-operator";
         version = "0.0.0-dev";
-        edition = "2021";
+        edition = "2024";
         crateBin = [
           {
             name = "stackable-secret-operator";
@@ -12152,7 +12152,7 @@ rec {
       "stackable-secret-operator-olm-deployer" = rec {
         crateName = "stackable-secret-operator-olm-deployer";
         version = "0.0.0-dev";
-        edition = "2021";
+        edition = "2024";
         crateBin = [
           {
             name = "stackable-secret-operator-olm-deployer";
@@ -12217,7 +12217,7 @@ rec {
       "stackable-secret-operator-utils" = rec {
         crateName = "stackable-secret-operator-utils";
         version = "0.0.0-dev";
-        edition = "2021";
+        edition = "2024";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/utils; };
         libName = "stackable_secret_operator_utils";
         authors = [

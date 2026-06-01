@@ -644,12 +644,12 @@ fn pbepkcs12sha1(pass: &[u8], salt: &[u8], iterations: u64, id: u8, size: u64) -
     let d = [id; V as usize];
     fn get_len(s: usize) -> usize {
         let s = s as u64;
-        (V * ((s + V - 1) / V)) as usize
+        (V * s.div_ceil(V)) as usize
     }
     let s = salt.iter().cycle().take(get_len(salt.len()));
     let p = pass.iter().cycle().take(get_len(pass.len()));
     let mut i: Vec<u8> = s.chain(p).cloned().collect();
-    let c = (size + U - 1) / U;
+    let c = size.div_ceil(U);
     let mut a: Vec<u8> = vec![];
     for _ in 1..c {
         let ai = pbepkcs12sha1core(&d, &i, &mut a, r);
