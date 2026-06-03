@@ -94,10 +94,9 @@ impl CredentialCache {
                 .expect("key was just confirmed to exist in cache")))
         } else {
             tracing::info!("credential not found in cache, generating...");
-            match mk_value(Ctx {
+            match TryFutureExt::into_future(mk_value(Ctx {
                 cache_ref: self.cache_ref.clone(),
-            })
-            .into_future()
+            }))
             .await
             {
                 Ok(value) => {
