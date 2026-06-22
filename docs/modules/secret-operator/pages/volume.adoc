@@ -186,7 +186,6 @@ The service name is not part of the domain components if the Pod spec does not c
 
 ```
 CN=generated certificate for pod, DC=my-job-pod-7c5xx, DC=my-namespace, DC=svc, DC=cluster, DC=local
-
 ```
 
 [NOTE]
