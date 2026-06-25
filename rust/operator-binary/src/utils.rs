@@ -130,7 +130,6 @@ pub async fn trystream_any<S: Stream<Item = Result<bool, E>>, E>(stream: S) -> R
     }
     Ok(false)
 }
-
 /// Concatenate chunks of bytes, short-circuiting on [`Err`].
 ///
 /// This is a byte-oriented equivalent to [`Iterator::collect::<Result<String, _>>`](`Iterator::collect`).
