@@ -17,10 +17,12 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- Redact the user-provided PKCS#12 keystore password in operator logs. ([#706]).
+- Redact the user-provided PKCS#12 keystore password in operator logs ([#706]).
+- Refuse to overwrite pre-existing ConfigMaps or Secrets that are not owned by the reconciling TrustStore ([#707]).
 
 [#693]: https://github.com/stackabletech/secret-operator/pull/693
 [#706]: https://github.com/stackabletech/secret-operator/pull/706
+[#707]: https://github.com/stackabletech/secret-operator/pull/707
 [#708]: https://github.com/stackabletech/secret-operator/pull/708
 
 ## [26.3.0] - 2026-03-16
