@@ -635,7 +635,7 @@ fn pbepkcs12sha1core(d: &[u8], i: &[u8], a: &mut Vec<u8>, iterations: u64) -> Ve
     a.append(&mut ai.clone());
     ai
 }
-
+#[allow(clippy::manual_div_ceil)] // This is a fork, ignoring errors
 #[allow(clippy::many_single_char_names)]
 fn pbepkcs12sha1(pass: &[u8], salt: &[u8], iterations: u64, id: u8, size: u64) -> Vec<u8> {
     const U: u64 = 160 / 8;
@@ -644,12 +644,12 @@ fn pbepkcs12sha1(pass: &[u8], salt: &[u8], iterations: u64, id: u8, size: u64) -
     let d = [id; V as usize];
     fn get_len(s: usize) -> usize {
         let s = s as u64;
-        (V * s.div_ceil(V)) as usize
+        (V * ((s + V - 1) / V)) as usize
     }
     let s = salt.iter().cycle().take(get_len(salt.len()));
     let p = pass.iter().cycle().take(get_len(pass.len()));
     let mut i: Vec<u8> = s.chain(p).cloned().collect();
-    let c = size.div_ceil(U);
+    let c = (size + U - 1) / U;
     let mut a: Vec<u8> = vec![];
     for _ in 1..c {
         let ai = pbepkcs12sha1core(&d, &i, &mut a, r);

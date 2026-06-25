@@ -123,15 +123,9 @@ pub fn error_full_message(err: &dyn std::error::Error) -> String {
 /// Propagates `Ok(true)` and `Err(_)` from `stream`, otherwise returns `Ok(false)`.
 pub async fn trystream_any<S: Stream<Item = Result<bool, E>>, E>(stream: S) -> Result<bool, E> {
     pin_mut!(stream);
-    loop {
-        let next_item = stream.next().await;
-        match next_item {
-            Some(value) => {
-                if let Ok(true) | Err(_) = value {
-                    return value;
-                }
-            }
-            None => break,
+    while let Some(value) = stream.next().await {
+        if let Ok(true) | Err(_) = value {
+            return value;
         }
     }
     Ok(false)
