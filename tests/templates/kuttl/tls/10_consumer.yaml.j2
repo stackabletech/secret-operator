@@ -68,7 +68,7 @@ spec:
               assert_trusted_roots_contain "cert 5"
               assert_trusted_roots_contain "cert 6"
 
-              echo Test subject DN with domain components
+              echo "Test subject DN with domain components"
 
               openssl x509 -in /stackable/tls-domain-components/tls.crt -subject -noout | \
                   grep "subject=CN=generated certificate for pod, DC=tls-consumer-.*, DC=$NAMESPACE, DC=svc, DC=.*"
