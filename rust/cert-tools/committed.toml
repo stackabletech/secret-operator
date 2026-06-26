@@ -1,0 +1,2 @@
+style = "conventional"
+allowed_scopes = ["cert-tools"]
