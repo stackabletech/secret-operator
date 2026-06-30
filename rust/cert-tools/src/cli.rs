@@ -107,7 +107,7 @@ pub enum CertInput {
 }
 
 impl CertInput {
-    pub fn from_file(&self) -> Result<Vec<X509>, CertInputError> {
+    pub fn read_certificates(&self) -> Result<Vec<X509>, CertInputError> {
         let read_file_fn = |path| fs::read(path).context(ReadFileSnafu { path });
 
         match self {

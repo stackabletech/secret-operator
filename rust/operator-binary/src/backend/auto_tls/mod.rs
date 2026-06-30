@@ -94,7 +94,10 @@ pub enum Error {
     GenerateKey { source: openssl::error::ErrorStack },
 
     #[snafu(display("failed to load CA"))]
-    LoadCa { source: ca::Error },
+    LoadCa {
+        #[snafu(source(from(ca::Error, Box::new)))]
+        source: Box<ca::Error>,
+    },
 
     #[snafu(display("failed to pick a CA"))]
     PickCa { source: ca::GetCaError },

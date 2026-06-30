@@ -93,7 +93,7 @@ pub fn parse_file_workaround(
     password: &str,
 ) -> Result<Vec<X509>, WorkaroundError> {
     let mut child = Command::new("openssl")
-        .args(&[
+        .args([
             "pkcs12",
             "-nokeys",
             "-password",

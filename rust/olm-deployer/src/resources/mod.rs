@@ -43,8 +43,7 @@ fn deployment_resources(deployment: &Deployment) -> Option<&ResourceRequirements
         .map(|ts| ts.containers.iter())
         .into_iter()
         .flatten()
-        .filter(|c| c.name == "secret-operator-deployer")
-        .last()
+        .rfind(|c| c.name == "secret-operator-deployer")
         .and_then(|c| c.resources.as_ref())
 }
 

@@ -1,8 +1,6 @@
 use stackable_operator::kube::{ResourceExt, api::DynamicObject};
 
-pub fn containers<'a>(
-    target: &'a mut DynamicObject,
-) -> anyhow::Result<&'a mut Vec<serde_json::Value>> {
+pub fn containers(target: &mut DynamicObject) -> anyhow::Result<&mut Vec<serde_json::Value>> {
     let tname = target.name_any();
     let path = "template/spec/containers".split("/");
     match get_or_create(target.data.pointer_mut("/spec").unwrap(), path)? {

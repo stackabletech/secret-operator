@@ -108,9 +108,9 @@ async fn main() -> anyhow::Result<()> {
     match cli.cmd {
         Command::Crd => {
             SecretClass::merged_crd(SecretClassVersion::V1Alpha2)?
-                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
+                .print_yaml_schema(built_info::PKG_VERSION, &SerializeOptions::default())?;
             TrustStore::merged_crd(TrustStoreVersion::V1Alpha1)?
-                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
+                .print_yaml_schema(built_info::PKG_VERSION, &SerializeOptions::default())?;
         }
         Command::Run(SecretOperatorRun { common, mode }) => {
             let RunArguments {
@@ -147,7 +147,7 @@ async fn main() -> anyhow::Result<()> {
             let sigterm_watcher = SignalWatcher::sigterm()?;
 
             let eos_checker =
-                EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, maintenance.end_of_support)?
+                EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, &maintenance.end_of_support)?
                     .run(sigterm_watcher.handle())
                     .map(Ok);
 

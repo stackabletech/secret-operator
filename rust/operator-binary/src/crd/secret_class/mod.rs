@@ -28,7 +28,10 @@ mod v1alpha2_impl;
 pub mod versioned {
     /// A [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass) is a cluster-global Kubernetes resource
     /// that defines a category of secrets that the Secret Operator knows how to provision.
-    #[versioned(crd(group = "secrets.stackable.tech"))]
+    #[versioned(crd(
+        group = "secrets.stackable.tech",
+        doc = "A SecretClass is a cluster-global Kubernetes resource that defines a category of secrets that the Secret Operator knows how to provision."
+    ))]
     #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
     #[serde(rename_all = "camelCase")]
     pub struct SecretClassSpec {
@@ -335,7 +338,7 @@ pub mod versioned {
 
 #[cfg(test)]
 mod test {
-    use stackable_operator::shared::time::Duration;
+    use stackable_operator::{shared::time::Duration, versioned::test_utils::RoundtripTestData};
     use stackable_secret_operator_utils::crd::{ConfigMapReference, SecretReference};
 
     use crate::{
@@ -343,11 +346,26 @@ mod test {
             DEFAULT_CA_CERT_LIFETIME, DEFAULT_CA_CERT_RETIREMENT_DURATION,
             DEFAULT_MAX_CERT_LIFETIME,
         },
-        crd::v1alpha2::{
-            AdditionalTrustRoot, AutoTlsBackend, AutoTlsCa, CertificateKeyGeneration, SecretClass,
-            SecretClassBackend, SecretClassSpec,
+        crd::{
+            secret_class::v1alpha1,
+            v1alpha2::{
+                self, AdditionalTrustRoot, AutoTlsBackend, AutoTlsCa, CertificateKeyGeneration,
+                SecretClass, SecretClassBackend, SecretClassSpec,
+            },
         },
     };
+
+    impl RoundtripTestData for v1alpha1::SecretClassSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            todo!()
+        }
+    }
+
+    impl RoundtripTestData for v1alpha2::SecretClassSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            todo!()
+        }
+    }
 
     #[test]
     fn test_deserialization() {
