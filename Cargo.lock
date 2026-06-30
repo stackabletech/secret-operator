@@ -3730,6 +3730,7 @@ dependencies = [
  "const_format",
  "futures 0.3.32",
  "h2",
+ "indoc",
  "kube-runtime",
  "libc",
  "openssl",

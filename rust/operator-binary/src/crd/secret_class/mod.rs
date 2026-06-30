@@ -355,15 +355,109 @@ mod test {
         },
     };
 
+    /// The test data for [`v1alpha1`] and [`v1alpha2`] is identical except for the names of the
+    /// `certManager` backend variant and the `generateSamAccountName` field, both of which were
+    /// renamed in v1alpha2. The differing names are templated in via `{{cert_manager_backend}}`
+    /// and `{{generate_sam_account_name}}` so that the YAML can be shared between both versions.
+    fn secret_class_roundtrip_test_data(
+        cert_manager_backend: &str,
+        generate_sam_account_name: &str,
+    ) -> String {
+        indoc::indoc! {"
+          - backend:
+              autoTls:
+                ca:
+                  secret:
+                    name: secret-provisioner-tls-ca
+                    namespace: default
+                  autoGenerate: true
+                  caCertificateLifetime: 100d
+                  caCertificateRetirementDuration: 1d
+                  keyGeneration:
+                    rsa:
+                      length: 3072
+                additionalTrustRoots:
+                  - configMap:
+                      name: tls-root-ca-config-map
+                      namespace: default
+                  - secret:
+                      name: tls-root-ca-secret
+                      namespace: default
+                maxCertificateLifetime: 31d
+          - backend:
+              k8sSearch:
+                searchNamespace:
+                  name: default
+                trustStoreConfigMapName: my-trust-store
+          - backend:
+              k8sSearch:
+                searchNamespace:
+                  pod: {}
+          - backend:
+              {{cert_manager_backend}}:
+                issuer:
+                  kind: ClusterIssuer
+                  name: secret-operator-issuer
+                defaultCertificateLifetime: 2d
+                keyGeneration:
+                  rsa:
+                    length: 4096
+          - backend:
+              kerberosKeytab:
+                realmName: CLUSTER.LOCAL
+                kdc: krb5-kdc.default.svc.cluster.local
+                admin:
+                  mit:
+                    kadminServer: krb5-kdc.default.svc.cluster.local
+                adminKeytabSecret:
+                  name: secret-operator-keytab
+                  namespace: default
+                adminPrincipal: stackable-secret-operator
+          - backend:
+              kerberosKeytab:
+                realmName: SBLE.TEST
+                kdc: sble-adds.sble.test
+                admin:
+                  activeDirectory:
+                    ldapServer: sble-adds.sble.test
+                    ldapTlsCaSecret:
+                      name: secret-operator-ad-ca
+                      namespace: default
+                    passwordCacheSecret:
+                      name: secret-operator-ad-passwords
+                      namespace: default
+                    userDistinguishedName: CN=Stackable,CN=Users,DC=sble,DC=test
+                    schemaDistinguishedName: CN=Schema,CN=Configuration,DC=sble,DC=test
+                    {{generate_sam_account_name}}:
+                      prefix: sble-
+                      totalLength: 15
+                adminKeytabSecret:
+                  name: secret-operator-keytab
+                  namespace: default
+                adminPrincipal: stackable-secret-operator
+        "}
+        .replace("{{cert_manager_backend}}", cert_manager_backend)
+        .replace("{{generate_sam_account_name}}", generate_sam_account_name)
+    }
+
     impl RoundtripTestData for v1alpha1::SecretClassSpec {
         fn roundtrip_test_data() -> Vec<Self> {
-            todo!()
+            stackable_operator::utils::yaml_from_str_singleton_map(
+                &secret_class_roundtrip_test_data(
+                    "experimentalCertManager",
+                    "experimentalGenerateSamAccountName",
+                ),
+            )
+            .expect("Failed to parse v1alpha1 SecretClassSpec YAML")
         }
     }
 
     impl RoundtripTestData for v1alpha2::SecretClassSpec {
         fn roundtrip_test_data() -> Vec<Self> {
-            todo!()
+            stackable_operator::utils::yaml_from_str_singleton_map(
+                &secret_class_roundtrip_test_data("certManager", "generateSamAccountName"),
+            )
+            .expect("Failed to parse v1alpha2 SecretClassSpec YAML")
         }
     }
 

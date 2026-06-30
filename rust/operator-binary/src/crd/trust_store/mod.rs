@@ -78,7 +78,17 @@ mod tests {
 
     impl RoundtripTestData for v1alpha1::TrustStoreSpec {
         fn roundtrip_test_data() -> Vec<Self> {
-            todo!()
+            stackable_operator::utils::yaml_from_str_singleton_map(indoc::indoc! {"
+              - secretClassName: tls
+              - secretClassName: tls
+                targetKind: Secret
+                format: tls-pem
+                tlsPemCaName: my-ca.crt
+              - secretClassName: tls
+                targetKind: ConfigMap
+                format: tls-pkcs12
+            "})
+            .expect("Failed to parse TrustStoreSpec YAML")
         }
     }
 }

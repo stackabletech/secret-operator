@@ -24,6 +24,7 @@ const_format = "0.2.34"
 futures = { version = "0.3", features = ["compat"] }
 h2 = "0.4"
 hex = "0.4"
+indoc = "2.0"
 # We can't use the stackable-operator re-export because we need the special "unstable-runtime-stream-control"
 # feature. We don't want to enable it in stackable-operator, as we don't want to accidentally use
 # unstable features.
