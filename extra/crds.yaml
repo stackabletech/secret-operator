@@ -17,7 +17,7 @@ spec:
     name: v1alpha2
     schema:
       openAPIV3Schema:
-        description: Auto-generated derived type for SecretClassSpec via `CustomResource`
+        description: A SecretClass is a cluster-global Kubernetes resource that defines a category of secrets that the Secret Operator knows how to provision.
         properties:
           spec:
             description: |-
@@ -444,7 +444,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Auto-generated derived type for SecretClassSpec via `CustomResource`
+        description: A SecretClass is a cluster-global Kubernetes resource that defines a category of secrets that the Secret Operator knows how to provision.
         properties:
           spec:
             description: |-
@@ -886,7 +886,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Auto-generated derived type for TrustStoreSpec via `CustomResource`
+        description: A TrustStore requests information about how to validate secrets issued by a SecretClass.
         properties:
           spec:
             description: |-
