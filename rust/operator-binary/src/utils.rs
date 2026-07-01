@@ -121,6 +121,7 @@ pub fn error_full_message(err: &dyn std::error::Error) -> String {
 }
 
 /// Propagates `Ok(true)` and `Err(_)` from `stream`, otherwise returns `Ok(false)`.
+#[allow(tail_expr_drop_order)]
 pub async fn trystream_any<S: Stream<Item = Result<bool, E>>, E>(stream: S) -> Result<bool, E> {
     pin_mut!(stream);
     while let Some(value) = stream.next().await {
@@ -130,6 +131,7 @@ pub async fn trystream_any<S: Stream<Item = Result<bool, E>>, E>(stream: S) -> R
     }
     Ok(false)
 }
+
 /// Concatenate chunks of bytes, short-circuiting on [`Err`].
 ///
 /// This is a byte-oriented equivalent to [`Iterator::collect::<Result<String, _>>`](`Iterator::collect`).
