@@ -635,7 +635,7 @@ fn pbepkcs12sha1core(d: &[u8], i: &[u8], a: &mut Vec<u8>, iterations: u64) -> Ve
     a.append(&mut ai.clone());
     ai
 }
-
+#[allow(clippy::manual_div_ceil)] // This is a fork, ignoring errors
 #[allow(clippy::many_single_char_names)]
 fn pbepkcs12sha1(pass: &[u8], salt: &[u8], iterations: u64, id: u8, size: u64) -> Vec<u8> {
     const U: u64 = 160 / 8;

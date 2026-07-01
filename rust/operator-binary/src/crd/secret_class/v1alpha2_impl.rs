@@ -26,7 +26,7 @@ impl SecretClassBackend {
     pub fn refers_to_config_map(
         &self,
         config_map: &PartialObjectMeta<ConfigMap>,
-    ) -> impl Iterator<Item = SearchNamespaceMatchCondition> {
+    ) -> impl Iterator<Item = SearchNamespaceMatchCondition> + use<> {
         let cm_namespace = config_map.metadata.namespace.as_deref();
         match self {
             Self::K8sSearch(backend) => {
@@ -46,7 +46,7 @@ impl SecretClassBackend {
     pub fn refers_to_secret(
         &self,
         secret: &PartialObjectMeta<Secret>,
-    ) -> impl Iterator<Item = SearchNamespaceMatchCondition> {
+    ) -> impl Iterator<Item = SearchNamespaceMatchCondition> + use<> {
         match self {
             Self::AutoTls(backend) => {
                 (backend.ca.secret == *secret).then_some(SearchNamespaceMatchCondition::True)
