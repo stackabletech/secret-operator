@@ -61,8 +61,7 @@ fn deployer_env_var(deployment: &Deployment) -> Option<&Vec<EnvVar>> {
         .map(|ts| ts.containers.iter())
         .into_iter()
         .flatten()
-        .filter(|c| c.name == "secret-operator-deployer")
-        .last()
+        .rfind(|c| c.name == "secret-operator-deployer")
         .and_then(|c| c.env.as_ref())
 }
 
