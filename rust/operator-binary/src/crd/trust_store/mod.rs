@@ -22,7 +22,11 @@ pub mod versioned {
     /// validate secrets issued by a [SecretClass](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass).
     ///
     /// The requested information is written to a ConfigMap with the same name as the TrustStore.
-    #[versioned(crd(group = "secrets.stackable.tech", namespaced))]
+    #[versioned(crd(
+        group = "secrets.stackable.tech",
+        namespaced,
+        doc = "A TrustStore requests information about how to validate secrets issued by a SecretClass.",
+    ))]
     #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
     #[serde(rename_all = "camelCase")]
     pub struct TrustStoreSpec {
@@ -63,5 +67,28 @@ pub mod versioned {
 impl v1alpha1::TrustStoreSpec {
     fn default_tls_pem_ca_name() -> String {
         FILE_PEM_CERT_CA.to_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use stackable_operator::versioned::test_utils::RoundtripTestData;
+
+    use crate::crd::trust_store::v1alpha1;
+
+    impl RoundtripTestData for v1alpha1::TrustStoreSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            stackable_operator::utils::yaml_from_str_singleton_map(indoc::indoc! {"
+              - secretClassName: tls
+              - secretClassName: tls
+                targetKind: Secret
+                format: tls-pem
+                tlsPemCaName: my-ca.crt
+              - secretClassName: tls
+                targetKind: ConfigMap
+                format: tls-pkcs12
+            "})
+            .expect("Failed to parse TrustStoreSpec YAML")
+        }
     }
 }

@@ -69,7 +69,7 @@ enum Error {
 
 enum AdminConnection<'a> {
     Mit(mit::MitAdmin<'a>),
-    ActiveDirectory(active_directory::AdAdmin<'a>),
+    ActiveDirectory(Box<active_directory::AdAdmin<'a>>),
 }
 
 async fn run() -> Result<Response, Error> {
@@ -95,7 +95,7 @@ async fn run() -> Result<Response, Error> {
             user_distinguished_name,
             schema_distinguished_name,
             generate_sam_account_name,
-        } => AdminConnection::ActiveDirectory(
+        } => AdminConnection::ActiveDirectory(Box::new(
             active_directory::AdAdmin::connect(
                 &ldap_server,
                 &krb,
@@ -107,7 +107,7 @@ async fn run() -> Result<Response, Error> {
             )
             .await
             .context(ActiveDirectoryInitSnafu)?,
-        ),
+        )),
     };
     let mut kt = Keytab::resolve(
         &krb,

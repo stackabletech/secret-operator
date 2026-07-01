@@ -94,7 +94,10 @@ pub enum Error {
     GenerateKey { source: openssl::error::ErrorStack },
 
     #[snafu(display("failed to load CA"))]
-    LoadCa { source: ca::Error },
+    LoadCa {
+        #[snafu(source(from(ca::Error, Box::new)))]
+        source: Box<ca::Error>,
+    },
 
     #[snafu(display("failed to pick a CA"))]
     PickCa { source: ca::GetCaError },
@@ -355,6 +358,21 @@ impl SecretBackend for TlsGenerate {
                     }
                 }
 
+                let domain_components = if selector.autotls_cert_domain_components_in_subject_dn {
+                    [
+                        Some(pod_info.pod_name.as_str()),
+                        pod_info.service_name.as_deref(),
+                        Some(&pod_info.namespace),
+                        Some("svc"),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .chain(pod_info.kubernetes_cluster_domain.split('.'))
+                    .collect()
+                } else {
+                    vec![]
+                };
+
                 let pod_cert = X509Builder::new()
                     .and_then(|mut x509| {
                         let subject_name = X509NameBuilder::new()
@@ -363,6 +381,12 @@ impl SecretBackend for TlsGenerate {
                                     Nid::COMMONNAME,
                                     "generated certificate for pod",
                                 )?;
+                                for domain_component in domain_components {
+                                    name.append_entry_by_nid(
+                                        Nid::DOMAINCOMPONENT,
+                                        domain_component,
+                                    )?;
+                                }
                                 Ok(name)
                             })?
                             .build();

@@ -129,6 +129,19 @@ pub struct SecretVolumeSelector {
     )]
     pub autotls_cert_jitter_factor: f64,
 
+    /// If set to `"true"`, the domain components of the Pod's fully qualified domain name (FQDN)
+    /// are appended to the subject distinguished name (DN) of the TLS certificate.
+    ///
+    /// For example, the subject DN could look as follows for a StatefulSet Pod:
+    ///
+    /// `CN=generated certificate for pod, DC=my-pod-0, DC=my-statefulset-service, DC=my-namespace, DC=svc, DC=cluster, DC=local`
+    #[serde(
+        rename = "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn",
+        deserialize_with = "SecretVolumeSelector::deserialize_str_as_bool",
+        default
+    )]
+    pub autotls_cert_domain_components_in_subject_dn: bool,
+
     /// The TLS cert lifetime (when using the [`cert_manager`] backend).
     ///
     /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
@@ -298,6 +311,16 @@ impl SecretVolumeSelector {
             <D::Error as serde::de::Error>::invalid_value(
                 Unexpected::Str(&str),
                 &"a string containing a f64",
+            )
+        })
+    }
+
+    fn deserialize_str_as_bool<'de, D: Deserializer<'de>>(de: D) -> Result<bool, D::Error> {
+        let str = String::deserialize(de)?;
+        str.parse().map_err(|_| {
+            <D::Error as serde::de::Error>::invalid_value(
+                Unexpected::Str(&str),
+                &"a string containing a boolean",
             )
         })
     }

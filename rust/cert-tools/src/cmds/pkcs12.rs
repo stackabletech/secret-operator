@@ -44,7 +44,7 @@ pub fn generate_truststore(args: GeneratePkcs12TruststoreArguments) -> Result<()
     let certificate_sources = certificate_sources
         .iter()
         .map(|source| {
-            let certificates_list = source.from_file().context(ReadCertificateSnafu {
+            let certificates_list = source.read_certificates().context(ReadCertificateSnafu {
                 path: source.path(),
             })?;
 

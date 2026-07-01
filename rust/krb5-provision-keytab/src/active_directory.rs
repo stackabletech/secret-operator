@@ -22,7 +22,8 @@ use crate::credential_cache::{self, CredentialCache};
 pub enum Error {
     #[snafu(display("failed to retrieve LDAP TLS CA {ca_ref}"))]
     GetLdapTlsCa {
-        source: kube::Error,
+        #[snafu(source(from(kube::Error, Box::new)))]
+        source: Box<kube::Error>,
         ca_ref: ObjectRef<Secret>,
     },
 
@@ -33,7 +34,10 @@ pub enum Error {
     ParseLdapTlsCa { source: native_tls::Error },
 
     #[snafu(display("password cache error"))]
-    PasswordCache { source: credential_cache::Error },
+    PasswordCache {
+        #[snafu(source(from(credential_cache::Error, Box::new)))]
+        source: Box<credential_cache::Error>,
+    },
 
     #[snafu(display("failed to configure LDAP TLS"))]
     ConfigureLdapTls { source: native_tls::Error },
@@ -58,7 +62,8 @@ pub enum Error {
         link = "https://docs.stackable.tech/home/nightly/secret-operator/troubleshooting.html#active-directory-ldap-user-conflict"
     ))]
     CreateLdapUserConflict {
-        source: ldap3::LdapError,
+        #[snafu(source(from(ldap3::LdapError, Box::new)))]
+        source: Box<ldap3::LdapError>,
         password_cache_ref: ObjectRef<Secret>,
     },
 

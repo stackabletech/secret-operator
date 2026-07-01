@@ -47,6 +47,7 @@ rand.workspace = true
 const_format.workspace = true
 
 [dev-dependencies]
+indoc.workspace = true
 serde_yaml.workspace = true
 
 [build-dependencies]
