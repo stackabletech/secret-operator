@@ -30,7 +30,9 @@ Install the Stackable Secret Operator
 $ helm install secret-operator oci://oci.stackable.tech/sdp-charts/secret-operator
 ----
 
-Helm will deploy the operator in Kubernetes containers and apply the CRDs. You're now ready to deploy secrets!
+Helm will deploy the operator in Kubernetes containers.
+The operator installs and maintains its own CRDs at startup (see xref:concepts:maintenance/crds.adoc[]).
+You're now ready to deploy secrets!
 
 === Microk8s
 
