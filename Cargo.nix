@@ -1238,7 +1238,7 @@ rec {
       "cert-tools" = rec {
         crateName = "cert-tools";
         version = "0.1.1";
-        edition = "2021";
+        edition = "2024";
         crateBin = [
           {
             name = "cert-tools";
@@ -4714,7 +4714,7 @@ rec {
           }
           {
             name = "windows-core";
-            packageId = "windows-core 0.62.2";
+            packageId = "windows-core";
             target = { target, features }: ("windows" == target."os" or null);
           }
         ];
@@ -12242,7 +12242,7 @@ rec {
       "stackable-krb5-provision-keytab" = rec {
         crateName = "stackable-krb5-provision-keytab";
         version = "0.0.0-dev";
-        edition = "2021";
+        edition = "2024";
         crateBin = [
           {
             name = "stackable-krb5-provision-keytab";
@@ -12559,7 +12559,7 @@ rec {
       "stackable-secret-operator" = rec {
         crateName = "stackable-secret-operator";
         version = "0.0.0-dev";
-        edition = "2021";
+        edition = "2024";
         crateBin = [
           {
             name = "stackable-secret-operator";
@@ -12748,7 +12748,7 @@ rec {
       "stackable-secret-operator-olm-deployer" = rec {
         crateName = "stackable-secret-operator-olm-deployer";
         version = "0.0.0-dev";
-        edition = "2021";
+        edition = "2024";
         crateBin = [
           {
             name = "stackable-secret-operator-olm-deployer";
@@ -12813,7 +12813,7 @@ rec {
       "stackable-secret-operator-utils" = rec {
         crateName = "stackable-secret-operator-utils";
         version = "0.0.0-dev";
-        edition = "2021";
+        edition = "2024";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/utils; };
         libName = "stackable_secret_operator_utils";
         authors = [
@@ -16823,7 +16823,7 @@ rec {
           }
           {
             name = "windows-core";
-            packageId = "windows-core 0.61.2";
+            packageId = "windows-core";
             usesDefaultFeatures = false;
           }
           {
@@ -17547,7 +17547,7 @@ rec {
         dependencies = [
           {
             name = "windows-core";
-            packageId = "windows-core 0.61.2";
+            packageId = "windows-core";
             usesDefaultFeatures = false;
           }
         ];
@@ -17555,7 +17555,7 @@ rec {
           "default" = [ "std" ];
         };
       };
-      "windows-core 0.61.2" = rec {
+      "windows-core" = rec {
         crateName = "windows-core";
         version = "0.61.2";
         edition = "2021";
@@ -17582,51 +17582,12 @@ rec {
           }
           {
             name = "windows-result";
-            packageId = "windows-result 0.3.4";
+            packageId = "windows-result";
             usesDefaultFeatures = false;
           }
           {
             name = "windows-strings";
-            packageId = "windows-strings 0.4.2";
-            usesDefaultFeatures = false;
-          }
-        ];
-        features = {
-          "default" = [ "std" ];
-          "std" = [ "windows-result/std" "windows-strings/std" ];
-        };
-        resolvedDefaultFeatures = [ "std" ];
-      };
-      "windows-core 0.62.2" = rec {
-        crateName = "windows-core";
-        version = "0.62.2";
-        edition = "2021";
-        sha256 = "1swxpv1a8qvn3bkxv8cn663238h2jccq35ff3nsj61jdsca3ms5q";
-        libName = "windows_core";
-        dependencies = [
-          {
-            name = "windows-implement";
-            packageId = "windows-implement";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "windows-interface";
-            packageId = "windows-interface";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "windows-link";
-            packageId = "windows-link 0.2.1";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "windows-result";
-            packageId = "windows-result 0.4.1";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "windows-strings";
-            packageId = "windows-strings 0.5.1";
+            packageId = "windows-strings";
             usesDefaultFeatures = false;
           }
         ];
@@ -17645,7 +17606,7 @@ rec {
         dependencies = [
           {
             name = "windows-core";
-            packageId = "windows-core 0.61.2";
+            packageId = "windows-core";
             usesDefaultFeatures = false;
           }
           {
@@ -17745,7 +17706,7 @@ rec {
         dependencies = [
           {
             name = "windows-core";
-            packageId = "windows-core 0.61.2";
+            packageId = "windows-core";
             usesDefaultFeatures = false;
           }
           {
@@ -17758,7 +17719,7 @@ rec {
           "default" = [ "std" ];
         };
       };
-      "windows-result 0.3.4" = rec {
+      "windows-result" = rec {
         crateName = "windows-result";
         version = "0.3.4";
         edition = "2021";
@@ -17779,25 +17740,7 @@ rec {
         };
         resolvedDefaultFeatures = [ "std" ];
       };
-      "windows-result 0.4.1" = rec {
-        crateName = "windows-result";
-        version = "0.4.1";
-        edition = "2021";
-        sha256 = "1d9yhmrmmfqh56zlj751s5wfm9a2aa7az9rd7nn5027nxa4zm0bp";
-        libName = "windows_result";
-        dependencies = [
-          {
-            name = "windows-link";
-            packageId = "windows-link 0.2.1";
-            usesDefaultFeatures = false;
-          }
-        ];
-        features = {
-          "default" = [ "std" ];
-        };
-        resolvedDefaultFeatures = [ "std" ];
-      };
-      "windows-strings 0.4.2" = rec {
+      "windows-strings" = rec {
         crateName = "windows-strings";
         version = "0.4.2";
         edition = "2021";
@@ -17810,24 +17753,6 @@ rec {
           {
             name = "windows-link";
             packageId = "windows-link 0.1.3";
-            usesDefaultFeatures = false;
-          }
-        ];
-        features = {
-          "default" = [ "std" ];
-        };
-        resolvedDefaultFeatures = [ "std" ];
-      };
-      "windows-strings 0.5.1" = rec {
-        crateName = "windows-strings";
-        version = "0.5.1";
-        edition = "2021";
-        sha256 = "14bhng9jqv4fyl7lqjz3az7vzh8pw0w4am49fsqgcz67d67x0dvq";
-        libName = "windows_strings";
-        dependencies = [
-          {
-            name = "windows-link";
-            packageId = "windows-link 0.2.1";
             usesDefaultFeatures = false;
           }
         ];
