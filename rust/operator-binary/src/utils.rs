@@ -246,8 +246,8 @@ where
 }
 
 pub trait ResultExt<T, E> {
-    /// Transforms this [`Result<T, E>`] into [`Ok(Some(T))`] if [`Ok`], [`Ok(None)`] if [`Err`] and
-    /// `predicate` is `true` or [`Err(_)`] if [`Err`].
+    /// Transforms this [`Result<T, E>`] into `Ok(Some(T))` if [`Ok`], `Ok(None)` if [`Err`] and
+    /// `predicate` is `true` or `Err(_)` if [`Err`].
     ///
     /// This basically applies [`Result::ok`] only if `predicate` is `true`.
     fn ok_if(self, predicate: bool) -> Result<Option<T>, E>;

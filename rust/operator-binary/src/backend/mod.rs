@@ -101,7 +101,7 @@ pub struct SecretVolumeSelector {
     #[serde(flatten)]
     pub names: NamingOptions,
 
-    /// The TLS cert lifetime (when using the [`tls`] backend).
+    /// The TLS cert lifetime (when using the [`auto_tls`] backend).
     /// The format is documented in <https://docs.stackable.tech/home/nightly/concepts/duration>.
     #[serde(
         rename = "secrets.stackable.tech/backend.autotls.cert.lifetime",

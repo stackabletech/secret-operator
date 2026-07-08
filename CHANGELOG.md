@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Bump stackable-operator to 0.113.3 and rand to 0.10 ([#719]).
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#693]).
 
 ### Fixed
@@ -24,6 +25,7 @@ All notable changes to this project will be documented in this file.
 [#706]: https://github.com/stackabletech/secret-operator/pull/706
 [#707]: https://github.com/stackabletech/secret-operator/pull/707
 [#708]: https://github.com/stackabletech/secret-operator/pull/708
+[#719]: https://github.com/stackabletech/secret-operator/pull/719
 
 ## [26.3.0] - 2026-03-16
 

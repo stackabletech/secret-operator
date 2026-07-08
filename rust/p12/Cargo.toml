@@ -30,7 +30,7 @@ version = "^0.4.2"
 features = ["alloc", "block-padding"]
 
 [dependencies.yasna]
-version = "^0.5"
+version = "^0.6"
 features = ["std"]
 
 [dev-dependencies]

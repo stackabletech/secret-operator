@@ -20,7 +20,7 @@ use openssl::{
         },
     },
 };
-use rand::Rng;
+use rand::RngExt as _;
 use snafu::{OptionExt, ResultExt, Snafu, ensure};
 use stackable_operator::{kube::runtime::reflector::ObjectRef, shared::time::Duration};
 use time::OffsetDateTime;
