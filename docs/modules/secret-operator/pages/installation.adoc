@@ -62,5 +62,7 @@ In case you are encountering the mentioned error (or secret-operator does not wo
 
 === VMware Tanzu
 
-VMware Tanzu uses a non-standard Kubelet state directory. Installing secret-operator on Tanzu requires the argument
-`--set csiNodeDriver.kubeletDir=/var/vcap/data/kubelet` to be added to the `helm install` command.
+Whether Tanzu uses a non-standard Kubelet state directory depends on the variant.
+BOSH-deployed clusters (Tanzu Kubernetes Grid Integrated Edition, formerly PKS) place it under `/var/vcap`, so installing secret-operator there requires the argument `--set csiNodeDriver.kubeletDir=/var/vcap/data/kubelet` to be added to the `helm install` command.
+Standard clusters (Tanzu Kubernetes Grid and vSphere with Tanzu) use the default `/var/lib/kubelet` and need no override.
+If unsure, check the actual directory on a node before overriding.
