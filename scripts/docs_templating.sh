@@ -39,8 +39,8 @@ do
 done
 
 # Ensure this script is executable
-chmod +x "docs/modules/secret-operator/examples/getting_started/getting_started.sh" \
-  || chmod +x "docs/modules/secret-operator/examples/getting_started/code/getting_started.sh" \
+chmod +x "docs/modules/secret/examples/getting_started/getting_started.sh" \
+  || chmod +x "docs/modules/secret/examples/getting_started/code/getting_started.sh" \
   || true
 
 echo "done"
