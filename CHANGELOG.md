@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [26.7.0] - 2026-07-21
+
+## [26.7.0-rc1] - 2026-07-16
+
 ### Added
 
 - Support configuring the name of the key in the ConfigMap/Secret, in which the PEM encoded CA certificate of the Truststore should be placed.
