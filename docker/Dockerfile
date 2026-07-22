@@ -191,7 +191,6 @@ COPY LICENSE /licenses/LICENSE
 
 COPY --from=builder --chown=${STACKABLE_USER_UID}:0 /app/* /usr/local/bin/
 
-
 USER ${STACKABLE_USER_UID}
 
 ENTRYPOINT ["stackable-secret-operator"]
