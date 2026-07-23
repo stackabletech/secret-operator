@@ -982,51 +982,7 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "logging" "prettyplease" "runtime" ];
       };
-      "bit-set" = rec {
-        crateName = "bit-set";
-        version = "0.8.0";
-        edition = "2015";
-        sha256 = "18riaa10s6n59n39vix0cr7l2dgwdhcpbcm97x1xbyfp1q47x008";
-        libName = "bit_set";
-        authors = [
-          "Alexis Beingessner <a.beingessner@gmail.com>"
-        ];
-        dependencies = [
-          {
-            name = "bit-vec";
-            packageId = "bit-vec 0.8.0";
-            usesDefaultFeatures = false;
-          }
-        ];
-        features = {
-          "default" = [ "std" ];
-          "serde" = [ "dep:serde" "bit-vec/serde" ];
-          "std" = [ "bit-vec/std" ];
-        };
-        resolvedDefaultFeatures = [ "std" ];
-      };
-      "bit-vec 0.8.0" = rec {
-        crateName = "bit-vec";
-        version = "0.8.0";
-        edition = "2015";
-        sha256 = "1xxa1s2cj291r7k1whbxq840jxvmdsq9xgh7bvrxl46m80fllxjy";
-        libName = "bit_vec";
-        authors = [
-          "Alexis Beingessner <a.beingessner@gmail.com>"
-        ];
-        features = {
-          "borsh" = [ "dep:borsh" ];
-          "borsh_std" = [ "borsh/std" ];
-          "default" = [ "std" ];
-          "miniserde" = [ "dep:miniserde" ];
-          "nanoserde" = [ "dep:nanoserde" ];
-          "serde" = [ "dep:serde" ];
-          "serde_no_std" = [ "serde/alloc" ];
-          "serde_std" = [ "std" "serde/std" ];
-        };
-        resolvedDefaultFeatures = [ "std" ];
-      };
-      "bit-vec 0.9.1" = rec {
+      "bit-vec" = rec {
         crateName = "bit-vec";
         version = "0.9.1";
         edition = "2021";
@@ -3085,43 +3041,6 @@ rec {
           "std" = [ "event-listener/std" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
-      };
-      "fancy-regex" = rec {
-        crateName = "fancy-regex";
-        version = "0.16.2";
-        edition = "2018";
-        sha256 = "0vy4c012f82xcg3gs068mq110zhsrnajh58fmq1jxr7vaijhb2wr";
-        libName = "fancy_regex";
-        authors = [
-          "Raph Levien <raph@google.com>"
-          "Robin Stocker <robin@nibor.org>"
-          "Keith Hall <keith.hall@available.systems>"
-        ];
-        dependencies = [
-          {
-            name = "bit-set";
-            packageId = "bit-set";
-            usesDefaultFeatures = false;
-          }
-          {
-            name = "regex-automata";
-            packageId = "regex-automata";
-            usesDefaultFeatures = false;
-            features = [ "alloc" "syntax" "meta" "nfa" "dfa" "hybrid" ];
-          }
-          {
-            name = "regex-syntax";
-            packageId = "regex-syntax";
-            usesDefaultFeatures = false;
-          }
-        ];
-        features = {
-          "default" = [ "unicode" "perf" "std" ];
-          "perf" = [ "regex-automata/perf" ];
-          "std" = [ "regex-automata/std" "regex-syntax/std" "bit-set/std" ];
-          "unicode" = [ "regex-automata/unicode" "regex-syntax/unicode" ];
-        };
-        resolvedDefaultFeatures = [ "default" "perf" "std" "unicode" ];
       };
       "fastrand" = rec {
         crateName = "fastrand";
@@ -5325,26 +5244,6 @@ rec {
           "default" = [ "use_std" ];
           "use_std" = [ "use_alloc" "either/use_std" ];
         };
-      };
-      "itertools 0.14.0" = rec {
-        crateName = "itertools";
-        version = "0.14.0";
-        edition = "2018";
-        sha256 = "118j6l1vs2mx65dqhwyssbrxpawa90886m3mzafdvyip41w2q69b";
-        authors = [
-          "bluss"
-        ];
-        dependencies = [
-          {
-            name = "either";
-            packageId = "either";
-            usesDefaultFeatures = false;
-          }
-        ];
-        features = {
-          "default" = [ "use_std" ];
-          "use_std" = [ "use_alloc" "either/use_std" ];
-        };
         resolvedDefaultFeatures = [ "default" "use_alloc" "use_std" ];
       };
       "itertools 0.15.0" = rec {
@@ -5784,8 +5683,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "013bbf43f7006a4ddfc08a147f68441ed88b462b";
-          sha256 = "1ab5qmawljwbll6b44gw3md57s9kjiy5p16akz6rv52j6fdxjpgr";
+          rev = "ee66b8d66fe10c216acfed0f81070b362604b392";
+          sha256 = "1v6slybgc0xqsmh3bxyid6xjvmz8ps41nfmmc6csgyzqs2v0wzxj";
         };
         libName = "k8s_version";
         authors = [
@@ -9141,61 +9040,6 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "proc-macro" ];
       };
-      "product-config" = rec {
-        crateName = "product-config";
-        version = "0.8.0";
-        edition = "2021";
-        workspace_member = null;
-        src = pkgs.fetchgit {
-          url = "https://github.com/stackabletech/product-config.git";
-          rev = "678fb7cf30af7d7b516c9a46698a1b661120d54a";
-          sha256 = "1dz70kapm2wdqcr7ndyjji0lhsl98bsq95gnb2lw487wf6yr7987";
-        };
-        libName = "product_config";
-        authors = [
-          "Malte Sander <malte.sander.it@gmail.com>"
-        ];
-        dependencies = [
-          {
-            name = "fancy-regex";
-            packageId = "fancy-regex";
-          }
-          {
-            name = "java-properties";
-            packageId = "java-properties";
-          }
-          {
-            name = "schemars";
-            packageId = "schemars";
-          }
-          {
-            name = "semver";
-            packageId = "semver";
-          }
-          {
-            name = "serde";
-            packageId = "serde";
-            features = [ "derive" ];
-          }
-          {
-            name = "serde_json";
-            packageId = "serde_json";
-          }
-          {
-            name = "serde_yaml";
-            packageId = "serde_yaml";
-          }
-          {
-            name = "snafu";
-            packageId = "snafu 0.8.9";
-          }
-          {
-            name = "xml";
-            packageId = "xml";
-          }
-        ];
-
-      };
       "prost 0.13.5" = rec {
         crateName = "prost";
         version = "0.13.5";
@@ -9274,7 +9118,7 @@ rec {
           }
           {
             name = "itertools";
-            packageId = "itertools 0.14.0";
+            packageId = "itertools 0.13.0";
             usesDefaultFeatures = false;
             features = [ "use_alloc" ];
           }
@@ -9364,7 +9208,7 @@ rec {
           }
           {
             name = "itertools";
-            packageId = "itertools 0.14.0";
+            packageId = "itertools 0.13.0";
           }
           {
             name = "proc-macro2";
@@ -9402,7 +9246,7 @@ rec {
           }
           {
             name = "itertools";
-            packageId = "itertools 0.14.0";
+            packageId = "itertools 0.13.0";
           }
           {
             name = "proc-macro2";
@@ -9983,7 +9827,7 @@ rec {
           "unicode-script" = [ "regex-syntax?/unicode-script" ];
           "unicode-segment" = [ "regex-syntax?/unicode-segment" ];
         };
-        resolvedDefaultFeatures = [ "alloc" "dfa" "dfa-build" "dfa-onepass" "dfa-search" "hybrid" "meta" "nfa" "nfa-backtrack" "nfa-pikevm" "nfa-thompson" "perf" "perf-inline" "perf-literal" "perf-literal-multisubstring" "perf-literal-substring" "std" "syntax" "unicode" "unicode-age" "unicode-bool" "unicode-case" "unicode-gencat" "unicode-perl" "unicode-script" "unicode-segment" "unicode-word-boundary" ];
+        resolvedDefaultFeatures = [ "alloc" "dfa-build" "dfa-onepass" "dfa-search" "hybrid" "meta" "nfa-backtrack" "nfa-pikevm" "nfa-thompson" "perf-inline" "perf-literal" "perf-literal-multisubstring" "perf-literal-substring" "std" "syntax" "unicode" "unicode-age" "unicode-bool" "unicode-case" "unicode-gencat" "unicode-perl" "unicode-script" "unicode-segment" "unicode-word-boundary" ];
       };
       "regex-syntax" = rec {
         crateName = "regex-syntax";
@@ -12138,9 +11982,9 @@ rec {
       };
       "spin" = rec {
         crateName = "spin";
-        version = "0.9.8";
+        version = "0.9.9";
         edition = "2015";
-        sha256 = "0rvam5r0p3a6qhc18scqpvpgb3ckzyqxpgdfyjnghh8ja7byi039";
+        sha256 = "03psal0vh1xdxp7agphw09p7kf50v3bj1zshijq1s5bkdd7jcqrp";
         authors = [
           "Mathijs van de Nes <git@mathijs.vd-nes.nl>"
           "John Ericson <git@JohnEricson.me>"
@@ -12213,8 +12057,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "013bbf43f7006a4ddfc08a147f68441ed88b462b";
-          sha256 = "1ab5qmawljwbll6b44gw3md57s9kjiy5p16akz6rv52j6fdxjpgr";
+          rev = "ee66b8d66fe10c216acfed0f81070b362604b392";
+          sha256 = "1v6slybgc0xqsmh3bxyid6xjvmz8ps41nfmmc6csgyzqs2v0wzxj";
         };
         libName = "stackable_certs";
         authors = [
@@ -12394,13 +12238,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.113.3";
+        version = "0.114.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "013bbf43f7006a4ddfc08a147f68441ed88b462b";
-          sha256 = "1ab5qmawljwbll6b44gw3md57s9kjiy5p16akz6rv52j6fdxjpgr";
+          rev = "ee66b8d66fe10c216acfed0f81070b362604b392";
+          sha256 = "1v6slybgc0xqsmh3bxyid6xjvmz8ps41nfmmc6csgyzqs2v0wzxj";
         };
         libName = "stackable_operator";
         authors = [
@@ -12474,10 +12318,6 @@ rec {
             packageId = "kube";
             usesDefaultFeatures = false;
             features = [ "client" "jsonpatch" "runtime" "derive" "admission" "rustls-tls" "ring" ];
-          }
-          {
-            name = "product-config";
-            packageId = "product-config";
           }
           {
             name = "rand";
@@ -12598,8 +12438,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "013bbf43f7006a4ddfc08a147f68441ed88b462b";
-          sha256 = "1ab5qmawljwbll6b44gw3md57s9kjiy5p16akz6rv52j6fdxjpgr";
+          rev = "ee66b8d66fe10c216acfed0f81070b362604b392";
+          sha256 = "1v6slybgc0xqsmh3bxyid6xjvmz8ps41nfmmc6csgyzqs2v0wzxj";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -12937,8 +12777,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "013bbf43f7006a4ddfc08a147f68441ed88b462b";
-          sha256 = "1ab5qmawljwbll6b44gw3md57s9kjiy5p16akz6rv52j6fdxjpgr";
+          rev = "ee66b8d66fe10c216acfed0f81070b362604b392";
+          sha256 = "1v6slybgc0xqsmh3bxyid6xjvmz8ps41nfmmc6csgyzqs2v0wzxj";
         };
         libName = "stackable_shared";
         authors = [
@@ -13128,8 +12968,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "013bbf43f7006a4ddfc08a147f68441ed88b462b";
-          sha256 = "1ab5qmawljwbll6b44gw3md57s9kjiy5p16akz6rv52j6fdxjpgr";
+          rev = "ee66b8d66fe10c216acfed0f81070b362604b392";
+          sha256 = "1v6slybgc0xqsmh3bxyid6xjvmz8ps41nfmmc6csgyzqs2v0wzxj";
         };
         libName = "stackable_telemetry";
         authors = [
@@ -13238,8 +13078,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "013bbf43f7006a4ddfc08a147f68441ed88b462b";
-          sha256 = "1ab5qmawljwbll6b44gw3md57s9kjiy5p16akz6rv52j6fdxjpgr";
+          rev = "ee66b8d66fe10c216acfed0f81070b362604b392";
+          sha256 = "1v6slybgc0xqsmh3bxyid6xjvmz8ps41nfmmc6csgyzqs2v0wzxj";
         };
         libName = "stackable_versioned";
         authors = [
@@ -13288,8 +13128,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "013bbf43f7006a4ddfc08a147f68441ed88b462b";
-          sha256 = "1ab5qmawljwbll6b44gw3md57s9kjiy5p16akz6rv52j6fdxjpgr";
+          rev = "ee66b8d66fe10c216acfed0f81070b362604b392";
+          sha256 = "1v6slybgc0xqsmh3bxyid6xjvmz8ps41nfmmc6csgyzqs2v0wzxj";
         };
         procMacro = true;
         libName = "stackable_versioned_macros";
@@ -13356,8 +13196,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "013bbf43f7006a4ddfc08a147f68441ed88b462b";
-          sha256 = "1ab5qmawljwbll6b44gw3md57s9kjiy5p16akz6rv52j6fdxjpgr";
+          rev = "ee66b8d66fe10c216acfed0f81070b362604b392";
+          sha256 = "1v6slybgc0xqsmh3bxyid6xjvmz8ps41nfmmc6csgyzqs2v0wzxj";
         };
         libName = "stackable_webhook";
         authors = [
@@ -18678,7 +18518,7 @@ rec {
         dependencies = [
           {
             name = "bit-vec";
-            packageId = "bit-vec 0.9.1";
+            packageId = "bit-vec";
             optional = true;
             usesDefaultFeatures = false;
           }
