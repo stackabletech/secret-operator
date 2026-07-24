@@ -115,7 +115,6 @@ async fn main() -> anyhow::Result<()> {
         Command::Run(SecretOperatorRun { common, mode }) => {
             let RunArguments {
                 operator_environment,
-                product_config: _,
                 watch_namespace,
                 maintenance,
                 common,
