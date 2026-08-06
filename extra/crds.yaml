@@ -6,15 +6,12 @@ metadata:
 spec:
   group: secrets.stackable.tech
   names:
-    categories: []
     kind: SecretClass
     plural: secretclasses
-    shortNames: []
     singular: secretclass
   scope: Cluster
   versions:
-  - additionalPrinterColumns: []
-    name: v1alpha2
+  - name: v1alpha2
     schema:
       openAPIV3Schema:
         description: A SecretClass is a cluster-global Kubernetes resource that defines a category of secrets that the Secret Operator knows how to provision.
@@ -439,9 +436,7 @@ spec:
         type: object
     served: true
     storage: true
-    subresources: {}
-  - additionalPrinterColumns: []
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: A SecretClass is a cluster-global Kubernetes resource that defines a category of secrets that the Secret Operator knows how to provision.
@@ -866,7 +861,6 @@ spec:
         type: object
     served: true
     storage: false
-    subresources: {}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -875,15 +869,12 @@ metadata:
 spec:
   group: secrets.stackable.tech
   names:
-    categories: []
     kind: TrustStore
     plural: truststores
-    shortNames: []
     singular: truststore
   scope: Namespaced
   versions:
-  - additionalPrinterColumns: []
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: A TrustStore requests information about how to validate secrets issued by a SecretClass.
@@ -938,4 +929,3 @@ spec:
         type: object
     served: true
     storage: true
-    subresources: {}
