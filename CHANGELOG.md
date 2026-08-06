@@ -7,8 +7,10 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Bump stackable-operator to 0.114.0 ([#730]).
+- Bump stackable-operator to 0.115.0 ([#735]).
 
 [#730]: https://github.com/stackabletech/secret-operator/pull/730
+[#735]: https://github.com/stackabletech/secret-operator/pull/735
 
 ## [26.7.0] - 2026-07-21
 
