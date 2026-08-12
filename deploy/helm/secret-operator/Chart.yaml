@@ -5,6 +5,10 @@ version: "0.0.0-dev"
 appVersion: "0.0.0-dev"
 description: "Kubernetes operator for provisioning TLS certificates, Kerberos keytabs and other secrets to pods. Part of the Stackable Data Platform (SDP)."
 home: https://github.com/stackabletech/secret-operator
+# One known use of this is the Artifact Hub (AH) listing which shows the logo.
+# AH downloads the logo and re-hosts it.
+# We opted to not use the project logos (e.g. the Apache Spark logo) here due to trademark concerns.
+icon: https://raw.githubusercontent.com/stackabletech/secret-operator/main/.readme/static/borrowed/Icon_Stackable.svg
 sources:
   - https://github.com/stackabletech/secret-operator
 keywords: ["secrets", "tls", "kerberos", "csi", "kubernetes", "operator"]
@@ -21,3 +25,14 @@ annotations:
       url: https://docs.stackable.tech/home/stable/secret-operator/
     - name: support
       url: https://github.com/stackabletech/secret-operator/issues
+  artifacthub.io/crds: |-
+    - kind: SecretClass
+      version: v1alpha2
+      name: secretclasses.secrets.stackable.tech
+      displayName: SecretClass
+      description: A SecretClass is a cluster-global Kubernetes resource that defines a category of secrets that the Secret Operator knows how to provision.
+    - kind: TrustStore
+      version: v1alpha1
+      name: truststores.secrets.stackable.tech
+      displayName: TrustStore
+      description: A TrustStore requests information about how to validate secrets issued by a SecretClass.
