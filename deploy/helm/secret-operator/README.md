@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD034 -->
-# Helm Chart for Stackable Operator for Stackable Secret Operator
+# Helm Chart for Stackable Secret Operator
 
 Kubernetes operator for provisioning TLS certificates, Kerberos keytabs and other secrets to pods. Part of the Stackable Data Platform (SDP).
 
