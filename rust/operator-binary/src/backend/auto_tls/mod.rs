@@ -121,7 +121,7 @@ pub enum Error {
     },
 
     #[snafu(display(
-        "certificate expiring at {expires_at} would schedule the pod to be restarted at {restart_at}, which is in the past (and we don't have a time machine (yet and/or anymore))"
+        "certificate expiring at {expires_at} would schedule the Pod to be restarted at {restart_at}, which is in the past (and we don't have a time machine (yet and/or anymore)). In case you request very short-lived certificates, you might also want to lower \"secrets.stackable.tech/backend.autotls.cert.restart-buffer\" (see our documentation)."
     ))]
     TooShortCertLifetimeRequiresTimeTravel {
         expires_at: OffsetDateTime,
