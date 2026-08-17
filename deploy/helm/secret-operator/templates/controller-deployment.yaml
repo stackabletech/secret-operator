@@ -27,7 +27,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       # NOTE (@Techassi): Does it maybe make sense to have two different service accounts?
-      serviceAccountName: {{ include "operator.fullname" . }}-serviceaccount
+      serviceAccountName: {{ include "operator.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.controllerService.podSecurityContext | nindent 8 }}
       containers:

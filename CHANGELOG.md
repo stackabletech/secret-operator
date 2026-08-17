@@ -9,8 +9,16 @@ All notable changes to this project will be documented in this file.
 - Bump stackable-operator to 0.114.0 ([#730]).
 - Bump stackable-operator to 0.115.0 ([#735]).
 
+### Fixed
+
+- BREAKING: Honour `serviceAccount.name`, which the ServiceAccount, the controller Deployment and
+  the CSI node driver DaemonSet previously ignored in favour of a hardcoded name.
+  `serviceAccount.create=false` now requires `serviceAccount.name`; it used to fall back to the
+  namespace default ServiceAccount, which lacks the operator ClusterRole ([#736]).
+
 [#730]: https://github.com/stackabletech/secret-operator/pull/730
 [#735]: https://github.com/stackabletech/secret-operator/pull/735
+[#736]: https://github.com/stackabletech/secret-operator/pull/736
 
 ## [26.7.0] - 2026-07-21
 
