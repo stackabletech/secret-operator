@@ -9,7 +9,7 @@ use crate::{
     utils::{ResultExt, Unloggable},
 };
 
-const FILE_PEM_CERT_CERT: &str = "tls.crt";
+pub const FILE_PEM_CERT_CERT: &str = "tls.crt";
 const FILE_PEM_CERT_KEY: &str = "tls.key";
 pub const FILE_PEM_CERT_CA: &str = "ca.crt";
 

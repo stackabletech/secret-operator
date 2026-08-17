@@ -178,6 +178,29 @@ pub fn asn1time_to_offsetdatetime(asn: &Asn1TimeRef) -> Result<OffsetDateTime, A
     .context(ParseSnafu)
 }
 
+#[derive(Debug, Snafu)]
+#[snafu(module)]
+pub enum DateTimeOutOfBoundsError {
+    #[snafu(display("datetime is invalid"))]
+    DateTime,
+
+    #[snafu(display("time zone is out of bounds"))]
+    TimeZone,
+}
+
+/// Converts a [`time::OffsetDateTime`] into the [`chrono`] equivalent used by the Kubernetes API.
+pub fn time_datetime_to_chrono(
+    dt: OffsetDateTime,
+) -> Result<chrono::DateTime<chrono::FixedOffset>, DateTimeOutOfBoundsError> {
+    use chrono::TimeZone as _;
+
+    let tz = chrono::FixedOffset::east_opt(dt.offset().whole_seconds())
+        .context(date_time_out_of_bounds_error::TimeZoneSnafu)?;
+    tz.timestamp_opt(dt.unix_timestamp(), dt.nanosecond())
+        .earliest()
+        .context(date_time_out_of_bounds_error::DateTimeSnafu)
+}
+
 /// Wrapper for (mostly) secret values that should not be logged.
 // When/if migrating to Valuable, provide a dummy implementation of Value too
 pub struct Unloggable<T>(pub T);
@@ -269,7 +292,7 @@ mod tests {
     use openssl::asn1::Asn1Time;
     use time::OffsetDateTime;
 
-    use super::{asn1time_to_offsetdatetime, iterator_try_concat_bytes};
+    use super::{asn1time_to_offsetdatetime, iterator_try_concat_bytes, time_datetime_to_chrono};
     use crate::utils::{Flattened, FmtByteSlice, ResultExt, error_full_message, trystream_any};
 
     #[test]
@@ -355,6 +378,25 @@ mod tests {
                 &time::format_description::well_known::Iso8601::DEFAULT
             )
             .unwrap()
+        );
+    }
+
+    #[test]
+    fn datetime_conversion() {
+        // Conversion should preserve timezone and fractional seconds.
+        // Comparing the two as `DateTime`s would not check the offset, because that compares
+        // instants. We assert on the formatted value, which has the offset.
+        assert_eq!(
+            time_datetime_to_chrono(
+                OffsetDateTime::parse(
+                    "2021-02-04T05:23:00.123+01:00",
+                    &time::format_description::well_known::Rfc3339
+                )
+                .unwrap()
+            )
+            .unwrap()
+            .to_rfc3339(),
+            "2021-02-04T05:23:00.123+01:00"
         );
     }
 

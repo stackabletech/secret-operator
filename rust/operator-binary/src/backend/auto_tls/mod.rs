@@ -3,7 +3,6 @@
 use std::{cmp::min, ops::Range};
 
 use async_trait::async_trait;
-use chrono::{FixedOffset, TimeZone};
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},
     bn::{BigNum, MsbOption},
@@ -21,7 +20,7 @@ use openssl::{
     },
 };
 use rand::RngExt as _;
-use snafu::{OptionExt, ResultExt, Snafu, ensure};
+use snafu::{ResultExt, Snafu, ensure};
 use stackable_operator::{kube::runtime::reflector::ObjectRef, shared::time::Duration};
 use time::OffsetDateTime;
 
@@ -34,7 +33,7 @@ use crate::{
     },
     crd::v1alpha2,
     format::{SecretData, WellKnownSecretData, well_known},
-    utils::iterator_try_concat_bytes,
+    utils::{DateTimeOutOfBoundsError, iterator_try_concat_bytes, time_datetime_to_chrono},
 };
 
 mod ca;
@@ -494,43 +493,5 @@ impl SecretBackend for TlsGenerate {
                 key_pem: None,
             }),
         )))
-    }
-}
-
-#[derive(Snafu, Debug)]
-#[snafu(module)]
-pub enum DateTimeOutOfBoundsError {
-    #[snafu(display("datetime is invalid"))]
-    DateTime,
-
-    #[snafu(display("time zone is out of bounds"))]
-    TimeZone,
-}
-fn time_datetime_to_chrono(
-    dt: time::OffsetDateTime,
-) -> Result<chrono::DateTime<FixedOffset>, DateTimeOutOfBoundsError> {
-    let tz = chrono::FixedOffset::east_opt(dt.offset().whole_seconds())
-        .context(date_time_out_of_bounds_error::TimeZoneSnafu)?;
-    tz.timestamp_opt(dt.unix_timestamp(), dt.nanosecond())
-        .earliest()
-        .context(date_time_out_of_bounds_error::DateTimeSnafu)
-}
-
-#[cfg(test)]
-mod tests {
-    use time::format_description::well_known::Rfc3339;
-
-    use super::time_datetime_to_chrono;
-
-    #[test]
-    fn datetime_conversion() {
-        // Conversion should preserve timezone and fractional seconds
-        assert_eq!(
-            time_datetime_to_chrono(
-                time::OffsetDateTime::parse("2021-02-04T05:23:00.123+01:00", &Rfc3339).unwrap()
-            )
-            .unwrap(),
-            chrono::DateTime::parse_from_rfc3339("2021-02-04T06:23:00.123+02:00").unwrap()
-        );
     }
 }
