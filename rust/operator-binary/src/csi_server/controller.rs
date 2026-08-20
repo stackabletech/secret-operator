@@ -107,9 +107,18 @@ impl From<CreateVolumeError> for Status {
             CreateVolumeError::InvalidSecretSelector { .. } => Code::FailedPrecondition,
             CreateVolumeError::InitBackend { source } => source.grpc_code(),
             CreateVolumeError::FindNodes { source } => source.grpc_code(),
-            // CSI defines ResourceExhausted as "unable to provision in accessible_topology",
-            // which is exactly this case.
-            CreateVolumeError::NoMatchingNode => Code::ResourceExhausted,
+            // CSI defines ResourceExhausted as "unable to provision in accessible_topology", which
+            // describes this case, but external-provisioner turns it into ProvisioningReschedule
+            // whenever the volume has a selected node, so it strips the node annotation and the
+            // scheduler picks another one. No node ever satisfies the scopes here, so the retry is
+            // futile.
+            // Additionally that path is not rate limited: the claim is forgotten rather than
+            // requeued, leaving the scheduler to re-trigger it immediately.
+            //
+            // It only stays dormant today because the operator has no `update` on
+            // persistentvolumeclaims and the annotation delete therefore fails (see roles.yaml).
+            // FailedPrecondition does not depend on that.
+            CreateVolumeError::NoMatchingNode => Code::FailedPrecondition,
         };
 
         // Applied to every variant, including the codes inherited from the backends (which are
