@@ -20,7 +20,7 @@ use tokio::{
 };
 use tonic::{Request, Response, Status};
 
-use super::controller::TOPOLOGY_NODE;
+use super::{controller::TOPOLOGY_NODE, log_if_endpoint_error};
 use crate::{
     backend::{
         self, SecretBackendError, SecretContents, SecretVolumeSelector,
@@ -495,14 +495,4 @@ impl Node for SecretProvisionerNode {
             }),
         }))
     }
-}
-
-fn log_if_endpoint_error<T, E: std::error::Error + 'static>(
-    error_msg: &str,
-    res: Result<T, E>,
-) -> Result<T, E> {
-    if let Err(err) = &res {
-        tracing::warn!(error = err as &dyn std::error::Error, "{error_msg}");
-    }
-    res
 }
