@@ -75,16 +75,12 @@ enum CreateVolumeError {
 /// running, call CreateVolume again later" into a terminal code.
 ///
 /// Such a code makes the provisioner park the PVC in an in-memory map that is only ever cleared
-/// on success or on a terminal code. Its PVC delete handler is a no-op, so a PVC that is deleted
-/// while parked is instead resurrected from the provisioner's stale copy and retried forever, on
-/// every node, since the provisioner runs in a DaemonSet without leader election.
+/// on success or on a terminal code.
 ///
-/// [`Controller::create_volume`] never leaves anything running in the background - it creates no
-/// state per volume, which is also why [`Controller::delete_volume`] has nothing to do - so none
-/// of these codes may escape it. The backends still use them for [`Controller::node_publish_volume`],
+/// [`Controller::create_volume`] never leaves anything running in the background. It creates no
+/// state per volume, so none of these codes may escape it.
+/// The backends still use them for [`Controller::node_publish_volume`],
 /// where they are correct, and so must be rewritten here rather than at their source.
-///
-/// See <https://github.com/stackabletech/secret-operator/issues/722>.
 fn make_terminal(code: Code) -> Code {
     match code {
         Code::Unavailable | Code::Aborted | Code::Cancelled | Code::DeadlineExceeded => {
@@ -115,7 +111,7 @@ impl From<CreateVolumeError> for Status {
             // Additionally that path is not rate limited: the claim is forgotten rather than
             // requeued, leaving the scheduler to re-trigger it immediately.
             //
-            // It only stays dormant today because the operator has no `update` on
+            // ResourceExhausted would only stay dormant today because the operator has no `update` on
             // persistentvolumeclaims and the annotation delete therefore fails (see roles.yaml).
             // FailedPrecondition does not depend on that.
             CreateVolumeError::NoMatchingNode => Code::FailedPrecondition,
@@ -128,7 +124,7 @@ impl From<CreateVolumeError> for Status {
             tracing::debug!(
                 grpc.code.original = ?raw_code,
                 grpc.code.returned = ?code,
-                "rewrote CreateVolume error code:"
+                "Mapped CreateVolume error code:"
             );
         }
 
