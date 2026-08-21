@@ -15,10 +15,12 @@ All notable changes to this project will be documented in this file.
   the CSI node driver DaemonSet previously ignored in favour of a hardcoded name.
   `serviceAccount.create=false` now requires `serviceAccount.name`; it used to fall back to the
   namespace default ServiceAccount, which lacks the operator ClusterRole ([#736]).
+- `CreateVolume` no longer returns gRPC codes that make external-provisioner retry indefinitely ([#743]).
 
 [#730]: https://github.com/stackabletech/secret-operator/pull/730
 [#735]: https://github.com/stackabletech/secret-operator/pull/735
 [#736]: https://github.com/stackabletech/secret-operator/pull/736
+[#743]: https://github.com/stackabletech/secret-operator/pull/743
 
 ## [26.7.0] - 2026-07-21
 
