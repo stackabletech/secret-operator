@@ -108,7 +108,7 @@ spec:
               mountPath: /tmp
 
         - name: external-provisioner
-          image: "{{ include "csi-provisioner.image" . }}"
+          image: "{{ include "secret-operator.csi-provisioner.image" . }}"
           imagePullPolicy: {{ .Values.csiNodeDriver.externalProvisioner.image.pullPolicy }}
           resources:
             {{ .Values.csiNodeDriver.externalProvisioner.resources | toYaml | nindent 12 }}
@@ -121,7 +121,7 @@ spec:
               mountPath: /csi
 
         - name: node-driver-registrar
-          image: "{{ include "csi-node-driver-registrar.image" . }}"
+          image: "{{ include "secret-operator.csi-node-driver-registrar.image" . }}"
           imagePullPolicy: {{ .Values.csiNodeDriver.nodeDriverRegistrar.image.pullPolicy }}
           resources:
             {{ .Values.csiNodeDriver.nodeDriverRegistrar.resources | toYaml | nindent 12 }}
