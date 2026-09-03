@@ -39,9 +39,9 @@ volumes:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "operator.fullname" . }}-clusterrole
+  name: {{ include "secret-operator.fullname" . }}-clusterrole
   labels:
-  {{- include "operator.labels" . | nindent 4 }}
+  {{- include "secret-operator.labels" . | nindent 4 }}
 rules:
   # Required for maintaining the CRDs (including the conversion webhook configuration) and
   # for the startup condition check.

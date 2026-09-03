@@ -2,36 +2,36 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ include "operator.fullname" . }}-csi-node-driver
+  name: {{ include "secret-operator.fullname" . }}-csi-node-driver
   labels:
-    {{- include "operator.labels" . | nindent 4 }}
+    {{- include "secret-operator.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      {{- include "operator.selectorLabels" . | nindent 6 }}
+      {{- include "secret-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
-        internal.stackable.tech/image: "{{ include "operator.image" . }}"
+        internal.stackable.tech/image: "{{ include "secret-operator.image" . }}"
         {{- with .Values.csiNodeDriver.podAnnotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "operator.selectorLabels" . | nindent 8 }}
+        {{- include "secret-operator.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       # NOTE (@Techassi): Does it maybe make sense to have two different service accounts?
-      serviceAccountName: {{ include "operator.serviceAccountName" . }}
+      serviceAccountName: {{ include "secret-operator.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.csiNodeDriver.podSecurityContext | nindent 8 }}
       containers:
         - name: csi-node-service
           securityContext:
             {{- toYaml .Values.csiNodeDriver.nodeService.securityContext | nindent 12 }}
-          image: "{{ include "operator.image" . }}"
+          image: "{{ include "secret-operator.image" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
             {{ .Values.csiNodeDriver.nodeService.resources | toYaml | nindent 12 }}
@@ -70,7 +70,7 @@ spec:
             # The name of the Kubernetes Service that point to the operator Pod, e.g. used to
             # construct the conversion webhook endpoint.
             - name: OPERATOR_SERVICE_NAME
-              value: {{ include "operator.fullname" . }}
+              value: {{ include "secret-operator.fullname" . }}
 
             # The image repository, like "oci.stackable.tech/sdp"
             - name: IMAGE_REPOSITORY
@@ -94,8 +94,8 @@ spec:
             - name: KUBERNETES_CLUSTER_DOMAIN
               value: {{ .Values.kubernetesClusterDomain | quote }}
             {{- end }}
-            {{- include "telemetry.envVars" . | nindent 12 }}
-            {{- include "maintenance.envVars" . | nindent 12 }}
+            {{- include "secret-operator.telemetry.envVars" . | nindent 12 }}
+            {{- include "secret-operator.maintenance.envVars" . | nindent 12 }}
           volumeMounts:
             - name: csi
               mountPath: /csi
