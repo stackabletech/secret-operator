@@ -4,5 +4,5 @@ kind: StorageClass
 metadata:
   name: secrets.stackable.tech
   labels:
-  {{- include "operator.labels" . | nindent 4 }}
+  {{- include "secret-operator.labels" . | nindent 4 }}
 provisioner: secrets.stackable.tech
