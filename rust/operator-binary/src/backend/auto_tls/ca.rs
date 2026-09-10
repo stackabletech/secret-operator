@@ -680,6 +680,7 @@ mod tests {
         rsa::Rsa,
         x509::{X509, X509Builder},
     };
+    use proptest::prelude::*;
     use stackable_operator::{
         k8s_openapi::{ByteString, api::core::v1::Secret},
         kube::runtime::reflector::ObjectRef,
@@ -689,6 +690,10 @@ mod tests {
     use time::{OffsetDateTime, macros::datetime};
 
     use super::{CertificateAuthority, Manager};
+
+    fn dur(secs: i64) -> Duration {
+        Duration::from(std::time::Duration::from_secs(secs.max(0) as u64))
+    }
 
     fn create_certificate(
         serial_number: u32,
@@ -846,5 +851,69 @@ mod tests {
             .collect();
 
         assert_eq!(vec![&ca2_certificate, &trust_root2], trust_roots_at_11_01);
+    }
+
+    proptest! {
+        // Invariant: whatever CA we pick to *sign* a leaf certificate must also be published as a
+        // trust root at the same instant, otherwise a freshly-provisioned pod could not even verify
+        // its own issuer.
+        //
+        // Today this holds by construction, because both `find_certificate_authority_for_signing`
+        // and `trust_roots` funnel through `active_certificate_authorities`, and the signing cutoff
+        // (`not_after`, in the future) is strictly tighter than the trust cutoff (`now`). This test
+        // pins that relationship so a future change to one code path but not the other is caught.
+        #![proptest_config(ProptestConfig::with_cases(64))]
+        #[test]
+        fn signer_is_always_a_published_trust_root(
+            // Each CA's `not_after`, as an offset in seconds after the base instant. A vector of
+            // 1..=4 CAs so both the single-CA case and multi-CA sets (as exist mid-rotation) are
+            // exercised, with expiries spanning 1 hour up to 3 years past the base instant.
+            ca_offsets in prop::collection::vec(3600i64..=3 * 365 * 86400, 1..=4),
+            // caCertificateRetirementDuration, 0 up to 30 days. 0 covers the no-retirement case
+            // (where the signing and trust cutoffs coincide); the upper end stays well below the
+            // CA expiries above so at least some CAs remain usable.
+            retirement_secs in 0i64..=30 * 86400,
+            // The instant the pod mounts, anywhere in the first year after the base instant.
+            now_offset in 0i64..=365 * 86400,
+            // Requested leaf lifetime, 1 second up to 30 days. Kept short relative to the CA
+            // expiries so a signer is often (but not always) available; when none is, the
+            // assertion below is simply skipped.
+            leaf_secs in 1i64..=30 * 86400,
+        ) {
+            let base = datetime!(2025-01-01 0:00 UTC);
+            let not_before = base - dur(86400);
+
+            let certificate_authorities = ca_offsets
+                .iter()
+                .enumerate()
+                .map(|(index, &offset)| {
+                    create_certificate_authority(index as u32 + 1, not_before, base + dur(offset))
+                        .expect("must be able to create a valid CA certificate")
+                })
+                .collect();
+
+            let manager = Manager {
+                source_secret: ObjectRef::<Secret>::new("secret-provisioner-tls-ca"),
+                certificate_authorities,
+                additional_trusted_certificates: vec![],
+                ca_certificate_retirement_duration: dur(retirement_secs),
+            };
+
+            let now = base + dur(now_offset);
+            let leaf_not_after = now + dur(leaf_secs);
+
+            // If a signer can be found, it must be in the trust store handed to the very same pod.
+            if let Ok(signer) = manager.find_certificate_authority_for_signing(leaf_not_after) {
+                let published = manager
+                    .trust_roots(now)
+                    .into_iter()
+                    .any(|cert| *cert == signer.certificate);
+                prop_assert!(
+                    published,
+                    "signer not published as trust root: now_offset={now_offset}, \
+                     leaf_secs={leaf_secs}, retirement_secs={retirement_secs}, ca_offsets={ca_offsets:?}",
+                );
+            }
+        }
     }
 }
