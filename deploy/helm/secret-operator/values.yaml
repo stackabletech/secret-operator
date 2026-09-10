@@ -2,9 +2,14 @@
 ---
 # Used by both the Controller Service and Node Service containers
 image:
-  # By default, the correct registry is automatically selected based on the Helm Chart installation source
+  # Registry and namespace holding the operator image, without the image name.
+  # Set when the chart is packaged, from the registry it is published to, so it is
+  # normally already correct. Override it to pull from a mirror.
   # repository: oci.stackable.tech/sdp
+
+  # Overrides the operator image tag, which defaults to the chart appVersion.
   # tag: 0.0.0-dev
+
   pullPolicy: IfNotPresent
   pullSecrets: []
 
@@ -15,6 +20,9 @@ controllerService:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+
+  # PriorityClass for the controller pod. Unset means the cluster default.
+  # priorityClassName: system-cluster-critical
 
   resources:
     limits:
@@ -46,6 +54,9 @@ csiNodeDriver:
   tolerations: []
   affinity: {}
 
+  # PriorityClass for the node driver pods. Unset means the cluster default.
+  # priorityClassName: system-node-critical
+
   nodeService:
     resources:
       limits:
@@ -71,7 +82,8 @@ csiNodeDriver:
 
   externalProvisioner:
     image:
-      # By default, the correct registry is automatically selected based on the Helm Chart installation source
+      # Registry and namespace holding the sidecar image. Defaults to image.repository
+      # with /sig-storage appended. Override it to pull from a mirror.
       # repository: oci.stackable.tech/sdp/sig-storage
       tag: v5.3.0
       pullPolicy: IfNotPresent
@@ -86,7 +98,8 @@ csiNodeDriver:
 
   nodeDriverRegistrar:
     image:
-      # By default, the correct registry is automatically selected based on the Helm Chart installation source
+      # Registry and namespace holding the sidecar image. Defaults to image.repository
+      # with /sig-storage appended. Override it to pull from a mirror.
       # repository: oci.stackable.tech/sdp/sig-storage
       tag: v2.15.0
       pullPolicy: IfNotPresent
@@ -108,7 +121,9 @@ serviceAccount:
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
+  # Leave empty to use the generated name, <release>-secret-operator-serviceaccount.
+  # Required when create is false, so that the workloads and the ClusterRoleBinding
+  # know which existing service account to use.
   name: ""
 
 # Provide additional labels which get attached to all deployed resources
@@ -121,6 +136,10 @@ secretClasses:
     # The namespace that the TLS Certificate Authority is installed into.
     # Defaults to the namespace where secret-op is installed.
     caSecretNamespace: null
+
+# When running on a non-default Kubernetes cluster domain, the cluster domain can be configured here.
+# See the https://docs.stackable.tech/home/stable/guides/kubernetes-cluster-domain guide for details.
+# kubernetesClusterDomain: my-cluster.local
 
 maintenance:
   endOfSupportCheck:
