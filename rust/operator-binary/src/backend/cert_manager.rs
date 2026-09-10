@@ -142,7 +142,14 @@ fn expire_pod_after(
         }
         None => {
             let validity: TimeDelta = not_after - not_before;
-            not_before + validity * 2 / 3
+            let renewal = not_before + validity * 2 / 3;
+            tracing::info!(
+                certificate.not_before = %not_before,
+                certificate.not_after = %not_after,
+                certificate.renewal_time = %renewal,
+                "Certificate has no status.renewalTime, assuming cert-manager's default of two thirds through the validity period"
+            );
+            renewal
         }
     };
 
