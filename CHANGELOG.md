@@ -16,11 +16,17 @@ All notable changes to this project will be documented in this file.
   `serviceAccount.create=false` now requires `serviceAccount.name`; it used to fall back to the
   namespace default ServiceAccount, which lacks the operator ClusterRole ([#736]).
 - `CreateVolume` no longer returns gRPC codes that make external-provisioner retry indefinitely ([#743]).
+- Report the certificate expiry for the `certManager` backend, so that Pods are restarted before
+  their certificate expires and pick up the renewed one. Previously no expiry was reported at all,
+  so a Pod kept the certificate it was given at startup and eventually ran on an expired one
+  indefinitely, even though cert-manager had long since renewed it in the Secret. The restart is
+  scheduled halfway between cert-manager's own `status.renewalTime` and the expiry ([#752]).
 
 [#730]: https://github.com/stackabletech/secret-operator/pull/730
 [#735]: https://github.com/stackabletech/secret-operator/pull/735
 [#736]: https://github.com/stackabletech/secret-operator/pull/736
 [#743]: https://github.com/stackabletech/secret-operator/pull/743
+[#752]: https://github.com/stackabletech/secret-operator/pull/752
 
 ## [26.7.0] - 2026-07-21
 

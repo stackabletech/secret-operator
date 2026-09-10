@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
+    k8s_openapi::apimachinery::pkg::apis::meta::v1::Time,
     kube::CustomResource,
     schemars::{self, JsonSchema},
 };
@@ -13,6 +14,7 @@ use stackable_operator::{
     version = "v1",
     kind = "Certificate",
     namespaced,
+    status = "CertificateStatus",
     crates(
         kube_core = "stackable_operator::kube::core",
         k8s_openapi = "stackable_operator::k8s_openapi",
@@ -29,6 +31,14 @@ pub struct CertificateSpec {
     pub ip_addresses: Vec<String>,
     pub issuer_ref: ObjectReference,
     pub private_key: CertificatePrivateKey,
+}
+
+/// See <https://cert-manager.io/docs/reference/api-docs/#cert-manager.io/v1.CertificateStatus>.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CertificateStatus {
+    /// When cert-manager will next attempt to renew the certificate.
+    pub renewal_time: Option<Time>,
 }
 
 /// See <https://cert-manager.io/docs/reference/api-docs/#cert-manager.io/v1.CertificatePrivateKey>.
