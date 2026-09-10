@@ -25,14 +25,14 @@ All notable changes to this project will be documented in this file.
   deleted, and issue the certificate without listener addresses. During namespace deletion these
   objects could be garbage-collected while `NodePublishVolume` was still waiting for them, blocking
   the Pod's termination indefinitely (holding `pvc-protection`). A terminating Pod no longer needs
-  listener-addressed certificates ([#753]).
+  listener-addressed certificates ([#755]).
 
 [#730]: https://github.com/stackabletech/secret-operator/pull/730
 [#735]: https://github.com/stackabletech/secret-operator/pull/735
 [#736]: https://github.com/stackabletech/secret-operator/pull/736
 [#743]: https://github.com/stackabletech/secret-operator/pull/743
 [#752]: https://github.com/stackabletech/secret-operator/pull/752
-[#753]: https://github.com/stackabletech/secret-operator/pull/753
+[#755]: https://github.com/stackabletech/secret-operator/pull/755
 
 ## [26.7.0] - 2026-07-21
 
