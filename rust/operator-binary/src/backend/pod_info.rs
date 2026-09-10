@@ -112,6 +112,14 @@ pub struct PodInfo {
     pub listener_addresses: Option<ListenerAddresses>,
     pub kubernetes_cluster_domain: DomainName,
     pub scheduling: SchedulingPodInfo,
+
+    /// Whether the served Pod is being deleted (has a `.metadata.deletionTimestamp`).
+    ///
+    /// A terminating Pod's [`PodListeners`](listener::v1alpha1::PodListeners) object may already
+    /// have been garbage-collected (e.g. during namespace deletion), so we skip fetching it and
+    /// issue without listener addresses instead of blocking termination on an object that will
+    /// never reappear.
+    pub is_being_deleted: bool,
 }
 
 impl PodInfo {
@@ -134,12 +142,26 @@ impl PodInfo {
             .with_context(|_| GetNodeSnafu {
                 node: ObjectRef::new(&node_name),
             })?;
-        let scheduling = SchedulingPodInfo::from_pod(client, &pod, scopes).await?;
-        let listener_addresses = if !scheduling.volume_listener_names.is_empty() {
-            Some(ListenerAddresses::fetch_for_pod(client, &pod, &scheduling, scopes).await?)
-        } else {
+        let is_being_deleted = pod.metadata.deletion_timestamp.is_some();
+        let scheduling =
+            SchedulingPodInfo::from_pod(client, &pod, scopes, is_being_deleted).await?;
+        let listener_addresses = if scheduling.volume_listener_names.is_empty() {
             // We don't care about the listener addresses if there is no listener scope, so we can save the API call
             None
+        } else if is_being_deleted {
+            // The Pod is terminating. Its PodListeners object may already have been
+            // garbage-collected (e.g. during namespace deletion), and a Pod that is going away no
+            // longer needs listener-addressed certificates. Skip the lookup so that publishing the
+            // volume (and thus deleting the Pod) is not blocked waiting for an object that will
+            // never reappear. See https://github.com/stackabletech/secret-operator/issues/720
+            tracing::warn!(
+                pod.name = %pod_name,
+                pod.namespace = %namespace,
+                "Pod is being deleted, skipping PodListeners lookup and issuing secret without listener addresses"
+            );
+            None
+        } else {
+            Some(ListenerAddresses::fetch_for_pod(client, &pod, &scheduling, scopes).await?)
         };
         Ok(Self {
             // This will generally be empty, since Kubernetes assigns pod IPs *after* CSI plugins are successful
@@ -175,6 +197,7 @@ impl PodInfo {
             listener_addresses,
             kubernetes_cluster_domain: client.kubernetes_cluster_info.cluster_domain.clone(),
             scheduling,
+            is_being_deleted,
         })
     }
 }
@@ -216,6 +239,10 @@ impl SchedulingPodInfo {
         client: &stackable_operator::client::Client,
         pod: &Pod,
         scopes: &[SecretScope],
+        // Whether the Pod is being deleted (see [`PodInfo::is_being_deleted`]). A terminating Pod's
+        // `Listener` objects may already have been garbage-collected, so we avoid the lookups that
+        // would otherwise fail and block termination.
+        is_being_deleted: bool,
     ) -> Result<Self, FromPodError> {
         use from_pod_error::*;
         let pod_name = pod.metadata.name.clone().context(NoPodNameSnafu)?;
@@ -280,12 +307,18 @@ impl SchedulingPodInfo {
             })
             .collect::<HashMap<_, _>>();
         let has_node_scope = scopes.contains(&SecretScope::Node)
-            || trystream_any(futures::stream::iter(volume_listener_pvcs).then(
-                |(listener_volume, _, pvc)| {
-                    listener_pvc_is_node_scoped(client, &namespace, listener_volume, pvc)
-                },
-            ))
-            .await?;
+            // Determining whether a listener scope is node-equivalent requires fetching the
+            // `Listener` and `ListenerClass`. For a terminating Pod those may already have been
+            // garbage-collected (e.g. during namespace deletion), and the Pod no longer needs an
+            // accurate node scope, so fall back to the statically-declared scopes instead of
+            // blocking termination on a lookup that will never succeed.
+            || (!is_being_deleted
+                && trystream_any(futures::stream::iter(volume_listener_pvcs).then(
+                    |(listener_volume, _, pvc)| {
+                        listener_pvc_is_node_scoped(client, &namespace, listener_volume, pvc)
+                    },
+                ))
+                .await?);
         Ok(SchedulingPodInfo {
             volume_listener_names,
             has_node_scope,
