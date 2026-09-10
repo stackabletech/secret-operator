@@ -21,12 +21,18 @@ All notable changes to this project will be documented in this file.
   so a Pod kept the certificate it was given at startup and eventually ran on an expired one
   indefinitely, even though cert-manager had long since renewed it in the Secret. The restart is
   scheduled halfway between cert-manager's own `status.renewalTime` and the expiry ([#752]).
+- Skip the `PodListeners`, `Listener` and `ListenerClass` lookups when the served Pod is being
+  deleted, and issue the certificate without listener addresses. During namespace deletion these
+  objects could be garbage-collected while `NodePublishVolume` was still waiting for them, blocking
+  the Pod's termination indefinitely (holding `pvc-protection`). A terminating Pod no longer needs
+  listener-addressed certificates ([#753]).
 
 [#730]: https://github.com/stackabletech/secret-operator/pull/730
 [#735]: https://github.com/stackabletech/secret-operator/pull/735
 [#736]: https://github.com/stackabletech/secret-operator/pull/736
 [#743]: https://github.com/stackabletech/secret-operator/pull/743
 [#752]: https://github.com/stackabletech/secret-operator/pull/752
+[#753]: https://github.com/stackabletech/secret-operator/pull/753
 
 ## [26.7.0] - 2026-07-21
 

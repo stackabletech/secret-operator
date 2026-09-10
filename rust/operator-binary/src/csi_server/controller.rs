@@ -240,9 +240,11 @@ impl Controller for SecretProvisionerController {
                     .get::<Pod>(&selector.pod, &selector.namespace)
                     .await
                     .context(GetPodSnafu)?;
-                let pod_info = SchedulingPodInfo::from_pod(&self.client, &pod, &selector.scope)
-                    .await
-                    .context(ParsePodSnafu)?;
+                let is_being_deleted = pod.metadata.deletion_timestamp.is_some();
+                let pod_info =
+                    SchedulingPodInfo::from_pod(&self.client, &pod, &selector.scope, is_being_deleted)
+                        .await
+                        .context(ParsePodSnafu)?;
 
                 let backend = backend::dynamic::from_selector(&self.client, &selector)
                     .await
