@@ -96,6 +96,14 @@ pub enum CertificateExpiryError {
 
     #[snafu(display("cert-manager reported a renewal time that is out of range: {seconds}s"))]
     RenewalTimeOutOfRange { seconds: i64 },
+
+    #[snafu(display(
+        "the provisioned certificate expired at {not_after} and cert-manager has not replaced it (renewal was due at {renewal})"
+    ))]
+    CertificateAlreadyExpired {
+        not_after: DateTime<FixedOffset>,
+        renewal: DateTime<FixedOffset>,
+    },
 }
 
 /// Returns when the Pod holding the certificate provisioned into `secret_data` should be restarted.
@@ -143,9 +151,17 @@ fn expire_pod_after(
     let remaining: TimeDelta = not_after - renewal;
     let expire_pod_after = renewal + remaining / 2;
 
+    // Reporting an expiry that has already passed would have the restarter evict the Pod at once,
+    // and the replacement would be handed this same certificate and evicted again. There is nothing
+    // useful to hand out, so fail and let the kubelet retry until cert-manager catches up.
+    if not_after <= now {
+        return CertificateAlreadyExpiredSnafu { not_after, renewal }.fail();
+    }
+
     if expire_pod_after <= now {
         // cert-manager has not renewed even though it said it would by now, so a restart would hand
-        // the Pod back the same certificate and evict it again. Wait for the expiry instead.
+        // the Pod back the same certificate and evict it again. Wait for the expiry instead, which
+        // the check above guarantees is still in the future.
         tracing::warn!(
             certificate.not_after = %not_after,
             certificate.renewal_time = %renewal,
@@ -441,6 +457,18 @@ mod tests {
                 .timestamp(),
             20 * HOUR
         );
+    }
+
+    #[test]
+    fn an_already_expired_certificate_is_an_error() {
+        let secret_data = secret_with(certificate_valid_between(NOT_BEFORE, NOT_AFTER));
+
+        // Reporting an expiry in the past would have the restarter evict the Pod immediately, and
+        // the replacement would be handed this same certificate.
+        assert!(matches!(
+            expire_pod_after(&secret_data, Some(&time_at(16 * HOUR)), at(30 * HOUR)),
+            Err(CertificateExpiryError::CertificateAlreadyExpired { .. })
+        ));
     }
 
     #[test]
