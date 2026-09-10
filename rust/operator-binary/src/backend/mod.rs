@@ -285,6 +285,10 @@ impl SecretVolumeSelector {
                         pod_listeners: listener_addresses.source.clone(),
                     })?
                     .to_vec(),
+                // The listener addresses are deliberately not fetched for a terminating Pod (see
+                // `PodInfo::from_pod`), which no longer needs listener-addressed certificates.
+                // Contribute no addresses for this scope instead of failing.
+                None if pod_info.is_being_deleted => Vec::new(),
                 None => return ListenerAddressesNotFetchedSnafu.fail(),
             },
         })

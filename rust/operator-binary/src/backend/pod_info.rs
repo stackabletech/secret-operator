@@ -112,6 +112,14 @@ pub struct PodInfo {
     pub listener_addresses: Option<ListenerAddresses>,
     pub kubernetes_cluster_domain: DomainName,
     pub scheduling: SchedulingPodInfo,
+
+    /// Whether the served Pod is being deleted (has a `.metadata.deletionTimestamp`).
+    ///
+    /// A terminating Pod's [`PodListeners`](listener::v1alpha1::PodListeners) object may already
+    /// have been garbage-collected (e.g. during namespace deletion), so we skip fetching it and
+    /// issue without listener addresses instead of blocking termination on an object that will
+    /// never reappear.
+    pub is_being_deleted: bool,
 }
 
 impl PodInfo {
@@ -135,11 +143,24 @@ impl PodInfo {
                 node: ObjectRef::new(&node_name),
             })?;
         let scheduling = SchedulingPodInfo::from_pod(client, &pod, scopes).await?;
-        let listener_addresses = if !scheduling.volume_listener_names.is_empty() {
-            Some(ListenerAddresses::fetch_for_pod(client, &pod, &scheduling, scopes).await?)
-        } else {
+        let is_being_deleted = pod.metadata.deletion_timestamp.is_some();
+        let listener_addresses = if scheduling.volume_listener_names.is_empty() {
             // We don't care about the listener addresses if there is no listener scope, so we can save the API call
             None
+        } else if is_being_deleted {
+            // The Pod is terminating. Its PodListeners object may already have been
+            // garbage-collected (e.g. during namespace deletion), and a Pod that is going away no
+            // longer needs listener-addressed certificates. Skip the lookup so that publishing the
+            // volume (and thus deleting the Pod) is not blocked waiting for an object that will
+            // never reappear. See https://github.com/stackabletech/secret-operator/issues/720
+            tracing::warn!(
+                pod.name = %pod_name,
+                pod.namespace = %namespace,
+                "Pod is being deleted, skipping PodListeners lookup and issuing secret without listener addresses"
+            );
+            None
+        } else {
+            Some(ListenerAddresses::fetch_for_pod(client, &pod, &scheduling, scopes).await?)
         };
         Ok(Self {
             // This will generally be empty, since Kubernetes assigns pod IPs *after* CSI plugins are successful
@@ -175,6 +196,7 @@ impl PodInfo {
             listener_addresses,
             kubernetes_cluster_domain: client.kubernetes_cluster_info.cluster_domain.clone(),
             scheduling,
+            is_being_deleted,
         })
     }
 }
