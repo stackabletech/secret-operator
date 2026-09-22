@@ -285,6 +285,10 @@ impl SecretVolumeSelector {
                         pod_listeners: listener_addresses.source.clone(),
                     })?
                     .to_vec(),
+                // The listener addresses are deliberately not fetched for a terminating Pod (see
+                // `PodInfo::from_pod`), which no longer needs listener-addressed certificates.
+                // Contribute no addresses for this scope instead of failing.
+                None if pod_info.is_being_deleted => Vec::new(),
                 None => return ListenerAddressesNotFetchedSnafu.fail(),
             },
         })
@@ -443,5 +447,76 @@ mod tests {
                 map.into_deserializer(),
             )
             .unwrap();
+    }
+
+    fn listener_scoped_selector() -> SecretVolumeSelector {
+        let mut map = required_fields_map();
+        map.insert(
+            "secrets.stackable.tech/scope".to_owned(),
+            "listener-volume=my-listener".to_owned(),
+        );
+        SecretVolumeSelector::deserialize::<MapDeserializer<'_, _, serde::de::value::Error>>(
+            map.into_deserializer(),
+        )
+        .unwrap()
+    }
+
+    fn pod_info_without_listener_addresses(is_being_deleted: bool) -> pod_info::PodInfo {
+        pod_info::PodInfo {
+            pod_ips: Vec::new(),
+            pod_name: "my-pod".to_owned(),
+            service_name: None,
+            namespace: "my-namespace".to_owned(),
+            node_name: "my-node".to_owned(),
+            node_ips: Vec::new(),
+            // No addresses were fetched, mirroring the terminating-Pod path in `PodInfo::from_pod`.
+            listener_addresses: None,
+            kubernetes_cluster_domain:
+                stackable_operator::commons::networking::DomainName::try_from("cluster.local")
+                    .unwrap(),
+            scheduling: SchedulingPodInfo {
+                namespace: "my-namespace".to_owned(),
+                volume_listener_names: HashMap::from([(
+                    "my-listener".to_owned(),
+                    "my-listener".to_owned(),
+                )]),
+                has_node_scope: false,
+            },
+            is_being_deleted,
+        }
+    }
+
+    /// A terminating Pod whose listener addresses were deliberately not fetched contributes no
+    /// addresses for a listener scope instead of failing, so publishing (and thus terminating) the
+    /// Pod is not blocked. See <https://github.com/stackabletech/secret-operator/issues/720>.
+    #[test]
+    fn scope_addresses_for_listener_scope_of_terminating_pod_is_empty() {
+        let selector = listener_scoped_selector();
+        let pod_info = pod_info_without_listener_addresses(true);
+        let scope = SecretScope::ListenerVolume {
+            name: "my-listener".to_owned(),
+        };
+
+        let addresses = selector.scope_addresses(&pod_info, &scope).unwrap();
+
+        assert!(addresses.is_empty());
+    }
+
+    /// A running Pod that is missing listener addresses is still an error: we must not silently
+    /// issue a certificate without the listener SANs it is supposed to carry.
+    #[test]
+    fn scope_addresses_for_listener_scope_of_running_pod_without_addresses_errors() {
+        let selector = listener_scoped_selector();
+        let pod_info = pod_info_without_listener_addresses(false);
+        let scope = SecretScope::ListenerVolume {
+            name: "my-listener".to_owned(),
+        };
+
+        let err = selector.scope_addresses(&pod_info, &scope).unwrap_err();
+
+        assert!(matches!(
+            err,
+            ScopeAddressesError::ListenerAddressesNotFetched
+        ));
     }
 }
