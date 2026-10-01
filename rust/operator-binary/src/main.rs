@@ -24,6 +24,7 @@ use stackable_operator::{
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
     utils::signal::{self, SignalWatcher},
+    webhook::health::HealthCheckRegistry,
 };
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::Server;
@@ -201,9 +202,20 @@ async fn main() -> anyhow::Result<()> {
                 RunMode::Controller(ControllerArguments {
                     tls_secretclass_ca_secret_namespace,
                 }) => {
+                    let mut readiness_checks = HealthCheckRegistry::new();
+                    let secret_class_crd_check = readiness_checks.register(format!(
+                        "CRD {crd} established",
+                        crd = v1alpha2::SecretClass::crd_name()
+                    ));
+                    let trust_store_crd_check = readiness_checks.register(format!(
+                        "CRD {crd} established",
+                        crd = v1alpha1::TrustStore::crd_name()
+                    ));
+
                     let (webhook_server, initial_reconcile_rx) = create_webhook_server(
                         &operator_environment,
                         maintenance.disable_crd_maintenance,
+                        readiness_checks,
                         client.as_kube_client(),
                     )
                     .await?;
@@ -238,8 +250,10 @@ async fn main() -> anyhow::Result<()> {
                     .map(anyhow::Ok);
 
                     let delayed_truststore_controller = async {
-                        signal::crd_established(&client, v1alpha1::TrustStore::crd_name(), None)
-                            .await?;
+                        signal::crd_established(&client, v1alpha2::SecretClass::crd_name()).await?;
+                        secret_class_crd_check.mark_passed();
+                        signal::crd_established(&client, v1alpha1::TrustStore::crd_name()).await?;
+                        trust_store_crd_check.mark_passed();
                         truststore_controller.await
                     };
 
