@@ -79,7 +79,8 @@ enum CreateVolumeError {
 ///
 /// [`Controller::create_volume`] never leaves anything running in the background. It creates no
 /// state per volume, so none of these codes may escape it.
-/// The backends still use them for [`Controller::node_publish_volume`],
+/// The backends still use them for
+/// [`Node::node_publish_volume`](crate::grpc::csi::v1::node_server::Node::node_publish_volume),
 /// where they are correct, and so must be rewritten here rather than at their source.
 fn make_terminal(code: Code) -> Code {
     match code {

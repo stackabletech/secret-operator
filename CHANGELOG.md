@@ -4,10 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#759]).
+- Add startup probe to the operator Deployment ([#759]).
+
 ### Changed
 
 - Bump stackable-operator to 0.114.0 ([#730]).
 - Bump stackable-operator to 0.115.0 ([#735]).
+- Bump stackable-operator to 0.119.0 ([#759]).
 
 ### Fixed
 
@@ -27,6 +33,7 @@ All notable changes to this project will be documented in this file.
 [#736]: https://github.com/stackabletech/secret-operator/pull/736
 [#743]: https://github.com/stackabletech/secret-operator/pull/743
 [#752]: https://github.com/stackabletech/secret-operator/pull/752
+[#759]: https://github.com/stackabletech/secret-operator/pull/759
 
 ## [26.7.0] - 2026-07-21
 
