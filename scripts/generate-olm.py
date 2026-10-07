@@ -46,6 +46,7 @@ OCI_TO_QUAY: dict[str, str] = {
 }
 
 # Stackable logo icon (PNG, base64-encoded). Sourced from the 25.11.0 OLM bundle.
+# typos:ignore-block-start
 _STACKABLE_ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAABCQAAAQ3CAYAAAAg1L88AAAACXBIWXMAABcRAAAXEQHKJvM/AAAg"
     "AElEQVR4nOzdT2ycZ4Ln95c09YdqW5SsluWxvSDdA3m7G2iIyCEBFsFaM0DqKt820WW8OSUGAhh7"
@@ -943,6 +944,7 @@ _STACKABLE_ICON_B64 = (
     "EgAAAEB0ggQAAAAQnSABAAAARCdIAAAAANEJEgAAAEB0ggQAAAAQnSABAAAARCdIAAAAANEJEgAA"
     "AEB0ggQAAAAQnSABAAAARCdIAAAAANEJEgAAAEBcSZL8f1HQsc8tcXUVAAAAAElFTkSuQmCC"
 )
+# typos:ignore-block-end
 
 # Permissions required by the olm-deployer service account (the bootstrap Deployment).
 # This account applies the ConfigMap manifests (DaemonSet, Deployment, CSIDriver, etc.).

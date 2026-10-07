@@ -13,7 +13,7 @@ pub enum Error {
     #[snafu(display("failed to convert certificate serial number to a hexadecimal string"))]
     ConvertSerialToHexString { source: openssl::error::ErrorStack },
 
-    #[snafu(display("failed to retireve certificate digest as SHA256"))]
+    #[snafu(display("failed to retrieve certificate digest as SHA256"))]
     RetrieveDigest { source: openssl::error::ErrorStack },
 }
 

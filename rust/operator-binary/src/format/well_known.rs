@@ -106,7 +106,7 @@ impl WellKnownSecretData {
 
         // Which file is tried to be parsed first matters. To support the use-case of people bringing
         // their own non-sensitive data via a Secret and consumers only requiring access to
-        // non-sensitve data (for example for CA verification), the non-senstive files are parsed
+        // non-sensitive data (for example for CA verification), the non-sensitive files are parsed
         // first. If the `relaxed` flag is provided, this function tries to parse sensitive files
         // but won't hard-error when they are not found.
 

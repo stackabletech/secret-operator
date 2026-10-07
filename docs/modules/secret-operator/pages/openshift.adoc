@@ -21,6 +21,6 @@ Upgrading to a new version requires you to uninstall the existing version of the
 * SecretClass: tls
 * ServiceAccount: secret-operator-service-account
 * ClusterRole: secret-operator-clusterrole
-* ClusterRoleBinding: secret-opreator-clusterrole-binding
+* ClusterRoleBinding: secret-operator-clusterrole-binding
 
-After these resources have been cleand up, you can install a new version of the operator.
+After these resources have been cleaned up, you can install a new version of the operator.

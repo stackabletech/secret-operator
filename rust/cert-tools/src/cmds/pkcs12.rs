@@ -13,7 +13,7 @@ pub enum Error {
     ))]
     NoCertificateSources,
 
-    #[snafu(display("failed to read certifcate source at {path}", path = path.display()))]
+    #[snafu(display("failed to read certificate source at {path}", path = path.display()))]
     ReadCertificate {
         source: crate::cli::CertInputError,
         path: PathBuf,
