@@ -180,7 +180,7 @@ pub struct TrustSelector {
 #[strum(serialize_all = "kebab-case")]
 #[serde(rename_all = "kebab-case")]
 pub enum ProvisionParts {
-    /// Provision only public (non-senstive) data.
+    /// Provision only public (non-sensitive) data.
     Public,
 
     /// Provision both public and private data.

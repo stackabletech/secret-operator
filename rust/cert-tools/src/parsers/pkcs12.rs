@@ -8,7 +8,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 
 #[derive(Debug, Snafu)]
 pub enum ParseError {
-    #[snafu(display("failed to deseralize PKCS#12 DER encoded file"))]
+    #[snafu(display("failed to deserialize PKCS#12 DER encoded file"))]
     DeserializeFile { source: openssl::error::ErrorStack },
 
     #[snafu(display("failed to parse file as PKCS#12"))]

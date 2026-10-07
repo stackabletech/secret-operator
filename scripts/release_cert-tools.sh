@@ -60,7 +60,7 @@ fi
 git add rust/cert-tools/CHANGELOG.md rust/cert-tools/Cargo.*
 git commit --message "chore(cert-tools): Release $CLEANED_BUMPED_VERSION" --no-verify --gpg-sign
 
-echo "Do you want to proceed with rasing a PR (y/N)?"
+echo "Do you want to proceed with raising a PR (y/N)?"
 read -r RESPONSE
 
 if [[ "$RESPONSE" == "y" || "$RESPONSE" == "Y" ]]; then
