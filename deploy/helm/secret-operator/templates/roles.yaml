@@ -158,10 +158,7 @@ rules:
     resources:
       - secretclasses
     verbs:
-      {{- if .Values.maintenance.customResourceDefinitions.maintain }}
       - create
-      - patch
-      {{- end }}
       - get
       - watch
       - list

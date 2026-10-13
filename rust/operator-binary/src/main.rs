@@ -2,7 +2,7 @@
 // This will need changes in our and upstream error types.
 #![allow(clippy::result_large_err)]
 
-use std::{future::Future, os::unix::prelude::FileTypeExt, path::PathBuf};
+use std::{os::unix::prelude::FileTypeExt, path::PathBuf};
 
 use anyhow::{Context, Ok, anyhow};
 use clap::Parser;
@@ -212,7 +212,7 @@ async fn main() -> anyhow::Result<()> {
                         crd = v1alpha1::TrustStore::crd_name()
                     ));
 
-                    let (webhook_server, initial_reconcile_rx) = create_webhook_server(
+                    let (webhook_server, _) = create_webhook_server(
                         &operator_environment,
                         maintenance.disable_crd_maintenance,
                         readiness_checks,
@@ -220,46 +220,39 @@ async fn main() -> anyhow::Result<()> {
                     )
                     .await?;
 
-                    // Here, we multiply the initial reconcile signal received by the oneshot receiver
-                    // to be able to pass it to both the default custom resource deployer and to delay
-                    // the startup of the controller.
-                    let initial_reconcile_signal =
-                        SignalWatcher::new(initial_reconcile_rx.map(|_| ()));
-
                     let webhook_server = webhook_server
                         .run(sigterm_watcher.handle())
                         .map_err(|err| anyhow!(err).context("failed to run webhook server"));
 
-                    let ca_secret_namespace = tls_secretclass_ca_secret_namespace
-                        .unwrap_or(operator_environment.operator_namespace.clone());
-
-                    let default_secretclass = create_default_secretclass(
-                        initial_reconcile_signal.handle(),
-                        ca_secret_namespace,
-                        client.clone(),
-                    )
-                    .map_err(|err| {
-                        anyhow!(err).context("failed to apply default custom resources")
-                    });
-
-                    let truststore_controller = truststore_controller::start(
-                        client.clone(),
-                        &watch_namespace,
-                        sigterm_watcher.handle(),
-                    )
-                    .map(anyhow::Ok);
-
-                    let delayed_truststore_controller = async {
+                    let truststore_controller_and_secret_class = async {
                         signal::crd_established(&client, v1alpha2::SecretClass::crd_name()).await?;
                         secret_class_crd_check.mark_passed();
                         signal::crd_established(&client, v1alpha1::TrustStore::crd_name()).await?;
                         trust_store_crd_check.mark_passed();
-                        truststore_controller.await
+
+                        let truststore_controller = truststore_controller::start(
+                            client.clone(),
+                            &watch_namespace,
+                            sigterm_watcher.handle(),
+                        )
+                        .map(anyhow::Ok);
+
+                        let ca_secret_namespace = tls_secretclass_ca_secret_namespace
+                            .unwrap_or(operator_environment.operator_namespace.clone());
+
+                        // Only create the secret class after the CRDs are established
+                        let default_secretclass =
+                            create_default_secretclass(ca_secret_namespace, client.clone())
+                                .map_err(|err| {
+                                    anyhow!(err).context("failed to apply default custom resources")
+                                });
+
+                        try_join!(truststore_controller, default_secretclass)?;
+                        Ok(())
                     };
 
                     try_join!(
-                        delayed_truststore_controller,
-                        default_secretclass,
+                        truststore_controller_and_secret_class,
                         webhook_server,
                         eos_checker,
                     )?;
@@ -272,12 +265,9 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn create_default_secretclass(
-    initial_reconcile_signal: impl Future<Output = ()>,
     ca_secret_namespace: String,
     client: Client,
 ) -> anyhow::Result<()> {
-    initial_reconcile_signal.await;
-
     tracing::info!("applying default secretclass");
 
     let deserializer = serde_yaml::Deserializer::from_slice(include_bytes!("secretclass.yaml"));
