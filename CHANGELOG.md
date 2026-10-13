@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
   so a Pod kept the certificate it was given at startup and eventually ran on an expired one
   indefinitely, even though cert-manager had long since renewed it in the Secret. The restart is
   scheduled halfway between cert-manager's own `status.renewalTime` and the expiry ([#752]).
+- Install default resources regardless of CRD maintenance flag ([#762]).
 
 [#730]: https://github.com/stackabletech/secret-operator/pull/730
 [#735]: https://github.com/stackabletech/secret-operator/pull/735
@@ -34,6 +35,7 @@ All notable changes to this project will be documented in this file.
 [#743]: https://github.com/stackabletech/secret-operator/pull/743
 [#752]: https://github.com/stackabletech/secret-operator/pull/752
 [#759]: https://github.com/stackabletech/secret-operator/pull/759
+[#762]: https://github.com/stackabletech/secret-operator/pull/762
 
 ## [26.7.0] - 2026-07-21
 
