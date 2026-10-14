@@ -17,6 +17,7 @@ anyhow.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 clap.workspace = true
+const_format.workspace = true
 futures.workspace = true
 h2.workspace = true
 # We don't directly use this crate, we declare it here to use feature unification
@@ -27,7 +28,6 @@ pin-project.workspace = true
 prost-types.workspace = true
 prost.workspace = true
 serde_json.workspace = true
-serde_yaml.workspace = true
 serde.workspace = true
 snafu.workspace = true
 socket2.workspace = true
@@ -44,11 +44,11 @@ tonic-reflection.workspace = true
 tracing.workspace = true
 uuid.workspace = true
 rand.workspace = true
-const_format.workspace = true
+yaml_serde.workspace = true
 
 [dev-dependencies]
 indoc.workspace = true
-serde_yaml.workspace = true
+yaml_serde.workspace = true
 
 [build-dependencies]
 built.workspace = true

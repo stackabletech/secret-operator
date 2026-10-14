@@ -75,9 +75,9 @@ spec:
 "#;
 
         let data =
-            serde_yaml::Value::deserialize(serde_yaml::Deserializer::from_str(STR_DAEMONSET))
+            yaml_serde::Value::deserialize(yaml_serde::Deserializer::from_str(STR_DAEMONSET))
                 .unwrap();
-        serde_yaml::from_value(data).unwrap()
+        yaml_serde::from_value(data).unwrap()
     });
 
     static DEPLOYMENT: LazyLock<Deployment> = LazyLock::new(|| {
@@ -102,9 +102,9 @@ spec:
     "#;
 
         let data =
-            serde_yaml::Value::deserialize(serde_yaml::Deserializer::from_str(STR_DEPLOYMENT))
+            yaml_serde::Value::deserialize(yaml_serde::Deserializer::from_str(STR_DEPLOYMENT))
                 .unwrap();
-        serde_yaml::from_value(data).unwrap()
+        yaml_serde::from_value(data).unwrap()
     });
 
     static CLUSTER_ROLE: LazyLock<ClusterRole> = LazyLock::new(|| {
@@ -124,9 +124,9 @@ rules:
       - get
     "#;
         let data =
-            serde_yaml::Value::deserialize(serde_yaml::Deserializer::from_str(STR_CLUSTER_ROLE))
+            yaml_serde::Value::deserialize(yaml_serde::Deserializer::from_str(STR_CLUSTER_ROLE))
                 .unwrap();
-        serde_yaml::from_value(data).unwrap()
+        yaml_serde::from_value(data).unwrap()
     });
 
     #[test]

@@ -270,9 +270,9 @@ async fn create_default_secretclass(
 ) -> anyhow::Result<()> {
     tracing::info!("applying default secretclass");
 
-    let deserializer = serde_yaml::Deserializer::from_slice(include_bytes!("secretclass.yaml"));
+    let deserializer = yaml_serde::Deserializer::from_slice(include_bytes!("secretclass.yaml"));
     let mut tls_secret_class: v1alpha2::SecretClass =
-        serde_yaml::with::singleton_map_recursive::deserialize(deserializer)
+        yaml_serde::with::singleton_map_recursive::deserialize(deserializer)
             .expect("compile-time included secretclass must be valid YAML");
 
     #[rustfmt::skip]
