@@ -479,9 +479,8 @@ mod test {
                   rsa:
                     length: 3072
         "#;
-        let deserializer = serde_yaml::Deserializer::from_str(input);
         let secret_class: SecretClass =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+            stackable_operator::utils::yaml_from_str_singleton_map(input).unwrap();
         assert_eq!(
             secret_class.spec,
             SecretClassSpec {
@@ -528,9 +527,8 @@ mod test {
                     namespace: default
               maxCertificateLifetime: 31d
         "#;
-        let deserializer = serde_yaml::Deserializer::from_str(input);
         let secret_class: SecretClass =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+            stackable_operator::utils::yaml_from_str_singleton_map(input).unwrap();
         assert_eq!(
             secret_class.spec,
             SecretClassSpec {
