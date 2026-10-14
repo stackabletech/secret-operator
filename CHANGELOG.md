@@ -11,9 +11,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Bump stackable-operator to 0.114.0 ([#730]).
-- Bump stackable-operator to 0.115.0 ([#735]).
-- Bump stackable-operator to 0.119.0 ([#759]).
+- Bump stackable-operator to 0.121.0 ([#730], [#735], [#759], [#763]).
+- All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#763]).
+- Replace the unmaintained `serde_yaml` with `yaml_serde` ([#763]).
 
 ### Fixed
 
@@ -36,6 +36,7 @@ All notable changes to this project will be documented in this file.
 [#752]: https://github.com/stackabletech/secret-operator/pull/752
 [#759]: https://github.com/stackabletech/secret-operator/pull/759
 [#762]: https://github.com/stackabletech/secret-operator/pull/762
+[#763]: https://github.com/stackabletech/secret-operator/pull/763
 
 ## [26.7.0] - 2026-07-21
 
