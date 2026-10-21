@@ -37,13 +37,10 @@ REPO_ROOT = SCRIPT_DIR.parent
 HELM_CHART = REPO_ROOT / "deploy" / "helm" / "secret-operator"
 OLM_OUTPUT = REPO_ROOT / "deploy" / "olm"
 
-# Mapping from OCI registry image repos to quay.io image repos.
-# The script replaces oci.stackable.tech images with quay.io images (using digest).
-OCI_TO_QUAY: dict[str, str] = {
-    "oci.stackable.tech/sdp/secret-operator": "quay.io/stackable/secret-operator",
-    "oci.stackable.tech/sdp/sig-storage/csi-provisioner": "quay.io/stackable/sig-storage/csi-provisioner",
-    "oci.stackable.tech/sdp/sig-storage/csi-node-driver-registrar": "quay.io/stackable/sig-storage/csi-node-driver-registrar",
-}
+# The chart is rendered with its own quay.io overlay, so the operator image comes from that
+# registry. The CSI sidecars are only mirrored to quay.io/stackable/sig-storage.
+QUAY_OVERLAY = HELM_CHART / "values" / "quay.io.yaml"
+SIDECAR_QUAY_REPO = "quay.io/stackable/sig-storage"
 
 # Stackable logo icon (PNG, base64-encoded). Sourced from the 25.11.0 OLM bundle.
 # typos:ignore-block-start
@@ -1052,7 +1049,7 @@ def get_quay_digest(quay_image: str, tag: str) -> str:
         ) from exc
 
 
-def render_helm(version: str) -> list[dict]:
+def render_helm(version: str, extra_values: list[str]) -> list[dict]:
     """Render the Helm chart with OpenShift APIs enabled and return parsed YAML docs."""
     result = subprocess.run(
         [
@@ -1063,6 +1060,9 @@ def render_helm(version: str) -> list[dict]:
             # Enable OpenShift API so that the SCC manifest is included.
             "--api-versions",
             "security.openshift.io/v1",
+            "--values",
+            str(QUAY_OVERLAY),
+            *(arg for path in extra_values for arg in ("--values", path)),
             "--set",
             f"image.tag={version}",
             str(HELM_CHART),
@@ -1080,21 +1080,29 @@ def load_values() -> dict:
         return yaml.safe_load(fh)
 
 
-def sidecar_image_info(values: dict) -> dict[str, dict[str, str]]:
-    """Return a dict of sidecar name -> {repo, tag} from values.yaml."""
+def load_registry() -> str:
+    with open(QUAY_OVERLAY) as fh:
+        return yaml.safe_load(fh)["image"]["repository"]
+
+
+def sidecar_image_info(values: dict, registry: str) -> dict[str, dict[str, str]]:
+    """Return a dict of sidecar name -> {repo, tag} as the chart renders them.
+
+    Like the chart, a sidecar repository that values.yaml leaves unset defaults to
+    <image.repository>/sig-storage.
+    """
+    images = {
+        "csi-provisioner": values["csiNodeDriver"]["externalProvisioner"]["image"],
+        "csi-node-driver-registrar": values["csiNodeDriver"]["nodeDriverRegistrar"][
+            "image"
+        ],
+    }
     return {
-        "csi-provisioner": {
-            "repo": values["csiNodeDriver"]["externalProvisioner"]["image"][
-                "repository"
-            ],
-            "tag": values["csiNodeDriver"]["externalProvisioner"]["image"]["tag"],
-        },
-        "csi-node-driver-registrar": {
-            "repo": values["csiNodeDriver"]["nodeDriverRegistrar"]["image"][
-                "repository"
-            ],
-            "tag": values["csiNodeDriver"]["nodeDriverRegistrar"]["image"]["tag"],
-        },
+        name: {
+            "repo": f"{image.get('repository') or f'{registry}/sig-storage'}/{name}",
+            "tag": image["tag"],
+        }
+        for name, image in images.items()
     }
 
 
@@ -1445,6 +1453,17 @@ def main() -> None:
             f" (default: {OLM_OUTPUT.relative_to(REPO_ROOT)})"
         ),
     )
+    parser.add_argument(
+        "--values",
+        "-f",
+        metavar="FILE",
+        action="append",
+        default=[],
+        help=(
+            "Extra Helm values file, can be repeated. The OLM bundles of a release take the"
+            " memory overrides in stackable-utils/olm/resources/values/secret-operator/values.yaml."
+        ),
+    )
     args = parser.parse_args()
 
     version: str = args.version
@@ -1464,9 +1483,9 @@ def main() -> None:
     # ------------------------------------------------------------------
     print("[1/4] Reading Helm values.yaml ...")
     values = load_values()
-    sidecars = sidecar_image_info(values)
-    main_oci_repo: str = values["image"]["repository"]
-    main_quay_repo = OCI_TO_QUAY[main_oci_repo]
+    registry = load_registry()
+    sidecars = sidecar_image_info(values, registry)
+    main_quay_repo = f"{registry}/secret-operator"
 
     # ------------------------------------------------------------------
     # 2. Look up quay.io image digests
@@ -1482,11 +1501,11 @@ def main() -> None:
     }
     # image_map: OCI repo:tag  ->  quay.io@digest  (for textual substitution)
     image_map: dict[str, str] = {
-        f"{main_oci_repo}:{version}": final_images["secret-operator"],
+        f"{main_quay_repo}:{version}": final_images["secret-operator"],
     }
 
     for sidecar_name, info in sidecars.items():
-        quay_repo = OCI_TO_QUAY[info["repo"]]
+        quay_repo = f"{SIDECAR_QUAY_REPO}/{sidecar_name}"
         tag = info["tag"]
         print(f"  {quay_repo}:{tag}")
         digest = get_quay_digest(quay_repo, tag)
@@ -1499,7 +1518,7 @@ def main() -> None:
     # 3. Render Helm chart
     # ------------------------------------------------------------------
     print("[3/4] Rendering Helm chart ...")
-    helm_docs = render_helm(version)
+    helm_docs = render_helm(version, [str(Path(f).resolve()) for f in args.values])
     print(f"  -> {len(helm_docs)} Kubernetes resources")
 
     # ------------------------------------------------------------------
