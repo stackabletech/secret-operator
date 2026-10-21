@@ -25,6 +25,7 @@ Requirements:
 
 import argparse
 import subprocess
+import json
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -41,6 +42,8 @@ OLM_OUTPUT = REPO_ROOT / "deploy" / "olm"
 # registry. The CSI sidecars are only mirrored to quay.io/stackable/sig-storage.
 QUAY_OVERLAY = HELM_CHART / "values" / "quay.io.yaml"
 SIDECAR_QUAY_REPO = "quay.io/stackable/sig-storage"
+
+HUB_API = "https://hub.stackable.tech/api/v1"
 
 # Stackable logo icon (PNG, base64-encoded). Sourced from the 25.11.0 OLM bundle.
 # typos:ignore-block-start
@@ -1225,6 +1228,81 @@ def _operator_cluster_rules(helm_docs: list[dict]) -> list[dict]:
     return []
 
 
+def load_chart() -> dict:
+    with open(HELM_CHART / "Chart.yaml") as fh:
+        return yaml.safe_load(fh)
+
+
+def csv_links(chart: dict) -> list[dict[str, str]]:
+    """Turn the chart's Artifact Hub links into CSV links.
+
+    >>> links = "[{name: Documentation, url: https://docs.stackable.tech}, {name: support, url: https://github.com}]"
+    >>> csv_links({"annotations": {"artifacthub.io/links": links}})
+    [{'name': 'Documentation', 'url': 'https://docs.stackable.tech'}, {'name': 'Support', 'url': 'https://github.com'}]
+
+    Charts without the annotation get no links:
+
+    >>> csv_links({"description": "An older chart"})
+    []
+    """
+    links = yaml.safe_load(
+        chart.get("annotations", {}).get("artifacthub.io/links", "[]")
+    )
+    # Artifact Hub only highlights a link named exactly "support"; the console shows names as-is.
+    return [
+        {
+            "name": "Support" if link["name"] == "support" else link["name"],
+            "url": link["url"],
+        }
+        for link in links
+    ]
+
+
+def hub_release_name(release: str) -> str:
+    """Return the name the Stackable Hub uses for a release.
+
+    >>> hub_release_name("26.11.0")
+    '26.11'
+    >>> hub_release_name("26.7.1")
+    '26.7'
+    >>> hub_release_name("0.0.0-dev")
+    'latest'
+    """
+    if release == "0.0.0-dev":
+        return "latest"
+    return ".".join(release.split(".")[:2])
+
+
+def lowest_kube_version(platforms: list[dict]) -> str:
+    """Return the lowest Kubernetes version in the Hub's platform list, as a full version.
+
+    Versions compare numerically, so 1.9 is lower than 1.10:
+
+    >>> lowest_kube_version([
+    ...     {"name": "OpenShift", "versions": ["4.20", "4.21"]},
+    ...     {"name": "Kubernetes", "versions": ["1.10", "1.9", "1.11"]},
+    ... ])
+    '1.9.0'
+    """
+    versions = next(p["versions"] for p in platforms if p["name"] == "Kubernetes")
+    lowest = min(versions, key=lambda v: tuple(int(x) for x in v.split(".")))
+    return f"{lowest}.0"
+
+
+def min_kube_version(release: str) -> str:
+    """Return the lowest Kubernetes version the release supports, according to the Stackable Hub."""
+    hub_release = hub_release_name(release)
+    url = f"{HUB_API}/releases/{hub_release}"
+    try:
+        with urllib.request.urlopen(url) as resp:
+            platforms = json.load(resp)["platforms"]
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(
+            f"Failed to read release {hub_release} from {url}: HTTP {exc.code}"
+        ) from exc
+    return lowest_kube_version(platforms)
+
+
 def build_csv(
     version: str,
     helm_docs: list[dict],
@@ -1233,6 +1311,7 @@ def build_csv(
     openshift_versions: str = "v4.18-v4.21",
 ) -> dict:
     """Build and return the ClusterServiceVersion manifest as a dict."""
+    chart = load_chart()
 
     deployer_deployment = {
         "name": f"secret-operator-deployer-{version}",
@@ -1323,9 +1402,9 @@ def build_csv(
                 "features.operators.openshift.io/token-auth-azure": "false",
                 "features.operators.openshift.io/token-auth-gcp": "false",
                 "support": "Stackable GmbH",
-                "categories": "Storage",
-                "capabilities": "Full Lifecycle",
-                "description": "Stackable Secret Operator",
+                "categories": "Big Data, Security",
+                "capabilities": "Basic Install",
+                "description": chart["description"],
                 "repository": "https://github.com/stackabletech/secret-operator",
                 "com.redhat.openshift.versions": openshift_versions,
             },
@@ -1333,24 +1412,20 @@ def build_csv(
         "spec": {
             "displayName": "Stackable Secret Operator",
             "description": (
-                "This is a Kubernetes operator to provide secret functionality to other"
-                " Stackable operators. The Stackable Secret Operator is part of the Stackable"
-                " Data Platform, a curated selection of the best open source data apps like"
-                " Kafka, Druid, Trino or Spark, all working together seamlessly. Based on"
-                " Kubernetes, it runs everywhere - on prem or in the cloud.\n\n"
-                "You can install the operator using"
-                " [stackablectl or helm](https://docs.stackable.tech/home/stable/secret-operator/installation.html).\n\n"
+                f"{chart['description']}\n\n"
                 "NOTE:\n"
                 'Make sure you install this operator in a namespace called "stackable-operators".'
                 " Failing to do so will result in a broken installation."
             ),
             "icon": [{"base64data": icon_b64, "mediatype": "image/png"}],
-            "keywords": ["secret"],
+            # Charts from before SDP 26.11 carry no keywords.
+            "keywords": chart.get("keywords", ["secret"]),
+            "links": csv_links(chart),
             "maintainers": [{"email": "info@stackable.tech", "name": "Stackable GmbH"}],
             "maturity": "stable",
             "provider": {"name": "Stackable GmbH", "url": "https://stackable.tech"},
             "version": version,
-            "minKubeVersion": "1.23.0",
+            "minKubeVersion": min_kube_version(version),
             "installModes": [
                 {"supported": True, "type": "OwnNamespace"},
                 {"supported": True, "type": "SingleNamespace"},
