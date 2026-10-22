@@ -1052,7 +1052,7 @@ def get_quay_digest(quay_image: str, tag: str) -> str:
         ) from exc
 
 
-def render_helm(version: str, extra_values: list[str]) -> list[dict]:
+def render_helm(version: str) -> list[dict]:
     """Render the Helm chart with OpenShift APIs enabled and return parsed YAML docs."""
     result = subprocess.run(
         [
@@ -1065,7 +1065,6 @@ def render_helm(version: str, extra_values: list[str]) -> list[dict]:
             "security.openshift.io/v1",
             "--values",
             str(QUAY_OVERLAY),
-            *(arg for path in extra_values for arg in ("--values", path)),
             "--set",
             f"image.tag={version}",
             str(HELM_CHART),
@@ -1528,17 +1527,6 @@ def main() -> None:
             f" (default: {OLM_OUTPUT.relative_to(REPO_ROOT)})"
         ),
     )
-    parser.add_argument(
-        "--values",
-        "-f",
-        metavar="FILE",
-        action="append",
-        default=[],
-        help=(
-            "Extra Helm values file, can be repeated. The OLM bundles of a release take the"
-            " memory overrides in stackable-utils/olm/resources/values/secret-operator/values.yaml."
-        ),
-    )
     args = parser.parse_args()
 
     version: str = args.version
@@ -1593,7 +1581,7 @@ def main() -> None:
     # 3. Render Helm chart
     # ------------------------------------------------------------------
     print("[3/4] Rendering Helm chart ...")
-    helm_docs = render_helm(version, [str(Path(f).resolve()) for f in args.values])
+    helm_docs = render_helm(version)
     print(f"  -> {len(helm_docs)} Kubernetes resources")
 
     # ------------------------------------------------------------------
