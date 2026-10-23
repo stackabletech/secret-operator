@@ -25,6 +25,7 @@ Requirements:
 
 import argparse
 import subprocess
+import json
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -37,13 +38,12 @@ REPO_ROOT = SCRIPT_DIR.parent
 HELM_CHART = REPO_ROOT / "deploy" / "helm" / "secret-operator"
 OLM_OUTPUT = REPO_ROOT / "deploy" / "olm"
 
-# Mapping from OCI registry image repos to quay.io image repos.
-# The script replaces oci.stackable.tech images with quay.io images (using digest).
-OCI_TO_QUAY: dict[str, str] = {
-    "oci.stackable.tech/sdp/secret-operator": "quay.io/stackable/secret-operator",
-    "oci.stackable.tech/sdp/sig-storage/csi-provisioner": "quay.io/stackable/sig-storage/csi-provisioner",
-    "oci.stackable.tech/sdp/sig-storage/csi-node-driver-registrar": "quay.io/stackable/sig-storage/csi-node-driver-registrar",
-}
+# The chart is rendered with its own quay.io overlay, so the operator image comes from that
+# registry. The CSI sidecars are only mirrored to quay.io/stackable/sig-storage.
+QUAY_OVERLAY = HELM_CHART / "values" / "quay.io.yaml"
+SIDECAR_QUAY_REPO = "quay.io/stackable/sig-storage"
+
+HUB_API = "https://hub.stackable.tech/api/v1"
 
 # Stackable logo icon (PNG, base64-encoded). Sourced from the 25.11.0 OLM bundle.
 # typos:ignore-block-start
@@ -1063,6 +1063,8 @@ def render_helm(version: str) -> list[dict]:
             # Enable OpenShift API so that the SCC manifest is included.
             "--api-versions",
             "security.openshift.io/v1",
+            "--values",
+            str(QUAY_OVERLAY),
             "--set",
             f"image.tag={version}",
             str(HELM_CHART),
@@ -1080,21 +1082,29 @@ def load_values() -> dict:
         return yaml.safe_load(fh)
 
 
-def sidecar_image_info(values: dict) -> dict[str, dict[str, str]]:
-    """Return a dict of sidecar name -> {repo, tag} from values.yaml."""
+def load_registry() -> str:
+    with open(QUAY_OVERLAY) as fh:
+        return yaml.safe_load(fh)["image"]["repository"]
+
+
+def sidecar_image_info(values: dict, registry: str) -> dict[str, dict[str, str]]:
+    """Return a dict of sidecar name -> {repo, tag} as the chart renders them.
+
+    Like the chart, a sidecar repository that values.yaml leaves unset defaults to
+    <image.repository>/sig-storage.
+    """
+    images = {
+        "csi-provisioner": values["csiNodeDriver"]["externalProvisioner"]["image"],
+        "csi-node-driver-registrar": values["csiNodeDriver"]["nodeDriverRegistrar"][
+            "image"
+        ],
+    }
     return {
-        "csi-provisioner": {
-            "repo": values["csiNodeDriver"]["externalProvisioner"]["image"][
-                "repository"
-            ],
-            "tag": values["csiNodeDriver"]["externalProvisioner"]["image"]["tag"],
-        },
-        "csi-node-driver-registrar": {
-            "repo": values["csiNodeDriver"]["nodeDriverRegistrar"]["image"][
-                "repository"
-            ],
-            "tag": values["csiNodeDriver"]["nodeDriverRegistrar"]["image"]["tag"],
-        },
+        name: {
+            "repo": f"{image.get('repository') or f'{registry}/sig-storage'}/{name}",
+            "tag": image["tag"],
+        }
+        for name, image in images.items()
     }
 
 
@@ -1217,6 +1227,81 @@ def _operator_cluster_rules(helm_docs: list[dict]) -> list[dict]:
     return []
 
 
+def load_chart() -> dict:
+    with open(HELM_CHART / "Chart.yaml") as fh:
+        return yaml.safe_load(fh)
+
+
+def csv_links(chart: dict) -> list[dict[str, str]]:
+    """Turn the chart's Artifact Hub links into CSV links.
+
+    >>> links = "[{name: Documentation, url: https://docs.stackable.tech}, {name: support, url: https://github.com}]"
+    >>> csv_links({"annotations": {"artifacthub.io/links": links}})
+    [{'name': 'Documentation', 'url': 'https://docs.stackable.tech'}, {'name': 'Support', 'url': 'https://github.com'}]
+
+    Charts without the annotation get no links:
+
+    >>> csv_links({"description": "An older chart"})
+    []
+    """
+    links = yaml.safe_load(
+        chart.get("annotations", {}).get("artifacthub.io/links", "[]")
+    )
+    # Artifact Hub only highlights a link named exactly "support"; the console shows names as-is.
+    return [
+        {
+            "name": "Support" if link["name"] == "support" else link["name"],
+            "url": link["url"],
+        }
+        for link in links
+    ]
+
+
+def hub_release_name(release: str) -> str:
+    """Return the name the Stackable Hub uses for a release.
+
+    >>> hub_release_name("26.11.0")
+    '26.11'
+    >>> hub_release_name("26.7.1")
+    '26.7'
+    >>> hub_release_name("0.0.0-dev")
+    'latest'
+    """
+    if release == "0.0.0-dev":
+        return "latest"
+    return ".".join(release.split(".")[:2])
+
+
+def lowest_kube_version(platforms: list[dict]) -> str:
+    """Return the lowest Kubernetes version in the Hub's platform list, as a full version.
+
+    Versions compare numerically, so 1.9 is lower than 1.10:
+
+    >>> lowest_kube_version([
+    ...     {"name": "OpenShift", "versions": ["4.20", "4.21"]},
+    ...     {"name": "Kubernetes", "versions": ["1.10", "1.9", "1.11"]},
+    ... ])
+    '1.9.0'
+    """
+    versions = next(p["versions"] for p in platforms if p["name"] == "Kubernetes")
+    lowest = min(versions, key=lambda v: tuple(int(x) for x in v.split(".")))
+    return f"{lowest}.0"
+
+
+def min_kube_version(release: str) -> str:
+    """Return the lowest Kubernetes version the release supports, according to the Stackable Hub."""
+    hub_release = hub_release_name(release)
+    url = f"{HUB_API}/releases/{hub_release}"
+    try:
+        with urllib.request.urlopen(url) as resp:
+            platforms = json.load(resp)["platforms"]
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(
+            f"Failed to read release {hub_release} from {url}: HTTP {exc.code}"
+        ) from exc
+    return lowest_kube_version(platforms)
+
+
 def build_csv(
     version: str,
     helm_docs: list[dict],
@@ -1225,6 +1310,7 @@ def build_csv(
     openshift_versions: str = "v4.18-v4.21",
 ) -> dict:
     """Build and return the ClusterServiceVersion manifest as a dict."""
+    chart = load_chart()
 
     deployer_deployment = {
         "name": f"secret-operator-deployer-{version}",
@@ -1315,9 +1401,9 @@ def build_csv(
                 "features.operators.openshift.io/token-auth-azure": "false",
                 "features.operators.openshift.io/token-auth-gcp": "false",
                 "support": "Stackable GmbH",
-                "categories": "Storage",
-                "capabilities": "Full Lifecycle",
-                "description": "Stackable Secret Operator",
+                "categories": "Big Data, Security",
+                "capabilities": "Basic Install",
+                "description": chart["description"],
                 "repository": "https://github.com/stackabletech/secret-operator",
                 "com.redhat.openshift.versions": openshift_versions,
             },
@@ -1325,24 +1411,20 @@ def build_csv(
         "spec": {
             "displayName": "Stackable Secret Operator",
             "description": (
-                "This is a Kubernetes operator to provide secret functionality to other"
-                " Stackable operators. The Stackable Secret Operator is part of the Stackable"
-                " Data Platform, a curated selection of the best open source data apps like"
-                " Kafka, Druid, Trino or Spark, all working together seamlessly. Based on"
-                " Kubernetes, it runs everywhere - on prem or in the cloud.\n\n"
-                "You can install the operator using"
-                " [stackablectl or helm](https://docs.stackable.tech/home/stable/secret-operator/installation.html).\n\n"
+                f"{chart['description']}\n\n"
                 "NOTE:\n"
                 'Make sure you install this operator in a namespace called "stackable-operators".'
                 " Failing to do so will result in a broken installation."
             ),
             "icon": [{"base64data": icon_b64, "mediatype": "image/png"}],
-            "keywords": ["secret"],
+            # Charts from before SDP 26.11 carry no keywords.
+            "keywords": chart.get("keywords", ["secret"]),
+            "links": csv_links(chart),
             "maintainers": [{"email": "info@stackable.tech", "name": "Stackable GmbH"}],
             "maturity": "stable",
             "provider": {"name": "Stackable GmbH", "url": "https://stackable.tech"},
             "version": version,
-            "minKubeVersion": "1.23.0",
+            "minKubeVersion": min_kube_version(version),
             "installModes": [
                 {"supported": True, "type": "OwnNamespace"},
                 {"supported": True, "type": "SingleNamespace"},
@@ -1464,9 +1546,9 @@ def main() -> None:
     # ------------------------------------------------------------------
     print("[1/4] Reading Helm values.yaml ...")
     values = load_values()
-    sidecars = sidecar_image_info(values)
-    main_oci_repo: str = values["image"]["repository"]
-    main_quay_repo = OCI_TO_QUAY[main_oci_repo]
+    registry = load_registry()
+    sidecars = sidecar_image_info(values, registry)
+    main_quay_repo = f"{registry}/secret-operator"
 
     # ------------------------------------------------------------------
     # 2. Look up quay.io image digests
@@ -1482,11 +1564,11 @@ def main() -> None:
     }
     # image_map: OCI repo:tag  ->  quay.io@digest  (for textual substitution)
     image_map: dict[str, str] = {
-        f"{main_oci_repo}:{version}": final_images["secret-operator"],
+        f"{main_quay_repo}:{version}": final_images["secret-operator"],
     }
 
     for sidecar_name, info in sidecars.items():
-        quay_repo = OCI_TO_QUAY[info["repo"]]
+        quay_repo = f"{SIDECAR_QUAY_REPO}/{sidecar_name}"
         tag = info["tag"]
         print(f"  {quay_repo}:{tag}")
         digest = get_quay_digest(quay_repo, tag)
