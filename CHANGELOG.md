@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Bump stackable-operator to 0.121.0 ([#730], [#735], [#759], [#763]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#763]).
 - Replace the unmaintained `serde_yaml` with `yaml_serde` ([#763]).
+- File logs are written to an `emptyDir` at `/var/log/secret-operator`, so file logging also works with a read-only root filesystem ([#766]).
 
 ### Fixed
 
@@ -37,6 +38,7 @@ All notable changes to this project will be documented in this file.
 [#759]: https://github.com/stackabletech/secret-operator/pull/759
 [#762]: https://github.com/stackabletech/secret-operator/pull/762
 [#763]: https://github.com/stackabletech/secret-operator/pull/763
+[#766]: https://github.com/stackabletech/secret-operator/pull/766
 
 ## [26.7.0] - 2026-07-21
 

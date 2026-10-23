@@ -448,14 +448,14 @@
         },
         "fileLog": {
           "title": "File logs",
-          "description": "Writes logs to /stackable/logs inside the container.",
+          "description": "Writes logs to /var/log/secret-operator inside the container, on an emptyDir volume.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "enabled": {
               "type": "boolean",
               "default": false,
-              "description": "Whether the operator also writes logs to /stackable/logs inside the container. Off by default: it needs a volume to be useful, otherwise the logs vanish with the pod."
+              "description": "Whether the operator also writes logs to /var/log/secret-operator inside the container. Off by default. The logs survive container restarts but not the Pod."
             },
             "level": {
               "title": "File log level",
