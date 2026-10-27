@@ -106,6 +106,10 @@ spec:
               {{- end }}
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.telemetry.fileLog.enabled }}
+            - name: log
+              mountPath: {{ include "secret-operator.telemetry.fileLogDirectory" . }}
+            {{- end }}
 
         - name: external-provisioner
           image: "{{ include "secret-operator.csi-provisioner.image" . }}"
@@ -147,6 +151,10 @@ spec:
             path: {{ .Values.csiNodeDriver.kubeletDir }}/pods/
         - name: tmp
           emptyDir: {}
+        {{- if .Values.telemetry.fileLog.enabled }}
+        - name: log
+          emptyDir: {}
+        {{- end }}
       {{- with .Values.csiNodeDriver.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
