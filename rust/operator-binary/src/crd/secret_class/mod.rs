@@ -63,7 +63,7 @@ pub mod versioned {
         ///
         /// [1]: DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-certmanager
         /// [cert-manager]: https://cert-manager.io/
-        #[versioned(changed(since = "v1alpha2", from_name = "ExperimentalCertManager"))]
+        #[versioned(changed(in = "v1alpha2", previous_name = "ExperimentalCertManager"))]
         CertManager(CertManagerBackend),
 
         /// The [`kerberosKeytab` backend](DOCS_BASE_URL_PLACEHOLDER/secret-operator/secretclass#backend-kerberoskeytab)
@@ -313,8 +313,8 @@ pub mod versioned {
         /// over the generation duty from the domain controller.
         #[versioned(
             changed(
-                since = "v1alpha2",
-                from_name = "experimental_generate_sam_account_name"
+                in = "v1alpha2",
+                previous_name = "experimental_generate_sam_account_name"
             ),
             hint(option)
         )]
