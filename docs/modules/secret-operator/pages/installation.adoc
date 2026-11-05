@@ -1,4 +1,5 @@
 = Installation
+:description: Installation of the Stackable secret operator with Helm, covering the settings for Kubernetes distributions such as MicroK8s, k0s and VMware Tanzu.
 
 There are two ways to run the Stackable Secret Operator:
 
