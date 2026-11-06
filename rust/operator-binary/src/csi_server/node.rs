@@ -93,6 +93,12 @@ enum PublishError {
         path: PathBuf,
     },
 
+    #[snafu(display("failed to check whether published marker {path:?} exists"))]
+    CheckPublishedMarker {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+
     #[snafu(display("file path {path:?} must only contain normal components"))]
     InvalidComponents { path: PathBuf },
 
@@ -127,6 +133,7 @@ impl From<PublishError> for Status {
             PublishError::SetDirPermissions { .. } => Status::unavailable(full_msg),
             PublishError::CreateFile { .. } => Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
+            PublishError::CheckPublishedMarker { .. } => Status::unavailable(full_msg),
             PublishError::InvalidComponents { .. } => Status::unavailable(full_msg),
             PublishError::InvalidAbsolutePath { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
@@ -373,6 +380,32 @@ impl SecretProvisionerNode {
     }
 }
 
+/// Empty file whose presence means that the volume has been published completely.
+///
+/// It is a dotfile so that `*` globs over the volume, as in `cp /stackable/tls/* ...`, skip it.
+const PUBLISHED_MARKER_FILE_NAME: &str = ".secret-operator-published";
+
+async fn is_published(target_path: &Path) -> Result<bool, PublishError> {
+    let path = target_path.join(PUBLISHED_MARKER_FILE_NAME);
+    tokio::fs::try_exists(&path)
+        .await
+        .context(publish_error::CheckPublishedMarkerSnafu { path })
+}
+
+/// Must be called after all secret files are written.
+async fn mark_published(target_path: &Path) -> Result<(), PublishError> {
+    let path = target_path.join(PUBLISHED_MARKER_FILE_NAME);
+    OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .mode(0o640)
+        .open(&path)
+        .await
+        .context(publish_error::CreateFileSnafu { path })?;
+    Ok(())
+}
+
 // Most of the services are not yet implemented, most of them will never be, because they are
 // not needed for this use case.
 // The main two services are publish_volume und unpublish_volume, which get called whenever a
@@ -408,6 +441,17 @@ impl Node for SecretProvisionerNode {
                     volume.path = %target_path.display(),
                     "Received NodePublishVolume request"
                 );
+                // The kubelet calls NodePublishVolume again for volumes it has already published,
+                // for example after a kubelet restart. Issuing a new secret would move the expiry
+                // annotation to a secret that a running process may never load, so the restarter
+                // could restart the Pod only after the secret in use has expired.
+                if is_published(&target_path).await? {
+                    tracing::info!(
+                        volume.path = %target_path.display(),
+                        "Volume is already published, keeping its secret data"
+                    );
+                    return Ok(Response::new(NodePublishVolumeResponse {}));
+                }
                 let selector =
                     SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
                         .context(publish_error::InvalidSelectorSnafu)?;
@@ -430,6 +474,7 @@ impl Node for SecretProvisionerNode {
                     selector
                 )
                 .await?;
+                mark_published(&target_path).await?;
                 Ok(Response::new(NodePublishVolumeResponse {}))
             }
             .await,
@@ -494,5 +539,33 @@ impl Node for SecretProvisionerNode {
                 segments: [(TOPOLOGY_NODE.to_string(), self.node_name.clone())].into(),
             }),
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_published, mark_published};
+
+    #[tokio::test]
+    async fn empty_volume_is_not_published() {
+        let volume = tempfile::tempdir().expect("temporary directory can be created");
+        assert!(
+            !is_published(volume.path())
+                .await
+                .expect("volume directory is readable")
+        );
+    }
+
+    #[tokio::test]
+    async fn marked_volume_is_published() {
+        let volume = tempfile::tempdir().expect("temporary directory can be created");
+        mark_published(volume.path())
+            .await
+            .expect("published marker can be written");
+        assert!(
+            is_published(volume.path())
+                .await
+                .expect("volume directory is readable")
+        );
     }
 }
