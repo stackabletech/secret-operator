@@ -4,6 +4,7 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+use chrono::{DateTime, FixedOffset};
 use openssl::sha::Sha256;
 use serde::{Deserialize, de::IntoDeserializer};
 use snafu::{ResultExt, Snafu, ensure};
@@ -300,8 +301,8 @@ impl SecretProvisionerNode {
         &self,
         client: &stackable_operator::client::Client,
         volume_id: &str,
-        selector: &SecretVolumeSelector,
-        data: &SecretContents,
+        pod: &ObjectRef<Pod>,
+        expires_after: Option<DateTime<FixedOffset>>,
     ) -> Result<(), PublishError> {
         // Each volume must have a unique tag, so that multiple markers of the same type can coexist on the same pod
         // Each tag needs to be simple and unique-ish per volume
@@ -316,7 +317,7 @@ impl SecretProvisionerNode {
 
         let mut annotations = Annotations::new();
 
-        if let Some(expires_after) = data.expires_after {
+        if let Some(expires_after) = expires_after {
             annotations
                 .parse_insert((
                     format!(
@@ -331,8 +332,8 @@ impl SecretProvisionerNode {
         if !annotations.is_empty() {
             let tagged_pod = Pod {
                 metadata: ObjectMetaBuilder::new()
-                    .name(&selector.pod)
-                    .namespace(&selector.namespace)
+                    .name(&pod.name)
+                    .namespace_opt(pod.namespace.clone())
                     .annotations(annotations)
                     .build(),
                 ..Pod::default()
@@ -392,7 +393,8 @@ async fn is_published(target_path: &Path) -> Result<bool, PublishError> {
         .context(publish_error::CheckPublishedMarkerSnafu { path })
 }
 
-/// Must be called after all secret files are written.
+/// Must be called last, after the secret files are written and the Pod is tagged. A volume marked
+/// as published is never tagged again, so the restarter would not know when its secret expires.
 async fn mark_published(target_path: &Path) -> Result<(), PublishError> {
     let path = target_path.join(PUBLISHED_MARKER_FILE_NAME);
     OpenOptions::new()
@@ -465,8 +467,7 @@ impl Node for SecretProvisionerNode {
                     .get_secret_data(&selector, pod_info)
                     .await
                     .context(publish_error::BackendGetSecretDataSnafu)?;
-                self.tag_pod(&self.client, &request.volume_id, &selector, &data)
-                    .await?;
+                let expires_after = data.expires_after;
                 self.prepare_secret_dir(&target_path).await?;
                 self.save_secret_data(
                     &target_path,
@@ -474,6 +475,10 @@ impl Node for SecretProvisionerNode {
                     selector
                 )
                 .await?;
+                // Tagging only after the files are in place keeps a failed publish from moving
+                // the expiry to a secret the Pod never received.
+                self.tag_pod(&self.client, &request.volume_id, &pod_ref, expires_after)
+                    .await?;
                 mark_published(&target_path).await?;
                 Ok(Response::new(NodePublishVolumeResponse {}))
             }
