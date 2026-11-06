@@ -1,3 +1,4 @@
 = CRD Reference
+:description: CRD reference for the Stackable secret operator on the Stackable Hub, covering every field, default and API version.
 
 Find all CRD reference for the Stackable Secret Operator at: {crd-ref}{crd-ref-release}&operator=secret-operator.
