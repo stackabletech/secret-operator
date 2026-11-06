@@ -1,9 +1,10 @@
 use std::{
     fs::Permissions,
-    os::unix::prelude::PermissionsExt,
+    os::unix::{fs::MetadataExt, prelude::PermissionsExt},
     path::{Component, Path, PathBuf},
 };
 
+use chrono::{DateTime, FixedOffset};
 use openssl::sha::Sha256;
 use serde::{Deserialize, de::IntoDeserializer};
 use snafu::{ResultExt, Snafu, ensure};
@@ -66,6 +67,12 @@ enum PublishError {
         path: PathBuf,
     },
 
+    #[snafu(display("failed to check whether {path:?} is already a mount point"))]
+    CheckMountPoint {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+
     #[snafu(display("failed to mount volume mount directory {path:?}"))]
     Mount {
         source: std::io::Error,
@@ -122,6 +129,7 @@ impl From<PublishError> for Status {
                 Status::new(source.grpc_code(), full_msg)
             }
             PublishError::CreateDir { .. } => Status::unavailable(full_msg),
+            PublishError::CheckMountPoint { .. } => Status::unavailable(full_msg),
             PublishError::Mount { .. } => Status::unavailable(full_msg),
             PublishError::FormatData { .. } => Status::unavailable(full_msg),
             PublishError::SetDirPermissions { .. } => Status::unavailable(full_msg),
@@ -161,6 +169,23 @@ impl From<UnpublishError> for Status {
             UnpublishError::Delete { .. } => Status::unavailable(full_msg),
         }
     }
+}
+
+/// Returns whether something is mounted at `path`.
+///
+/// A mount point is on a different device than its parent directory. A path that does not exist
+/// is not a mount point.
+fn is_mount_point(path: &Path) -> std::io::Result<bool> {
+    let metadata = match std::fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(err) => return Err(err),
+    };
+    // The root directory is always a mount point
+    let Some(parent) = path.parent() else {
+        return Ok(true);
+    };
+    Ok(metadata.dev() != std::fs::metadata(parent)?.dev())
 }
 
 // The actual provisioner that is run on all nodes and in charge of provisioning and storing
@@ -289,12 +314,35 @@ impl SecretProvisionerNode {
         Ok(())
     }
 
+    /// Provisions a new volume at `target_path`.
+    ///
+    /// The Pod is only tagged with the expiry once the files are in place. Otherwise, the restart
+    /// controller could be told to wait for a certificate that the Pod never received.
+    async fn publish_new_volume(
+        &self,
+        target_path: &Path,
+        volume_id: &str,
+        selector: SecretVolumeSelector,
+        data: SecretContents,
+    ) -> Result<(), PublishError> {
+        // `save_secret_data` consumes both, but they are still needed to tag the Pod afterwards
+        let pod = selector.pod.clone();
+        let namespace = selector.namespace.clone();
+        let expires_after = data.expires_after;
+
+        self.prepare_secret_dir(target_path).await?;
+        self.save_secret_data(target_path, data, selector).await?;
+        self.tag_pod(&self.client, volume_id, &pod, &namespace, expires_after)
+            .await
+    }
+
     async fn tag_pod(
         &self,
         client: &stackable_operator::client::Client,
         volume_id: &str,
-        selector: &SecretVolumeSelector,
-        data: &SecretContents,
+        pod: &str,
+        namespace: &str,
+        expires_after: Option<DateTime<FixedOffset>>,
     ) -> Result<(), PublishError> {
         // Each volume must have a unique tag, so that multiple markers of the same type can coexist on the same pod
         // Each tag needs to be simple and unique-ish per volume
@@ -309,7 +357,7 @@ impl SecretProvisionerNode {
 
         let mut annotations = Annotations::new();
 
-        if let Some(expires_after) = data.expires_after {
+        if let Some(expires_after) = expires_after {
             annotations
                 .parse_insert((
                     format!(
@@ -324,8 +372,8 @@ impl SecretProvisionerNode {
         if !annotations.is_empty() {
             let tagged_pod = Pod {
                 metadata: ObjectMetaBuilder::new()
-                    .name(&selector.pod)
-                    .namespace(&selector.namespace)
+                    .name(pod)
+                    .namespace(namespace)
                     .annotations(annotations)
                     .build(),
                 ..Pod::default()
@@ -408,6 +456,23 @@ impl Node for SecretProvisionerNode {
                     volume.path = %target_path.display(),
                     "Received NodePublishVolume request"
                 );
+                // NodePublishVolume must be idempotent. The Kubelet calls it again for volumes that
+                // are already in use (for example after a restart of the Kubelet). The container
+                // keeps the mount from the first call, so a second tmpfs mounted on top of it
+                // would never be seen by the Pod, while the Pod annotation would already point
+                // to the expiry of the new, undelivered certificate.
+                // This relies on failed publishes being cleaned up (see below), so that a mount
+                // point always belongs to a complete volume.
+                // There is no mount in unprivileged mode, so there is nothing to detect there.
+                if self.privileged && is_mount_point(&target_path).context(
+                    publish_error::CheckMountPointSnafu { path: &target_path },
+                )? {
+                    tracing::info!(
+                        volume.path = %target_path.display(),
+                        "Volume is already published, keeping the existing secret"
+                    );
+                    return Ok(Response::new(NodePublishVolumeResponse {}));
+                }
                 let selector =
                     SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
                         .context(publish_error::InvalidSelectorSnafu)?;
@@ -421,15 +486,25 @@ impl Node for SecretProvisionerNode {
                     .get_secret_data(&selector, pod_info)
                     .await
                     .context(publish_error::BackendGetSecretDataSnafu)?;
-                self.tag_pod(&self.client, &request.volume_id, &selector, &data)
-                    .await?;
-                self.prepare_secret_dir(&target_path).await?;
-                self.save_secret_data(
-                    &target_path,
-                    data,
-                    selector
-                )
-                .await?;
+                if let Err(err) = self
+                    .publish_new_volume(&target_path, &request.volume_id, selector, data)
+                    .await
+                {
+                    // Don't leave a partially provisioned volume behind. It would be mistaken
+                    // for a complete one by the next call, which would then skip provisioning.
+                    // In unprivileged mode, the directory might be a previously provisioned
+                    // volume that is still in use, which must not be deleted.
+                    if self.privileged
+                        && let Err(cleanup_err) = self.clean_secret_dir(&target_path).await
+                    {
+                        tracing::warn!(
+                            volume.path = %target_path.display(),
+                            error = %error_full_message(&cleanup_err),
+                            "Failed to clean up volume after a failed publish"
+                        );
+                    }
+                    return Err(err.into());
+                }
                 Ok(Response::new(NodePublishVolumeResponse {}))
             }
             .await,
