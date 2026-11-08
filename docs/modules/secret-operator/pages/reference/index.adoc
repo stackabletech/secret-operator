@@ -1,4 +1,5 @@
 = Reference
+:description: Reference for the Stackable secret operator, covering CRD fields, command-line parameters and environment variables, with their default values.
 
 Consult the reference documentation section to find exhaustive information on:
 
