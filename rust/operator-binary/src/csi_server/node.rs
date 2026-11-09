@@ -399,16 +399,21 @@ impl SecretProvisionerNode {
 /// Bind mounts within the same filesystem are not detected.
 /// That is fine for the tmpfs mounts created by [`SecretProvisionerNode::prepare_secret_dir`].
 async fn is_mount_point(path: &Path) -> Result<bool, PublishError> {
-    let parent = path.parent().unwrap_or(path);
-    let device = tokio::fs::metadata(path)
-        .await
-        .context(publish_error::ReadMetadataSnafu { path })?
-        .dev();
-    let parent_device = tokio::fs::metadata(parent)
-        .await
-        .context(publish_error::ReadMetadataSnafu { path: parent })?
-        .dev();
-    Ok(device != parent_device)
+    match path.parent() {
+        Some(parent) => {
+            let device = tokio::fs::metadata(path)
+                .await
+                .context(publish_error::ReadMetadataSnafu { path })?
+                .dev();
+            let parent_device = tokio::fs::metadata(parent)
+                .await
+                .context(publish_error::ReadMetadataSnafu { path: parent })?
+                .dev();
+            Ok(device != parent_device)
+        }
+        // If the path and its parent is the same, we can always return false.
+        None => Ok(false),
+    }
 }
 
 // Most of the services are not yet implemented, most of them will never be, because they are
