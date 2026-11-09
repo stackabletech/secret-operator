@@ -1,4 +1,5 @@
 = Usage
+:description: Usage of the Stackable secret operator in other Pods through ephemeral volumes, and when a SecretClass on a stacklet is the better fit.
 
 The operator injects secret data into xref:volume.adoc[] mounts that declare an ephemeral volume with `storageClassName: secrets.stackable.tech`.
 

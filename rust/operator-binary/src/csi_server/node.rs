@@ -1,6 +1,6 @@
 use std::{
     fs::Permissions,
-    os::unix::prelude::PermissionsExt,
+    os::unix::prelude::{MetadataExt, PermissionsExt},
     path::{Component, Path, PathBuf},
 };
 
@@ -62,6 +62,12 @@ enum PublishError {
 
     #[snafu(display("failed to create secret parent dir {path:?}"))]
     CreateDir {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+
+    #[snafu(display("failed to read metadata of {path:?}"))]
+    ReadMetadata {
         source: std::io::Error,
         path: PathBuf,
     },
@@ -128,6 +134,7 @@ impl From<PublishError> for Status {
                 Status::new(source.grpc_code(), full_msg)
             }
             PublishError::CreateDir { .. } => Status::unavailable(full_msg),
+            PublishError::ReadMetadata { .. } => Status::unavailable(full_msg),
             PublishError::Mount { .. } => Status::unavailable(full_msg),
             PublishError::FormatData { .. } => Status::unavailable(full_msg),
             PublishError::SetDirPermissions { .. } => Status::unavailable(full_msg),
@@ -201,11 +208,21 @@ impl SecretProvisionerNode {
             },
         }
         if self.privileged {
-            Mount::builder()
-                .fstype("tmpfs")
-                .flags(MountFlags::NODEV | MountFlags::NOEXEC | MountFlags::NOSUID)
-                .mount("", target_path)
-                .context(publish_error::MountSnafu { path: target_path })?;
+            // NodePublishVolume must be idempotent: the kubelet calls it again for volumes it has
+            // already published, for example after a kubelet restart. Mounting on every call would
+            // stack a new empty tmpfs over the previous one. The container keeps the lowest layer,
+            // and `clean_secret_dir` unmounts only one layer per NodeUnpublishVolume, so removing
+            // the directory fails with EBUSY until the kubelet has retried once per layer.
+            // And that is the reason we check here whether a mount already exists.
+            if is_mount_point(target_path).await? {
+                tracing::info!(volume.path = %target_path.display(), "Volume path is already mounted, reusing the mount");
+            } else {
+                Mount::builder()
+                    .fstype("tmpfs")
+                    .flags(MountFlags::NODEV | MountFlags::NOEXEC | MountFlags::NOSUID)
+                    .mount("", target_path)
+                    .context(publish_error::MountSnafu { path: target_path })?;
+            }
         } else {
             tracing::info!("Running in unprivileged mode, not creating mount for secret volume");
         }
@@ -238,6 +255,10 @@ impl SecretProvisionerNode {
             let mut opts = OpenOptions::new();
             opts.create(true)
                 .write(true)
+                // A repeated publish rewrites existing files, and regenerated keys and
+                // certificates vary in length. Without truncating, a shorter file keeps the
+                // trailing bytes of the previous one. Not good. So we truncate.
+                .truncate(true)
                 // User: root/secret-operator
                 // Group: Controlled by Pod.securityContext.fsGroup, the actual application
                 // (when running as unprivileged user)
@@ -377,6 +398,28 @@ impl SecretProvisionerNode {
             }
             Err(err) => Err(err).context(unpublish_error::DeleteSnafu { path: target_path }),
         }
+    }
+}
+
+/// Returns whether `path` is the root of a mount, by comparing its device with its parent's.
+///
+/// Bind mounts within the same filesystem are not detected.
+/// That is fine for the tmpfs mounts created by [`SecretProvisionerNode::prepare_secret_dir`].
+async fn is_mount_point(path: &Path) -> Result<bool, PublishError> {
+    match path.parent() {
+        Some(parent) => {
+            let device = tokio::fs::metadata(path)
+                .await
+                .context(publish_error::ReadMetadataSnafu { path })?
+                .dev();
+            let parent_device = tokio::fs::metadata(parent)
+                .await
+                .context(publish_error::ReadMetadataSnafu { path: parent })?
+                .dev();
+            Ok(device != parent_device)
+        }
+        // If the path and its parent is the same, we can always return false.
+        None => Ok(false),
     }
 }
 
@@ -544,7 +587,28 @@ impl Node for SecretProvisionerNode {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_published, mark_published};
+    use std::path::Path;
+
+    use super::{is_mount_point, is_published, mark_published};
+
+    #[tokio::test]
+    async fn plain_directory_is_not_mount_point() {
+        let dir = tempfile::tempdir().expect("temporary directory can be created");
+        assert!(
+            !is_mount_point(dir.path())
+                .await
+                .expect("metadata of temporary directory is readable")
+        );
+    }
+
+    #[tokio::test]
+    async fn proc_is_mount_point() {
+        assert!(
+            is_mount_point(Path::new("/proc"))
+                .await
+                .expect("metadata of /proc is readable")
+        );
+    }
 
     #[tokio::test]
     async fn empty_volume_is_not_published() {
