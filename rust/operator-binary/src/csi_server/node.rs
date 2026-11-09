@@ -99,8 +99,8 @@ enum PublishError {
         path: PathBuf,
     },
 
-    #[snafu(display("failed to check whether published marker {path:?} exists"))]
-    CheckPublishedMarker {
+    #[snafu(display("failed to check whether provisioned marker {path:?} exists"))]
+    CheckProvisionedMarker {
         source: std::io::Error,
         path: PathBuf,
     },
@@ -140,7 +140,7 @@ impl From<PublishError> for Status {
             PublishError::SetDirPermissions { .. } => Status::unavailable(full_msg),
             PublishError::CreateFile { .. } => Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
-            PublishError::CheckPublishedMarker { .. } => Status::unavailable(full_msg),
+            PublishError::CheckProvisionedMarker { .. } => Status::unavailable(full_msg),
             PublishError::InvalidComponents { .. } => Status::unavailable(full_msg),
             PublishError::InvalidAbsolutePath { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
@@ -423,26 +423,35 @@ async fn is_mount_point(path: &Path) -> Result<bool, PublishError> {
     }
 }
 
-/// Empty file whose presence means that the volume has been published completely.
+/// Empty file whose presence means that the secret data has been provisioned completely.
 ///
 /// It is a dotfile so that `*` globs over the volume, as in `cp /stackable/tls/* ...`, skip it.
-const PUBLISHED_MARKER_FILE_NAME: &str = ".secret-operator-published";
+///
+/// Processes in the Pod can write to the volume, so the marker might have been replaced by a
+/// symlink or another kind of file. [`is_provisioned`] counts any entry without following it.
+/// Because if there's _something_ there already we won't tamper with it and [`mark_provisioned`]
+/// will not overwrite it anyway. Effectively that means if someone writes anything with that name
+/// then you're on your own. The operator counts it as provisioned.
+const PROVISIONED_MARKER_FILE_NAME: &str = ".stackable-secret-operator-data-provisioned";
 
-async fn is_published(target_path: &Path) -> Result<bool, PublishError> {
-    let path = target_path.join(PUBLISHED_MARKER_FILE_NAME);
-    tokio::fs::try_exists(&path)
-        .await
-        .context(publish_error::CheckPublishedMarkerSnafu { path })
+async fn is_provisioned(target_path: &Path) -> Result<bool, PublishError> {
+    let path = target_path.join(PROVISIONED_MARKER_FILE_NAME);
+    match tokio::fs::symlink_metadata(&path).await {
+        Ok(_) => Ok(true),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(err).context(publish_error::CheckProvisionedMarkerSnafu { path }),
+    }
 }
 
 /// Must be called after all secret files are written.
-async fn mark_published(target_path: &Path) -> Result<(), PublishError> {
-    let path = target_path.join(PUBLISHED_MARKER_FILE_NAME);
+async fn mark_provisioned(target_path: &Path) -> Result<(), PublishError> {
+    let path = target_path.join(PROVISIONED_MARKER_FILE_NAME);
     OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
         .mode(0o640)
+        .custom_flags(libc::O_NOFOLLOW)
         .open(&path)
         .await
         .context(publish_error::CreateFileSnafu { path })?;
@@ -488,7 +497,7 @@ impl Node for SecretProvisionerNode {
                 // for example after a kubelet restart. Issuing a new secret would move the expiry
                 // annotation to a secret that a running process may never load, so the restarter
                 // could restart the Pod only after the secret in use has expired.
-                if is_published(&target_path).await? {
+                if is_provisioned(&target_path).await? {
                     tracing::info!(
                         volume.path = %target_path.display(),
                         "Volume is already published, keeping its secret data"
@@ -517,7 +526,7 @@ impl Node for SecretProvisionerNode {
                     selector
                 )
                 .await?;
-                mark_published(&target_path).await?;
+                mark_provisioned(&target_path).await?;
                 Ok(Response::new(NodePublishVolumeResponse {}))
             }
             .await,
@@ -589,7 +598,7 @@ impl Node for SecretProvisionerNode {
 mod tests {
     use std::path::Path;
 
-    use super::{is_mount_point, is_published, mark_published};
+    use super::{PROVISIONED_MARKER_FILE_NAME, is_mount_point, is_provisioned, mark_provisioned};
 
     #[tokio::test]
     async fn plain_directory_is_not_mount_point() {
@@ -611,25 +620,50 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn empty_volume_is_not_published() {
+    async fn empty_volume_is_not_provisioned() {
         let volume = tempfile::tempdir().expect("temporary directory can be created");
         assert!(
-            !is_published(volume.path())
+            !is_provisioned(volume.path())
                 .await
                 .expect("volume directory is readable")
         );
     }
 
     #[tokio::test]
-    async fn marked_volume_is_published() {
+    async fn marked_volume_is_provisioned() {
         let volume = tempfile::tempdir().expect("temporary directory can be created");
-        mark_published(volume.path())
+        mark_provisioned(volume.path())
             .await
-            .expect("published marker can be written");
+            .expect("provisioned marker can be written");
         assert!(
-            is_published(volume.path())
+            is_provisioned(volume.path())
                 .await
                 .expect("volume directory is readable")
         );
+    }
+
+    #[tokio::test]
+    async fn dangling_symlink_marker_is_provisioned() {
+        let volume = tempfile::tempdir().expect("temporary directory can be created");
+        std::os::unix::fs::symlink(
+            volume.path().join("missing"),
+            volume.path().join(PROVISIONED_MARKER_FILE_NAME),
+        )
+        .expect("symlink can be created");
+        assert!(
+            is_provisioned(volume.path())
+                .await
+                .expect("volume directory is readable")
+        );
+    }
+
+    #[tokio::test]
+    async fn marking_does_not_follow_symlink() {
+        let volume = tempfile::tempdir().expect("temporary directory can be created");
+        let target = volume.path().join("target");
+        std::os::unix::fs::symlink(&target, volume.path().join(PROVISIONED_MARKER_FILE_NAME))
+            .expect("symlink can be created");
+        assert!(mark_provisioned(volume.path()).await.is_err());
+        assert!(!target.exists());
     }
 }
