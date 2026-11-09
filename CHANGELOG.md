@@ -23,6 +23,8 @@ All notable changes to this project will be documented in this file.
   `serviceAccount.create=false` now requires `serviceAccount.name`; it used to fall back to the
   namespace default ServiceAccount, which lacks the operator ClusterRole ([#736]).
 - `CreateVolume` no longer returns gRPC codes that make external-provisioner retry indefinitely ([#743]).
+- In privileged mode, `NodePublishVolume` reuses an existing tmpfs mount instead of mounting another one on top, so a repeated publish (for example after a kubelet restart) no longer stacks mounts, which kept Pods in `Terminating` for minutes ([#770]).
+- `NodePublishVolume` truncates the secret files it rewrites, so a repeated publish no longer leaves trailing bytes of a longer previous file behind ([#770]).
 - Report the certificate expiry for the `certManager` backend, so that Pods are restarted before
   their certificate expires and pick up the renewed one. Previously no expiry was reported at all,
   so a Pod kept the certificate it was given at startup and eventually ran on an expired one
@@ -39,6 +41,7 @@ All notable changes to this project will be documented in this file.
 [#762]: https://github.com/stackabletech/secret-operator/pull/762
 [#763]: https://github.com/stackabletech/secret-operator/pull/763
 [#766]: https://github.com/stackabletech/secret-operator/pull/766
+[#770]: https://github.com/stackabletech/secret-operator/pull/770
 
 ## [26.7.0] - 2026-07-21
 
