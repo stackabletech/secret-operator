@@ -105,6 +105,9 @@ enum PublishError {
         path: PathBuf,
     },
 
+    #[snafu(display("provisioned marker {path:?} is not a regular file"))]
+    InvalidProvisionedMarker { path: PathBuf },
+
     #[snafu(display("file path {path:?} must only contain normal components"))]
     InvalidComponents { path: PathBuf },
 
@@ -141,6 +144,7 @@ impl From<PublishError> for Status {
             PublishError::CreateFile { .. } => Status::unavailable(full_msg),
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
             PublishError::CheckProvisionedMarker { .. } => Status::unavailable(full_msg),
+            PublishError::InvalidProvisionedMarker { .. } => Status::failed_precondition(full_msg),
             PublishError::InvalidComponents { .. } => Status::unavailable(full_msg),
             PublishError::InvalidAbsolutePath { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
@@ -427,17 +431,15 @@ async fn is_mount_point(path: &Path) -> Result<bool, PublishError> {
 ///
 /// It is a dotfile so that `*` globs over the volume, as in `cp /stackable/tls/* ...`, skip it.
 ///
-/// Processes in the Pod can write to the volume, so the marker might have been replaced by a
-/// symlink or another kind of file. [`is_provisioned`] counts any entry without following it.
-/// Because if there's _something_ there already we won't tamper with it and [`mark_provisioned`]
-/// will not overwrite it anyway. Effectively that means if someone writes anything with that name
-/// then you're on your own. The operator counts it as provisioned.
+/// Processes in the Pod can write to the volume.
+/// Anything other than a regular file is rejected
 const PROVISIONED_MARKER_FILE_NAME: &str = ".stackable-secret-operator-data-provisioned";
 
 async fn is_provisioned(target_path: &Path) -> Result<bool, PublishError> {
     let path = target_path.join(PROVISIONED_MARKER_FILE_NAME);
     match tokio::fs::symlink_metadata(&path).await {
-        Ok(_) => Ok(true),
+        Ok(metadata) if metadata.is_file() => Ok(true),
+        Ok(_) => publish_error::InvalidProvisionedMarkerSnafu { path }.fail(),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(err) => Err(err).context(publish_error::CheckProvisionedMarkerSnafu { path }),
     }
@@ -643,18 +645,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dangling_symlink_marker_is_provisioned() {
+    async fn symlinked_marker_is_rejected() {
         let volume = tempfile::tempdir().expect("temporary directory can be created");
         std::os::unix::fs::symlink(
             volume.path().join("missing"),
             volume.path().join(PROVISIONED_MARKER_FILE_NAME),
         )
         .expect("symlink can be created");
-        assert!(
-            is_provisioned(volume.path())
-                .await
-                .expect("volume directory is readable")
-        );
+        assert!(is_provisioned(volume.path()).await.is_err());
     }
 
     #[tokio::test]
