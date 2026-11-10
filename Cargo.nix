@@ -13647,6 +13647,11 @@ rec {
             packageId = "rand 0.10.3";
           }
           {
+            name = "rustix";
+            packageId = "rustix";
+            features = [ "fs" ];
+          }
+          {
             name = "serde";
             packageId = "serde";
             features = [ "derive" ];

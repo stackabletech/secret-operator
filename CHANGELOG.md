@@ -26,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - In privileged mode, `NodePublishVolume` reuses an existing tmpfs mount instead of mounting another one on top, so a repeated publish (for example after a kubelet restart) no longer stacks mounts, which kept Pods in `Terminating` for minutes ([#770]).
 - `NodePublishVolume` truncates the secret files it rewrites, so a repeated publish no longer leaves trailing bytes of a longer previous file behind ([#770]).
 - A repeated `NodePublishVolume` (for example after a kubelet restart) keeps the published secret instead of issuing a new one, so the expiry annotation keeps matching the secret the Pod uses ([#773]).
+- `NodePublishVolume` no longer follows symlinks inside the volume and only writes secret data into regular files ([#775]).
 - Report the certificate expiry for the `certManager` backend, so that Pods are restarted before
   their certificate expires and pick up the renewed one. Previously no expiry was reported at all,
   so a Pod kept the certificate it was given at startup and eventually ran on an expired one
@@ -44,6 +45,7 @@ All notable changes to this project will be documented in this file.
 [#766]: https://github.com/stackabletech/secret-operator/pull/766
 [#770]: https://github.com/stackabletech/secret-operator/pull/770
 [#773]: https://github.com/stackabletech/secret-operator/pull/773
+[#775]: https://github.com/stackabletech/secret-operator/pull/775
 
 ## [26.7.0] - 2026-07-21
 
