@@ -11,7 +11,7 @@ use rustix::{
     io::Errno,
 };
 use serde::{Deserialize, de::IntoDeserializer};
-use snafu::{OptionExt, ResultExt, Snafu, ensure};
+use snafu::{OptionExt as _, ResultExt as _, Snafu, ensure};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::Pod,
