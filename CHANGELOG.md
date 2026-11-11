@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- BREAKING: The Pod's fsGroup only gets read access to secret volumes instead of write access. Products must not write into these volumes ([#XXX]).
 - Bump stackable-operator to 0.121.0 ([#730], [#735], [#759], [#763]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#763]).
 - Replace the unmaintained `serde_yaml` with `yaml_serde` ([#763]).

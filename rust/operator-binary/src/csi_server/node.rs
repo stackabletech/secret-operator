@@ -7,7 +7,7 @@ use std::{
 
 use openssl::sha::Sha256;
 use rustix::{
-    fs::{CWD, FileType, Mode, OFlags, fstat, mkdirat, openat},
+    fs::{CWD, FileType, Gid, Mode, OFlags, fchmod, fchown, fstat, mkdirat, openat},
     io::Errno,
 };
 use serde::{Deserialize, de::IntoDeserializer};
@@ -32,9 +32,10 @@ use crate::{
         NodeExpandVolumeRequest, NodeExpandVolumeResponse, NodeGetCapabilitiesRequest,
         NodeGetCapabilitiesResponse, NodeGetInfoRequest, NodeGetInfoResponse,
         NodeGetVolumeStatsRequest, NodeGetVolumeStatsResponse, NodePublishVolumeRequest,
-        NodePublishVolumeResponse, NodeStageVolumeRequest, NodeStageVolumeResponse,
-        NodeUnpublishVolumeRequest, NodeUnpublishVolumeResponse, NodeUnstageVolumeRequest,
-        NodeUnstageVolumeResponse, Topology, node_server::Node,
+        NodePublishVolumeResponse, NodeServiceCapability, NodeStageVolumeRequest,
+        NodeStageVolumeResponse, NodeUnpublishVolumeRequest, NodeUnpublishVolumeResponse,
+        NodeUnstageVolumeRequest, NodeUnstageVolumeResponse, Topology, node_server::Node,
+        node_service_capability, volume_capability,
     },
     utils::{FmtByteSlice, error_full_message},
 };
@@ -112,6 +113,15 @@ enum PublishError {
     #[snafu(display("secret file {path:?} exists but is not a regular file"))]
     NotRegularFile { path: PathBuf },
 
+    #[snafu(display("failed to set owner group and permissions of {path:?}"))]
+    SetOwnership {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+
+    #[snafu(display("volume mount group {group:?} is not a valid group ID"))]
+    InvalidVolumeMountGroup { group: String },
+
     #[snafu(display("file path {path:?} must only contain normal components"))]
     InvalidComponents { path: PathBuf },
 
@@ -150,6 +160,8 @@ impl From<PublishError> for Status {
             PublishError::CheckProvisionedMarker { .. } => Status::unavailable(full_msg),
             PublishError::InvalidProvisionedMarker { .. } => Status::failed_precondition(full_msg),
             PublishError::NotRegularFile { .. } => Status::failed_precondition(full_msg),
+            PublishError::SetOwnership { .. } => Status::unavailable(full_msg),
+            PublishError::InvalidVolumeMountGroup { .. } => Status::invalid_argument(full_msg),
             PublishError::InvalidComponents { .. } => Status::unavailable(full_msg),
             PublishError::InvalidAbsolutePath { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
@@ -251,6 +263,7 @@ impl SecretProvisionerNode {
         target_path: &Path,
         data: SecretContents,
         selector: SecretVolumeSelector,
+        group: Option<Gid>,
     ) -> Result<(), PublishError> {
         let SecretVolumeSelector {
             provision_parts,
@@ -265,7 +278,7 @@ impl SecretProvisionerNode {
             .into_files(format, names, compat, provision_parts)
             .context(publish_error::FormatDataSnafu)?
         {
-            write_secret_file(target_path, Path::new(&k), &v)?;
+            write_secret_file(target_path, Path::new(&k), &v, group)?;
         }
         Ok(())
     }
@@ -395,8 +408,56 @@ async fn is_provisioned(target_path: &Path) -> Result<bool, PublishError> {
 }
 
 /// Must be called after all secret files are written.
-async fn mark_provisioned(target_path: &Path) -> Result<(), PublishError> {
-    write_secret_file(target_path, Path::new(PROVISIONED_MARKER_FILE_NAME), &[])
+async fn mark_provisioned(target_path: &Path, group: Option<Gid>) -> Result<(), PublishError> {
+    write_secret_file(
+        target_path,
+        Path::new(PROVISIONED_MARKER_FILE_NAME),
+        &[],
+        group,
+    )
+}
+
+/// Returns the Pod's fsGroup, which the kubelet passes because of the `VOLUME_MOUNT_GROUP` node
+/// capability.
+fn volume_mount_group(
+    capability: Option<&crate::grpc::csi::v1::VolumeCapability>,
+) -> Result<Option<Gid>, PublishError> {
+    let group = capability
+        .and_then(|capability| match &capability.access_type {
+            Some(volume_capability::AccessType::Mount(mount)) => {
+                Some(mount.volume_mount_group.as_str())
+            }
+            _ => None,
+        })
+        .filter(|group| !group.is_empty());
+    group
+        .map(|group| {
+            group
+                .parse::<u32>()
+                .ok()
+                // u32::MAX is -1, which leaves the group unchanged in chown(2).
+                .filter(|id| *id != u32::MAX)
+                .map(Gid::from_raw)
+                .context(publish_error::InvalidVolumeMountGroupSnafu { group })
+        })
+        .transpose()
+}
+
+/// Sets `mode` on `fd`, and `group` as its group if given.
+fn restrict_to_group(
+    fd: impl std::os::fd::AsFd,
+    mode: u32,
+    group: Option<Gid>,
+    path: &Path,
+) -> Result<(), PublishError> {
+    if let Some(group) = group {
+        fchown(&fd, None, Some(group))
+            .map_err(std::io::Error::from)
+            .context(publish_error::SetOwnershipSnafu { path })?;
+    }
+    fchmod(&fd, Mode::from_raw_mode(mode))
+        .map_err(std::io::Error::from)
+        .context(publish_error::SetOwnershipSnafu { path })
 }
 
 /// Writes `contents` to `relative_path` beneath `root`, creating missing directories.
@@ -410,10 +471,14 @@ async fn mark_provisioned(target_path: &Path) -> Result<(), PublishError> {
 /// the directory before it rather than by path, so replacing an entry after it has been opened
 /// cannot redirect the write. It only writes into regular files: a FIFO or device node in place
 /// of the file is an error.
+///
+/// Every directory on the way gets mode `0750` and the file `0640`, both owned by `group` if given,
+/// so the Pod can read the secret but not change the volume.
 fn write_secret_file(
     root: &Path,
     relative_path: &Path,
     contents: &[u8],
+    group: Option<Gid>,
 ) -> Result<(), PublishError> {
     // Ensure that `relative_path` is indeed a relative path
     ensure!(
@@ -447,6 +512,7 @@ fn write_secret_file(
     let mut directory = openat(CWD, root, directory_flags, Mode::empty())
         .map_err(std::io::Error::from)
         .context(publish_error::CreateDirSnafu { path: &path })?;
+    restrict_to_group(&directory, 0o750, group, &path)?;
     for component in relative_path
         .parent()
         .into_iter()
@@ -464,6 +530,7 @@ fn write_secret_file(
         directory = openat(&directory, name, directory_flags, Mode::empty())
             .map_err(std::io::Error::from)
             .context(publish_error::CreateDirSnafu { path: &path })?;
+        restrict_to_group(&directory, 0o750, group, &path)?;
     }
 
     // And now finally we create the actual file from `contents`
@@ -494,6 +561,7 @@ fn write_secret_file(
         file_type == FileType::RegularFile,
         publish_error::NotRegularFileSnafu { path }
     );
+    restrict_to_group(&file, 0o640, group, &path)?;
     File::from(file)
         .write_all(contents)
         .context(publish_error::WriteFileSnafu { path })
@@ -545,6 +613,7 @@ impl Node for SecretProvisionerNode {
                     );
                     return Ok(Response::new(NodePublishVolumeResponse {}));
                 }
+                let group = volume_mount_group(request.volume_capability.as_ref())?;
                 let selector =
                     SecretVolumeSelector::deserialize(request.volume_context.into_deserializer())
                         .context(publish_error::InvalidSelectorSnafu)?;
@@ -564,10 +633,11 @@ impl Node for SecretProvisionerNode {
                 self.save_secret_data(
                     &target_path,
                     data,
-                    selector
+                    selector,
+                    group,
                 )
                 .await?;
-                mark_provisioned(&target_path).await?;
+                mark_provisioned(&target_path, group).await?;
                 Ok(Response::new(NodePublishVolumeResponse {}))
             }
             .await,
@@ -616,8 +686,17 @@ impl Node for SecretProvisionerNode {
         &self,
         _request: Request<NodeGetCapabilitiesRequest>,
     ) -> Result<Response<NodeGetCapabilitiesResponse>, Status> {
+        // With this capability the kubelet passes the Pod's fsGroup instead of making the volume
+        // group-writable itself. The group only gets read access: the CSI spec recommends
+        // read-write, but files the Pod can replace are files the publish path cannot trust.
         Ok(Response::new(NodeGetCapabilitiesResponse {
-            capabilities: vec![],
+            capabilities: vec![NodeServiceCapability {
+                r#type: Some(node_service_capability::Type::Rpc(
+                    node_service_capability::Rpc {
+                        r#type: node_service_capability::rpc::Type::VolumeMountGroup.into(),
+                    },
+                )),
+            }],
         }))
     }
 
@@ -678,7 +757,7 @@ mod tests {
     #[tokio::test]
     async fn marked_volume_is_provisioned() {
         let volume = tempfile::tempdir().expect("temporary directory can be created");
-        mark_provisioned(volume.path())
+        mark_provisioned(volume.path(), None)
             .await
             .expect("provisioned marker can be written");
         assert!(
@@ -705,15 +784,20 @@ mod tests {
         let target = volume.path().join("target");
         std::os::unix::fs::symlink(&target, volume.path().join(PROVISIONED_MARKER_FILE_NAME))
             .expect("symlink can be created");
-        assert!(mark_provisioned(volume.path()).await.is_err());
+        assert!(mark_provisioned(volume.path(), None).await.is_err());
         assert!(!target.exists());
     }
 
     #[test]
     fn writes_nested_secret_file() {
         let volume = tempfile::tempdir().expect("temporary directory can be created");
-        write_secret_file(volume.path(), Path::new("nested/tls.crt"), b"certificate")
-            .expect("secret file can be written");
+        write_secret_file(
+            volume.path(),
+            Path::new("nested/tls.crt"),
+            b"certificate",
+            None,
+        )
+        .expect("secret file can be written");
         let contents =
             std::fs::read(volume.path().join("nested/tls.crt")).expect("secret file is readable");
         assert_eq!(contents, b"certificate");
@@ -722,9 +806,9 @@ mod tests {
     #[test]
     fn rewriting_truncates_secret_file() {
         let volume = tempfile::tempdir().expect("temporary directory can be created");
-        write_secret_file(volume.path(), Path::new("tls.key"), b"longer key")
+        write_secret_file(volume.path(), Path::new("tls.key"), b"longer key", None)
             .expect("secret file can be written");
-        write_secret_file(volume.path(), Path::new("tls.key"), b"key")
+        write_secret_file(volume.path(), Path::new("tls.key"), b"key", None)
             .expect("secret file can be rewritten");
         let contents =
             std::fs::read(volume.path().join("tls.key")).expect("secret file is readable");
@@ -740,7 +824,9 @@ mod tests {
         std::os::unix::fs::symlink(&target, volume.path().join("tls.crt"))
             .expect("symlink can be created");
 
-        assert!(write_secret_file(volume.path(), Path::new("tls.crt"), b"certificate").is_err());
+        assert!(
+            write_secret_file(volume.path(), Path::new("tls.crt"), b"certificate", None).is_err()
+        );
         let contents = std::fs::read_to_string(&target).expect("symlink target is readable");
         assert_eq!(contents, "untouched");
     }
@@ -753,7 +839,13 @@ mod tests {
             .expect("symlink can be created");
 
         assert!(
-            write_secret_file(volume.path(), Path::new("nested/tls.crt"), b"certificate").is_err()
+            write_secret_file(
+                volume.path(),
+                Path::new("nested/tls.crt"),
+                b"certificate",
+                None
+            )
+            .is_err()
         );
         assert!(!outside.path().join("tls.crt").exists());
     }
@@ -770,7 +862,7 @@ mod tests {
         )
         .expect("FIFO can be created");
 
-        let result = write_secret_file(volume.path(), Path::new("tls.crt"), b"certificate");
+        let result = write_secret_file(volume.path(), Path::new("tls.crt"), b"certificate", None);
         assert!(matches!(
             result,
             Err(PublishError::NotRegularFile { .. } | PublishError::CreateFile { .. })
@@ -784,8 +876,48 @@ mod tests {
         std::fs::create_dir(&volume).expect("volume directory can be created");
 
         for path in ["../escaped", "/escaped", "nested/../../escaped"] {
-            assert!(write_secret_file(&volume, Path::new(path), b"certificate").is_err());
+            assert!(write_secret_file(&volume, Path::new(path), b"certificate", None).is_err());
         }
         assert!(!root.path().join("escaped").exists());
+    }
+
+    #[test]
+    fn secret_file_is_readable_but_not_writable_by_group() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+        let volume = tempfile::tempdir().expect("temporary directory can be created");
+        let group = rustix::fs::Gid::from_raw(
+            std::fs::metadata(volume.path())
+                .expect("metadata is readable")
+                .gid(),
+        );
+        let file = volume.path().join("nested/tls.crt");
+        write_secret_file(
+            volume.path(),
+            Path::new("nested/tls.crt"),
+            b"certificate",
+            None,
+        )
+        .expect("secret file can be written");
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o660))
+            .expect("permissions can be widened");
+
+        write_secret_file(
+            volume.path(),
+            Path::new("nested/tls.crt"),
+            b"certificate",
+            Some(group),
+        )
+        .expect("secret file can be rewritten");
+
+        for (path, mode) in [
+            (volume.path().to_path_buf(), 0o750),
+            (volume.path().join("nested"), 0o750),
+            (file, 0o640),
+        ] {
+            let metadata = std::fs::metadata(&path).expect("metadata is readable");
+            assert_eq!(metadata.mode() & 0o777, mode, "mode of {path:?}");
+            assert_eq!(metadata.gid(), group.as_raw(), "group of {path:?}");
+        }
     }
 }
