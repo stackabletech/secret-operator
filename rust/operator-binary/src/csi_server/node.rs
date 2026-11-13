@@ -473,8 +473,8 @@ fn write_secret_file(
             | OFlags::TRUNC
             // Fail on a symlink instead of writing to its target.
             | OFlags::NOFOLLOW
-            // Opening a FIFO without a reader would otherwise block; the type check below then
-            // rejects it.
+            // Opening a FIFO would otherwise block until a reader appears. With it the open fails
+            // if there is no reader, and the type check below rejects a FIFO that has one.
             | OFlags::NONBLOCK
             | OFlags::CLOEXEC,
         // User: root/secret-operator
@@ -635,7 +635,7 @@ impl Node for SecretProvisionerNode {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{os::unix::fs::MetadataExt as _, path::Path};
 
     use rustix::fs::{CWD, FileType, Mode, mknodat};
 
@@ -715,6 +715,17 @@ mod tests {
         let contents =
             std::fs::read(volume.path().join("nested/tls.crt")).expect("secret file is readable");
         assert_eq!(contents, b"certificate");
+
+        // The umask can only remove bits, so check for an upper bound rather than exact modes.
+        let directory_mode = std::fs::metadata(volume.path().join("nested"))
+            .expect("directory metadata is readable")
+            .mode();
+        assert_ne!(directory_mode & 0o100, 0, "owner can enter the directory");
+        assert_eq!(directory_mode & 0o777 & !0o750, 0);
+        let file_mode = std::fs::metadata(volume.path().join("nested/tls.crt"))
+            .expect("secret file metadata is readable")
+            .mode();
+        assert_eq!(file_mode & 0o777 & !0o640, 0);
     }
 
     #[test]
