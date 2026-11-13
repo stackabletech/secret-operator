@@ -1,12 +1,17 @@
 use std::{
-    fs::Permissions,
+    fs::{File, Permissions},
+    io::Write,
     os::unix::prelude::{MetadataExt, PermissionsExt},
     path::{Component, Path, PathBuf},
 };
 
 use openssl::sha::Sha256;
+use rustix::{
+    fs::{CWD, FileType, Mode, OFlags, fstat, mkdirat, openat},
+    io::Errno,
+};
 use serde::{Deserialize, de::IntoDeserializer};
-use snafu::{ResultExt, Snafu, ensure};
+use snafu::{OptionExt as _, ResultExt as _, Snafu, ensure};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::Pod,
@@ -14,10 +19,6 @@ use stackable_operator::{
     kvp::{AnnotationError, Annotations},
 };
 use sys_mount::{Mount, MountFlags, UnmountFlags, unmount};
-use tokio::{
-    fs::{OpenOptions, create_dir_all},
-    io::AsyncWriteExt,
-};
 use tonic::{Request, Response, Status};
 
 use super::{controller::TOPOLOGY_NODE, log_if_endpoint_error};
@@ -108,6 +109,9 @@ enum PublishError {
     #[snafu(display("provisioned marker {path:?} is not a regular file"))]
     InvalidProvisionedMarker { path: PathBuf },
 
+    #[snafu(display("secret file {path:?} exists but is not a regular file"))]
+    NotRegularFile { path: PathBuf },
+
     #[snafu(display("file path {path:?} must only contain normal components"))]
     InvalidComponents { path: PathBuf },
 
@@ -145,6 +149,7 @@ impl From<PublishError> for Status {
             PublishError::WriteFile { .. } => Status::unavailable(full_msg),
             PublishError::CheckProvisionedMarker { .. } => Status::unavailable(full_msg),
             PublishError::InvalidProvisionedMarker { .. } => Status::failed_precondition(full_msg),
+            PublishError::NotRegularFile { .. } => Status::failed_precondition(full_msg),
             PublishError::InvalidComponents { .. } => Status::unavailable(full_msg),
             PublishError::InvalidAbsolutePath { .. } => Status::unavailable(full_msg),
             PublishError::TagPod { .. } => Status::unavailable(full_msg),
@@ -255,68 +260,12 @@ impl SecretProvisionerNode {
             ..
         } = selector;
 
-        let create_secret = {
-            let mut opts = OpenOptions::new();
-            opts.create(true)
-                .write(true)
-                // A repeated publish rewrites existing files, and regenerated keys and
-                // certificates vary in length. Without truncating, a shorter file keeps the
-                // trailing bytes of the previous one. Not good. So we truncate.
-                .truncate(true)
-                // User: root/secret-operator
-                // Group: Controlled by Pod.securityContext.fsGroup, the actual application
-                // (when running as unprivileged user)
-                .mode(0o640);
-            opts
-        };
-
         for (k, v) in data
             .data
             .into_files(format, names, compat, provision_parts)
             .context(publish_error::FormatDataSnafu)?
         {
-            // The following few lines of code do some basic checks against
-            // unwanted path traversals. In the future, we want to leverage
-            // capability based filesystem operations (openat) to prevent these
-            // traversals.
-
-            // First, let's turn the (potentially custom) file path into a path.
-            let file_path = PathBuf::from(k);
-
-            // Next, ensure the path is not absolute (does not contain root),
-            // because joining an absolute path with a different path will
-            // replace the exiting path entirely.
-            ensure!(
-                !file_path.has_root(),
-                publish_error::InvalidAbsolutePathSnafu { path: &file_path }
-            );
-
-            // Ensure that the file path only contains normal components. This
-            // prevents any path traversals up the path using '..'.
-            ensure!(
-                file_path
-                    .components()
-                    .all(|c| matches!(c, Component::Normal(_))),
-                publish_error::InvalidComponentsSnafu { path: &file_path }
-            );
-
-            // Now, we can join the base and file path
-            let item_path = target_path.join(file_path);
-
-            if let Some(item_path_parent) = item_path.parent() {
-                create_dir_all(item_path_parent)
-                    .await
-                    .context(publish_error::CreateDirSnafu {
-                        path: item_path_parent,
-                    })?;
-            }
-            create_secret
-                .open(&item_path)
-                .await
-                .context(publish_error::CreateFileSnafu { path: &item_path })?
-                .write_all(&v)
-                .await
-                .context(publish_error::WriteFileSnafu { path: item_path })?;
+            write_secret_file(target_path, Path::new(&k), &v)?;
         }
         Ok(())
     }
@@ -447,17 +396,105 @@ async fn is_provisioned(target_path: &Path) -> Result<bool, PublishError> {
 
 /// Must be called after all secret files are written.
 async fn mark_provisioned(target_path: &Path) -> Result<(), PublishError> {
-    let path = target_path.join(PROVISIONED_MARKER_FILE_NAME);
-    OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .mode(0o640)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(&path)
-        .await
-        .context(publish_error::CreateFileSnafu { path })?;
-    Ok(())
+    write_secret_file(target_path, Path::new(PROVISIONED_MARKER_FILE_NAME), &[])
+}
+
+/// Writes `contents` to `file_path` beneath `target_path`, creating missing directories.
+///
+/// `file_path` can be chosen by users, so it must be relative and only consist of normal
+/// components, otherwise the write fails.
+///
+/// The Pod can write to the volume, so since the last publish it may have replaced any entry in
+/// it, for example with a symlink. This function never follows a symlink, neither for the file
+/// nor for the directories leading to it. Each directory is opened through a file descriptor of
+/// the directory before it rather than by path, so replacing an entry after it has been opened
+/// cannot redirect the write. It only writes into regular files: a FIFO or device node in place
+/// of the file is an error.
+fn write_secret_file(
+    target_path: &Path,
+    file_path: &Path,
+    contents: &[u8],
+) -> Result<(), PublishError> {
+    // An absolute path would leave the volume: joining it to `target_path` replaces
+    // `target_path` entirely.
+    ensure!(
+        !file_path.has_root(),
+        publish_error::InvalidAbsolutePathSnafu { path: file_path }
+    );
+
+    // Only normal components, so that `..` cannot traverse out of the volume.
+    ensure!(
+        file_path
+            .components()
+            .all(|c| matches!(c, Component::Normal(_))),
+        publish_error::InvalidComponentsSnafu { path: file_path }
+    );
+
+    let file_name = file_path
+        .file_name()
+        .context(publish_error::InvalidComponentsSnafu { path: file_path })?;
+
+    // RDONLY: a directory can only be opened read-only, and the descriptor is only used as the
+    //   base for the next `openat`/`mkdirat`.
+    // DIRECTORY: fail if the entry is not a directory.
+    // NOFOLLOW: fail if the entry is a symlink instead of following it.
+    // CLOEXEC: do not leak the descriptor into child processes.
+    let directory_flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+
+    let mut path = target_path.to_path_buf();
+    let mut directory = openat(CWD, target_path, directory_flags, Mode::empty())
+        .map_err(std::io::Error::from)
+        .context(publish_error::CreateDirSnafu { path: &path })?;
+    for component in file_path.parent().into_iter().flat_map(Path::components) {
+        let component = component.as_os_str();
+        path.push(component);
+        // Directories need the execute bit to be entered, so this is 0o750 rather than the 0o640
+        // of the files.
+        match mkdirat(&directory, component, Mode::from_raw_mode(0o750)) {
+            Ok(()) | Err(Errno::EXIST) => {}
+            Err(err) => {
+                return Err(std::io::Error::from(err))
+                    .context(publish_error::CreateDirSnafu { path });
+            }
+        }
+        directory = openat(&directory, component, directory_flags, Mode::empty())
+            .map_err(std::io::Error::from)
+            .context(publish_error::CreateDirSnafu { path: &path })?;
+    }
+
+    path.push(file_name);
+    let file = openat(
+        &directory,
+        file_name,
+        OFlags::WRONLY
+            | OFlags::CREATE
+            // A repeated publish rewrites existing files, and regenerated keys and certificates
+            // vary in length, so a shorter file would keep trailing bytes of the previous one.
+            | OFlags::TRUNC
+            // Fail on a symlink instead of writing to its target.
+            | OFlags::NOFOLLOW
+            // Opening a FIFO would otherwise block until a reader appears. With it the open fails
+            // if there is no reader, and the type check below rejects a FIFO that has one.
+            | OFlags::NONBLOCK
+            | OFlags::CLOEXEC,
+        // User: root/secret-operator
+        // Group: Controlled by Pod.securityContext.fsGroup, the actual application
+        // (when running as unprivileged user)
+        Mode::from_raw_mode(0o640),
+    )
+    .map_err(std::io::Error::from)
+    .context(publish_error::CreateFileSnafu { path: &path })?;
+    let file_type = fstat(&file)
+        .map(|stat| FileType::from_raw_mode(stat.st_mode))
+        .map_err(std::io::Error::from)
+        .context(publish_error::CreateFileSnafu { path: &path })?;
+    ensure!(
+        file_type == FileType::RegularFile,
+        publish_error::NotRegularFileSnafu { path }
+    );
+    File::from(file)
+        .write_all(contents)
+        .context(publish_error::WriteFileSnafu { path })
 }
 
 // Most of the services are not yet implemented, most of them will never be, because they are
@@ -598,9 +635,14 @@ impl Node for SecretProvisionerNode {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{os::unix::fs::MetadataExt as _, path::Path};
 
-    use super::{PROVISIONED_MARKER_FILE_NAME, is_mount_point, is_provisioned, mark_provisioned};
+    use rustix::fs::{CWD, FileType, Mode, mknodat};
+
+    use super::{
+        PROVISIONED_MARKER_FILE_NAME, PublishError, is_mount_point, is_provisioned,
+        mark_provisioned, write_secret_file,
+    };
 
     #[tokio::test]
     async fn plain_directory_is_not_mount_point() {
@@ -663,5 +705,96 @@ mod tests {
             .expect("symlink can be created");
         assert!(mark_provisioned(volume.path()).await.is_err());
         assert!(!target.exists());
+    }
+
+    #[test]
+    fn writes_nested_secret_file() {
+        let volume = tempfile::tempdir().expect("temporary directory can be created");
+        write_secret_file(volume.path(), Path::new("nested/tls.crt"), b"certificate")
+            .expect("secret file can be written");
+        let contents =
+            std::fs::read(volume.path().join("nested/tls.crt")).expect("secret file is readable");
+        assert_eq!(contents, b"certificate");
+
+        // The umask can only remove bits, so check for an upper bound rather than exact modes.
+        let directory_mode = std::fs::metadata(volume.path().join("nested"))
+            .expect("directory metadata is readable")
+            .mode();
+        assert_ne!(directory_mode & 0o100, 0, "owner can enter the directory");
+        assert_eq!(directory_mode & 0o777 & !0o750, 0);
+        let file_mode = std::fs::metadata(volume.path().join("nested/tls.crt"))
+            .expect("secret file metadata is readable")
+            .mode();
+        assert_eq!(file_mode & 0o777 & !0o640, 0);
+    }
+
+    #[test]
+    fn rewriting_truncates_secret_file() {
+        let volume = tempfile::tempdir().expect("temporary directory can be created");
+        write_secret_file(volume.path(), Path::new("tls.key"), b"longer key")
+            .expect("secret file can be written");
+        write_secret_file(volume.path(), Path::new("tls.key"), b"key")
+            .expect("secret file can be rewritten");
+        let contents =
+            std::fs::read(volume.path().join("tls.key")).expect("secret file is readable");
+        assert_eq!(contents, b"key");
+    }
+
+    #[test]
+    fn symlinked_secret_file_is_not_followed() {
+        let volume = tempfile::tempdir().expect("temporary directory can be created");
+        let outside = tempfile::tempdir().expect("temporary directory can be created");
+        let target = outside.path().join("victim");
+        std::fs::write(&target, "untouched").expect("symlink target can be written");
+        std::os::unix::fs::symlink(&target, volume.path().join("tls.crt"))
+            .expect("symlink can be created");
+
+        assert!(write_secret_file(volume.path(), Path::new("tls.crt"), b"certificate").is_err());
+        let contents = std::fs::read_to_string(&target).expect("symlink target is readable");
+        assert_eq!(contents, "untouched");
+    }
+
+    #[test]
+    fn symlinked_directory_is_not_followed() {
+        let volume = tempfile::tempdir().expect("temporary directory can be created");
+        let outside = tempfile::tempdir().expect("temporary directory can be created");
+        std::os::unix::fs::symlink(outside.path(), volume.path().join("nested"))
+            .expect("symlink can be created");
+
+        assert!(
+            write_secret_file(volume.path(), Path::new("nested/tls.crt"), b"certificate").is_err()
+        );
+        assert!(!outside.path().join("tls.crt").exists());
+    }
+
+    #[test]
+    fn fifo_in_place_of_secret_file_is_rejected() {
+        let volume = tempfile::tempdir().expect("temporary directory can be created");
+        mknodat(
+            CWD,
+            volume.path().join("tls.crt"),
+            FileType::Fifo,
+            Mode::from_raw_mode(0o600),
+            0,
+        )
+        .expect("FIFO can be created");
+
+        let result = write_secret_file(volume.path(), Path::new("tls.crt"), b"certificate");
+        assert!(matches!(
+            result,
+            Err(PublishError::NotRegularFile { .. } | PublishError::CreateFile { .. })
+        ));
+    }
+
+    #[test]
+    fn secret_file_outside_volume_is_rejected() {
+        let root = tempfile::tempdir().expect("temporary directory can be created");
+        let volume = root.path().join("volume");
+        std::fs::create_dir(&volume).expect("volume directory can be created");
+
+        for path in ["../escaped", "/escaped", "nested/../../escaped"] {
+            assert!(write_secret_file(&volume, Path::new(path), b"certificate").is_err());
+        }
+        assert!(!root.path().join("escaped").exists());
     }
 }

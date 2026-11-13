@@ -44,6 +44,7 @@ tonic-reflection.workspace = true
 tracing.workspace = true
 uuid.workspace = true
 rand.workspace = true
+rustix.workspace = true
 yaml_serde.workspace = true
 
 [dev-dependencies]
