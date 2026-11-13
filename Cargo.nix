@@ -13649,7 +13649,8 @@ rec {
           {
             name = "rustix";
             packageId = "rustix";
-            features = [ "fs" ];
+            usesDefaultFeatures = false;
+            features = [ "fs" "std" ];
           }
           {
             name = "serde";

@@ -399,9 +399,9 @@ async fn mark_provisioned(target_path: &Path) -> Result<(), PublishError> {
     write_secret_file(target_path, Path::new(PROVISIONED_MARKER_FILE_NAME), &[])
 }
 
-/// Writes `contents` to `relative_path` beneath `root`, creating missing directories.
+/// Writes `contents` to `file_path` beneath `target_path`, creating missing directories.
 ///
-/// `relative_path` can be chosen by users, so it must be relative and only consist of normal
+/// `file_path` can be chosen by users, so it must be relative and only consist of normal
 /// components, otherwise the write fails.
 ///
 /// The Pod can write to the volume, so since the last publish it may have replaced any entry in
@@ -411,62 +411,57 @@ async fn mark_provisioned(target_path: &Path) -> Result<(), PublishError> {
 /// cannot redirect the write. It only writes into regular files: a FIFO or device node in place
 /// of the file is an error.
 fn write_secret_file(
-    root: &Path,
-    relative_path: &Path,
+    target_path: &Path,
+    file_path: &Path,
     contents: &[u8],
 ) -> Result<(), PublishError> {
-    // Ensure that `relative_path` is indeed a relative path
+    // An absolute path would leave the volume: joining it to `target_path` replaces
+    // `target_path` entirely.
     ensure!(
-        !relative_path.has_root(),
-        publish_error::InvalidAbsolutePathSnafu {
-            path: relative_path
-        }
+        !file_path.has_root(),
+        publish_error::InvalidAbsolutePathSnafu { path: file_path }
     );
 
-    // Ensure that all components of the path are "normal"
-    // Examples for not-normal are things like "." and ".."
+    // Only normal components, so that `..` cannot traverse out of the volume.
     ensure!(
-        relative_path
+        file_path
             .components()
             .all(|c| matches!(c, Component::Normal(_))),
-        publish_error::InvalidComponentsSnafu {
-            path: relative_path
-        }
+        publish_error::InvalidComponentsSnafu { path: file_path }
     );
 
-    // This creates the directory structure needed to get to the relative directory
-    // making sure to not follow symlinks and so on
-    let directory_flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
-    let file_name = relative_path
+    let file_name = file_path
         .file_name()
-        .context(publish_error::InvalidComponentsSnafu {
-            path: relative_path,
-        })?;
+        .context(publish_error::InvalidComponentsSnafu { path: file_path })?;
 
-    let mut path = root.to_path_buf();
-    let mut directory = openat(CWD, root, directory_flags, Mode::empty())
+    // RDONLY: a directory can only be opened read-only, and the descriptor is only used as the
+    //   base for the next `openat`/`mkdirat`.
+    // DIRECTORY: fail if the entry is not a directory.
+    // NOFOLLOW: fail if the entry is a symlink instead of following it.
+    // CLOEXEC: do not leak the descriptor into child processes.
+    let directory_flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+
+    let mut path = target_path.to_path_buf();
+    let mut directory = openat(CWD, target_path, directory_flags, Mode::empty())
         .map_err(std::io::Error::from)
         .context(publish_error::CreateDirSnafu { path: &path })?;
-    for component in relative_path
-        .parent()
-        .into_iter()
-        .flat_map(Path::components)
-    {
-        let name = component.as_os_str();
-        path.push(name);
-        match mkdirat(&directory, name, Mode::from_raw_mode(0o777)) {
+    for component in file_path.parent().into_iter().flat_map(Path::components) {
+        let component = component.as_os_str();
+        path.push(component);
+        // Directories need the execute bit to be entered, so this is 0o750 rather than the 0o640
+        // of the files.
+        match mkdirat(&directory, component, Mode::from_raw_mode(0o750)) {
             Ok(()) | Err(Errno::EXIST) => {}
             Err(err) => {
                 return Err(std::io::Error::from(err))
                     .context(publish_error::CreateDirSnafu { path });
             }
         }
-        directory = openat(&directory, name, directory_flags, Mode::empty())
+        directory = openat(&directory, component, directory_flags, Mode::empty())
             .map_err(std::io::Error::from)
             .context(publish_error::CreateDirSnafu { path: &path })?;
     }
 
-    // And now finally we create the actual file from `contents`
     path.push(file_name);
     let file = openat(
         &directory,
@@ -476,7 +471,10 @@ fn write_secret_file(
             // A repeated publish rewrites existing files, and regenerated keys and certificates
             // vary in length, so a shorter file would keep trailing bytes of the previous one.
             | OFlags::TRUNC
+            // Fail on a symlink instead of writing to its target.
             | OFlags::NOFOLLOW
+            // Opening a FIFO without a reader would otherwise block; the type check below then
+            // rejects it.
             | OFlags::NONBLOCK
             | OFlags::CLOEXEC,
         // User: root/secret-operator
