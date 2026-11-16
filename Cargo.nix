@@ -12398,7 +12398,7 @@ rec {
           }
           {
             name = "base64";
-            packageId = "base64 0.23.1";
+            packageId = "base64 0.22.1";
             optional = true;
           }
           {
@@ -13843,6 +13843,12 @@ rec {
           {
             name = "rand";
             packageId = "rand 0.10.4";
+          }
+          {
+            name = "rustix";
+            packageId = "rustix";
+            usesDefaultFeatures = false;
+            features = [ "fs" "std" ];
           }
           {
             name = "serde";
