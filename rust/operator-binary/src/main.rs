@@ -19,7 +19,10 @@ use stackable_operator::{
     cli::{Command, CommonOptions, RunArguments},
     client::Client,
     eos::EndOfSupportChecker,
-    kube::CustomResourceExt,
+    kube::{
+        CustomResourceExt,
+        runtime::events::{Recorder, Reporter},
+    },
     kvp::{Label, LabelExt},
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
@@ -32,6 +35,7 @@ use utils::{TonicUnixStream, uds_bind_private};
 
 use crate::{
     crd::{SecretClass, SecretClassVersion, TrustStore, TrustStoreVersion, v1alpha1, v1alpha2},
+    csi_server::node,
     webhooks::conversion::create_webhook_server,
 };
 
@@ -183,6 +187,13 @@ async fn main() -> anyhow::Result<()> {
                             client: client.clone(),
                         }))
                         .add_service(NodeServer::new(SecretProvisionerNode {
+                            event_recorder: Recorder::new(
+                                client.as_kube_client(),
+                                Reporter {
+                                    controller: node::FULL_CONTROLLER_NAME.to_string(),
+                                    instance: None,
+                                },
+                            ),
                             node_name: cluster_info.kubernetes_node_name,
                             privileged,
                             client,
