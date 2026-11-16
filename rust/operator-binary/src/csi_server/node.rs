@@ -637,7 +637,10 @@ impl Node for SecretProvisionerNode {
 mod tests {
     use std::{os::unix::fs::MetadataExt as _, path::Path};
 
-    use rustix::fs::{CWD, FileType, Mode, mknodat};
+    use rustix::{
+        fs::{CWD, FileType, Mode, OFlags, mknodat, open},
+        io::Errno,
+    };
 
     use super::{
         PROVISIONED_MARKER_FILE_NAME, PublishError, is_mount_point, is_provisioned,
@@ -767,8 +770,10 @@ mod tests {
         assert!(!outside.path().join("tls.crt").exists());
     }
 
+    // A Pod can replace a secret file with a FIFO.
+    // Opening it for writing must neither block the driver thread nor write into it.
     #[test]
-    fn fifo_in_place_of_secret_file_is_rejected() {
+    fn fifo_without_reader_in_place_of_secret_file_is_rejected() {
         let volume = tempfile::tempdir().expect("temporary directory can be created");
         mknodat(
             CWD,
@@ -780,10 +785,26 @@ mod tests {
         .expect("FIFO can be created");
 
         let result = write_secret_file(volume.path(), Path::new("tls.crt"), b"certificate");
-        assert!(matches!(
-            result,
-            Err(PublishError::NotRegularFile { .. } | PublishError::CreateFile { .. })
-        ));
+        let Err(PublishError::CreateFile { source, .. }) = result else {
+            panic!("expected CreateFile, got {result:?}");
+        };
+        assert_eq!(source.raw_os_error(), Some(Errno::NXIO.raw_os_error()));
+    }
+
+    #[test]
+    fn fifo_with_reader_in_place_of_secret_file_is_rejected() {
+        let volume = tempfile::tempdir().expect("temporary directory can be created");
+        let fifo = volume.path().join("tls.crt");
+        mknodat(CWD, &fifo, FileType::Fifo, Mode::from_raw_mode(0o600), 0)
+            .expect("FIFO can be created");
+        let _reader = open(&fifo, OFlags::RDONLY | OFlags::NONBLOCK, Mode::empty())
+            .expect("FIFO can be opened for reading");
+
+        let result = write_secret_file(volume.path(), Path::new("tls.crt"), b"certificate");
+        assert!(
+            matches!(result, Err(PublishError::NotRegularFile { .. })),
+            "expected NotRegularFile, got {result:?}"
+        );
     }
 
     #[test]
