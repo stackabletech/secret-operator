@@ -635,7 +635,7 @@ impl Node for SecretProvisionerNode {
 
 #[cfg(test)]
 mod tests {
-    use std::{os::unix::fs::MetadataExt as _, path::Path};
+    use std::{assert_matches, os::unix::fs::MetadataExt as _, path::Path};
 
     use rustix::{
         fs::{CWD, FileType, Mode, OFlags, mknodat, open},
@@ -801,9 +801,10 @@ mod tests {
             .expect("FIFO can be opened for reading");
 
         let result = write_secret_file(volume.path(), Path::new("tls.crt"), b"certificate");
-        assert!(
-            matches!(result, Err(PublishError::NotRegularFile { .. })),
-            "expected NotRegularFile, got {result:?}"
+        assert_matches!(
+            result,
+            Err(PublishError::NotRegularFile { .. }),
+            "expected NotRegularFile"
         );
     }
 
