@@ -52,3 +52,5 @@ passin = "passin"
 tpe = "tpe"
 # Triple-DES EDE (encrypt-decrypt-encrypt) cipher type from the `des` crate.
 TdesEde3 = "TdesEde3"
+# open(2) flag for write-only access, as `OFlags::WRONLY` in `rustix`.
+WRONLY = "WRONLY"
