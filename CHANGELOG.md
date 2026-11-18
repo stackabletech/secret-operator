@@ -33,6 +33,7 @@ All notable changes to this project will be documented in this file.
   indefinitely, even though cert-manager had long since renewed it in the Secret. The restart is
   scheduled halfway between cert-manager's own `status.renewalTime` and the expiry ([#752]).
 - Install default resources regardless of CRD maintenance flag ([#762]).
+- The OLM bundle declares that the operator provides a CSI driver and sets `createdAt` ([#779]).
 
 [#730]: https://github.com/stackabletech/secret-operator/pull/730
 [#735]: https://github.com/stackabletech/secret-operator/pull/735
@@ -46,6 +47,7 @@ All notable changes to this project will be documented in this file.
 [#770]: https://github.com/stackabletech/secret-operator/pull/770
 [#773]: https://github.com/stackabletech/secret-operator/pull/773
 [#775]: https://github.com/stackabletech/secret-operator/pull/775
+[#779]: https://github.com/stackabletech/secret-operator/pull/779
 
 ## [26.7.0] - 2026-07-21
 
