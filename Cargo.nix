@@ -7417,10 +7417,10 @@ rec {
       };
       "libz-sys" = rec {
         crateName = "libz-sys";
-        version = "1.1.31";
+        version = "1.1.33";
         edition = "2018";
         links = "z";
-        sha256 = "1cjw8nisxy5iv8yms7dsxwhclb26djl38n6xq4nmlqxxra73087z";
+        sha256 = "0ic0jc13vgz6fwcm12p7ss5bvl09mbkl52c2ip3v1ni18fgzbqzy";
         libName = "libz_sys";
         license = "MIT OR Apache-2.0";
         authors = [
@@ -14836,7 +14836,7 @@ rec {
           }
           {
             name = "getrandom";
-            packageId = "getrandom 0.4.3";
+            packageId = "getrandom 0.3.4";
             optional = true;
             usesDefaultFeatures = false;
             target = { target, features }: ((target."unix" or false) || (target."windows" or false) || ("wasi" == target."os" or null));
