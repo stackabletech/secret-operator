@@ -4293,10 +4293,10 @@ rec {
       };
       "granit-parser" = rec {
         crateName = "granit-parser";
-        version = "2.1.0";
+        version = "2.2.0";
         edition = "2021";
         crateBin = [];
-        sha256 = "1pq1ljzfc7n0sfx0f6la8f5p4lmj81n841rj293kvpylsj35bw05";
+        sha256 = "1j1d897qqxarylh7rjrq37469aaax9x33ljqnhbb8ybhkh6lvl4v";
         libName = "granit_parser";
         license = "MIT OR Apache-2.0";
         authors = [
@@ -7417,10 +7417,10 @@ rec {
       };
       "libz-sys" = rec {
         crateName = "libz-sys";
-        version = "1.1.31";
+        version = "1.1.33";
         edition = "2018";
         links = "z";
-        sha256 = "1cjw8nisxy5iv8yms7dsxwhclb26djl38n6xq4nmlqxxra73087z";
+        sha256 = "0ic0jc13vgz6fwcm12p7ss5bvl09mbkl52c2ip3v1ni18fgzbqzy";
         libName = "libz_sys";
         license = "MIT OR Apache-2.0";
         authors = [
@@ -9009,7 +9009,7 @@ rec {
       };
       "p12" = rec {
         crateName = "p12";
-        version = "0.0.0-dev";
+        version = "26.11.0-rc1";
         edition = "2021";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/p12; };
         license = "MIT OR Apache-2.0";
@@ -12186,10 +12186,10 @@ rec {
       };
       "serde-saphyr" = rec {
         crateName = "serde-saphyr";
-        version = "2.1.1";
+        version = "2.2.0";
         edition = "2024";
         crateBin = [];
-        sha256 = "1zh7iwfc84z3brgqgbfyips049hq6l4pv3d557wyc1qbalnvhgyl";
+        sha256 = "1n87f1lfymy00y0fnr4kjq9xn1pqp2zsv6szigsvnk9l941xx74n";
         libName = "serde_saphyr";
         license = "MIT OR Apache-2.0";
         dependencies = [
@@ -12200,7 +12200,7 @@ rec {
           }
           {
             name = "base64";
-            packageId = "base64 0.22.1";
+            packageId = "base64 0.23.1";
             optional = true;
           }
           {
@@ -13243,7 +13243,7 @@ rec {
       };
       "stackable-krb5-provision-keytab" = rec {
         crateName = "stackable-krb5-provision-keytab";
-        version = "0.0.0-dev";
+        version = "26.11.0-rc1";
         edition = "2024";
         crateBin = [
           {
@@ -13568,7 +13568,7 @@ rec {
       };
       "stackable-secret-operator" = rec {
         crateName = "stackable-secret-operator";
-        version = "0.0.0-dev";
+        version = "26.11.0-rc1";
         edition = "2024";
         crateBin = [
           {
@@ -13764,7 +13764,7 @@ rec {
       };
       "stackable-secret-operator-olm-deployer" = rec {
         crateName = "stackable-secret-operator-olm-deployer";
-        version = "0.0.0-dev";
+        version = "26.11.0-rc1";
         edition = "2024";
         crateBin = [
           {
@@ -13830,7 +13830,7 @@ rec {
       };
       "stackable-secret-operator-utils" = rec {
         crateName = "stackable-secret-operator-utils";
-        version = "0.0.0-dev";
+        version = "26.11.0-rc1";
         edition = "2024";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/utils; };
         libName = "stackable_secret_operator_utils";
@@ -14836,7 +14836,7 @@ rec {
           }
           {
             name = "getrandom";
-            packageId = "getrandom 0.4.3";
+            packageId = "getrandom 0.3.4";
             optional = true;
             usesDefaultFeatures = false;
             target = { target, features }: ((target."unix" or false) || (target."windows" or false) || ("wasi" == target."os" or null));
