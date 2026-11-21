@@ -5,6 +5,7 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+use const_format::concatcp;
 use openssl::sha::Sha256;
 use rustix::{
     fs::{CWD, FileType, Mode, OFlags, fstat, mkdirat, openat},
@@ -14,8 +15,11 @@ use serde::{Deserialize, de::IntoDeserializer};
 use snafu::{OptionExt as _, ResultExt as _, Snafu, ensure};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
-    k8s_openapi::api::core::v1::Pod,
-    kube::runtime::reflector::ObjectRef,
+    k8s_openapi::api::core::v1::{ObjectReference, Pod},
+    kube::runtime::{
+        events::{Event, Recorder},
+        reflector::ObjectRef,
+    },
     kvp::{AnnotationError, Annotations},
 };
 use sys_mount::{Mount, MountFlags, UnmountFlags, unmount};
@@ -23,6 +27,7 @@ use tonic::{Request, Response, Status};
 
 use super::{controller::TOPOLOGY_NODE, log_if_endpoint_error};
 use crate::{
+    OPERATOR_NAME,
     backend::{
         self, SecretBackendError, SecretContents, SecretVolumeSelector,
         pod_info::{self, PodInfo},
@@ -38,6 +43,9 @@ use crate::{
     },
     utils::{FmtByteSlice, error_full_message},
 };
+
+const CONTROLLER_NAME: &str = "csi-node-service";
+pub const FULL_CONTROLLER_NAME: &str = concatcp!(CONTROLLER_NAME, ".", OPERATOR_NAME);
 
 #[derive(Snafu, Debug)]
 #[snafu(module)]
@@ -190,6 +198,7 @@ impl From<UnpublishError> for Status {
 // secrets for pods that get scheduled on that node.
 pub struct SecretProvisionerNode {
     pub client: stackable_operator::client::Client,
+    pub event_recorder: Recorder,
     pub node_name: String,
     pub privileged: bool,
 }
@@ -249,7 +258,7 @@ impl SecretProvisionerNode {
     async fn save_secret_data(
         &self,
         target_path: &Path,
-        data: SecretContents,
+        data: format::SecretData,
         selector: SecretVolumeSelector,
     ) -> Result<(), PublishError> {
         let SecretVolumeSelector {
@@ -261,7 +270,6 @@ impl SecretProvisionerNode {
         } = selector;
 
         for (k, v) in data
-            .data
             .into_files(format, names, compat, provision_parts)
             .context(publish_error::FormatDataSnafu)?
         {
@@ -317,6 +325,21 @@ impl SecretProvisionerNode {
                 .context(publish_error::TagPodSnafu)?;
         }
         Ok(())
+    }
+
+    /// Publishes events on the referenced Pod (e.g. events about provisioned certificates).
+    async fn publish_pod_events(&self, pod_ref: &ObjectRef<Pod>, events: &[Event]) {
+        let pod_reference = ObjectReference::from(pod_ref.clone());
+        for event in events {
+            if let Err(err) = self.event_recorder.publish(event, &pod_reference).await {
+                tracing::error!(
+                    error = &err as &dyn std::error::Error,
+                    pod = %pod_ref,
+                    event.reason,
+                    "Failed to publish K8s event for Pod"
+                );
+            }
+        }
     }
 
     async fn clean_secret_dir(&self, target_path: &Path) -> Result<(), UnpublishError> {
@@ -550,7 +573,7 @@ impl Node for SecretProvisionerNode {
                 let backend = backend::dynamic::from_selector(&self.client, &selector)
                     .await
                     .context(publish_error::InitBackendSnafu)?;
-                let pod_ref = ObjectRef::<Pod>::new(&selector.pod).within(&selector.namespace);
+                let pod_ref = pod_info.pod_ref();
                 tracing::info!(pod = %pod_ref, ?selector, ?pod_info, ?backend, "issuing secret for Pod");
                 let data = backend
                     .get_secret_data(&selector, pod_info)
@@ -561,11 +584,12 @@ impl Node for SecretProvisionerNode {
                 self.prepare_secret_dir(&target_path).await?;
                 self.save_secret_data(
                     &target_path,
-                    data,
+                    data.data,
                     selector
                 )
                 .await?;
                 mark_provisioned(&target_path).await?;
+                self.publish_pod_events(&pod_ref, &data.events).await;
                 Ok(Response::new(NodePublishVolumeResponse {}))
             }
             .await,

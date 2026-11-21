@@ -49,6 +49,7 @@ yaml_serde.workspace = true
 
 [dev-dependencies]
 indoc.workspace = true
+rstest.workspace = true
 yaml_serde.workspace = true
 
 [build-dependencies]

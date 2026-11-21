@@ -349,6 +349,11 @@ pub struct Manager {
 }
 
 impl Manager {
+    /// Returns an immutable reference to the [`Secret`] the CAs are loaded from.
+    pub fn source_secret(&self) -> &ObjectRef<Secret> {
+        &self.source_secret
+    }
+
     pub async fn load_or_create(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
@@ -632,6 +637,16 @@ impl Manager {
                 cutoff: active_until_at_least,
                 secret: self.source_secret.clone(),
             })
+    }
+
+    /// Returns the point in time until which the newest CA may still sign certificates.
+    /// Returns [`None`] if there are no CAs.
+    pub fn newest_ca_active_until(&self) -> Option<OffsetDateTime> {
+        self.certificate_authorities
+            .iter()
+            .map(|ca| ca.not_after)
+            .max()
+            .map(|not_after| not_after - self.ca_certificate_retirement_duration)
     }
 
     /// Get all active trust root certificates.
