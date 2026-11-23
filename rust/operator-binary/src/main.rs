@@ -190,7 +190,7 @@ async fn main() -> anyhow::Result<()> {
                             event_recorder: Recorder::new(
                                 client.as_kube_client(),
                                 Reporter {
-                                    controller: node::FULL_CONTROLLER_NAME.to_string(),
+                                    controller: node::FULL_CONTROLLER_NAME.to_owned(),
                                     instance: None,
                                 },
                             ),

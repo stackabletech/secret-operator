@@ -800,6 +800,35 @@ mod tests {
     }
 
     #[test]
+    fn test_newest_ca_active_until() {
+        let ca1 = create_certificate_authority(
+            1,
+            datetime!(2025-01-01 0:00 UTC),
+            datetime!(2025-01-01 12:00 UTC),
+        )
+        .expect("should be able to create a valid certificate");
+        let ca2 = create_certificate_authority(
+            2,
+            datetime!(2025-01-01 6:00 UTC),
+            datetime!(2025-01-01 18:00 UTC),
+        )
+        .expect("should be able to create a valid certificate");
+
+        let manager = |certificate_authorities| Manager {
+            source_secret: ObjectRef::<Secret>::new("secret-provisioner-tls-ca"),
+            certificate_authorities,
+            additional_trusted_certificates: vec![],
+            ca_certificate_retirement_duration: Duration::from_hours_unchecked(1),
+        };
+
+        assert_eq!(
+            manager(vec![ca2, ca1]).newest_ca_active_until(),
+            Some(datetime!(2025-01-01 17:00 UTC))
+        );
+        assert_eq!(manager(vec![]).newest_ca_active_until(), None);
+    }
+
+    #[test]
     fn test_trust_roots() {
         let ca_certificate_retirement_duration = Duration::from_hours_unchecked(1);
 

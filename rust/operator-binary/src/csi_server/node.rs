@@ -575,21 +575,21 @@ impl Node for SecretProvisionerNode {
                     .context(publish_error::InitBackendSnafu)?;
                 let pod_ref = pod_info.pod_ref();
                 tracing::info!(pod = %pod_ref, ?selector, ?pod_info, ?backend, "issuing secret for Pod");
-                let data = backend
+                let secret_contents = backend
                     .get_secret_data(&selector, pod_info)
                     .await
                     .context(publish_error::BackendGetSecretDataSnafu)?;
-                self.tag_pod(&self.client, &request.volume_id, &selector, &data)
+                self.tag_pod(&self.client, &request.volume_id, &selector, &secret_contents)
                     .await?;
                 self.prepare_secret_dir(&target_path).await?;
                 self.save_secret_data(
                     &target_path,
-                    data.data,
+                    secret_contents.data,
                     selector
                 )
                 .await?;
                 mark_provisioned(&target_path).await?;
-                self.publish_pod_events(&pod_ref, &data.events).await;
+                self.publish_pod_events(&pod_ref, &secret_contents.events).await;
                 Ok(Response::new(NodePublishVolumeResponse {}))
             }
             .await,

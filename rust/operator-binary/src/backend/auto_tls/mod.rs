@@ -135,12 +135,12 @@ pub enum Error {
     },
 
     #[snafu(display(
-        "the newest CA in {secret}, which can be used until {active_until}, retires too soon to issue usable certificates considering the configured restart buffer of {restart_buffer}, a CA with a later expiry must be added"
+        "the newest CA in {secret_ref}, which can be used until {active_until}, retires too soon to issue usable certificates considering the configured restart buffer of {restart_buffer}, a CA with a later expiry must be added"
     ))]
     CaExpiresTooSoon {
         active_until: OffsetDateTime,
         restart_buffer: Duration,
-        secret: ObjectRef<Secret>,
+        secret_ref: ObjectRef<Secret>,
     },
 
     #[snafu(display("invalid jitter factor {requested} requested, must be within {range:?}"))]
@@ -184,7 +184,7 @@ impl SecretBackendError for Error {
             Error::InvalidCertLifetime { .. } => None,
             Error::RetirementDurationNotShorterThanCertificateLifetime { .. } => None,
             Error::TooShortCertLifetimeRequiresTimeTravel { .. } => None,
-            Error::CaExpiresTooSoon { secret, .. } => Some(secret.clone().erase()),
+            Error::CaExpiresTooSoon { secret_ref, .. } => Some(secret_ref.clone().erase()),
             Error::JitterOutOfRange { .. } => None,
         }
     }
@@ -318,13 +318,13 @@ impl SecretBackend for TlsGenerate {
 
                 let event = Event {
                     type_: EventType::Warning,
-                    reason: "CertificateLifetimeReduced".to_string(),
+                    reason: "CertificateLifetimeReduced".to_owned(),
                     note: Some(format!(
                         "The certificate expiry was capped at {active_until}, because the newest CA for SecretClass {class} can only sign certificates until then",
                         active_until = now + remaining_ca_lifetime,
                         class = selector.class,
                     )),
-                    action: "ProvisionSecret".to_string(),
+                    action: "ProvisionSecret".to_owned(),
                     secondary: Some(self.ca_manager.source_secret().clone().into()),
                 };
 
@@ -364,7 +364,7 @@ impl SecretBackend for TlsGenerate {
                 Some(remaining_ca_lifetime) => CaExpiresTooSoonSnafu {
                     active_until: now + remaining_ca_lifetime,
                     restart_buffer: cert_restart_buffer,
-                    secret: self.ca_manager.source_secret().clone(),
+                    secret_ref: self.ca_manager.source_secret().clone(),
                 }
                 .fail()?,
                 None => TooShortCertLifetimeRequiresTimeTravelSnafu {
@@ -562,10 +562,10 @@ impl SecretBackend for TlsGenerate {
 fn cert_lifetime_cap_by_ca(
     cert_lifetime: Duration,
     newest_ca_active_until: Option<OffsetDateTime>,
-    now: OffsetDateTime,
+    cert_issued_at: OffsetDateTime,
 ) -> Option<Duration> {
     let remaining_ca_lifetime = newest_ca_active_until
-        .and_then(|active_until| std::time::Duration::try_from(active_until - now).ok())
+        .and_then(|active_until| std::time::Duration::try_from(active_until - cert_issued_at).ok())
         .map(Duration::from)?;
     (cert_lifetime > remaining_ca_lifetime).then_some(remaining_ca_lifetime)
 }

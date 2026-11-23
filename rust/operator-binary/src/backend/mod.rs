@@ -360,7 +360,6 @@ impl SecretContents {
 impl std::fmt::Debug for SecretContents {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SecretContents")
-            .field("data", &self.data)
             .field("expires_after", &self.expires_after)
             .field(
                 "events",
