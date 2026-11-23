@@ -20,18 +20,19 @@ Usage:
 Requirements:
     - uv    (https://docs.astral.sh/uv/) — installs PyYAML automatically
     - helm  (https://helm.sh)
+    - git   (createdAt is the commit date of the checked-out release tag)
     - cargo (Rust toolchain)
 """
 
 import argparse
-import subprocess
+import datetime
 import json
-import urllib.request
+import subprocess
 import urllib.error
+import urllib.request
 from pathlib import Path
 
 import yaml
-
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 REPO_ROOT = SCRIPT_DIR.parent
@@ -1302,6 +1303,32 @@ def min_kube_version(release: str) -> str:
     return lowest_kube_version(platforms)
 
 
+def created_at() -> str:
+    """Return the commit date of the checked-out commit, so createdAt stays the same when the bundle is rebuilt."""
+    try:
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%ct"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=REPO_ROOT,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(f"Failed to read the commit date: {exc.stderr}") from exc
+    return format_created_at(int(result.stdout))
+
+
+def format_created_at(epoch_seconds: int) -> str:
+    """Format a Unix timestamp the way OLM bundles write createdAt, in UTC.
+
+    >>> format_created_at(1784628000)
+    '2026-07-21T10:00:00Z'
+    """
+    return datetime.datetime.fromtimestamp(epoch_seconds, tz=datetime.UTC).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
+
 def build_csv(
     version: str,
     helm_docs: list[dict],
@@ -1392,7 +1419,7 @@ def build_csv(
                 "operatorframework.io/suggested-namespace": "stackable-operators",
                 "features.operators.openshift.io/cnf": "false",
                 "features.operators.openshift.io/cni": "false",
-                "features.operators.openshift.io/csi": "false",
+                "features.operators.openshift.io/csi": "true",
                 "features.operators.openshift.io/disconnected": "false",
                 "features.operators.openshift.io/fips-compliant": "false",
                 "features.operators.openshift.io/proxy-aware": "false",
@@ -1405,6 +1432,7 @@ def build_csv(
                 "capabilities": "Basic Install",
                 "description": chart["description"],
                 "repository": "https://github.com/stackabletech/secret-operator",
+                "createdAt": created_at(),
                 "com.redhat.openshift.versions": openshift_versions,
             },
         },

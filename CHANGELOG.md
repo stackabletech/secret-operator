@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- The OLM bundle declares that the operator provides a CSI driver and sets `createdAt` ([#779]).
+
+[#779]: https://github.com/stackabletech/secret-operator/pull/779
+
+## [26.11.0] - 2026-11-20
+
+## [26.11.0-rc1] - 2026-11-19
+
+### Added
+
 - Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#759]).
 - Add startup probe to the operator Deployment ([#759]).
 
