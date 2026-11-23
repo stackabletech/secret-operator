@@ -349,6 +349,11 @@ pub struct Manager {
 }
 
 impl Manager {
+    /// Returns an immutable reference to the [`Secret`] the CAs are loaded from.
+    pub fn source_secret(&self) -> &ObjectRef<Secret> {
+        &self.source_secret
+    }
+
     pub async fn load_or_create(
         client: &stackable_operator::client::Client,
         secret_ref: &SecretReference,
@@ -634,6 +639,16 @@ impl Manager {
             })
     }
 
+    /// Returns the point in time until which the newest CA may still sign certificates.
+    /// Returns [`None`] if there are no CAs.
+    pub fn newest_ca_active_until(&self) -> Option<OffsetDateTime> {
+        self.certificate_authorities
+            .iter()
+            .map(|ca| ca.not_after)
+            .max()
+            .map(|not_after| not_after - self.ca_certificate_retirement_duration)
+    }
+
     /// Get all active trust root certificates.
     pub fn trust_roots(
         &self,
@@ -782,6 +797,35 @@ mod tests {
             Some("CertificateAuthority(serial=2)".to_owned()),
             signing_ca_at_11_01.ok().map(|ca| format!("{}", ca))
         );
+    }
+
+    #[test]
+    fn test_newest_ca_active_until() {
+        let ca1 = create_certificate_authority(
+            1,
+            datetime!(2025-01-01 0:00 UTC),
+            datetime!(2025-01-01 12:00 UTC),
+        )
+        .expect("should be able to create a valid certificate");
+        let ca2 = create_certificate_authority(
+            2,
+            datetime!(2025-01-01 6:00 UTC),
+            datetime!(2025-01-01 18:00 UTC),
+        )
+        .expect("should be able to create a valid certificate");
+
+        let manager = |certificate_authorities| Manager {
+            source_secret: ObjectRef::<Secret>::new("secret-provisioner-tls-ca"),
+            certificate_authorities,
+            additional_trusted_certificates: vec![],
+            ca_certificate_retirement_duration: Duration::from_hours_unchecked(1),
+        };
+
+        assert_eq!(
+            manager(vec![ca2, ca1]).newest_ca_active_until(),
+            Some(datetime!(2025-01-01 17:00 UTC))
+        );
+        assert_eq!(manager(vec![]).newest_ca_active_until(), None);
     }
 
     #[test]

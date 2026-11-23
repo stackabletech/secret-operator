@@ -147,8 +147,9 @@ spec:
                             type: object
                           secret:
                             description: |-
-                              Reference (name and namespace) to a Kubernetes Secret object where the CA certificate
-                              and key is stored in the keys `ca.crt` and `ca.key` respectively.
+                              Reference (name and namespace) to a Kubernetes Secret object where the CA certificates
+                              and keys are stored. Each CA is stored as a pair of keys `<n>.ca.crt` and `<n>.ca.key`,
+                              e.g. `0.ca.crt` and `0.ca.key`.
                             properties:
                               name:
                                 description: Name of the Secret being referred to.
@@ -572,8 +573,9 @@ spec:
                             type: object
                           secret:
                             description: |-
-                              Reference (name and namespace) to a Kubernetes Secret object where the CA certificate
-                              and key is stored in the keys `ca.crt` and `ca.key` respectively.
+                              Reference (name and namespace) to a Kubernetes Secret object where the CA certificates
+                              and keys are stored. Each CA is stored as a pair of keys `<n>.ca.crt` and `<n>.ca.key`,
+                              e.g. `0.ca.crt` and `0.ca.key`.
                             properties:
                               name:
                                 description: Name of the Secret being referred to.

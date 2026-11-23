@@ -21,7 +21,14 @@ use openssl::{
 };
 use rand::RngExt as _;
 use snafu::{ResultExt, Snafu, ensure};
-use stackable_operator::{kube::runtime::reflector::ObjectRef, shared::time::Duration};
+use stackable_operator::{
+    k8s_openapi::api::core::v1::Secret,
+    kube::runtime::{
+        events::{Event, EventType},
+        reflector::ObjectRef,
+    },
+    shared::time::Duration,
+};
 use time::OffsetDateTime;
 
 use crate::{
@@ -127,6 +134,15 @@ pub enum Error {
         restart_at: OffsetDateTime,
     },
 
+    #[snafu(display(
+        "the newest CA in {secret_ref}, which can be used until {active_until}, retires too soon to issue usable certificates considering the configured restart buffer of {restart_buffer}, a CA with a later expiry must be added"
+    ))]
+    CaExpiresTooSoon {
+        active_until: OffsetDateTime,
+        restart_buffer: Duration,
+        secret_ref: ObjectRef<Secret>,
+    },
+
     #[snafu(display("invalid jitter factor {requested} requested, must be within {range:?}"))]
     JitterOutOfRange { requested: f64, range: Range<f64> },
 }
@@ -152,6 +168,7 @@ impl SecretBackendError for Error {
                 tonic::Code::InvalidArgument
             }
             Error::TooShortCertLifetimeRequiresTimeTravel { .. } => tonic::Code::InvalidArgument,
+            Error::CaExpiresTooSoon { .. } => tonic::Code::FailedPrecondition,
             Error::JitterOutOfRange { .. } => tonic::Code::InvalidArgument,
         }
     }
@@ -167,6 +184,7 @@ impl SecretBackendError for Error {
             Error::InvalidCertLifetime { .. } => None,
             Error::RetirementDurationNotShorterThanCertificateLifetime { .. } => None,
             Error::TooShortCertLifetimeRequiresTimeTravel { .. } => None,
+            Error::CaExpiresTooSoon { secret_ref, .. } => Some(secret_ref.clone().erase()),
             Error::JitterOutOfRange { .. } => None,
         }
     }
@@ -284,6 +302,37 @@ impl SecretBackend for TlsGenerate {
             cert_lifetime
         };
 
+        // A certificate cannot outlive the CA that signs it. Cap the certificate lifetime to how
+        // long the newest CA may still sign certificates. This mostly affects user-provided CAs.
+        let cert_lifetime_cap =
+            cert_lifetime_cap_by_ca(cert_lifetime, self.ca_manager.newest_ca_active_until(), now);
+        let (cert_lifetime, lifetime_reduced_event) = match cert_lifetime_cap {
+            Some(remaining_ca_lifetime) => {
+                tracing::warn!(
+                    pod = %pod_info.pod_ref(),
+                    ca.secret = %self.ca_manager.source_secret(),
+                    certificate.lifetime.requested = %cert_lifetime,
+                    ca.active_until = %(now + remaining_ca_lifetime),
+                    "The newest CA retires before the requested Pod certificate lifetime ends, reducing the lifetime",
+                );
+
+                let event = Event {
+                    type_: EventType::Warning,
+                    reason: "CertificateLifetimeReduced".to_owned(),
+                    note: Some(format!(
+                        "The certificate expiry was capped at {active_until}, because the newest CA for SecretClass {class} can only sign certificates until then",
+                        active_until = now + remaining_ca_lifetime,
+                        class = selector.class,
+                    )),
+                    action: "ProvisionSecret".to_owned(),
+                    secondary: Some(self.ca_manager.source_secret().clone().into()),
+                };
+
+                (remaining_ca_lifetime, Some(event))
+            }
+            None => (cert_lifetime, None),
+        };
+
         // Jitter the certificate lifetimes
         let jitter_factor_cap = selector.autotls_cert_jitter_factor;
         let jitter_factor_allowed_range = 0.0..1.0;
@@ -311,11 +360,19 @@ impl SecretBackend for TlsGenerate {
         let not_after = now + cert_lifetime;
         let expire_pod_after = not_after - cert_restart_buffer;
         if expire_pod_after <= now {
-            TooShortCertLifetimeRequiresTimeTravelSnafu {
-                expires_at: not_after,
-                restart_at: expire_pod_after,
+            match cert_lifetime_cap {
+                Some(remaining_ca_lifetime) => CaExpiresTooSoonSnafu {
+                    active_until: now + remaining_ca_lifetime,
+                    restart_buffer: cert_restart_buffer,
+                    secret_ref: self.ca_manager.source_secret().clone(),
+                }
+                .fail()?,
+                None => TooShortCertLifetimeRequiresTimeTravelSnafu {
+                    expires_at: not_after,
+                    restart_at: expire_pod_after,
+                }
+                .fail()?,
             }
-            .fail()?;
         }
 
         let ca = self
@@ -470,7 +527,8 @@ impl SecretBackend for TlsGenerate {
             )))
             .expires_after(
                 time_datetime_to_chrono(expire_pod_after).context(InvalidCertLifetimeSnafu)?,
-            ),
+            )
+            .events(lifetime_reduced_event),
         )
     }
 
@@ -493,5 +551,50 @@ impl SecretBackend for TlsGenerate {
                 key_pem: None,
             }),
         )))
+    }
+}
+
+/// Returns the reduced lifetime of a Pod certificate, so that the newest CA can still
+/// sign it, i.e. the newest CA's remaining lifetime if it's shorter than `cert_lifetime`.
+///
+/// Returns [`None`] if no reduction is needed or reduction is not possible
+/// (i.e. missing/retired CA).
+fn cert_lifetime_cap_by_ca(
+    cert_lifetime: Duration,
+    newest_ca_active_until: Option<OffsetDateTime>,
+    cert_issued_at: OffsetDateTime,
+) -> Option<Duration> {
+    let remaining_ca_lifetime = newest_ca_active_until
+        .and_then(|active_until| std::time::Duration::try_from(active_until - cert_issued_at).ok())
+        .map(Duration::from)?;
+    (cert_lifetime > remaining_ca_lifetime).then_some(remaining_ca_lifetime)
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+    use time::macros::datetime;
+
+    use super::*;
+
+    const NOW: OffsetDateTime = datetime!(2025-01-01 00:00 UTC);
+    const CERT_LIFETIME: Duration = Duration::from_days_unchecked(15);
+
+    #[rstest]
+    #[case::ca_expires_before_cert(
+        NOW + Duration::from_days_unchecked(10),
+        Some(Duration::from_days_unchecked(10))
+    )]
+    #[case::ca_expires_together_with_cert(NOW + CERT_LIFETIME, None)]
+    #[case::ca_retires_now(NOW, Some(Duration::from_secs(0)))]
+    #[case::ca_already_retired(NOW - Duration::from_hours_unchecked(1), None)]
+    fn cert_lifetime_cap(
+        #[case] newest_ca_active_until: OffsetDateTime,
+        #[case] expected_cap: Option<Duration>,
+    ) {
+        assert_eq!(
+            cert_lifetime_cap_by_ca(CERT_LIFETIME, Some(newest_ca_active_until), NOW),
+            expected_cap
+        );
     }
 }

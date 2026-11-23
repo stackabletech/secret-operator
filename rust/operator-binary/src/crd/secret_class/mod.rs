@@ -146,8 +146,9 @@ pub mod versioned {
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
     #[serde(rename_all = "camelCase")]
     pub struct AutoTlsCa {
-        /// Reference (name and namespace) to a Kubernetes Secret object where the CA certificate
-        /// and key is stored in the keys `ca.crt` and `ca.key` respectively.
+        /// Reference (name and namespace) to a Kubernetes Secret object where the CA certificates
+        /// and keys are stored. Each CA is stored as a pair of keys `<n>.ca.crt` and `<n>.ca.key`,
+        /// e.g. `0.ca.crt` and `0.ca.key`.
         pub secret: SecretReference,
 
         /// Whether the certificate authority should be managed by Secret Operator, including being generated

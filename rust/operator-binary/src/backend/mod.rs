@@ -22,7 +22,10 @@ use serde::{Deserialize, Deserializer, Serialize, de::Unexpected};
 use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     crd::listener,
-    kube::{api::DynamicObject, runtime::reflector::ObjectRef},
+    kube::{
+        api::DynamicObject,
+        runtime::{events::Event, reflector::ObjectRef},
+    },
     shared::time::Duration,
 };
 
@@ -326,10 +329,12 @@ impl SecretVolumeSelector {
     }
 }
 
-#[derive(Debug)]
 pub struct SecretContents {
     pub data: SecretData,
     pub expires_after: Option<DateTime<FixedOffset>>,
+
+    // Kubernetes Events to be published on the Pod about the provisioned secret
+    pub events: Vec<Event>,
 }
 
 impl SecretContents {
@@ -337,11 +342,17 @@ impl SecretContents {
         Self {
             data,
             expires_after: None,
+            events: Vec::new(),
         }
     }
 
     fn expires_after(mut self, deadline: DateTime<FixedOffset>) -> Self {
         self.expires_after = Some(deadline);
+        self
+    }
+
+    fn events(mut self, events: impl IntoIterator<Item = Event>) -> Self {
+        self.events.extend(events);
         self
     }
 }

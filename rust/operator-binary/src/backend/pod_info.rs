@@ -105,6 +105,7 @@ pub enum FromPodError {
 pub struct PodInfo {
     pub pod_ips: Vec<IpAddr>,
     pub pod_name: String,
+    pub pod_uid: String,
     pub service_name: Option<String>,
     pub namespace: String,
     pub node_name: String,
@@ -122,6 +123,7 @@ impl PodInfo {
     ) -> Result<Self, FromPodError> {
         use from_pod_error::*;
         let pod_name = pod.metadata.name.clone().context(NoPodNameSnafu)?;
+        let pod_uid = pod.metadata.uid.clone().context(NoPodUidSnafu)?;
         let namespace = pod.metadata.namespace.clone().context(NoNamespaceSnafu)?;
         let node_name = pod
             .spec
@@ -155,6 +157,7 @@ impl PodInfo {
                 })
                 .collect::<Result<_, _>>()?,
             pod_name,
+            pod_uid,
             service_name: pod.spec.as_ref().and_then(|spec| spec.subdomain.clone()),
             namespace,
             node_name,
@@ -176,6 +179,13 @@ impl PodInfo {
             kubernetes_cluster_domain: client.kubernetes_cluster_info.cluster_domain.clone(),
             scheduling,
         })
+    }
+
+    /// Returns a reference to the [`Pod`], modified to include its UID in `extra.uid`.
+    pub fn pod_ref(&self) -> ObjectRef<Pod> {
+        let mut pod_ref = ObjectRef::new(&self.pod_name).within(&self.namespace);
+        pod_ref.extra.uid = Some(self.pod_uid.clone());
+        pod_ref
     }
 }
 

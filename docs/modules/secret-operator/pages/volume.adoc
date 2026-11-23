@@ -133,6 +133,7 @@ Has no effect if the `format` is not `tls-pem`.
 The lifetime of the created certificate.
 Please note that you can not request a lifetime longer than allowed by `maxCertificateLifetime` on the SecretClass.
 If you do so, `maxCertificateLifetime` will be used as the certificate lifetime, to adhere to the requirements set by the administrator who created the SecretClass.
+The lifetime will also be shortened if the certificate would otherwise outlive the newest CA of the SecretClass.
 
 The format is documented in xref:concepts:duration.adoc[].
 
