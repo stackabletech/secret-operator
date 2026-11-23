@@ -357,22 +357,6 @@ impl SecretContents {
     }
 }
 
-impl std::fmt::Debug for SecretContents {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SecretContents")
-            .field("expires_after", &self.expires_after)
-            .field(
-                "events",
-                &self
-                    .events
-                    .iter()
-                    .map(|event| &event.reason)
-                    .collect::<Vec<_>>(),
-            )
-            .finish()
-    }
-}
-
 /// This trait needs to be implemented by all secret providers.
 /// It gets the pod information as well as volume definition and has to
 /// return any number of files.
