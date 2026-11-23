@@ -411,9 +411,9 @@ rec {
       };
       "anyhow" = rec {
         crateName = "anyhow";
-        version = "1.0.104";
+        version = "1.0.105";
         edition = "2021";
-        sha256 = "0w34jjcm02p5g9kvsjr1dvpw0zs2fi7igi6nr414fkm5gz85w2ik";
+        sha256 = "00nrrzik3z7jyc4x4ga1mkhp31j19lfx9yjwkbb86mmqi70k3f9c";
         license = "MIT OR Apache-2.0";
         authors = [
           "David Tolnay <dtolnay@gmail.com>"
@@ -1220,9 +1220,9 @@ rec {
       };
       "bytes" = rec {
         crateName = "bytes";
-        version = "1.12.1";
+        version = "1.12.2";
         edition = "2021";
-        sha256 = "017z19dpg4f942h051m7bpnzcgng042hhcpd7bmg7bjjqd42lrgw";
+        sha256 = "0z6xjs7a66qmhag9nlvv8m4wnk370c8cg8l4qqr8fbay06yzwvbp";
         license = "MIT";
         authors = [
           "Carl Lerche <me@carllerche.com>"
@@ -1268,9 +1268,9 @@ rec {
       };
       "cc" = rec {
         crateName = "cc";
-        version = "1.11.2";
+        version = "1.11.3";
         edition = "2021";
-        sha256 = "0i8xv6psbly5zn2vpmv283cnl402jwlw3x6gjmx5r92lh4z9xvrk";
+        sha256 = "0sgskgkiv1502hz51s6hd125a1jayb0dyv6aw1f38s5kmliy1w02";
         license = "MIT OR Apache-2.0";
         dependencies = [
           {
@@ -1591,10 +1591,10 @@ rec {
       };
       "clap" = rec {
         crateName = "clap";
-        version = "4.6.7";
+        version = "4.6.9";
         edition = "2024";
         crateBin = [];
-        sha256 = "0il98y2rfw75984ck59znd4n592p07bxz8yy3a9blddb02rpd25a";
+        sha256 = "0z1k2mq1fdh3vj2c0fafs8ql8i5644dwl32pinv2q6dycl5mqk44";
         license = "MIT OR Apache-2.0";
         dependencies = [
           {
@@ -1674,9 +1674,9 @@ rec {
       };
       "clap_derive" = rec {
         crateName = "clap_derive";
-        version = "4.6.7";
+        version = "4.6.9";
         edition = "2024";
-        sha256 = "1q36bgbkfb9rdz7jcvd0ffv0wwlyw0lg3z6iwdcybm0mjjvm3izr";
+        sha256 = "1mqc10w212v411pm03kmaiabv71b51g95005qsl9r6wl3zqp9hdl";
         procMacro = true;
         license = "MIT OR Apache-2.0";
         dependencies = [
@@ -1707,9 +1707,9 @@ rec {
       };
       "clap_lex" = rec {
         crateName = "clap_lex";
-        version = "1.1.1";
+        version = "1.1.2";
         edition = "2024";
-        sha256 = "11k4m4ngn39iz39lnq6nn6kyxzp62mnm1d86qfad3q0vlk33n4qw";
+        sha256 = "0y9asv286gc92n02i11f5h15h91ljizjx4cz3j5dz8dkfqw1p4p0";
         license = "MIT OR Apache-2.0";
 
       };
@@ -3551,9 +3551,9 @@ rec {
       };
       "form_urlencoded" = rec {
         crateName = "form_urlencoded";
-        version = "1.2.2";
+        version = "1.2.3";
         edition = "2018";
-        sha256 = "1kqzb2qn608rxl3dws04zahcklpplkd5r1vpabwga5l50d2v4k6b";
+        sha256 = "0vph40jb1qvkvl52aigslr0hvbg1dhiwdwaxg48i5yxgkqcqk95g";
         license = "MIT OR Apache-2.0";
         authors = [
           "The rust-url developers"
@@ -4217,10 +4217,10 @@ rec {
       };
       "granit-parser" = rec {
         crateName = "granit-parser";
-        version = "2.1.0";
+        version = "2.2.0";
         edition = "2021";
         crateBin = [];
-        sha256 = "1pq1ljzfc7n0sfx0f6la8f5p4lmj81n841rj293kvpylsj35bw05";
+        sha256 = "1j1d897qqxarylh7rjrq37469aaax9x33ljqnhbb8ybhkh6lvl4v";
         libName = "granit_parser";
         license = "MIT OR Apache-2.0";
         authors = [
@@ -4431,11 +4431,11 @@ rec {
         };
         resolvedDefaultFeatures = [ "allocator-api2" "default" "default-hasher" "equivalent" "inline-more" "raw-entry" ];
       };
-      "hashbrown 0.17.1" = rec {
+      "hashbrown 0.17.2" = rec {
         crateName = "hashbrown";
-        version = "0.17.1";
+        version = "0.17.2";
         edition = "2024";
-        sha256 = "0jmqz7i4yl6cm7rbn0i2ffkfrmwi6xkmzkaldr2v8bcsx2v0jngd";
+        sha256 = "1g1194xfmdlc8wl098vwg4cqxfh51jwsxyk28glb5zx5lqhslpkk";
         license = "MIT OR Apache-2.0";
         features = {
           "alloc" = [ "dep:alloc" ];
@@ -5573,7 +5573,7 @@ rec {
           }
           {
             name = "hashbrown";
-            packageId = "hashbrown 0.17.1";
+            packageId = "hashbrown 0.17.2";
             usesDefaultFeatures = false;
           }
         ];
@@ -9557,9 +9557,9 @@ rec {
       };
       "pin-project" = rec {
         crateName = "pin-project";
-        version = "1.1.13";
+        version = "1.2.0";
         edition = "2021";
-        sha256 = "09091qp946lpmjz4yp0xil1r5v4hgc91fi19dg5csayhdqrv4ri4";
+        sha256 = "1jac2z46kb5yng2f968w3z7b2y7n0dyawv8accid9fq88wzi5hm6";
         libName = "pin_project";
         license = "Apache-2.0 OR MIT";
         dependencies = [
@@ -9572,9 +9572,9 @@ rec {
       };
       "pin-project-internal" = rec {
         crateName = "pin-project-internal";
-        version = "1.1.13";
+        version = "1.2.0";
         edition = "2021";
-        sha256 = "12rzlh07i1sdgrvzj6wgkka5bjqyvbfsl8knq6qi7g16m7q9aqy9";
+        sha256 = "0mkpz2ilap8nl4kblixc9a03rwbmn87vca5k9gjc2i7rdpyki29m";
         procMacro = true;
         libName = "pin_project_internal";
         license = "Apache-2.0 OR MIT";
@@ -9589,7 +9589,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 2.0.119";
+            packageId = "syn 3.0.10";
             usesDefaultFeatures = false;
             features = [ "parsing" "printing" "clone-impls" "proc-macro" "full" "visit-mut" ];
           }
@@ -9598,9 +9598,9 @@ rec {
       };
       "pin-project-lite" = rec {
         crateName = "pin-project-lite";
-        version = "0.2.17";
+        version = "0.2.18";
         edition = "2018";
-        sha256 = "1kfmwvs271si96zay4mm8887v5khw0c27jc9srw1a75ykvgj54x8";
+        sha256 = "0li7lxjqidvbksliq1jc7vl5izypdkcr0fsms1gncbam35bh2f69";
         libName = "pin_project_lite";
         license = "Apache-2.0 OR MIT";
 
@@ -10645,9 +10645,9 @@ rec {
       };
       "regex" = rec {
         crateName = "regex";
-        version = "1.13.1";
+        version = "1.13.2";
         edition = "2021";
-        sha256 = "1391a0a4100ik8cp7l577p3ip3haqq03rd9c5vdr7vcfdixj687h";
+        sha256 = "0mq8jm4w2by1xsxwh8s04xqqyamzj4bn0khvm99yf4lccc7ay1wq";
         license = "MIT OR Apache-2.0";
         authors = [
           "The Rust Project Developers"
@@ -10704,9 +10704,9 @@ rec {
       };
       "regex-automata" = rec {
         crateName = "regex-automata";
-        version = "0.4.18";
+        version = "0.4.19";
         edition = "2021";
-        sha256 = "1cml0rm0ssqfkibh9nh3gy4b6hbsbicj1rihpwf2a4v4nawm71dd";
+        sha256 = "0n0i8kyv1lbpvb1i6a5x7mrybaml5q8p680s19m50mzlgpq0xmj1";
         libName = "regex_automata";
         license = "MIT OR Apache-2.0";
         authors = [
@@ -10766,9 +10766,9 @@ rec {
       };
       "regex-syntax" = rec {
         crateName = "regex-syntax";
-        version = "0.8.11";
+        version = "0.8.12";
         edition = "2021";
-        sha256 = "1m25h5q2wp976fb9gc3dsc9l99svcvd5cri8lncb51c46ydgzxnn";
+        sha256 = "1xplhpgv7827jixdkhh17y899s8irsh5hwmrrb1y9898d9p080nr";
         libName = "regex_syntax";
         license = "MIT OR Apache-2.0";
         authors = [
@@ -12384,10 +12384,10 @@ rec {
       };
       "serde-saphyr" = rec {
         crateName = "serde-saphyr";
-        version = "2.1.1";
+        version = "2.2.0";
         edition = "2024";
         crateBin = [];
-        sha256 = "1zh7iwfc84z3brgqgbfyips049hq6l4pv3d557wyc1qbalnvhgyl";
+        sha256 = "1n87f1lfymy00y0fnr4kjq9xn1pqp2zsv6szigsvnk9l941xx74n";
         libName = "serde_saphyr";
         license = "MIT OR Apache-2.0";
         dependencies = [
@@ -12398,7 +12398,7 @@ rec {
           }
           {
             name = "base64";
-            packageId = "base64 0.22.1";
+            packageId = "base64 0.23.1";
             optional = true;
           }
           {
@@ -13020,9 +13020,9 @@ rec {
       };
       "smallvec" = rec {
         crateName = "smallvec";
-        version = "1.16.5";
+        version = "1.16.6";
         edition = "2018";
-        sha256 = "0ipfizwpq0byhrl50xcizs2yf758mgccmq6s5nqk8wszi94hk4ql";
+        sha256 = "0nbvgy2346gisl3kj8hh2dxvplhgzysx2mgcj2frbpnm6ljm8i1j";
         license = "MIT OR Apache-2.0";
         authors = [
           "The Servo Project Developers"
@@ -15743,9 +15743,9 @@ rec {
       };
       "toml_edit" = rec {
         crateName = "toml_edit";
-        version = "0.25.19+spec-1.1.0";
+        version = "0.25.20+spec-1.1.0";
         edition = "2024";
-        sha256 = "063j62l4wsmxpvbiqfw89avzxhv79a3rz6ngw552dmsq9266hhyx";
+        sha256 = "0wwf7cq3574plx88970km5jp7x483akmny8p7rcddnyn07i60qz7";
         license = "MIT OR Apache-2.0";
         dependencies = [
           {
@@ -15779,9 +15779,9 @@ rec {
       };
       "toml_parser" = rec {
         crateName = "toml_parser";
-        version = "1.1.5+spec-1.1.0";
+        version = "1.1.6+spec-1.1.0";
         edition = "2024";
-        sha256 = "0k3lljyi4zxchdklaqghkwbl7wkd2ab1w16hlyniqzid0fl979ms";
+        sha256 = "0cgayl788yfspv6xbxs71w8wk74s8c67fdvbdilk1fki5m2rqxp6";
         license = "MIT OR Apache-2.0";
         dependencies = [
           {
@@ -17205,9 +17205,9 @@ rec {
       };
       "ucd-trie" = rec {
         crateName = "ucd-trie";
-        version = "0.1.7";
+        version = "0.1.8";
         edition = "2021";
-        sha256 = "0wc9p07sqwz320848i52nvyjvpsxkx3kv5bfbmm6s35809fdk5i8";
+        sha256 = "19lj832gpvlv5099zgzgbm87h9smnklbpdcgl7x8cmlir6zvs84g";
         libName = "ucd_trie";
         license = "MIT OR Apache-2.0";
         authors = [
@@ -17304,9 +17304,9 @@ rec {
       };
       "url" = rec {
         crateName = "url";
-        version = "2.5.8";
+        version = "2.5.9";
         edition = "2018";
-        sha256 = "1v8f7nx3hpr1qh76if0a04sj08k86amsq4h8cvpw6wvk76jahrzz";
+        sha256 = "06ivkcv3ljdrp34vlr8n2byyzk7m43q4r3g8ggqhwb5lgd0d437h";
         license = "MIT OR Apache-2.0";
         authors = [
           "The rust-url developers"
@@ -17404,9 +17404,9 @@ rec {
       };
       "uuid" = rec {
         crateName = "uuid";
-        version = "1.29.2";
+        version = "1.29.3";
         edition = "2021";
-        sha256 = "0z161qj1jw91fz64pmz1vqs9l1y7dpbf8yziwp7vbjfsywwr3ndy";
+        sha256 = "0r1v5bh3xrdqgrywfmg9yqplyjm018a5gs0345qvvx52zxfv251w";
         license = "Apache-2.0 OR MIT";
         dependencies = [
           {
@@ -17439,7 +17439,6 @@ rec {
         ];
         features = {
           "arbitrary" = [ "dep:arbitrary" ];
-          "atomic" = [ "dep:atomic" ];
           "borsh" = [ "dep:borsh" "dep:borsh-derive" ];
           "bytemuck" = [ "dep:bytemuck" ];
           "default" = [ "std" ];
@@ -17454,11 +17453,9 @@ rec {
           "slog" = [ "dep:slog" ];
           "std" = [ "wasm-bindgen?/std" "js-sys?/std" ];
           "uuid-rng-internal-lib" = [ "dep:uuid-rng-internal-lib" ];
-          "v1" = [ "atomic" ];
           "v3" = [ "md5" ];
           "v4" = [ "rng" ];
           "v5" = [ "sha1" ];
-          "v6" = [ "atomic" ];
           "v7" = [ "rng" ];
           "zerocopy" = [ "dep:zerocopy" ];
         };
@@ -17502,9 +17499,9 @@ rec {
       };
       "walkdir" = rec {
         crateName = "walkdir";
-        version = "2.5.0";
+        version = "2.5.1";
         edition = "2018";
-        sha256 = "0jsy7a710qv8gld5957ybrnc07gavppp963gs32xk4ag8130jy99";
+        sha256 = "00sl8ykyfwcpr9xwdjh1nawdkjhz0238a398h94n1i2jfidjjbml";
         license = "Unlicense/MIT";
         authors = [
           "Andrew Gallant <jamslam@gmail.com>"
@@ -20113,9 +20110,9 @@ rec {
       };
       "x509-cert" = rec {
         crateName = "x509-cert";
-        version = "0.3.0";
+        version = "0.3.1";
         edition = "2024";
-        sha256 = "12q37mnxnjhp9a8cl64rkvvavf08pzjd08ynhgpkgccw5mjg8phh";
+        sha256 = "05w416dffr7wv2006x2wp1dxf1biqasnjp9z0ry5r552hpb8mxg9";
         libName = "x509_cert";
         license = "Apache-2.0 OR MIT";
         authors = [
@@ -20324,9 +20321,9 @@ rec {
       };
       "zerocopy" = rec {
         crateName = "zerocopy";
-        version = "0.8.63";
+        version = "0.8.64";
         edition = "2021";
-        sha256 = "1n1fm40mq4adw83hvn56j6rhnph0lldccx11jq01l6863f7izzp5";
+        sha256 = "0r88gv6d4ga8j0iy73flfqxrvymxmr80aqrw1w04pil30c3g6hzd";
         license = "BSD-2-Clause OR Apache-2.0 OR MIT";
         dependencies = [
           {
@@ -20357,9 +20354,9 @@ rec {
       };
       "zerocopy-derive" = rec {
         crateName = "zerocopy-derive";
-        version = "0.8.63";
+        version = "0.8.64";
         edition = "2021";
-        sha256 = "0zqc4g3yf378dkbsr68h1jjx3n0d4k4zvnxf83bv8gr9hfnd6fl6";
+        sha256 = "1ffqd322vmg8jjp7606i1ipc92v1n7kcfv9vr0wgnd9yzqhdijx5";
         procMacro = true;
         libName = "zerocopy_derive";
         license = "BSD-2-Clause OR Apache-2.0 OR MIT";
@@ -20444,9 +20441,9 @@ rec {
       };
       "zeroize" = rec {
         crateName = "zeroize";
-        version = "1.9.1";
+        version = "1.9.2";
         edition = "2024";
-        sha256 = "0yb8iykihpl3hfw5c4silw2lklpfxajkaa9yj1qw6jsy5hwq8c71";
+        sha256 = "1an5zxp4cnc9gz1zyygxylndsmvmkzagqjndlkma3aq5925gzk45";
         license = "Apache-2.0 OR MIT";
         authors = [
           "The RustCrypto Project Developers"
