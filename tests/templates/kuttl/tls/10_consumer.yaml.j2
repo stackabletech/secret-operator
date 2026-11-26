@@ -49,6 +49,11 @@ spec:
               cat "/stackable/tls-3d/$CERT_NAME" | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
               cat "/stackable/tls-42h/$CERT_NAME" | openssl x509 -noout -text | grep "DNS:my-tls-service.$NAMESPACE.svc.cluster.local"
 
+              echo "Test SPIFFE ID of the ServiceAccount in the SAN"
+
+              cat "/stackable/tls-3d/$CERT_NAME" | openssl x509 -noout -text | grep "URI:spiffe://cluster.local/ns/$NAMESPACE/sa/integration-tests-sa"
+              openssl x509 -in /stackable/tls-domain-components/tls.crt -noout -text | grep "URI:spiffe://cluster.local/ns/$NAMESPACE/sa/integration-tests-sa"
+
 
               function assert_trusted_roots_contain {
                   subject=$1

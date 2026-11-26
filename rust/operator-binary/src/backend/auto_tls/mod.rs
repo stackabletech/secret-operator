@@ -488,6 +488,14 @@ impl SecretBackend for TlsGenerate {
                                 Address::Ip(ip) => san_ext.ip(&ip.to_string()),
                             };
                         }
+                        if let Some(service_account_name) = &pod_info.service_account_name {
+                            has_san = true;
+                            san_ext.uri(&spiffe_id(
+                                &pod_info.kubernetes_cluster_domain,
+                                &pod_info.namespace,
+                                service_account_name,
+                            ));
+                        }
                         if has_san {
                             exts.push(san_ext.build(&ctx)?);
                         }
@@ -570,6 +578,19 @@ fn cert_lifetime_cap_by_ca(
     (cert_lifetime > remaining_ca_lifetime).then_some(remaining_ca_lifetime)
 }
 
+/// Returns the [SPIFFE ID](https://github.com/spiffe/spiffe/blob/main/standards/SPIFFE-ID.md)
+/// of a ServiceAccount, using the same format as Istio:
+/// `spiffe://<trust-domain>/ns/<namespace>/sa/<service-account>`.
+///
+/// The Kubernetes cluster domain is used as trust domain. SPIFFE requires the trust domain to be
+/// lowercase and without a trailing dot, which a [`DomainName`] does not guarantee.
+///
+/// [`DomainName`]: stackable_operator::commons::networking::DomainName
+fn spiffe_id(cluster_domain: &str, namespace: &str, service_account: &str) -> String {
+    let trust_domain = cluster_domain.trim_end_matches('.').to_lowercase();
+    format!("spiffe://{trust_domain}/ns/{namespace}/sa/{service_account}")
+}
+
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
@@ -595,6 +616,17 @@ mod tests {
         assert_eq!(
             cert_lifetime_cap_by_ca(CERT_LIFETIME, Some(newest_ca_active_until), NOW),
             expected_cap
+        );
+    }
+
+    #[rstest]
+    #[case::default_cluster_domain("cluster.local")]
+    #[case::trailing_dot("cluster.local.")]
+    #[case::uppercase("Cluster.LOCAL")]
+    fn spiffe_id(#[case] cluster_domain: &str) {
+        assert_eq!(
+            super::spiffe_id(cluster_domain, "my-namespace", "my-service-account"),
+            "spiffe://cluster.local/ns/my-namespace/sa/my-service-account"
         );
     }
 }

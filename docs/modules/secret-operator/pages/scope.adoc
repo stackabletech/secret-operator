@@ -61,3 +61,5 @@ xref:#node[] and xref:#pod[] would contain the following values in its `subjectA
 * The node's IP address
 * The node's fully qualified domain name (`my-node.example.com`, without a trailing dot)
 * The pod's fully qualified domain name (`my-pod.my-service.my-namespace.svc.cluster.local`, without a trailing dot)
+
+Independent of the scopes, the xref:secretclass.adoc#backend-autotls[`autoTls`] backend always adds the SPIFFE ID of the Pod's ServiceAccount (`spiffe://cluster.local/ns/my-namespace/sa/my-service-account`).
