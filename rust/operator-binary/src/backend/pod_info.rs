@@ -107,6 +107,8 @@ pub struct PodInfo {
     pub pod_name: String,
     pub pod_uid: String,
     pub service_name: Option<String>,
+    /// Can be empty if the ServiceAccount admission plugin is disabled
+    pub service_account_name: Option<String>,
     pub namespace: String,
     pub node_name: String,
     pub node_ips: Vec<IpAddr>,
@@ -159,6 +161,11 @@ impl PodInfo {
             pod_name,
             pod_uid,
             service_name: pod.spec.as_ref().and_then(|spec| spec.subdomain.clone()),
+            service_account_name: pod
+                .spec
+                .as_ref()
+                .and_then(|spec| spec.service_account_name.clone())
+                .filter(|name| !name.is_empty()),
             namespace,
             node_name,
             node_ips: node

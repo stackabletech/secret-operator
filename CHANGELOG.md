@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - The OLM bundle declares that the operator provides a CSI driver and sets `createdAt` ([#779]).
+- `autoTls` certificates now contain the Pod's ServiceAccount as a SPIFFE ID URI SAN
+  (`spiffe://<cluster-domain>/ns/<namespace>/sa/<service-account>`), in the same format as Istio ([#XXX]).
 
 ### Fixed
 
